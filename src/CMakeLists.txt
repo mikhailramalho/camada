@@ -1,8 +1,8 @@
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-set(libcamada_src_files version.cpp)
+set(libcamada_src_files camada.cpp)
 
-set(libcamada_headers_files version.h)
+set(libcamada_headers_files camada.h)
 
 if(BUILD_SHARED_LIBS)
   add_library(camada SHARED ${libcamada_src_files})

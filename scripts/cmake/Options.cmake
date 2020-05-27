@@ -20,7 +20,7 @@ Also, you can set some variables which are not defined directly here:
 option(ENABLE_WERROR "All warnings are treated as errors during compilation (default: OFF)" OFF)
 
 # Demand C++14
-set (CMAKE_CXX_STANDARD 14)
+set (CMAKE_CXX_STANDARD 17)
 
 # Used by try_compile
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)

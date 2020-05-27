@@ -29,6 +29,8 @@ include(OptimizationCCache)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 option(BUILD_STATIC_LIBS "Build static library" ON)
 
+find_package(Boost REQUIRED)
+
 add_subdirectory(src)
 
 # Generate ac_config.h
