@@ -6,7 +6,7 @@ set(libcamada_headers_files camada.h)
 
 if(BUILD_SHARED_LIBS)
   add_library(camada SHARED ${libcamada_src_files})
-  target_link_libraries(camada ${LIBRARIES})
+  target_link_libraries(camada fmt::fmt)
 
   install(TARGETS camada
     EXPORT camada-export
@@ -19,7 +19,7 @@ endif()
 
 if(BUILD_STATIC_LIBS)
   add_library(camada-static STATIC ${libcamada_src_files})
-  target_link_libraries(camada ${LIBRARIES})
+  target_link_libraries(camada-static fmt::fmt)
 
   install(TARGETS camada-static
     EXPORT camada-export

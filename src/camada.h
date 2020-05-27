@@ -35,7 +35,7 @@ public:
     return LHS.equal_to(RHS);
   }
 
-  void dump() const {};
+  void dump() const;
 
 protected:
   /// Query the SMT solver and returns true if two sorts are equal (same kind
@@ -65,7 +65,7 @@ public:
     return LHS.equal_to(RHS);
   }
 
-  void dump() const {};
+  void dump() const;
 
 protected:
   /// Query the SMT solver and returns true if two sorts are equal (same kind
@@ -86,7 +86,7 @@ public:
   SMTSolver() = default;
   virtual ~SMTSolver() = default;
 
-  void dump() const {};
+  void dump() const;
 
   /// Returns a boolean sort.
   virtual SMTSortRef getBoolSort() = 0;
