@@ -555,14 +555,29 @@ public:
                                     toZ3Sort(*Sort).Sort)));
   }
 
-  const std::string getBitvector(const camada::SMTExprRef &Exp,
-                                 bool isUnsigned) override {
+  const std::string getBitvector(const camada::SMTExprRef &Exp) override {
     return std::string(
         Z3_get_numeral_string(Context.Context, toZ3Expr(*Exp).AST));
   }
 
   bool getBoolean(const camada::SMTExprRef &Exp) override {
     return Z3_get_bool_value(Context.Context, toZ3Expr(*Exp).AST) == Z3_L_TRUE;
+  }
+
+  /// Given an expression, extract the value of this operand in the model.
+  bool getInterpretation(const camada::SMTExprRef &Exp,
+                         std::string &Inter) override {
+    Z3Model Model(Context, Z3_solver_get_model(Context.Context, Solver));
+    Z3_func_decl Func = Z3_get_app_decl(
+        Context.Context, Z3_to_app(Context.Context, toZ3Expr(*Exp).AST));
+    if (Z3_model_has_interp(Context.Context, Model.Model, Func) != Z3_L_TRUE)
+      return false;
+
+    Inter = getBitvector(newExprRef(
+        Z3Expr(Context,
+               Z3_model_get_const_interp(Context.Context, Model.Model, Func))));
+
+    return true;
   }
 
   camada::checkResult check() const override {

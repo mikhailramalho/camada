@@ -249,11 +249,13 @@ public:
 
   /// If the a model is available, returns the value of a given bitvector
   /// symbol
-  virtual const std::string getBitvector(const SMTExprRef &Exp,
-                                         bool isUnsigned) = 0;
+  virtual const std::string getBitvector(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given boolean symbol
   virtual bool getBoolean(const SMTExprRef &Exp) = 0;
+
+  /// Given an expression, extract the value of this operand in the model.
+  virtual bool getInterpretation(const SMTExprRef &Exp, std::string &Inter) = 0;
 
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBoolean(const bool b) = 0;
