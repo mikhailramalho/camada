@@ -51,9 +51,9 @@ macro(config_solver name version)
     endif()
 
     # otherwise, add it to the list of available solvers
-    set(CAMADA_AVAILABLE_SOLVERS "${CAMADA_AVAILABLE_SOLVERS} ${name}")
+    list(APPEND CAMADA_AVAILABLE_SOLVERS "${name}")
 
-    # Add solver definition
+    # Add solver define
     add_definitions(-DSOLVER_${name}_ENABLED)
 
     # Add include dirs
@@ -105,8 +105,6 @@ find_package(fmt REQUIRED)
 
 #-----------------------------------------------------------------------------#
 # Solvers
-
-set(CAMADA_AVAILABLE_SOLVERS "")
 
 set(CAMADA_SOLVER_LIBS "")
 
