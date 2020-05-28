@@ -106,7 +106,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 
 # Check for required packages
-find_package(Boost REQUIRED)
 find_package(fmt REQUIRED)
 
 #-----------------------------------------------------------------------------#

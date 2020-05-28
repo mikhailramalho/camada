@@ -5,8 +5,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/multiprecision/cpp_int.hpp>
-
 namespace camada {
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
@@ -251,8 +249,8 @@ public:
 
   /// If the a model is available, returns the value of a given bitvector
   /// symbol
-  virtual const boost::multiprecision::cpp_int
-  getBitvector(const SMTExprRef &Exp, bool isUnsigned) = 0;
+  virtual const std::string getBitvector(const SMTExprRef &Exp,
+                                         bool isUnsigned) = 0;
 
   /// If the a model is available, returns the value of a given boolean symbol
   virtual bool getBoolean(const SMTExprRef &Exp) = 0;
@@ -261,8 +259,7 @@ public:
   virtual SMTExprRef mkBoolean(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an APSInt and its bit width
-  virtual SMTExprRef mkBitvector(const boost::multiprecision::cpp_int Int,
-                                 unsigned BitWidth) = 0;
+  virtual SMTExprRef mkBitvector(const std::string Int, unsigned BitWidth) = 0;
 
   /// Check if the constraints are satisfiable
   virtual checkResult check() const = 0;

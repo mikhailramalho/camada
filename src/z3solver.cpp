@@ -539,13 +539,12 @@ public:
                                         : Z3_mk_false(Context.Context)));
   }
 
-  camada::SMTExprRef mkBitvector(const boost::multiprecision::cpp_int Int,
+  camada::SMTExprRef mkBitvector(const std::string Int,
                                  unsigned BitWidth) override {
     const camada::SMTSortRef Sort = getBitvectorSort(BitWidth);
-    return newExprRef(Z3Expr(
-        Context, Z3_mk_numeral(Context.Context,
-                               boost::lexical_cast<std::string>(Int).c_str(),
-                               toZ3Sort(*Sort).Sort)));
+    return newExprRef(
+        Z3Expr(Context, Z3_mk_numeral(Context.Context, Int.c_str(),
+                                      toZ3Sort(*Sort).Sort)));
   }
 
   camada::SMTExprRef mkSymbol(const char *Name,
@@ -556,9 +555,9 @@ public:
                                     toZ3Sort(*Sort).Sort)));
   }
 
-  const boost::multiprecision::cpp_int
-  getBitvector(const camada::SMTExprRef &Exp, bool isUnsigned) override {
-    return boost::multiprecision::cpp_int(
+  const std::string getBitvector(const camada::SMTExprRef &Exp,
+                                 bool isUnsigned) override {
+    return std::string(
         Z3_get_numeral_string(Context.Context, toZ3Expr(*Exp).AST));
   }
 
