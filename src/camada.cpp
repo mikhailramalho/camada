@@ -16,3 +16,7 @@ void camada::SMTExpr::dump() const {
 void camada::SMTSolver::dump() const {
   fmt::printf("SMTSolver dump not implemented.");
 }
+
+void camada::SMTSolver::dumpModel() const {
+  fmt::printf("SMTSolver model dump not implemented.");
+}

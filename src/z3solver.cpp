@@ -590,6 +590,12 @@ public:
   void dump() const override {
     fmt::print(stderr, Z3_solver_to_string(Context.Context, Solver));
   }
+
+  void dumpModel() const override {
+    fmt::print(stderr, Z3_model_to_string(
+                           Context.Context,
+                           Z3_solver_get_model(Context.Context, Solver)));
+  }
 }; // end class Z3Solver
 
 } // end anonymous namespace

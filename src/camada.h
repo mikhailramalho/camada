@@ -86,8 +86,6 @@ public:
   SMTSolver() = default;
   virtual ~SMTSolver() = default;
 
-  virtual void dump() const;
-
   /// Wrapper to create new SMTSort
   virtual SMTSortRef newSortRef(const SMTSort &Sort) const = 0;
 
@@ -276,6 +274,12 @@ public:
 
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
+
+  /// Dump formula
+  virtual void dump() const;
+
+  /// Dump Model
+  virtual void dumpModel() const;
 };
 
 /// Shared pointer for SMTSolvers.
