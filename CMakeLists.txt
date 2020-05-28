@@ -60,8 +60,7 @@ macro(config_solver name version)
     include_directories(${SOLVER_${name}_INCLUDE_DIR})
 
     # and the libs to the list of solver libs
-    set(CAMADA_SOLVER_LIBS "${CAMADA_SOLVER_LIBS} ${SOLVER_${name}_LIB}")
-    string(STRIP ${CAMADA_SOLVER_LIBS} CAMADA_SOLVER_LIBS)
+    list(APPEND CAMADA_SOLVER_LIBS "${SOLVER_${name}_LIB}")
   endif()
 endmacro()
 
@@ -105,8 +104,6 @@ find_package(fmt REQUIRED)
 
 #-----------------------------------------------------------------------------#
 # Solvers
-
-set(CAMADA_SOLVER_LIBS "")
 
 config_solver(Z3 4.8.4)
 
