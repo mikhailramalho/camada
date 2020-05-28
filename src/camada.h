@@ -35,7 +35,7 @@ public:
     return LHS.equal_to(RHS);
   }
 
-  void dump() const;
+  virtual void dump() const;
 
 protected:
   /// Query the SMT solver and returns true if two sorts are equal (same kind
@@ -65,7 +65,7 @@ public:
     return LHS.equal_to(RHS);
   }
 
-  void dump() const;
+  virtual void dump() const;
 
 protected:
   /// Query the SMT solver and returns true if two sorts are equal (same kind
@@ -86,7 +86,13 @@ public:
   SMTSolver() = default;
   virtual ~SMTSolver() = default;
 
-  void dump() const;
+  virtual void dump() const;
+
+  /// Wrapper to create new SMTSort
+  virtual SMTSortRef newSortRef(const SMTSort &Sort) const = 0;
+
+  /// Wrapper to create new SMTExpr
+  virtual SMTExprRef newExprRef(const SMTExpr &Exp) const = 0;
 
   /// Returns a boolean sort.
   virtual SMTSortRef getBoolSort() = 0;
@@ -230,8 +236,8 @@ public:
   /// operation
   virtual SMTExprRef mkBVNegNoOverflow(const SMTExprRef &Exp) = 0;
 
-  /// Creates a predicate that checks for overflow in a bitvector multiplication
-  /// operation
+  /// Creates a predicate that checks for overflow in a bitvector
+  /// multiplication operation
   virtual SMTExprRef mkBVMulNoOverflow(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS,
                                        bool isSigned) = 0;
@@ -244,9 +250,10 @@ public:
   /// Creates a new symbol, given a name and a sort
   virtual SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) = 0;
 
-  /// If the a model is available, returns the value of a given bitvector symbol
+  /// If the a model is available, returns the value of a given bitvector
+  /// symbol
   virtual const boost::multiprecision::cpp_int
-  getBitvector(const SMTExprRef &Exp, unsigned BitWidth, bool isUnsigned) = 0;
+  getBitvector(const SMTExprRef &Exp, bool isUnsigned) = 0;
 
   /// If the a model is available, returns the value of a given boolean symbol
   virtual bool getBoolean(const SMTExprRef &Exp) = 0;
@@ -255,7 +262,7 @@ public:
   virtual SMTExprRef mkBoolean(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an APSInt and its bit width
-  virtual SMTExprRef mkBitvector(const boost::multiprecision::cpp_int,
+  virtual SMTExprRef mkBitvector(const boost::multiprecision::cpp_int Int,
                                  unsigned BitWidth) = 0;
 
   /// Check if the constraints are satisfiable
