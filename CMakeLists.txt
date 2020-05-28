@@ -129,6 +129,16 @@ configure_file (
 )
 
 #-----------------------------------------------------------------------------#
+# Tests
+
+include(CTest)
+if(BUILD_TESTING)
+  find_package(Catch2 REQUIRED)
+  enable_testing()
+  add_subdirectory(regression)
+endif()
+
+#-----------------------------------------------------------------------------#
 # Print Camada configuration
 
 if(NOT WIN32)

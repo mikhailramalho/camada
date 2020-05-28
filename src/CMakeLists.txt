@@ -6,6 +6,8 @@ set(libcamada_headers_files camada.h)
 add_library(camada ${libcamada_src_files})
 target_link_libraries(camada fmt::fmt ${CAMADA_SOLVER_LIBS})
 
+target_include_directories(camada INTERFACE ./)
+
 install(TARGETS camada
   EXPORT camada-export
   LIBRARY DESTINATION lib
