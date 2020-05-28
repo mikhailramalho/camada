@@ -202,48 +202,6 @@ public:
   virtual SMTExprRef mkBVConcat(const SMTExprRef &LHS,
                                 const SMTExprRef &RHS) = 0;
 
-  /// Creates a predicate that checks for overflow in a bitvector addition
-  /// operation
-  virtual SMTExprRef mkBVAddNoOverflow(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS,
-                                       bool isSigned) = 0;
-
-  /// Creates a predicate that checks for underflow in a signed bitvector
-  /// addition operation
-  virtual SMTExprRef mkBVAddNoUnderflow(const SMTExprRef &LHS,
-                                        const SMTExprRef &RHS) = 0;
-
-  /// Creates a predicate that checks for overflow in a signed bitvector
-  /// subtraction operation
-  virtual SMTExprRef mkBVSubNoOverflow(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS) = 0;
-
-  /// Creates a predicate that checks for underflow in a bitvector subtraction
-  /// operation
-  virtual SMTExprRef mkBVSubNoUnderflow(const SMTExprRef &LHS,
-                                        const SMTExprRef &RHS,
-                                        bool isSigned) = 0;
-
-  /// Creates a predicate that checks for overflow in a signed bitvector
-  /// division/modulus operation
-  virtual SMTExprRef mkBVSDivNoOverflow(const SMTExprRef &LHS,
-                                        const SMTExprRef &RHS) = 0;
-
-  /// Creates a predicate that checks for overflow in a bitvector negation
-  /// operation
-  virtual SMTExprRef mkBVNegNoOverflow(const SMTExprRef &Exp) = 0;
-
-  /// Creates a predicate that checks for overflow in a bitvector
-  /// multiplication operation
-  virtual SMTExprRef mkBVMulNoOverflow(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS,
-                                       bool isSigned) = 0;
-
-  /// Creates a predicate that checks for underflow in a signed bitvector
-  /// multiplication operation
-  virtual SMTExprRef mkBVMulNoUnderflow(const SMTExprRef &LHS,
-                                        const SMTExprRef &RHS) = 0;
-
   /// Creates a new symbol, given a name and a sort
   virtual SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) = 0;
 
