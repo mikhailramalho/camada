@@ -1,7 +1,6 @@
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-set(libcamada_src_files camada.cpp)
-
+set(libcamada_src_files camada.cpp z3solver.cpp)
 set(libcamada_headers_files camada.h)
 
 if(BUILD_SHARED_LIBS)
