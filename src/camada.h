@@ -284,6 +284,9 @@ using SMTSolverRef = std::shared_ptr<SMTSolver>;
 /// Return camada version
 const std::string getCamadaVersion();
 
+/// Convenience method to create a Z3Solver object
+SMTSolverRef createZ3Solver();
+
 } // namespace camada
 
 #endif
