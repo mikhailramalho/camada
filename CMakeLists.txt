@@ -53,8 +53,8 @@ macro(config_solver name version)
     # otherwise, add it to the list of available solvers
     set(CAMADA_AVAILABLE_SOLVERS "${CAMADA_AVAILABLE_SOLVERS} ${name}")
 
-    # set the variable that sets the define to 1
-    set(SOLVER_${name}_ENABLED 1)
+    # Add solver definition
+    add_definitions(-DSOLVER_${name}_ENABLED)
 
     # Add include dirs
     include_directories(${SOLVER_${name}_INCLUDE_DIR})
@@ -62,11 +62,6 @@ macro(config_solver name version)
     # and the libs to the list of solver libs
     set(CAMADA_SOLVER_LIBS "${CAMADA_SOLVER_LIBS} ${SOLVER_${name}_LIB}")
     string(STRIP ${CAMADA_SOLVER_LIBS} CAMADA_SOLVER_LIBS)
-
-  else()
-    # If we could not find the solver and the user did not explicitly enabled it, set
-    # the variable that sets the define to 0
-    set(SOLVER_${name}_ENABLED 0)
   endif()
 endmacro()
 
