@@ -5,13 +5,20 @@ function(check_z3_version z3_include z3_lib)
   # Get lib path
   get_filename_component(z3_lib_path ${z3_lib} PATH)
 
+  if (NOT BUILD_SHARED_LIBS)
+    find_package(Threads REQUIRED)
+    if(Threads_FOUND)
+      set(z3_lib "${z3_lib} ${CMAKE_THREAD_LIBS_INIT} -ldl")
+    endif()
+  endif ()
+
   try_run(
     Z3_RETURNCODE
     Z3_COMPILED
     ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/scripts/cmake/try_z3.cpp
     COMPILE_DEFINITIONS -I"${z3_include}"
-    LINK_LIBRARIES -L${z3_lib_path} -lz3
+    LINK_LIBRARIES -L${z3_lib_path} ${z3_lib}
     RUN_OUTPUT_VARIABLE SRC_OUTPUT
   )
 
@@ -25,11 +32,7 @@ endfunction(check_z3_version)
 # Looking for Z3 in LLVM_Z3_INSTALL_DIR
 find_path(SOLVER_Z3_INCLUDE_DIR z3.h PATHS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES include)
 
-find_library(SOLVER_Z3_LIB z3 libz3 PATHS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES lib bin)
-
-if (BUILD_STATIC_LIBS)
-  set(SOLVER_Z3_LIB "${SOLVER_Z3_LIB} -pthread -ldl")
-endif ()
+find_library(SOLVER_Z3_LIB z3 PATHS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that
 # prints Z3's version
@@ -39,6 +42,14 @@ if(SOLVER_Z3_INCLUDE_DIR AND SOLVER_Z3_LIB)
   check_z3_version(${SOLVER_Z3_INCLUDE_DIR} ${SOLVER_Z3_LIB})
 endif()
 
+# Alright, now create a list with z3 and it's dependencies
+if (NOT BUILD_SHARED_LIBS)
+  find_package(Threads REQUIRED)
+  if(Threads_FOUND)
+    set(SOLVER_Z3_LIB "${SOLVER_Z3_LIB} ${CMAKE_THREAD_LIBS_INIT} -ldl")
+  endif()
+endif ()
+
 # handle the QUIETLY and REQUIRED arguments and set Z3_FOUND to TRUE if
 # all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
@@ -46,4 +57,4 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(Z3
                                   REQUIRED_VARS SOLVER_Z3_LIB SOLVER_Z3_INCLUDE_DIR
                                   VERSION_VAR Z3_VERSION_STRING)
 
-mark_as_advanced(SOLVER_Z3_INCLUDE_DIR SOLVER_Z3_LIB)
+mark_as_advanced(SOLVER_Z3_LIB SOLVER_Z3_INCLUDE_DIR)

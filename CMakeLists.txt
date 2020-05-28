@@ -53,8 +53,16 @@ macro(config_solver name version)
     # otherwise, add it to the list of available solvers
     set(CAMADA_AVAILABLE_SOLVERS "${CAMADA_AVAILABLE_SOLVERS} ${name}")
 
-    # and set the variable that sets the define to 1
+    # set the variable that sets the define to 1
     set(SOLVER_${name}_ENABLED 1)
+
+    # Add include dirs
+    include_directories(${SOLVER_${name}_INCLUDE_DIR})
+
+    # and the libs to the list of solver libs
+    set(CAMADA_SOLVER_LIBS "${CAMADA_SOLVER_LIBS} ${SOLVER_${name}_LIB}")
+    string(STRIP ${CAMADA_SOLVER_LIBS} CAMADA_SOLVER_LIBS)
+
   else()
     # If we could not find the solver and the user did not explicitly enabled it, set
     # the variable that sets the define to 0
@@ -96,7 +104,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Build both shared and static libraries by default
 option(BUILD_SHARED_LIBS "Build shared library" ON)
-option(BUILD_STATIC_LIBS "Build static library" ON)
 
 # Check for required packages
 find_package(Boost REQUIRED)
@@ -107,9 +114,12 @@ find_package(fmt REQUIRED)
 
 set(CAMADA_AVAILABLE_SOLVERS "")
 
+set(CAMADA_SOLVER_LIBS "")
+
 config_solver(Z3 4.8.4)
 
 #-----------------------------------------------------------------------------#
+# Define targets
 
 add_subdirectory(src)
 
@@ -143,6 +153,5 @@ endmacro()
 
 config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
-config_info_bool("Static build" "${BUILD_STATIC_LIBS}")
 
 config_info_bool("Solver Z3" "${CAMADA_ENABLE_SOLVER_Z3}")
