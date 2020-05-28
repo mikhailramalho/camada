@@ -121,8 +121,10 @@ configure_file (
 #-----------------------------------------------------------------------------#
 # Tests
 
-include(CTest)
-if(BUILD_TESTING)
+option(CAMADA_ENABLE_REGRESSION "Enable regression testing" OFF)
+
+if(CAMADA_ENABLE_REGRESSION)
+  include(CTest)
   find_package(Catch2 REQUIRED)
   enable_testing()
   add_subdirectory(regression)
