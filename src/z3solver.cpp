@@ -566,15 +566,15 @@ public:
     return Z3_get_bool_value(Context.Context, toZ3Expr(*Exp).AST) == Z3_L_TRUE;
   }
 
-  std::optional<bool> check() const override {
+  camada::checkResult check() const override {
     Z3_lbool res = Z3_solver_check(Context.Context, Solver);
     if (res == Z3_L_TRUE)
-      return true;
+      return camada::checkResult::SAT;
 
     if (res == Z3_L_FALSE)
-      return false;
+      return camada::checkResult::UNSAT;
 
-    return std::optional<bool>();
+    return camada::checkResult::UNKNOWN;
   }
 
   void push() override { return Z3_solver_push(Context.Context, Solver); }

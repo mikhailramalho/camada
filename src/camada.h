@@ -3,12 +3,13 @@
 
 #include <cassert>
 #include <memory>
-#include <optional>
 #include <string>
 
 #include <boost/multiprecision/cpp_int.hpp>
 
 namespace camada {
+
+enum class checkResult { SAT, UNSAT, UNKNOWN };
 
 /// Generic base class for SMT sorts
 class SMTSort {
@@ -264,7 +265,7 @@ public:
                                  unsigned BitWidth) = 0;
 
   /// Check if the constraints are satisfiable
-  virtual std::optional<bool> check() const = 0;
+  virtual checkResult check() const = 0;
 
   /// Push the current solver state
   virtual void push() = 0;
