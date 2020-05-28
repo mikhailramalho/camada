@@ -102,7 +102,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Generate compile commands by default
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Build both shared and static libraries by default
+# Build only shared by default
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 
 # Check for required packages
