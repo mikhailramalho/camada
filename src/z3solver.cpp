@@ -40,13 +40,13 @@ camada::Z3Sort::Z3Sort(camada::Z3ContextRef C, Z3_sort ZS)
   Z3_inc_ref(Context->Context, reinterpret_cast<Z3_ast>(Sort));
 }
 
-///  implicit copy constructor for correct reference counting.
+/// implicit copy constructor for correct reference counting.
 camada::Z3Sort::Z3Sort(const camada::Z3Sort &Other)
     : Context(Other.Context), Sort(Other.Sort) {
   Z3_inc_ref(Context->Context, reinterpret_cast<Z3_ast>(Sort));
 }
 
-///  implicit copy assignment constructor for correct reference
+/// implicit copy assignment constructor for correct reference
 /// counting.
 camada::Z3Sort &camada::Z3Sort::operator=(const camada::Z3Sort &Other) {
   Z3_inc_ref(Context->Context, reinterpret_cast<Z3_ast>(Other.Sort));
@@ -86,13 +86,13 @@ camada::Z3Expr::Z3Expr(camada::Z3ContextRef C, Z3_ast ZA)
   Z3_inc_ref(Context->Context, AST);
 }
 
-///  implicit copy constructor for correct reference counting.
+/// implicit copy constructor for correct reference counting.
 camada::Z3Expr::Z3Expr(const camada::Z3Expr &Copy)
     : camada::SMTExpr(), Context(Copy.Context), AST(Copy.AST) {
   Z3_inc_ref(Context->Context, AST);
 }
 
-///  implicit copy assignment constructor for correct reference
+/// implicit copy assignment constructor for correct reference
 /// counting.
 camada::Z3Expr &camada::Z3Expr::operator=(const camada::Z3Expr &Other) {
   Z3_inc_ref(Context->Context, Other.AST);
