@@ -22,8 +22,8 @@ void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
              "Z3 error: " + std::string(Z3_get_error_msg(Context, Error)));
 }
 
-camada::Z3Context::Z3Context() {
-  Context = Z3_mk_context_rc(camada::Z3Config().Config);
+camada::Z3Context::Z3Context(Z3Config &&Config)
+    : Context(Z3_mk_context_rc(Config.Config)) {
   // The error function is set here because the context is the first object
   // created by the backend
   Z3_set_error_handler(Context, Z3ErrorHandler);
@@ -134,11 +134,13 @@ void camada::Z3Model::dump() const {
   fmt::print(stderr, Z3_model_to_string(Context->Context, Model));
 }
 
-camada::Z3Solver::Z3Solver()
-    : Context(std::make_shared<Z3Context>()),
+camada::Z3Solver::Z3Solver(Z3Config &&C)
+    : Context(std::make_shared<Z3Context>(std::move(C))),
       Solver(Z3_mk_simple_solver(Context->Context)) {
   Z3_solver_inc_ref(Context->Context, Solver);
 }
+
+camada::Z3Solver::Z3Solver() : camada::Z3Solver(camada::Z3Config()) {}
 
 camada::Z3Solver::~Z3Solver() {
   if (Solver)

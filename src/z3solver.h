@@ -27,7 +27,7 @@ public:
 /// Wrapper for Z3 context
 class Z3Context {
 public:
-  Z3Context();
+  explicit Z3Context(Z3Config &&Config);
   virtual ~Z3Context();
 
   Z3_context Context;
@@ -135,6 +135,7 @@ class Z3Solver : public camada::SMTSolver {
 
 public:
   Z3Solver();
+  explicit Z3Solver(Z3Config &&C);
 
   Z3Solver(const Z3Solver &Other) = delete;
   Z3Solver(Z3Solver &&Other) = delete;
