@@ -475,6 +475,6 @@ camada::SMTSolverRef camada::createZ3Solver() {
 #else
   fmt::print(stderr, "Camada was not compiled with Z3 support, rebuild with "
                      "-DCAMADA_ENABLE_SOLVER_Z3=ON");
-  return nullptr;
+  abort();
 #endif
 }
