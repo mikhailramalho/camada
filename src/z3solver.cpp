@@ -1,8 +1,9 @@
-#ifdef SOLVER_Z3_ENABLED
 
 #include "z3solver.h"
 
 #include <fmt/printf.h>
+
+#ifdef SOLVER_Z3_ENABLED
 
 camada::Z3Config::Z3Config() : Config(Z3_mk_config()) {
   // Enable model finding

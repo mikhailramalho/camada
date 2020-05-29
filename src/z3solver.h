@@ -1,9 +1,10 @@
 #ifndef Z3SOLVER_H_
 #define Z3SOLVER_H_
 
+#include "camada.h"
+
 #ifdef SOLVER_Z3_ENABLED
 
-#include "camada.h"
 #include <z3.h>
 
 namespace camada {
