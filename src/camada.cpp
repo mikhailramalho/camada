@@ -6,17 +6,17 @@
 const std::string getCamadaVersion() { return CAMADA_VERSION; }
 
 void camada::SMTSort::dump() const {
-  fmt::printf("SMTSort dump not implemented.");
+  fmt::printf("SMTSort dump not implemented.\n");
 }
 
 void camada::SMTExpr::dump() const {
-  fmt::printf("SMTExpr dump not implemented.");
+  fmt::printf("SMTExpr dump not implemented.\n");
 }
 
 void camada::SMTSolver::dump() const {
-  fmt::printf("SMTSolver dump not implemented.");
+  fmt::printf("SMTSolver dump not implemented.\n");
 }
 
 void camada::SMTSolver::dumpModel() const {
-  fmt::printf("SMTSolver model dump not implemented.");
+  fmt::printf("SMTSolver model dump not implemented.\n");
 }

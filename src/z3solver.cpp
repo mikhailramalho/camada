@@ -18,8 +18,8 @@ camada::Z3Config::~Z3Config() { Z3_del_config(Config); }
 
 // Function used to report errors
 void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
-  fmt::print(stderr,
-             "Z3 error: " + std::string(Z3_get_error_msg(Context, Error)));
+  fmt::print(stderr, "Z3 error: {}\n",
+             std::string(Z3_get_error_msg(Context, Error)));
 }
 
 camada::Z3Context::Z3Context(Z3Config &&Config)
@@ -78,7 +78,7 @@ bool camada::Z3Sort::equal_to(camada::SMTSort const &Other) const {
 }
 
 void camada::Z3Sort::dump() const {
-  fmt::print(stderr, Z3_sort_to_string(Context->Context, Sort));
+  fmt::print(stderr, "{}\n", Z3_sort_to_string(Context->Context, Sort));
 }
 
 camada::Z3Expr::Z3Expr(camada::Z3ContextRef C, Z3_ast ZA)
@@ -117,7 +117,7 @@ bool camada::Z3Expr::equal_to(camada::SMTExpr const &Other) const {
 }
 
 void camada::Z3Expr::dump() const {
-  fmt::print(stderr, Z3_ast_to_string(Context->Context, AST));
+  fmt::print(stderr, "{}\n", Z3_ast_to_string(Context->Context, AST));
 }
 
 camada::Z3Model::Z3Model(camada::Z3ContextRef C, Z3_model ZM)
@@ -131,7 +131,7 @@ camada::Z3Model::~Z3Model() {
 }
 
 void camada::Z3Model::dump() const {
-  fmt::print(stderr, Z3_model_to_string(Context->Context, Model));
+  fmt::print(stderr, "{}\n", Z3_model_to_string(Context->Context, Model));
 }
 
 camada::Z3Solver::Z3Solver(Z3Config &&C)
@@ -458,11 +458,11 @@ void camada::Z3Solver::pop(unsigned NumStates) {
 void camada::Z3Solver::reset() { Z3_solver_reset(Context->Context, Solver); }
 
 void camada::Z3Solver::dump() const {
-  fmt::print(stderr, Z3_solver_to_string(Context->Context, Solver));
+  fmt::print(stderr, "{}\n", Z3_solver_to_string(Context->Context, Solver));
 }
 
 void camada::Z3Solver::dumpModel() const {
-  fmt::print(stderr,
+  fmt::print(stderr, "{}\n",
              Z3_model_to_string(Context->Context,
                                 Z3_solver_get_model(Context->Context, Solver)));
 }
@@ -474,7 +474,7 @@ camada::SMTSolverRef camada::createZ3Solver() {
   return std::make_shared<Z3Solver>();
 #else
   fmt::print(stderr, "Camada was not compiled with Z3 support, rebuild with "
-                     "-DCAMADA_ENABLE_SOLVER_Z3=ON");
+                     "-DCAMADA_ENABLE_SOLVER_Z3=ON\n");
   abort();
 #endif
 }
