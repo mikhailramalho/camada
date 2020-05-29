@@ -134,13 +134,20 @@ void camada::Z3Model::dump() const {
   fmt::print(stderr, "{}\n", Z3_model_to_string(Context->Context, Model));
 }
 
-camada::Z3Solver::Z3Solver(Z3Config &&C)
-    : Context(std::make_shared<Z3Context>(std::move(C))),
-      Solver(Z3_mk_simple_solver(Context->Context)) {
-  Z3_solver_inc_ref(Context->Context, Solver);
+camada::Z3Tactic::Z3Tactic(Z3ContextRef C, Z3_tactic T)
+    : Context(C), Tactic(T) {
+  Z3_tactic_inc_ref(Context->Context, Tactic);
 }
 
-camada::Z3Solver::Z3Solver() : camada::Z3Solver(camada::Z3Config()) {}
+camada::Z3Tactic::~Z3Tactic() {
+  if (Tactic)
+    Z3_tactic_dec_ref(Context->Context, Tactic);
+}
+
+camada::Z3Solver::Z3Solver(Z3ContextRef C)
+    : Context(C), Solver(Z3_mk_simple_solver(Context->Context)) {
+  Z3_solver_inc_ref(Context->Context, Solver);
+}
 
 camada::Z3Solver::~Z3Solver() {
   if (Solver)
@@ -471,7 +478,8 @@ void camada::Z3Solver::dumpModel() const {
 
 camada::SMTSolverRef camada::createZ3Solver() {
 #if SOLVER_Z3_ENABLED
-  return std::make_shared<Z3Solver>();
+  return std::make_shared<Z3Solver>(
+      std::make_shared<Z3Context>(std::move(camada::Z3Config())));
 #else
   fmt::print(stderr, "Camada was not compiled with Z3 support, rebuild with "
                      "-DCAMADA_ENABLE_SOLVER_Z3=ON\n");

@@ -16,10 +16,9 @@ class Z3Solver;
 class Z3Config {
   friend class Z3Context;
 
-protected:
+public:
   Z3_config Config;
 
-public:
   Z3Config();
   virtual ~Z3Config();
 
@@ -40,11 +39,11 @@ using Z3ContextRef = std::shared_ptr<Z3Context>;
 class Z3Sort : public SMTSort {
   friend class Z3Solver;
 
+public:
   Z3ContextRef Context;
 
   Z3_sort Sort;
 
-public:
   /// Default constructor, mainly used by make_shared
   Z3Sort(Z3ContextRef C, Z3_sort ZS);
 
@@ -78,11 +77,11 @@ static const Z3Sort &toZ3Sort(const SMTSort &S) {
 class Z3Expr : public SMTExpr {
   friend class Z3Solver;
 
+public:
   Z3ContextRef Context;
 
   Z3_ast AST;
 
-public:
   Z3Expr(Z3ContextRef C, Z3_ast ZA);
 
   /// Override implicit copy constructor for correct reference counting.
@@ -110,11 +109,11 @@ static const Z3Expr &toZ3Expr(const SMTExpr &E) {
 class Z3Model {
   friend class Z3Solver;
 
+public:
   Z3ContextRef Context;
 
   Z3_model Model;
 
-public:
   Z3Model(Z3ContextRef C, Z3_model ZM);
 
   Z3Model(const Z3Model &Other) = delete;
@@ -127,16 +126,53 @@ public:
   void dump() const;
 }; // end class Z3Model
 
-class Z3Solver : public camada::SMTSolver {
-  friend class Z3ConstraintManager;
+class Z3Tactic {
+  friend class Z3Solver;
 
+public:
+  Z3ContextRef Context;
+
+  Z3_tactic Tactic;
+
+  Z3Tactic(Z3ContextRef C, Z3_tactic T);
+
+  Z3Tactic(const Z3Tactic &Other) = delete;
+  Z3Tactic(Z3Tactic &&Other) = delete;
+  Z3Tactic &operator=(Z3Tactic &Other) = delete;
+  Z3Tactic &operator=(Z3Tactic &&Other) = delete;
+
+  virtual ~Z3Tactic();
+
+}; // end class Z3Tactic
+
+class Z3Params {
+  friend class Z3Solver;
+
+public:
+  Z3ContextRef Context;
+
+  Z3_params Params;
+
+  Z3Params(Z3ContextRef C, Z3_params P);
+
+  Z3Params(const Z3Params &Other) = delete;
+  Z3Params(Z3Params &&Other) = delete;
+  Z3Params &operator=(Z3Params &Other) = delete;
+  Z3Params &operator=(Z3Params &&Other) = delete;
+
+  virtual ~Z3Params();
+
+}; // end class Z3Params
+
+class Z3Solver : public camada::SMTSolver {
+
+public:
   Z3ContextRef Context;
 
   Z3_solver Solver;
 
-public:
-  Z3Solver();
-  explicit Z3Solver(Z3Config &&C);
+  Z3Solver() = default;
+  explicit Z3Solver(Z3ContextRef C);
 
   Z3Solver(const Z3Solver &Other) = delete;
   Z3Solver(Z3Solver &&Other) = delete;
