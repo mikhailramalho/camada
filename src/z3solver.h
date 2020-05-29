@@ -250,7 +250,7 @@ public:
   camada::SMTExprRef mkBVConcat(const camada::SMTExprRef &LHS,
                                 const camada::SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBoolean(const bool b);
+  camada::SMTExprRef mkBoolean(const bool b) override;
 
   camada::SMTExprRef mkBitvector(const std::string Int,
                                  unsigned BitWidth) override;
