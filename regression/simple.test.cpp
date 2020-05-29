@@ -4,6 +4,8 @@
 #include <camada.h>
 
 TEST_CASE("Simple test", "[Basic]") {
+
+#ifdef SOLVER_Z3_ENABLED
   // Create Z3 Solver
   auto z3 = camada::createZ3Solver();
 
@@ -23,4 +25,5 @@ TEST_CASE("Simple test", "[Basic]") {
   std::string f_res;
   REQUIRE(z3->getInterpretation(f, f_res));
   REQUIRE(f_res == z3->getBitvector(ten));
+#endif
 }
