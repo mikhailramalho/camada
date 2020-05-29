@@ -16,6 +16,7 @@ class Z3Solver;
 class Z3Config {
   friend class Z3Context;
 
+protected:
   Z3_config Config;
 
 public:
