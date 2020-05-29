@@ -1,5 +1,5 @@
 add_executable(camada-regression
-  simple.test.cpp
+  z3.test.cpp
 )
 
 target_link_libraries(camada-regression
