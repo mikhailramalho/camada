@@ -16,22 +16,10 @@ class Z3Sort : public SMTSort {
 public:
   Z3ContextRef Context;
 
-  Z3_sort Sort;
+  z3::sort Sort;
 
-  /// Default constructor, mainly used by make_shared
-  Z3Sort(Z3ContextRef C, Z3_sort ZS);
-
-  /// Override implicit copy constructor for correct reference counting.
-  Z3Sort(const Z3Sort &Other);
-
-  /// Override implicit copy assignment constructor for correct reference
-  /// counting.
-  Z3Sort &operator=(const Z3Sort &Other);
-
-  Z3Sort(Z3Sort &&Other) = delete;
-  Z3Sort &operator=(Z3Sort &&Other) = delete;
-
-  virtual ~Z3Sort();
+  Z3Sort(Z3ContextRef C, z3::sort ZS);
+  virtual ~Z3Sort() = default;
 
   bool isBitvectorSortImpl() const override;
 
@@ -52,21 +40,10 @@ class Z3Expr : public SMTExpr {
 public:
   Z3ContextRef Context;
 
-  Z3_ast AST;
+  z3::expr AST;
 
-  Z3Expr(Z3ContextRef C, Z3_ast ZA);
-
-  /// Override implicit copy constructor for correct reference counting.
-  Z3Expr(const Z3Expr &Copy);
-
-  /// Override implicit copy assignment constructor for correct reference
-  /// counting.
-  Z3Expr &operator=(const Z3Expr &Other);
-
-  Z3Expr(Z3Expr &&Other) = delete;
-  Z3Expr &operator=(Z3Expr &&Other) = delete;
-
-  virtual ~Z3Expr();
+  Z3Expr(Z3ContextRef C, z3::expr ZA);
+  virtual ~Z3Expr() = default;
 
   /// Comparison of AST equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -78,73 +55,15 @@ static const Z3Expr &toZ3Expr(const SMTExpr &E) {
   return static_cast<const Z3Expr &>(E);
 }
 
-class Z3Model {
-public:
-  Z3ContextRef Context;
-
-  Z3_model Model;
-
-  Z3Model(Z3ContextRef C, Z3_model ZM);
-
-  Z3Model(const Z3Model &Other) = delete;
-  Z3Model(Z3Model &&Other) = delete;
-  Z3Model &operator=(Z3Model &Other) = delete;
-  Z3Model &operator=(Z3Model &&Other) = delete;
-
-  virtual ~Z3Model();
-
-  void dump() const;
-}; // end class Z3Model
-
-class Z3Tactic {
-public:
-  Z3ContextRef Context;
-
-  Z3_tactic Tactic;
-
-  Z3Tactic(Z3ContextRef C, Z3_tactic T);
-
-  Z3Tactic(const Z3Tactic &Other) = delete;
-  Z3Tactic(Z3Tactic &&Other) = delete;
-  Z3Tactic &operator=(Z3Tactic &Other) = delete;
-  Z3Tactic &operator=(Z3Tactic &&Other) = delete;
-
-  virtual ~Z3Tactic();
-
-}; // end class Z3Tactic
-
-class Z3Params {
-public:
-  Z3ContextRef Context;
-
-  Z3_params Params;
-
-  Z3Params(Z3ContextRef C, Z3_params P);
-
-  Z3Params(const Z3Params &Other) = delete;
-  Z3Params(Z3Params &&Other) = delete;
-  Z3Params &operator=(Z3Params &Other) = delete;
-  Z3Params &operator=(Z3Params &&Other) = delete;
-
-  virtual ~Z3Params();
-
-}; // end class Z3Params
-
 class Z3Solver : public camada::SMTSolver {
 public:
   Z3ContextRef Context;
 
-  Z3_solver Solver;
+  z3::solver Solver;
 
-  Z3Solver() = default;
   explicit Z3Solver(Z3ContextRef C);
-
-  Z3Solver(const Z3Solver &Other) = delete;
-  Z3Solver(Z3Solver &&Other) = delete;
-  Z3Solver &operator=(Z3Solver &Other) = delete;
-  Z3Solver &operator=(Z3Solver &&Other) = delete;
-
-  ~Z3Solver();
+  explicit Z3Solver(Z3ContextRef C, z3::solver S);
+  ~Z3Solver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) const override;
 
@@ -254,7 +173,7 @@ public:
 
   camada::SMTExprRef mkBoolean(const bool b) override;
 
-  camada::SMTExprRef mkBitvector(const std::string Int,
+  camada::SMTExprRef mkBitvector(const std::string &Int,
                                  unsigned BitWidth) override;
 
   camada::SMTExprRef mkSymbol(const char *Name,

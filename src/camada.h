@@ -219,7 +219,7 @@ public:
   virtual SMTExprRef mkBoolean(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an APSInt and its bit width
-  virtual SMTExprRef mkBitvector(const std::string Int, unsigned BitWidth) = 0;
+  virtual SMTExprRef mkBitvector(const std::string &Int, unsigned BitWidth) = 0;
 
   /// Check if the constraints are satisfiable
   virtual checkResult check() const = 0;

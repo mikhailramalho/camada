@@ -6,44 +6,19 @@
 #ifdef SOLVER_Z3_ENABLED
 
 /// Default constructor, mainly used by make_shared
-camada::Z3Sort::Z3Sort(camada::Z3ContextRef C, Z3_sort ZS)
-    : Context(C), Sort(ZS) {
-  Z3_inc_ref(*Context, reinterpret_cast<Z3_ast>(Sort));
-}
+camada::Z3Sort::Z3Sort(camada::Z3ContextRef C, z3::sort ZS)
+    : Context(C), Sort(ZS) {}
 
-/// implicit copy constructor for correct reference counting.
-camada::Z3Sort::Z3Sort(const camada::Z3Sort &Other)
-    : Context(Other.Context), Sort(Other.Sort) {
-  Z3_inc_ref(*Context, reinterpret_cast<Z3_ast>(Sort));
-}
+bool camada::Z3Sort::isBitvectorSortImpl() const { return Sort.is_bv(); }
 
-/// implicit copy assignment constructor for correct reference
-/// counting.
-camada::Z3Sort &camada::Z3Sort::operator=(const camada::Z3Sort &Other) {
-  Z3_inc_ref(*Context, reinterpret_cast<Z3_ast>(Other.Sort));
-  Z3_dec_ref(*Context, reinterpret_cast<Z3_ast>(Sort));
-  Sort = Other.Sort;
-  return *this;
-}
-
-camada::Z3Sort::~Z3Sort() {
-  if (Sort)
-    Z3_dec_ref(*Context, reinterpret_cast<Z3_ast>(Sort));
-}
-
-bool camada::Z3Sort::isBitvectorSortImpl() const {
-  return (Z3_get_sort_kind(*Context, Sort) == Z3_BV_SORT);
-}
-
-bool camada::Z3Sort::isBooleanSortImpl() const {
-  return (Z3_get_sort_kind(*Context, Sort) == Z3_BOOL_SORT);
-}
+bool camada::Z3Sort::isBooleanSortImpl() const { return Sort.is_bool(); }
 
 unsigned camada::Z3Sort::getBitvectorSortSizeImpl() const {
-  return Z3_get_bv_sort_size(*Context, Sort);
+  return Sort.bv_size();
 }
 
 bool camada::Z3Sort::equal_to(camada::SMTSort const &Other) const {
+
   return Z3_is_eq_sort(*Context, Sort, static_cast<const Z3Sort &>(Other).Sort);
 }
 
@@ -51,30 +26,8 @@ void camada::Z3Sort::dump() const {
   fmt::print(stderr, "{}\n", Z3_sort_to_string(*Context, Sort));
 }
 
-camada::Z3Expr::Z3Expr(camada::Z3ContextRef C, Z3_ast ZA)
-    : camada::SMTExpr(), Context(C), AST(ZA) {
-  Z3_inc_ref(*Context, AST);
-}
-
-/// implicit copy constructor for correct reference counting.
-camada::Z3Expr::Z3Expr(const camada::Z3Expr &Copy)
-    : camada::SMTExpr(), Context(Copy.Context), AST(Copy.AST) {
-  Z3_inc_ref(*Context, AST);
-}
-
-/// implicit copy assignment constructor for correct reference
-/// counting.
-camada::Z3Expr &camada::Z3Expr::operator=(const camada::Z3Expr &Other) {
-  Z3_inc_ref(*Context, Other.AST);
-  Z3_dec_ref(*Context, AST);
-  AST = Other.AST;
-  return *this;
-}
-
-camada::Z3Expr::~Z3Expr() {
-  if (AST)
-    Z3_dec_ref(*Context, AST);
-}
+camada::Z3Expr::Z3Expr(camada::Z3ContextRef C, z3::expr ZA)
+    : camada::SMTExpr(), Context(C), AST(ZA) {}
 
 /// Comparison of AST equality, not model equivalence.
 bool camada::Z3Expr::equal_to(camada::SMTExpr const &Other) const {
@@ -89,47 +42,19 @@ void camada::Z3Expr::dump() const {
   fmt::print(stderr, "{}\n", Z3_ast_to_string(*Context, AST));
 }
 
-camada::Z3Model::Z3Model(camada::Z3ContextRef C, Z3_model ZM)
-    : Context(C), Model(ZM) {
-  Z3_model_inc_ref(*Context, Model);
-}
-
-camada::Z3Model::~Z3Model() {
-  if (Model)
-    Z3_model_dec_ref(*Context, Model);
-}
-
-void camada::Z3Model::dump() const {
-  fmt::print(stderr, "{}\n", Z3_model_to_string(*Context, Model));
-}
-
-camada::Z3Tactic::Z3Tactic(Z3ContextRef C, Z3_tactic T)
-    : Context(C), Tactic(T) {
-  Z3_tactic_inc_ref(*Context, Tactic);
-}
-
-camada::Z3Tactic::~Z3Tactic() {
-  if (Tactic)
-    Z3_tactic_dec_ref(*Context, Tactic);
-}
-
 // Function used to report errors
 void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
   fmt::print(stderr, "Z3 error: {}\n",
              std::string(Z3_get_error_msg(Context, Error)));
 }
 
-camada::Z3Solver::Z3Solver(Z3ContextRef C)
-    : Context(C), Solver(Z3_mk_simple_solver(*Context)) {
-
+camada::Z3Solver::Z3Solver(Z3ContextRef C) : Context(C), Solver(*Context) {
   Z3_set_error_handler(*Context, Z3ErrorHandler);
-
-  Z3_solver_inc_ref(*Context, Solver);
 }
 
-camada::Z3Solver::~Z3Solver() {
-  if (Solver)
-    Z3_solver_dec_ref(*Context, Solver);
+camada::Z3Solver::Z3Solver(Z3ContextRef C, z3::solver S)
+    : Context(C), Solver(S) {
+  Z3_set_error_handler(*Context, Z3ErrorHandler);
 }
 
 void camada::Z3Solver::addConstraint(const camada::SMTExprRef &Exp) const {
@@ -147,223 +72,204 @@ camada::Z3Solver::newExprRef(const camada::SMTExpr &Exp) const {
 }
 
 camada::SMTSortRef camada::Z3Solver::getBoolSort() {
-  return newSortRef(Z3Sort(Context, Z3_mk_bool_sort(*Context)));
+  return newSortRef(Z3Sort(Context, Context->bool_sort()));
 }
 
 camada::SMTSortRef camada::Z3Solver::getBitvectorSort(unsigned BitWidth) {
-  return newSortRef(Z3Sort(Context, Z3_mk_bv_sort(*Context, BitWidth)));
+  return newSortRef(Z3Sort(Context, Context->bv_sort(BitWidth)));
 }
 
 camada::SMTSortRef camada::Z3Solver::getSort(const camada::SMTExprRef &Exp) {
-  return newSortRef(Z3Sort(Context, Z3_get_sort(*Context, toZ3Expr(*Exp).AST)));
+  return newSortRef(Z3Sort(Context, toZ3Expr(*Exp).AST.get_sort()));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVNeg(const camada::SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, Z3_mk_bvneg(*Context, toZ3Expr(*Exp).AST)));
+  return newExprRef(Z3Expr(Context, -toZ3Expr(*Exp).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVNot(const camada::SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, Z3_mk_bvnot(*Context, toZ3Expr(*Exp).AST)));
+  return newExprRef(Z3Expr(Context, ~toZ3Expr(*Exp).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkNot(const camada::SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, Z3_mk_not(*Context, toZ3Expr(*Exp).AST)));
+  return newExprRef(Z3Expr(Context, !toZ3Expr(*Exp).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVAdd(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvadd(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST + toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVSub(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvsub(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST - toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVMul(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvmul(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST * toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVSRem(const camada::SMTExprRef &LHS,
                                               const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvsrem(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::srem(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVURem(const camada::SMTExprRef &LHS,
                                               const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvurem(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::urem(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVSDiv(const camada::SMTExprRef &LHS,
                                               const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvsdiv(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST / toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVUDiv(const camada::SMTExprRef &LHS,
                                               const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvudiv(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::udiv(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVShl(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvshl(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::shl(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVAshr(const camada::SMTExprRef &LHS,
                                               const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvashr(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::ashr(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVLshr(const camada::SMTExprRef &LHS,
                                               const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvlshr(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::lshr(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVXor(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvxor(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST ^ toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVOr(const camada::SMTExprRef &LHS,
                                             const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvor(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST | toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVAnd(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvand(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST & toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVUlt(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvult(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::ult(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVSlt(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvslt(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::slt(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVUgt(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvugt(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::ugt(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVSgt(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvsgt(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST > toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVUle(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvule(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::ule(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVSle(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvsle(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::sle(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVUge(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvuge(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::uge(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVSge(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_bvsge(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST >= toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkAnd(const camada::SMTExprRef &LHS,
                                            const camada::SMTExprRef &RHS) {
-  Z3_ast Args[2] = {toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST};
-  return newExprRef(Z3Expr(Context, Z3_mk_and(*Context, 2, Args)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST && toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkOr(const camada::SMTExprRef &LHS,
                                           const camada::SMTExprRef &RHS) {
-  Z3_ast Args[2] = {toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST};
-  return newExprRef(Z3Expr(Context, Z3_mk_or(*Context, 2, Args)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST || toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkEqual(const camada::SMTExprRef &LHS,
                                              const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_eq(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST == toZ3Expr(*RHS).AST));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkIte(const camada::SMTExprRef &Cond,
                                            const camada::SMTExprRef &T,
                                            const camada::SMTExprRef &F) {
   return newExprRef(
-      Z3Expr(Context, Z3_mk_ite(*Context, toZ3Expr(*Cond).AST, toZ3Expr(*T).AST,
-                                toZ3Expr(*F).AST)));
+      Z3Expr(Context,
+             z3::ite(toZ3Expr(*Cond).AST, toZ3Expr(*T).AST, toZ3Expr(*F).AST)));
 }
 
 camada::SMTExprRef
 camada::Z3Solver::mkBVSignExt(unsigned i, const camada::SMTExprRef &Exp) {
-  return newExprRef(
-      Z3Expr(Context, Z3_mk_sign_ext(*Context, i, toZ3Expr(*Exp).AST)));
+  return newExprRef(Z3Expr(Context, z3::sext(toZ3Expr(*Exp).AST, i)));
 }
 
 camada::SMTExprRef
 camada::Z3Solver::mkBVZeroExt(unsigned i, const camada::SMTExprRef &Exp) {
-  return newExprRef(
-      Z3Expr(Context, Z3_mk_zero_ext(*Context, i, toZ3Expr(*Exp).AST)));
+  return newExprRef(Z3Expr(Context, z3::zext(toZ3Expr(*Exp).AST, i)));
 }
 
 camada::SMTExprRef
 camada::Z3Solver::mkBVExtract(unsigned High, unsigned Low,
                               const camada::SMTExprRef &Exp) {
-  return newExprRef(
-      Z3Expr(Context, Z3_mk_extract(*Context, High, Low, toZ3Expr(*Exp).AST)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*Exp).AST.extract(High, Low)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBVConcat(const camada::SMTExprRef &LHS,
                                                 const camada::SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_concat(*Context, toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+  return newExprRef(
+      Z3Expr(Context, z3::concat(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkBoolean(const bool b) {
-  return newExprRef(
-      Z3Expr(Context, b ? Z3_mk_true(*Context) : Z3_mk_false(*Context)));
+  return newExprRef(Z3Expr(Context, Context->bool_val(b)));
 }
 
-camada::SMTExprRef camada::Z3Solver::mkBitvector(const std::string Int,
+camada::SMTExprRef camada::Z3Solver::mkBitvector(const std::string &Int,
                                                  unsigned BitWidth) {
-  const camada::SMTSortRef Sort = getBitvectorSort(BitWidth);
-  return newExprRef(Z3Expr(
-      Context, Z3_mk_numeral(*Context, Int.c_str(), toZ3Sort(*Sort).Sort)));
+  return newExprRef(Z3Expr(Context, Context->bv_val(Int.c_str(), BitWidth)));
 }
 
 camada::SMTExprRef camada::Z3Solver::mkSymbol(const char *Name,
                                               camada::SMTSortRef Sort) {
   return newExprRef(
-      Z3Expr(Context, Z3_mk_const(*Context, Z3_mk_string_symbol(*Context, Name),
-                                  toZ3Sort(*Sort).Sort)));
+      Z3Expr(Context, Context->constant(Name, toZ3Sort(*Sort).Sort)));
 }
 
 const std::string
@@ -378,14 +284,12 @@ bool camada::Z3Solver::getBoolean(const camada::SMTExprRef &Exp) {
 /// Given an expression, extract the value of this operand in the model.
 bool camada::Z3Solver::getInterpretation(const camada::SMTExprRef &Exp,
                                          std::string &Inter) {
-  Z3Model Model(Context, Z3_solver_get_model(*Context, Solver));
-  Z3_func_decl Func =
-      Z3_get_app_decl(*Context, Z3_to_app(*Context, toZ3Expr(*Exp).AST));
-  if (Z3_model_has_interp(*Context, Model.Model, Func) != Z3_L_TRUE)
+  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
     return false;
 
   Inter = getBitvector(newExprRef(
-      Z3Expr(Context, Z3_model_get_const_interp(*Context, Model.Model, Func))));
+      Z3Expr(Context,
+             Solver.get_model().get_const_interp(toZ3Expr(*Exp).AST.decl()))));
   return true;
 }
 

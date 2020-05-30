@@ -37,25 +37,11 @@ TEST_CASE("Override Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
-    myZ3Solver(camada::Z3ContextRef C) : camada::Z3Solver() {
-      Context = C;
-
-      camada::Z3Tactic t1(Context, Z3_mk_tactic(*Context, "simplify"));
-      camada::Z3Tactic t2(Context, Z3_mk_tactic(*Context, "solve-eqs"));
-      camada::Z3Tactic t3(Context, Z3_mk_tactic(*Context, "simplify"));
-      camada::Z3Tactic t4(Context, Z3_mk_tactic(*Context, "smt"));
-
-      camada::Z3Tactic t(
-          Context,
-          Z3_tactic_and_then(
-              *Context, t1.Tactic,
-              Z3_tactic_and_then(
-                  *Context, t2.Tactic,
-                  Z3_tactic_and_then(*Context, t3.Tactic, t4.Tactic))));
-
-      Solver = Z3_mk_solver_from_tactic(*Context, t.Tactic);
-      Z3_solver_inc_ref(*Context, Solver);
-    }
+    myZ3Solver(camada::Z3ContextRef C)
+        : camada::Z3Solver(
+              C, (z3::tactic(*C, "simplify") & z3::tactic(*C, "solve-eqs") &
+                  z3::tactic(*C, "simplify") & z3::tactic(*C, "smt"))
+                     .mk_solver()) {}
   };
 
   // Create Z3 Solver
