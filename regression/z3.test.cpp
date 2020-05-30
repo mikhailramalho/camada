@@ -40,27 +40,27 @@ TEST_CASE("Override Solver", "[Z3]") {
     myZ3Solver(camada::Z3ContextRef C) : camada::Z3Solver() {
       Context = C;
 
-      camada::Z3Tactic t1(Context, Z3_mk_tactic(Context->Context, "simplify"));
-      camada::Z3Tactic t2(Context, Z3_mk_tactic(Context->Context, "solve-eqs"));
-      camada::Z3Tactic t3(Context, Z3_mk_tactic(Context->Context, "simplify"));
-      camada::Z3Tactic t4(Context, Z3_mk_tactic(Context->Context, "smt"));
+      camada::Z3Tactic t1(Context, Z3_mk_tactic(*Context, "simplify"));
+      camada::Z3Tactic t2(Context, Z3_mk_tactic(*Context, "solve-eqs"));
+      camada::Z3Tactic t3(Context, Z3_mk_tactic(*Context, "simplify"));
+      camada::Z3Tactic t4(Context, Z3_mk_tactic(*Context, "smt"));
 
       camada::Z3Tactic t(
           Context,
           Z3_tactic_and_then(
-              Context->Context, t1.Tactic,
+              *Context, t1.Tactic,
               Z3_tactic_and_then(
-                  Context->Context, t2.Tactic,
-                  Z3_tactic_and_then(Context->Context, t3.Tactic, t4.Tactic))));
+                  *Context, t2.Tactic,
+                  Z3_tactic_and_then(*Context, t3.Tactic, t4.Tactic))));
 
-      Solver = Z3_mk_solver_from_tactic(Context->Context, t.Tactic);
-      Z3_solver_inc_ref(Context->Context, Solver);
+      Solver = Z3_mk_solver_from_tactic(*Context, t.Tactic);
+      Z3_solver_inc_ref(*Context, Solver);
     }
   };
 
   // Create Z3 Solver
-  camada::SMTSolverRef z3 = std::make_shared<camada::Z3Solver>(
-      std::make_shared<camada::Z3Context>(std::move(camada::Z3Config())));
+  camada::SMTSolverRef z3 =
+      std::make_shared<camada::Z3Solver>(std::make_shared<z3::context>());
 
   equal_ten(z3);
 }

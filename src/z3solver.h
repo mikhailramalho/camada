@@ -9,37 +9,10 @@
 
 namespace camada {
 
-class Z3Context;
-class Z3Solver;
-
-/// Configuration class for Z3
-class Z3Config {
-  friend class Z3Context;
-
-public:
-  z3::config Config;
-
-  Z3Config();
-  virtual ~Z3Config() = default;
-
-}; // end class Z3Config
-
-/// Wrapper for Z3 context
-class Z3Context {
-public:
-  z3::context Context;
-
-  explicit Z3Context(Z3Config &&Config);
-  virtual ~Z3Context() = default;
-
-}; // end class Z3Context
-
-using Z3ContextRef = std::shared_ptr<Z3Context>;
+using Z3ContextRef = std::shared_ptr<z3::context>;
 
 /// Wrapper for Z3 Sort
 class Z3Sort : public SMTSort {
-  friend class Z3Solver;
-
 public:
   Z3ContextRef Context;
 
@@ -76,8 +49,6 @@ static const Z3Sort &toZ3Sort(const SMTSort &S) {
 }
 
 class Z3Expr : public SMTExpr {
-  friend class Z3Solver;
-
 public:
   Z3ContextRef Context;
 
@@ -108,8 +79,6 @@ static const Z3Expr &toZ3Expr(const SMTExpr &E) {
 }
 
 class Z3Model {
-  friend class Z3Solver;
-
 public:
   Z3ContextRef Context;
 
@@ -128,8 +97,6 @@ public:
 }; // end class Z3Model
 
 class Z3Tactic {
-  friend class Z3Solver;
-
 public:
   Z3ContextRef Context;
 
@@ -147,8 +114,6 @@ public:
 }; // end class Z3Tactic
 
 class Z3Params {
-  friend class Z3Solver;
-
 public:
   Z3ContextRef Context;
 
@@ -166,7 +131,6 @@ public:
 }; // end class Z3Params
 
 class Z3Solver : public camada::SMTSolver {
-
 public:
   Z3ContextRef Context;
 
