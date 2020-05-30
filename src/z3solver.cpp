@@ -5,7 +5,7 @@
 
 #ifdef SOLVER_Z3_ENABLED
 
-camada::Z3Config::Z3Config() : Config(Z3_mk_config()) {
+camada::Z3Config::Z3Config() : Config() {
   // Enable model finding
   Z3_set_param_value(Config, "model", "true");
   // Disable proof generation
@@ -13,8 +13,6 @@ camada::Z3Config::Z3Config() : Config(Z3_mk_config()) {
   // Set timeout to 15000ms = 15s
   Z3_set_param_value(Config, "timeout", "15000");
 }
-
-camada::Z3Config::~Z3Config() { Z3_del_config(Config); }
 
 // Function used to report errors
 void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {

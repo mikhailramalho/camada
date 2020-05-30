@@ -5,7 +5,7 @@
 
 #ifdef SOLVER_Z3_ENABLED
 
-#include <z3.h>
+#include <z3++.h>
 
 namespace camada {
 
@@ -17,10 +17,10 @@ class Z3Config {
   friend class Z3Context;
 
 public:
-  Z3_config Config;
+  z3::config Config;
 
   Z3Config();
-  virtual ~Z3Config();
+  virtual ~Z3Config() = default;
 
 }; // end class Z3Config
 
