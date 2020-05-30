@@ -27,10 +27,11 @@ public:
 /// Wrapper for Z3 context
 class Z3Context {
 public:
-  explicit Z3Context(Z3Config &&Config);
-  virtual ~Z3Context();
+  z3::context Context;
 
-  Z3_context Context;
+  explicit Z3Context(Z3Config &&Config);
+  virtual ~Z3Context() = default;
+
 }; // end class Z3Context
 
 using Z3ContextRef = std::shared_ptr<Z3Context>;

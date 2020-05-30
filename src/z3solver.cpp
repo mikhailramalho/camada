@@ -20,16 +20,10 @@ void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
              std::string(Z3_get_error_msg(Context, Error)));
 }
 
-camada::Z3Context::Z3Context(Z3Config &&Config)
-    : Context(Z3_mk_context_rc(Config.Config)) {
+camada::Z3Context::Z3Context(Z3Config &&Config) : Context(Config.Config) {
   // The error function is set here because the context is the first object
   // created by the backend
   Z3_set_error_handler(Context, Z3ErrorHandler);
-}
-
-camada::Z3Context::~Z3Context() {
-  Z3_del_context(Context);
-  Context = nullptr;
 }
 
 /// Default constructor, mainly used by make_shared
