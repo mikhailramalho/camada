@@ -18,7 +18,6 @@ unsigned camada::Z3Sort::getBitvectorSortSizeImpl() const {
 }
 
 bool camada::Z3Sort::equal_to(camada::SMTSort const &Other) const {
-
   return Z3_is_eq_sort(*Context, Sort, static_cast<const Z3Sort &>(Other).Sort);
 }
 
@@ -31,11 +30,10 @@ camada::Z3Expr::Z3Expr(camada::Z3ContextRef C, z3::expr ZA)
 
 /// Comparison of AST equality, not model equivalence.
 bool camada::Z3Expr::equal_to(camada::SMTExpr const &Other) const {
-  assert(Z3_is_eq_sort(
-             *Context, Z3_get_sort(*Context, AST),
-             Z3_get_sort(*Context, static_cast<const Z3Expr &>(Other).AST)) &&
+  assert(Z3_is_eq_sort(*Context, AST.get_sort(),
+                       static_cast<const Z3Expr &>(Other).AST.get_sort()) &&
          "AST's must have the same sort");
-  return Z3_is_eq_ast(*Context, AST, static_cast<const Z3Expr &>(Other).AST);
+  return z3::eq(AST, static_cast<const Z3Expr &>(Other).AST);
 }
 
 void camada::Z3Expr::dump() const {
@@ -57,8 +55,8 @@ camada::Z3Solver::Z3Solver(Z3ContextRef C, z3::solver S)
   Z3_set_error_handler(*Context, Z3ErrorHandler);
 }
 
-void camada::Z3Solver::addConstraint(const camada::SMTExprRef &Exp) const {
-  Z3_solver_assert(*Context, Solver, toZ3Expr(*Exp).AST);
+void camada::Z3Solver::addConstraint(const camada::SMTExprRef &Exp) {
+  Solver.add(toZ3Expr(*Exp).AST);
 }
 
 camada::SMTSortRef
@@ -278,7 +276,7 @@ camada::Z3Solver::getBitvector(const camada::SMTExprRef &Exp) {
 }
 
 bool camada::Z3Solver::getBoolean(const camada::SMTExprRef &Exp) {
-  return Z3_get_bool_value(*Context, toZ3Expr(*Exp).AST) == Z3_L_TRUE;
+  return toZ3Expr(*Exp).AST.bool_value();
 }
 
 /// Given an expression, extract the value of this operand in the model.
@@ -293,35 +291,30 @@ bool camada::Z3Solver::getInterpretation(const camada::SMTExprRef &Exp,
   return true;
 }
 
-camada::checkResult camada::Z3Solver::check() const {
-  Z3_lbool res = Z3_solver_check(*Context, Solver);
-  if (res == Z3_L_TRUE)
+camada::checkResult camada::Z3Solver::check() {
+  z3::check_result res = Solver.check();
+  if (res == z3::check_result::sat)
     return camada::checkResult::SAT;
 
-  if (res == Z3_L_FALSE)
+  if (res == z3::check_result::unsat)
     return camada::checkResult::UNSAT;
 
   return camada::checkResult::UNKNOWN;
 }
 
-void camada::Z3Solver::push() { return Z3_solver_push(*Context, Solver); }
+void camada::Z3Solver::push() { return Solver.push(); }
 
-void camada::Z3Solver::pop(unsigned NumStates) {
-  assert(Z3_solver_get_num_scopes(*Context, Solver) >= NumStates);
-  return Z3_solver_pop(*Context, Solver, NumStates);
-}
+void camada::Z3Solver::pop(unsigned NumStates) { return Solver.pop(NumStates); }
 
 /// Reset the solver and remove all constraints.
-void camada::Z3Solver::reset() { Z3_solver_reset(*Context, Solver); }
+void camada::Z3Solver::reset() { Solver.reset(); }
 
 void camada::Z3Solver::dump() const {
   fmt::print(stderr, "{}\n", Z3_solver_to_string(*Context, Solver));
 }
 
 void camada::Z3Solver::dumpModel() const {
-  fmt::print(
-      stderr, "{}\n",
-      Z3_model_to_string(*Context, Z3_solver_get_model(*Context, Solver)));
+  fmt::print(stderr, "{}\n", Z3_model_to_string(*Context, Solver.get_model()));
 }
 
 #endif

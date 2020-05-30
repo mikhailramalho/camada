@@ -65,7 +65,7 @@ public:
   explicit Z3Solver(Z3ContextRef C, z3::solver S);
   ~Z3Solver() = default;
 
-  void addConstraint(const camada::SMTExprRef &Exp) const override;
+  void addConstraint(const camada::SMTExprRef &Exp) override;
 
   camada::SMTSortRef newSortRef(const camada::SMTSort &Sort) const override;
 
@@ -187,7 +187,7 @@ public:
   bool getInterpretation(const camada::SMTExprRef &Exp,
                          std::string &Inter) override;
 
-  camada::checkResult check() const override;
+  camada::checkResult check() override;
 
   void push() override;
 

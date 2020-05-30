@@ -101,7 +101,7 @@ public:
   virtual SMTSortRef getSort(const SMTExprRef &AST) = 0;
 
   /// Given a constraint, adds it to the solver
-  virtual void addConstraint(const SMTExprRef &Exp) const = 0;
+  virtual void addConstraint(const SMTExprRef &Exp) = 0;
 
   /// Creates a bitvector addition operation
   virtual SMTExprRef mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
@@ -222,7 +222,7 @@ public:
   virtual SMTExprRef mkBitvector(const std::string &Int, unsigned BitWidth) = 0;
 
   /// Check if the constraints are satisfiable
-  virtual checkResult check() const = 0;
+  virtual checkResult check() = 0;
 
   /// Push the current solver state
   virtual void push() = 0;
