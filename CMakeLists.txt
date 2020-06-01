@@ -87,6 +87,11 @@ endif()
 
 option(ENABLE_WERROR "All warnings are treated as errors during compilation (default: OFF)" OFF)
 
+option(ENABLE_WALL "Enable -Wall during compilation (default: OFF)" OFF)
+if(ENABLE_WALL)
+  add_definitions(-Wall)
+endif()
+
 # Demand C++17
 set (CMAKE_CXX_STANDARD 17)
 
