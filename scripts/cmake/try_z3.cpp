@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <z3.h>
 
 int main() {

@@ -1,11 +1,16 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
-#include <cassert>
 #include <memory>
 #include <string>
 
 namespace camada {
+
+/// Return camada version
+const std::string getCamadaVersion();
+
+/// Abort program if Cond if false and prints Msg to stderr
+void abortCondWithMessage(std::string Msg, bool Cond = false);
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 
@@ -39,19 +44,19 @@ public:
   /// Returns the bitvector size, fails if the sort is not a bitvector
   /// Calls getBitvectorSortSizeImpl().
   virtual unsigned getBitvectorSortSize() const {
-    assert(isBitvectorSort() && "Not a bitvector sort!");
-    unsigned Size = getBitvectorSortSizeImpl();
-    assert(Size && "Size is zero!");
-    return Size;
+    abortCondWithMessage("Not a bitvector sort!", isBitvectorSort());
+    unsigned size = getBitvectorSortSizeImpl();
+    abortCondWithMessage("Bitvector size is zero!", size);
+    return size;
   };
 
   /// Returns the floating-point size, fails if the sort is not a floating-point
   /// Calls getFloatSortSizeImpl().
   virtual unsigned getFloatSortSize() const {
-    assert(isFloatSort() && "Not a floating-point sort!");
-    unsigned Size = getFloatSortSizeImpl();
-    assert(Size && "Size is zero!");
-    return Size;
+    abortCondWithMessage("Not a floating-point sort!", isFloatSort());
+    unsigned size = getFloatSortSizeImpl();
+    abortCondWithMessage("Floating-point size is zero!", size);
+    return size;
   };
 
   friend bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
@@ -414,9 +419,6 @@ public:
 
 /// Shared pointer for SMTSolvers.
 using SMTSolverRef = std::shared_ptr<SMTSolver>;
-
-/// Return camada version
-const std::string getCamadaVersion();
 
 /// Convenience method to create a Z3Solver object
 SMTSolverRef createZ3Solver();

@@ -38,7 +38,7 @@ public:
   void dump() const override;
 }; // end class Z3Sort
 
-static const Z3Sort &toZ3Sort(const SMTSort &S) {
+static inline const Z3Sort &toZ3Sort(const SMTSort &S) {
   return static_cast<const Z3Sort &>(S);
 }
 
@@ -57,7 +57,7 @@ public:
   void dump() const override;
 }; // end class Z3Expr
 
-static const Z3Expr &toZ3Expr(const SMTExpr &E) {
+static inline const Z3Expr &toZ3Expr(const SMTExpr &E) {
   return static_cast<const Z3Expr &>(E);
 }
 
