@@ -13,8 +13,18 @@ bool camada::Z3Sort::isBitvectorSortImpl() const { return Sort.is_bv(); }
 
 bool camada::Z3Sort::isBooleanSortImpl() const { return Sort.is_bool(); }
 
+bool camada::Z3Sort::isFloatSortImpl() const { return Sort.is_fpa(); }
+
+bool camada::Z3Sort::isRoundingModeSortImpl() const {
+  return (Z3_get_sort_kind(*Context, Sort) == Z3_ROUNDING_MODE_SORT);
+}
+
 unsigned camada::Z3Sort::getBitvectorSortSizeImpl() const {
   return Sort.bv_size();
+}
+
+unsigned camada::Z3Sort::getFloatSortSizeImpl() const {
+  return Sort.fpa_ebits() + Sort.fpa_sbits();
 }
 
 bool camada::Z3Sort::equal_to(camada::SMTSort const &Other) const {
@@ -75,6 +85,16 @@ camada::SMTSortRef camada::Z3Solver::getBoolSort() {
 
 camada::SMTSortRef camada::Z3Solver::getBitvectorSort(unsigned BitWidth) {
   return newSortRef(Z3Sort(Context, Context->bv_sort(BitWidth)));
+}
+
+camada::SMTSortRef camada::Z3Solver::getRoundingModeSort() {
+  return newSortRef(Z3Sort(
+      Context, z3::to_sort(*Context, Z3_mk_fpa_rounding_mode_sort(*Context))));
+}
+
+camada::SMTSortRef camada::Z3Solver::getFloatSort(const unsigned ExpWidth,
+                                                  const unsigned SigWidth) {
+  return newSortRef(Z3Sort(Context, Context->fpa_sort(ExpWidth, SigWidth)));
 }
 
 camada::SMTSortRef camada::Z3Solver::getSort(const camada::SMTExprRef &Exp) {
@@ -255,6 +275,286 @@ camada::SMTExprRef camada::Z3Solver::mkBVConcat(const camada::SMTExprRef &LHS,
       Z3Expr(Context, z3::concat(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
 }
 
+camada::SMTExprRef camada::Z3Solver::mkFPNeg(const camada::SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(Context, -toZ3Expr(*Exp).AST));
+}
+
+camada::SMTExprRef
+camada::Z3Solver::mkFPIsInfinite(const camada::SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context, Z3_mk_fpa_is_infinite(
+                                         *Context, toZ3Expr(*Exp).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPIsNaN(const camada::SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context, Z3_mk_fpa_is_nan(*Context, toZ3Expr(*Exp).AST))));
+}
+
+camada::SMTExprRef
+camada::Z3Solver::mkFPIsNormal(const camada::SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context,
+                           Z3_mk_fpa_is_normal(*Context, toZ3Expr(*Exp).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPIsZero(const camada::SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context, Z3_mk_fpa_is_zero(*Context, toZ3Expr(*Exp).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPMul(const camada::SMTExprRef &LHS,
+                                             const camada::SMTExprRef &RHS,
+                                             const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context,
+                  Z3_mk_fpa_mul(*Context, toZ3Expr(*roundingMode).AST,
+                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPDiv(const camada::SMTExprRef &LHS,
+                                             const camada::SMTExprRef &RHS,
+                                             const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context,
+                  Z3_mk_fpa_div(*Context, toZ3Expr(*roundingMode).AST,
+                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPRem(const camada::SMTExprRef &LHS,
+                                             const camada::SMTExprRef &RHS) {
+  return newExprRef(
+      Z3Expr(Context, z3::rem(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPAdd(const camada::SMTExprRef &LHS,
+                                             const camada::SMTExprRef &RHS,
+                                             const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context,
+                  Z3_mk_fpa_add(*Context, toZ3Expr(*roundingMode).AST,
+                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPSub(const camada::SMTExprRef &LHS,
+                                             const camada::SMTExprRef &RHS,
+                                             const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context,
+                  Z3_mk_fpa_sub(*Context, toZ3Expr(*roundingMode).AST,
+                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPSqrt(const camada::SMTExprRef &Exp,
+                                              const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context,
+                           Z3_mk_fpa_sqrt(*Context, toZ3Expr(*roundingMode).AST,
+                                          toZ3Expr(*Exp).AST))));
+};
+
+camada::SMTExprRef camada::Z3Solver::mkFPFMA(const camada::SMTExprRef &X,
+                                             const camada::SMTExprRef &Y,
+                                             const camada::SMTExprRef &Z,
+                                             const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context, Z3_mk_fpa_fma(*Context, toZ3Expr(*roundingMode).AST,
+                                          toZ3Expr(*Z).AST, toZ3Expr(*Y).AST,
+                                          toZ3Expr(*Z).AST))));
+};
+
+camada::SMTExprRef camada::Z3Solver::mkFPLt(const camada::SMTExprRef &LHS,
+                                            const camada::SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST < toZ3Expr(*RHS).AST));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPGt(const camada::SMTExprRef &LHS,
+                                            const camada::SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST > toZ3Expr(*RHS).AST));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPLe(const camada::SMTExprRef &LHS,
+                                            const camada::SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST <= toZ3Expr(*RHS).AST));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPGe(const camada::SMTExprRef &LHS,
+                                            const camada::SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context, Z3_mk_fpa_geq(*Context, toZ3Expr(*LHS).AST,
+                                                   toZ3Expr(*RHS).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPEqual(const camada::SMTExprRef &LHS,
+                                               const camada::SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context, Z3_mk_fpa_eq(*Context, toZ3Expr(*LHS).AST,
+                                                  toZ3Expr(*RHS).AST))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPtoFP(const camada::SMTExprRef &From,
+                                              const SMTSortRef &To,
+                                              const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context, Z3_mk_fpa_to_fp_float(
+                                *Context, toZ3Expr(*roundingMode).AST,
+                                toZ3Expr(*From).AST, toZ3Sort(*To).Sort))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkSBVtoFP(const camada::SMTExprRef &From,
+                                               const SMTSortRef &To,
+                                               const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context, Z3_mk_fpa_to_fp_signed(
+                                *Context, toZ3Expr(*roundingMode).AST,
+                                toZ3Expr(*From).AST, toZ3Sort(*To).Sort))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkUBVtoFP(const camada::SMTExprRef &From,
+                                               const SMTSortRef &To,
+                                               const RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context, Z3_mk_fpa_to_fp_unsigned(
+                                *Context, toZ3Expr(*roundingMode).AST,
+                                toZ3Expr(*From).AST, toZ3Sort(*To).Sort))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPtoSBV(const camada::SMTExprRef &From,
+                                               unsigned ToWidth) {
+  // Conversion from float to integers always truncate, so we assume
+  // the round mode to be toward zero
+  SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context, Z3_mk_fpa_to_sbv(
+                                         *Context, toZ3Expr(*roundingMode).AST,
+                                         toZ3Expr(*From).AST, ToWidth))));
+}
+
+camada::SMTExprRef camada::Z3Solver::mkFPtoUBV(const camada::SMTExprRef &From,
+                                               unsigned ToWidth) {
+  // Conversion from float to integers always truncate, so we assume
+  // the round mode to be toward zero
+  SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context, Z3_mk_fpa_to_ubv(
+                                         *Context, toZ3Expr(*roundingMode).AST,
+                                         toZ3Expr(*From).AST, ToWidth))));
+}
+
+camada::SMTExprRef
+camada::Z3Solver::mkFPtoIntegral(const camada::SMTExprRef &From,
+                                 RoundingMode R) {
+  SMTExprRef roundingMode = mkRoundingMode(R);
+  return newExprRef(Z3Expr(
+      Context, z3::to_expr(*Context, Z3_mk_fpa_round_to_integral(
+                                         *Context, toZ3Expr(*roundingMode).AST,
+                                         toZ3Expr(*From).AST))));
+};
+
+bool camada::Z3Solver::getBoolean(const camada::SMTExprRef &Exp) {
+  return toZ3Expr(*Exp).AST.bool_value();
+}
+
+const std::string
+camada::Z3Solver::getBitvector(const camada::SMTExprRef &Exp) {
+  std::string bv;
+  bool is_num = toZ3Expr(*Exp).AST.is_numeral(bv);
+  assert(is_num && "Failed to get bitvector from Z3");
+  return bv;
+}
+
+template <typename FPType, typename IntType,
+          bool (*Z3Func)(Z3_context c, Z3_ast v, IntType *i)>
+static inline FPType getFP(const camada::Z3ContextRef C, const z3::model Model,
+                           const camada::SMTExprRef &Exp) {
+  // TODO: what about negative NaN?
+  if (Z3_fpa_is_numeral_nan(*C, toZ3Expr(*Exp).AST))
+    return NAN;
+
+  if (Z3_fpa_is_numeral_inf(*C, toZ3Expr(*Exp).AST))
+    return Z3_fpa_is_numeral_positive(*C, toZ3Expr(*Exp).AST) ? INFINITY
+                                                              : -INFINITY;
+
+  // Convert the float to bv
+  Z3_ast fp_value;
+  bool eval = Z3_model_eval(
+      *C, Model, Z3_mk_fpa_to_ieee_bv(*C, toZ3Expr(*Exp).AST), 1, &fp_value);
+  assert(eval && "Failed to convert FP to BV in Z3");
+
+  IntType FP_as_int;
+  (*Z3Func)(*C, fp_value, &FP_as_int);
+
+  // Convert the integer to float/double
+  // We assume that floats are 32 bits long and doubles are 64 bits long
+  assert(sizeof(float) == sizeof(int32_t));
+
+  FPType result;
+  memcpy(&result, &FP_as_int, sizeof(FPType));
+  return result;
+}
+
+const float camada::Z3Solver::getFloat(const camada::SMTExprRef &Exp) {
+  return getFP<float, int32_t, Z3_get_numeral_int>(Context, Solver.get_model(),
+                                                   Exp);
+}
+
+const double camada::Z3Solver::getDouble(const camada::SMTExprRef &Exp) {
+  return getFP<double, int64_t, Z3_get_numeral_int64>(Context,
+                                                      Solver.get_model(), Exp);
+}
+
+bool camada::Z3Solver::getInterpretation(const camada::SMTExprRef &Exp,
+                                         std::string &Inter) {
+  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
+    return false;
+
+  Inter = getBitvector(newExprRef(
+      Z3Expr(Context,
+             Solver.get_model().get_const_interp(toZ3Expr(*Exp).AST.decl()))));
+  return true;
+}
+
+bool camada::Z3Solver::getInterpretation(const camada::SMTExprRef &Exp,
+                                         float &Float) {
+  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
+    return false;
+
+  Float =
+      getFloat(newExprRef(Z3Expr(Context, Solver.get_model().get_const_interp(
+                                              toZ3Expr(*Exp).AST.decl()))));
+  return true;
+}
+
+bool camada::Z3Solver::getInterpretation(const camada::SMTExprRef &Exp,
+                                         double &Double) {
+  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
+    return false;
+
+  Double =
+      getDouble(newExprRef(Z3Expr(Context, Solver.get_model().get_const_interp(
+                                               toZ3Expr(*Exp).AST.decl()))));
+  return true;
+}
+
 camada::SMTExprRef camada::Z3Solver::mkBoolean(const bool b) {
   return newExprRef(Z3Expr(Context, Context->bool_val(b)));
 }
@@ -270,25 +570,56 @@ camada::SMTExprRef camada::Z3Solver::mkSymbol(const char *Name,
       Z3Expr(Context, Context->constant(Name, toZ3Sort(*Sort).Sort)));
 }
 
-const std::string
-camada::Z3Solver::getBitvector(const camada::SMTExprRef &Exp) {
-  return std::string(Z3_get_numeral_string(*Context, toZ3Expr(*Exp).AST));
+camada::SMTExprRef camada::Z3Solver::mkFP(const float Float) {
+  return newExprRef(Z3Expr(Context, Context->fpa_val(Float)));
 }
 
-bool camada::Z3Solver::getBoolean(const camada::SMTExprRef &Exp) {
-  return toZ3Expr(*Exp).AST.bool_value();
+camada::SMTExprRef camada::Z3Solver::mkFP(const double Double) {
+  return newExprRef(Z3Expr(Context, Context->fpa_val(Double)));
 }
 
-/// Given an expression, extract the value of this operand in the model.
-bool camada::Z3Solver::getInterpretation(const camada::SMTExprRef &Exp,
-                                         std::string &Inter) {
-  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
-    return false;
+camada::SMTExprRef camada::Z3Solver::mkRoundingMode(const RoundingMode R) {
+  switch (R) {
+  default:
+    assert(0 && "Unsupported floating-point semantics!");
+    break;
+  case RoundingMode::ROUND_TO_EVEN:
+    return newExprRef(
+        Z3Expr(Context, z3::to_expr(*Context, Z3_mk_fpa_rne(*Context))));
+  case RoundingMode::ROUND_TO_AWAY:
+    return newExprRef(
+        Z3Expr(Context, z3::to_expr(*Context, Z3_mk_fpa_rna(*Context))));
+  case RoundingMode::ROUND_TO_PLUS_INF:
+    return newExprRef(
+        Z3Expr(Context, z3::to_expr(*Context, Z3_mk_fpa_rtp(*Context))));
+  case RoundingMode::ROUND_TO_MINUS_INF:
+    return newExprRef(
+        Z3Expr(Context, z3::to_expr(*Context, Z3_mk_fpa_rtn(*Context))));
+  case RoundingMode::ROUND_TO_ZERO:
+    return newExprRef(
+        Z3Expr(Context, z3::to_expr(*Context, Z3_mk_fpa_rtz(*Context))));
+  }
+}
 
-  Inter = getBitvector(newExprRef(
+camada::SMTExprRef camada::Z3Solver::mkNaN(const bool Sgn,
+                                           const unsigned ExpWidth,
+                                           const unsigned SigWidth) {
+  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
+  SMTExprRef theNaN = newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(*Context, Z3_mk_fpa_nan(*Context, toZ3Sort(*sort).Sort))));
+
+  return Sgn ? mkFPNeg(theNaN) : theNaN;
+}
+
+camada::SMTExprRef camada::Z3Solver::mkInf(const bool Sgn,
+                                           const unsigned ExpWidth,
+                                           const unsigned SigWidth) {
+  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
+  return newExprRef(
       Z3Expr(Context,
-             Solver.get_model().get_const_interp(toZ3Expr(*Exp).AST.decl()))));
-  return true;
+             z3::to_expr(*Context,
+                         Z3_mk_fpa_inf(*Context, toZ3Sort(*sort).Sort, Sgn))));
 }
 
 camada::checkResult camada::Z3Solver::check() {
