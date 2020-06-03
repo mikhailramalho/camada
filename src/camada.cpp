@@ -3,9 +3,9 @@
 
 #include <fmt/printf.h>
 
-const std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
+std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
 
-void camada::abortCondWithMessage(const std::string Msg, bool Cond) {
+void camada::abortCondWithMessage(const std::string &Msg, bool Cond) {
   if (!Cond) {
     fmt::print(stderr, Msg + "\n");
     abort();

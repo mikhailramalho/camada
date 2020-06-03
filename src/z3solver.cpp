@@ -7,7 +7,8 @@ using namespace camada;
 #ifdef SOLVER_Z3_ENABLED
 
 /// Default constructor, mainly used by make_shared
-Z3Sort::Z3Sort(Z3ContextRef C, z3::sort ZS) : Context(C), Sort(ZS) {}
+Z3Sort::Z3Sort(Z3ContextRef C, const z3::sort &ZS)
+    : Context(std::move(C)), Sort(ZS) {}
 
 bool Z3Sort::isBitvectorSortImpl() const { return Sort.is_bv(); }
 
@@ -26,22 +27,24 @@ unsigned Z3Sort::getFloatSortSizeImpl() const {
 }
 
 bool Z3Sort::equal_to(SMTSort const &Other) const {
-  return Z3_is_eq_sort(*Context, Sort, static_cast<const Z3Sort &>(Other).Sort);
+  return Z3_is_eq_sort(*Context, Sort,
+                       dynamic_cast<const Z3Sort &>(Other).Sort);
 }
 
 void Z3Sort::dump() const {
   fmt::print(stderr, "{}\n", Z3_sort_to_string(*Context, Sort));
 }
 
-Z3Expr::Z3Expr(Z3ContextRef C, z3::expr ZA) : SMTExpr(), Context(C), AST(ZA) {}
+Z3Expr::Z3Expr(Z3ContextRef C, const z3::expr &ZA)
+    : Context(std::move(C)), AST(ZA) {}
 
 /// Comparison of AST equality, not model equivalence.
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       "AST's must have the same sort",
       Z3_is_eq_sort(*Context, AST.get_sort(),
-                    static_cast<const Z3Expr &>(Other).AST.get_sort()));
-  return z3::eq(AST, static_cast<const Z3Expr &>(Other).AST);
+                    dynamic_cast<const Z3Expr &>(Other).AST.get_sort()));
+  return z3::eq(AST, dynamic_cast<const Z3Expr &>(Other).AST);
 }
 
 void Z3Expr::dump() const {
@@ -54,11 +57,12 @@ void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
              std::string(Z3_get_error_msg(Context, Error)));
 }
 
-Z3Solver::Z3Solver(Z3ContextRef C) : Context(C), Solver(*Context) {
+Z3Solver::Z3Solver(Z3ContextRef C) : Context(std::move(C)), Solver(*Context) {
   Z3_set_error_handler(*Context, Z3ErrorHandler);
 }
 
-Z3Solver::Z3Solver(Z3ContextRef C, z3::solver S) : Context(C), Solver(S) {
+Z3Solver::Z3Solver(Z3ContextRef C, const z3::solver &S)
+    : Context(std::move(C)), Solver(S) {
   Z3_set_error_handler(*Context, Z3ErrorHandler);
 }
 
@@ -418,7 +422,7 @@ bool Z3Solver::getBoolean(const SMTExprRef &Exp) {
   return toZ3Expr(*Exp).AST.bool_value();
 }
 
-const std::string Z3Solver::getBitvector(const SMTExprRef &Exp) {
+std::string Z3Solver::getBitvector(const SMTExprRef &Exp) {
   std::string bv;
   bool is_num = toZ3Expr(*Exp).AST.is_numeral(bv);
   camada::abortCondWithMessage("Failed to get bitvector from Z3", is_num);
@@ -427,7 +431,7 @@ const std::string Z3Solver::getBitvector(const SMTExprRef &Exp) {
 
 template <typename FPType, typename IntType,
           bool (*Z3Func)(Z3_context c, Z3_ast v, IntType *i)>
-static inline FPType getFP(const Z3ContextRef C, const z3::model Model,
+static inline FPType getFP(const Z3ContextRef &C, const z3::model &Model,
                            const SMTExprRef &Exp) {
   // TODO: what about negative NaN?
   if (Z3_fpa_is_numeral_nan(*C, toZ3Expr(*Exp).AST))
@@ -440,7 +444,7 @@ static inline FPType getFP(const Z3ContextRef C, const z3::model Model,
   // Convert the float to bv
   Z3_ast fp_value;
   bool eval = Z3_model_eval(
-      *C, Model, Z3_mk_fpa_to_ieee_bv(*C, toZ3Expr(*Exp).AST), 1, &fp_value);
+      *C, Model, Z3_mk_fpa_to_ieee_bv(*C, toZ3Expr(*Exp).AST), true, &fp_value);
   camada::abortCondWithMessage("Failed to convert FP to BV in Z3", eval);
 
   IntType FP_as_int;
@@ -456,12 +460,12 @@ static inline FPType getFP(const Z3ContextRef C, const z3::model Model,
   return result;
 }
 
-const float Z3Solver::getFloat(const SMTExprRef &Exp) {
+float Z3Solver::getFloat(const SMTExprRef &Exp) {
   return getFP<float, int32_t, Z3_get_numeral_int>(Context, Solver.get_model(),
                                                    Exp);
 }
 
-const double Z3Solver::getDouble(const SMTExprRef &Exp) {
+double Z3Solver::getDouble(const SMTExprRef &Exp) {
   return getFP<double, int64_t, Z3_get_numeral_int64>(Context,
                                                       Solver.get_model(), Exp);
 }

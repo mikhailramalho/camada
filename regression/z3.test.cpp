@@ -8,7 +8,7 @@
 #include <z3++.h>
 #include <z3solver.h>
 
-void equal_ten(camada::SMTSolverRef solver) {
+void equal_ten(const camada::SMTSolverRef& solver) {
   // A free variable
   auto f = solver->mkSymbol("f", solver->getBitvectorSort(10));
 
@@ -37,7 +37,7 @@ TEST_CASE("Override Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
-    myZ3Solver(camada::Z3ContextRef C)
+    explicit myZ3Solver(const camada::Z3ContextRef& C)
         : camada::Z3Solver(
               C, (z3::tactic(*C, "simplify") & z3::tactic(*C, "solve-eqs") &
                   z3::tactic(*C, "simplify") & z3::tactic(*C, "smt"))

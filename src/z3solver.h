@@ -18,7 +18,7 @@ public:
 
   z3::sort Sort;
 
-  Z3Sort(Z3ContextRef C, z3::sort ZS);
+  Z3Sort(Z3ContextRef C, const z3::sort &ZS);
   virtual ~Z3Sort() = default;
 
   bool isBitvectorSortImpl() const override;
@@ -48,7 +48,7 @@ public:
 
   z3::expr AST;
 
-  Z3Expr(Z3ContextRef C, z3::expr ZA);
+  Z3Expr(Z3ContextRef C, const z3::expr &ZA);
   virtual ~Z3Expr() = default;
 
   /// Comparison of AST equality, not model equivalence.
@@ -68,7 +68,7 @@ public:
   z3::solver Solver;
 
   explicit Z3Solver(Z3ContextRef C);
-  explicit Z3Solver(Z3ContextRef C, z3::solver S);
+  explicit Z3Solver(Z3ContextRef C, const z3::solver &S);
   ~Z3Solver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
@@ -238,11 +238,11 @@ public:
 
   bool getBoolean(const camada::SMTExprRef &Exp) override;
 
-  const std::string getBitvector(const camada::SMTExprRef &Exp) override;
+  std::string getBitvector(const camada::SMTExprRef &Exp) override;
 
-  const float getFloat(const camada::SMTExprRef &Exp) override;
+  float getFloat(const camada::SMTExprRef &Exp) override;
 
-  const double getDouble(const camada::SMTExprRef &Exp) override;
+  double getDouble(const camada::SMTExprRef &Exp) override;
 
   bool getInterpretation(const camada::SMTExprRef &Exp,
                          std::string &Int) override;

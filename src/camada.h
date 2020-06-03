@@ -7,10 +7,10 @@
 namespace camada {
 
 /// Return camada version
-const std::string getCamadaVersion();
+std::string getCamadaVersion();
 
 /// Abort program if Cond if false and prints Msg to stderr
-void abortCondWithMessage(std::string Msg, bool Cond = false);
+void abortCondWithMessage(const std::string &Msg, bool Cond = false);
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 
@@ -341,15 +341,15 @@ public:
 
   /// If the a model is available, returns the value of a given bitvector
   /// symbol
-  virtual const std::string getBitvector(const SMTExprRef &Exp) = 0;
+  virtual std::string getBitvector(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as float
-  virtual const float getFloat(const SMTExprRef &Exp) = 0;
+  virtual float getFloat(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as double
-  virtual const double getDouble(const SMTExprRef &Exp) = 0;
+  virtual double getDouble(const SMTExprRef &Exp) = 0;
 
   /// Given an expression, extract the value of this operand in the model.
   virtual bool getInterpretation(const SMTExprRef &Exp, std::string &Int) = 0;
