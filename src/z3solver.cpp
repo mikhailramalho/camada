@@ -422,9 +422,9 @@ bool Z3Solver::getBoolean(const SMTExprRef &Exp) {
   return toZ3Expr(*Exp).AST.bool_value();
 }
 
-std::string Z3Solver::getBitvector(const SMTExprRef &Exp) {
-  std::string bv;
-  bool is_num = toZ3Expr(*Exp).AST.is_numeral(bv);
+int64_t Z3Solver::getBitvector(const SMTExprRef &Exp) {
+  int64_t bv;
+  bool is_num = toZ3Expr(*Exp).AST.is_numeral_i64(bv);
   camada::abortCondWithMessage("Failed to get bitvector from Z3", is_num);
   return bv;
 }
@@ -470,7 +470,7 @@ double Z3Solver::getDouble(const SMTExprRef &Exp) {
                                                       Solver.get_model(), Exp);
 }
 
-bool Z3Solver::getInterpretation(const SMTExprRef &Exp, std::string &Inter) {
+bool Z3Solver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
   if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
     return false;
 
@@ -504,8 +504,8 @@ SMTExprRef Z3Solver::mkBoolean(const bool b) {
   return newExprRef(Z3Expr(Context, Context->bool_val(b)));
 }
 
-SMTExprRef Z3Solver::mkBitvector(const std::string &Int, unsigned BitWidth) {
-  return newExprRef(Z3Expr(Context, Context->bv_val(Int.c_str(), BitWidth)));
+SMTExprRef Z3Solver::mkBitvector(const int64_t Int, unsigned BitWidth) {
+  return newExprRef(Z3Expr(Context, Context->bv_val(Int, BitWidth)));
 }
 
 SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
@@ -513,11 +513,11 @@ SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
       Z3Expr(Context, Context->constant(Name, toZ3Sort(*Sort).Sort)));
 }
 
-SMTExprRef Z3Solver::mkFP(const float Float) {
+SMTExprRef Z3Solver::mkFloat(const float Float) {
   return newExprRef(Z3Expr(Context, Context->fpa_val(Float)));
 }
 
-SMTExprRef Z3Solver::mkFP(const double Double) {
+SMTExprRef Z3Solver::mkDouble(const double Double) {
   return newExprRef(Z3Expr(Context, Context->fpa_val(Double)));
 }
 

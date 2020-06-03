@@ -340,8 +340,8 @@ public:
   virtual bool getBoolean(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given bitvector
-  /// symbol
-  virtual std::string getBitvector(const SMTExprRef &Exp) = 0;
+  /// symbol as a 64-bits int
+  virtual int64_t getBitvector(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as float
@@ -352,7 +352,7 @@ public:
   virtual double getDouble(const SMTExprRef &Exp) = 0;
 
   /// Given an expression, extract the value of this operand in the model.
-  virtual bool getInterpretation(const SMTExprRef &Exp, std::string &Int) = 0;
+  virtual bool getInterpretation(const SMTExprRef &Exp, int64_t &Int) = 0;
 
   /// Given an expression extract the value of this operand in the model.
   virtual bool getInterpretation(const SMTExprRef &Exp, float &Float) = 0;
@@ -364,16 +364,16 @@ public:
   virtual SMTExprRef mkBoolean(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an integer and its bit width
-  virtual SMTExprRef mkBitvector(const std::string &Int, unsigned BitWidth) = 0;
+  virtual SMTExprRef mkBitvector(const int64_t Int, unsigned BitWidth) = 0;
 
   /// Creates a new symbol, given a name and a sort
   virtual SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) = 0;
 
   /// Constructs an SMTExprRef from a float.
-  virtual SMTExprRef mkFP(const float Float) = 0;
+  virtual SMTExprRef mkFloat(const float Float) = 0;
 
   /// Constructs an SMTExprRef from a double.
-  virtual SMTExprRef mkFP(const double Double) = 0;
+  virtual SMTExprRef mkDouble(const double Double) = 0;
 
   /// Returns an appropriate floating-point rounding mode.
   virtual SMTExprRef mkRoundingMode(const RoundingMode R) = 0;

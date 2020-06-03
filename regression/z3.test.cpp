@@ -8,12 +8,12 @@
 #include <z3++.h>
 #include <z3solver.h>
 
-void equal_ten(const camada::SMTSolverRef& solver) {
+void equal_ten(const camada::SMTSolverRef &solver) {
   // A free variable
   auto f = solver->mkSymbol("f", solver->getBitvectorSort(10));
 
   // And assert if there is a value for 'f' that is equal to 10
-  auto ten = solver->mkBitvector(std::to_string(10), 10);
+  auto ten = solver->mkBitvector(10, 10);
   auto eq = solver->mkEqual(f, ten);
 
   // Add the constraint to the solver
@@ -22,7 +22,7 @@ void equal_ten(const camada::SMTSolverRef& solver) {
   // And check for satisfiability
   REQUIRE(solver->check() == camada::checkResult::SAT);
 
-  std::string f_res;
+  int64_t f_res;
   REQUIRE(solver->getInterpretation(f, f_res));
   REQUIRE(f_res == solver->getBitvector(ten));
 }
@@ -37,7 +37,7 @@ TEST_CASE("Override Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
-    explicit myZ3Solver(const camada::Z3ContextRef& C)
+    explicit myZ3Solver(const camada::Z3ContextRef &C)
         : camada::Z3Solver(
               C, (z3::tactic(*C, "simplify") & z3::tactic(*C, "solve-eqs") &
                   z3::tactic(*C, "simplify") & z3::tactic(*C, "smt"))

@@ -238,14 +238,13 @@ public:
 
   bool getBoolean(const camada::SMTExprRef &Exp) override;
 
-  std::string getBitvector(const camada::SMTExprRef &Exp) override;
+  int64_t getBitvector(const camada::SMTExprRef &Exp) override;
 
   float getFloat(const camada::SMTExprRef &Exp) override;
 
   double getDouble(const camada::SMTExprRef &Exp) override;
 
-  bool getInterpretation(const camada::SMTExprRef &Exp,
-                         std::string &Int) override;
+  bool getInterpretation(const camada::SMTExprRef &Exp, int64_t &Int) override;
 
   bool getInterpretation(const SMTExprRef &Exp, float &Float) override;
 
@@ -253,15 +252,14 @@ public:
 
   camada::SMTExprRef mkBoolean(const bool b) override;
 
-  camada::SMTExprRef mkBitvector(const std::string &Int,
-                                 unsigned BitWidth) override;
+  camada::SMTExprRef mkBitvector(const int64_t Int, unsigned BitWidth) override;
 
   camada::SMTExprRef mkSymbol(const char *Name,
                               camada::SMTSortRef Sort) override;
 
-  SMTExprRef mkFP(const float Float) override;
+  SMTExprRef mkFloat(const float Float) override;
 
-  SMTExprRef mkFP(const double Double) override;
+  SMTExprRef mkDouble(const double Double) override;
 
   SMTExprRef mkRoundingMode(const RoundingMode R) override;
 
