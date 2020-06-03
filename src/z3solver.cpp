@@ -328,7 +328,7 @@ SMTExprRef Z3Solver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
   return newExprRef(Z3Expr(
       Context,
       z3::to_expr(*Context, Z3_mk_fpa_fma(*Context, toZ3Expr(*roundingMode).AST,
-                                          toZ3Expr(*Z).AST, toZ3Expr(*Y).AST,
+                                          toZ3Expr(*X).AST, toZ3Expr(*Y).AST,
                                           toZ3Expr(*Z).AST))));
 };
 
