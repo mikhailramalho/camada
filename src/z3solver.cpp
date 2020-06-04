@@ -58,7 +58,8 @@ void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
              std::string(Z3_get_error_msg(Context, Error)));
 }
 
-Z3Solver::Z3Solver(Z3ContextRef C) : Context(std::move(C)), Solver(*Context) {
+Z3Solver::Z3Solver()
+    : Context(std::make_shared<z3::context>()), Solver(*Context) {
   Z3_set_error_handler(*Context, Z3ErrorHandler);
 }
 
@@ -593,7 +594,7 @@ void Z3Solver::dumpModel() const {
 
 SMTSolverRef camada::createZ3Solver() {
 #if SOLVER_Z3_ENABLED
-  return std::make_shared<Z3Solver>(std::make_shared<z3::context>());
+  return std::make_shared<Z3Solver>();
 #else
   fmt::print(stderr, "Camada was not compiled with Z3 support, rebuild with "
                      "-DCAMADA_ENABLE_SOLVER_Z3=ON\n");

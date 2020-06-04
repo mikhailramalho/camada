@@ -65,7 +65,7 @@ public:
 
   z3::solver Solver;
 
-  explicit Z3Solver(Z3ContextRef C);
+  explicit Z3Solver();
   explicit Z3Solver(Z3ContextRef C, const z3::solver &S);
   ~Z3Solver() = default;
 

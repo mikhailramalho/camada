@@ -26,7 +26,7 @@ TEST_CASE("Override Solver", "[Z3]") {
 
   // Create Z3 Solver
   camada::SMTSolverRef z3 =
-      std::make_shared<camada::Z3Solver>(std::make_shared<z3::context>());
+      std::make_shared<myZ3Solver>(std::make_shared<z3::context>());
 
   equal_ten(z3);
 }
