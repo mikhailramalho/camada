@@ -9,8 +9,11 @@ namespace camada {
 /// Return camada version
 std::string getCamadaVersion();
 
-/// Abort program if Cond if false and prints Msg to stderr
-void abortCondWithMessage(const std::string &Msg, bool Cond = false);
+/// Abort program if Cond is false and prints Msg to stderr
+void abortCondWithMessage(bool Cond, const std::string &Msg);
+
+/// Abort program and prints Msg to stderr
+[[noreturn]] void abortWithMessage(const std::string &Msg);
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 
@@ -44,18 +47,18 @@ public:
   /// Returns the bitvector size, fails if the sort is not a bitvector
   /// Calls getBitvectorSortSizeImpl().
   virtual unsigned getBitvectorSortSize() const {
-    abortCondWithMessage("Not a bitvector sort!", isBitvectorSort());
+    abortCondWithMessage(isBitvectorSort(), "Not a bitvector sort!");
     unsigned size = getBitvectorSortSizeImpl();
-    abortCondWithMessage("Bitvector size is zero!", size);
+    abortCondWithMessage(size, "Bitvector size is zero!");
     return size;
   };
 
   /// Returns the floating-point size, fails if the sort is not a floating-point
   /// Calls getFloatSortSizeImpl().
   virtual unsigned getFloatSortSize() const {
-    abortCondWithMessage("Not a floating-point sort!", isFloatSort());
+    abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
     unsigned size = getFloatSortSizeImpl();
-    abortCondWithMessage("Floating-point size is zero!", size);
+    abortCondWithMessage(size, "Floating-point size is zero!");
     return size;
   };
 

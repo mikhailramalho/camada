@@ -5,11 +5,14 @@
 
 std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
 
-void camada::abortCondWithMessage(const std::string &Msg, bool Cond) {
-  if (!Cond) {
-    fmt::print(stderr, Msg + "\n");
-    abort();
-  }
+[[noreturn]] void camada::abortWithMessage(const std::string &Msg) {
+  fmt::print(stderr, Msg + "\n");
+  abort();
+}
+
+void camada::abortCondWithMessage(bool Cond, const std::string &Msg) {
+  if (!Cond)
+    abortWithMessage(Msg);
 }
 
 void camada::SMTSort::dump() const {

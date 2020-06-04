@@ -42,9 +42,9 @@ Z3Expr::Z3Expr(Z3ContextRef C, const z3::expr &ZA)
 /// Comparison of AST equality, not model equivalence.
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
-      "AST's must have the same sort",
       Z3_is_eq_sort(*Context, AST.get_sort(),
-                    dynamic_cast<const Z3Expr &>(Other).AST.get_sort()));
+                    dynamic_cast<const Z3Expr &>(Other).AST.get_sort()),
+      "AST's must have the same sort");
   return z3::eq(AST, dynamic_cast<const Z3Expr &>(Other).AST);
 }
 
@@ -426,7 +426,7 @@ bool Z3Solver::getBoolean(const SMTExprRef &Exp) {
 int64_t Z3Solver::getBitvector(const SMTExprRef &Exp) {
   int64_t bv;
   bool is_num = toZ3Expr(*Exp).AST.is_numeral_i64(bv);
-  camada::abortCondWithMessage("Failed to get bitvector from Z3", is_num);
+  camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
   return bv;
 }
 
@@ -446,15 +446,15 @@ static inline FPType getFP(const Z3ContextRef &C, const z3::model &Model,
   Z3_ast fp_value;
   bool eval = Z3_model_eval(
       *C, Model, Z3_mk_fpa_to_ieee_bv(*C, toZ3Expr(*Exp).AST), true, &fp_value);
-  camada::abortCondWithMessage("Failed to convert FP to BV in Z3", eval);
+  camada::abortCondWithMessage(eval, "Failed to convert FP to BV in Z3");
 
   IntType FP_as_int;
   (*Z3Func)(*C, fp_value, &FP_as_int);
 
   // Convert the integer to float/double
   // We assume that floats are 32 bits long and doubles are 64 bits long
-  camada::abortCondWithMessage("Cannot convert int to floating-point",
-                               sizeof(FPType) == sizeof(IntType));
+  camada::abortCondWithMessage(sizeof(FPType) == sizeof(IntType),
+                               "Cannot convert int to floating-point");
 
   FPType result;
   memcpy(&result, &FP_as_int, sizeof(FPType));
@@ -541,7 +541,7 @@ SMTExprRef Z3Solver::mkRoundingMode(const RoundingMode R) {
         Z3Expr(Context, z3::to_expr(*Context, Z3_mk_fpa_rtz(*Context))));
   default:;
   }
-  camada::abortCondWithMessage("Unsupported floating-point semantics.");
+  camada::abortWithMessage("Unsupported floating-point semantics.");
 }
 
 SMTExprRef Z3Solver::mkNaN(const bool Sgn, const unsigned ExpWidth,
