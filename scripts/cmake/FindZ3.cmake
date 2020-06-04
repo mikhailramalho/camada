@@ -29,7 +29,7 @@ function(check_z3_version z3_include z3_lib)
   endif()
 endfunction(check_z3_version)
 
-# Looking for Z3 in LLVM_Z3_INSTALL_DIR
+# Looking for Z3 in SOLVER_Z3_INCLUDE_DIR
 find_path(SOLVER_Z3_INCLUDE_DIR z3.h PATHS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES include)
 
 find_library(SOLVER_Z3_LIB z3 PATHS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES lib bin)
