@@ -114,6 +114,7 @@ find_package(fmt REQUIRED)
 # Solvers
 
 config_solver(Z3 4.8.4)
+config_solver(MATHSAT 5.6.3)
 
 #-----------------------------------------------------------------------------#
 # Define targets
@@ -164,3 +165,4 @@ config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 
 config_info_bool("Solver Z3" "${CAMADA_ENABLE_SOLVER_Z3}")
+config_info_bool("Solver MathSAT" "${CAMADA_ENABLE_SOLVER_MathSAT}")

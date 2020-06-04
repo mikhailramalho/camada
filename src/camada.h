@@ -438,6 +438,9 @@ using SMTSolverRef = std::shared_ptr<SMTSolver>;
 /// Convenience method to create a Z3Solver object
 SMTSolverRef createZ3Solver();
 
+/// Convenience method to create a MathSATSolver object
+SMTSolverRef createMathSATSolver();
+
 } // namespace camada
 
 #endif
