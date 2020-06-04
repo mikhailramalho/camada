@@ -574,9 +574,9 @@ checkResult Z3Solver::check() {
   return checkResult::UNKNOWN;
 }
 
-void Z3Solver::push() { return Solver.push(); }
+void Z3Solver::push() { Solver.push(); }
 
-void Z3Solver::pop(unsigned NumStates) { return Solver.pop(NumStates); }
+void Z3Solver::pop(unsigned NumStates) { Solver.pop(NumStates); }
 
 /// Reset the solver and remove all constraints.
 void Z3Solver::reset() { Solver.reset(); }
