@@ -1,29 +1,11 @@
 
 
 #include "camada.h"
+#include "simple.test.h"
 
 #include <catch2/catch.hpp>
 #include <z3++.h>
 #include <z3solver.h>
-
-void equal_ten(const camada::SMTSolverRef &solver) {
-  // A free variable
-  auto f = solver->mkSymbol("f", solver->getBitvectorSort(10));
-
-  // And assert if there is a value for 'f' that is equal to 10
-  auto ten = solver->mkBitvector(10, 10);
-  auto eq = solver->mkEqual(f, ten);
-
-  // Add the constraint to the solver
-  solver->addConstraint(eq);
-
-  // And check for satisfiability
-  REQUIRE(solver->check() == camada::checkResult::SAT);
-
-  int64_t f_res;
-  REQUIRE(solver->getInterpretation(f, f_res));
-  REQUIRE(f_res == solver->getBitvector(ten));
-}
 
 TEST_CASE("Simple test", "[Z3]") {
   // Create Z3 Solver
