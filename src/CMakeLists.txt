@@ -1,6 +1,22 @@
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_BINARY_DIR}/src)
 
-set(libcamada_src_files camada.cpp z3solver.cpp)
+#-----------------------------------------------------------------------------#
+# Macro to add solver files to compile
+function(compile_solver)
+  foreach(name IN LISTS ARGN)
+    string(TOLOWER ${name} lower_name)
+
+    if(CAMADA_ENABLE_SOLVER_${name})
+      set(libcamada_src_files "${libcamada_src_files}" "${lower_name}solver.cpp" PARENT_SCOPE)
+    endif()
+  endforeach()
+endfunction()
+
+# Add base implementation
+set(libcamada_src_files camada.cpp)
+
+# And compile each solver specific implementation, if it is enabled
+compile_solver(${CAMADA_AVAILABLE_SOLVERS})
 
 add_library(camada ${libcamada_src_files})
 target_link_libraries(camada fmt::fmt ${CAMADA_SOLVER_LIBS})

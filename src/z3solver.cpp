@@ -1,4 +1,5 @@
 #include "z3solver.h"
+#include "ac_config.h"
 
 #include <fmt/printf.h>
 

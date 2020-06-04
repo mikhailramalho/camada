@@ -1,10 +1,8 @@
-#define CATCH_CONFIG_MAIN
+
+
+#include "camada.h"
+
 #include <catch2/catch.hpp>
-
-#include <camada.h>
-
-#ifdef SOLVER_Z3_ENABLED
-
 #include <z3++.h>
 #include <z3solver.h>
 
@@ -50,5 +48,3 @@ TEST_CASE("Override Solver", "[Z3]") {
 
   equal_ten(z3);
 }
-
-#endif

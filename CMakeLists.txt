@@ -43,6 +43,9 @@ macro(config_solver name version)
     set_option(CAMADA_ENABLE_SOLVER_${name} ON)
   endif()
 
+  # Set the variable to enable the solver to 0, if the solver is enabled, it will be set to 1
+  set(SOLVER_${name}_ENABLED 0)
+
   if(CAMADA_ENABLE_SOLVER_${name})
 
     # If the solver was enabled but we could not find it, throw an error
@@ -53,8 +56,8 @@ macro(config_solver name version)
     # otherwise, add it to the list of available solvers
     list(APPEND CAMADA_AVAILABLE_SOLVERS "${name}")
 
-    # Add solver define
-    add_definitions(-DSOLVER_${name}_ENABLED)
+    # Set the variable to enable the solver to 1
+    set(SOLVER_${name}_ENABLED 1)
 
     # Add include dirs
     include_directories(${SOLVER_${name}_INCLUDE_DIR})

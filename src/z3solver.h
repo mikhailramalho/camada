@@ -3,8 +3,6 @@
 
 #include "camada.h"
 
-#ifdef SOLVER_Z3_ENABLED
-
 #include <z3++.h>
 
 namespace camada {
@@ -284,7 +282,5 @@ public:
 }; // end class Z3Solver
 
 } // namespace camada
-
-#endif
 
 #endif
