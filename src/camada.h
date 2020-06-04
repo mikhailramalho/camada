@@ -208,10 +208,14 @@ public:
   virtual SMTExprRef mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector unsigned greater-than operation
-  virtual SMTExprRef mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkNot(mkBVUle(LHS, RHS));
+  }
 
   /// Creates a bitvector signed greater-than operation
-  virtual SMTExprRef mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkNot(mkBVSle(LHS, RHS));
+  }
 
   /// Creates a bitvector unsigned less-equal-than operation
   virtual SMTExprRef mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
@@ -220,10 +224,14 @@ public:
   virtual SMTExprRef mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector unsigned greater-equal-than operation
-  virtual SMTExprRef mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkNot(mkBVUlt(LHS, RHS));
+  }
 
   /// Creates a bitvector signed greater-equal-than operation
-  virtual SMTExprRef mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkNot(mkBVSlt(LHS, RHS));
+  }
 
   /// Creates a boolean not operation
   virtual SMTExprRef mkNot(const SMTExprRef &Exp) = 0;
@@ -300,13 +308,17 @@ public:
   virtual SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point greater-than operation
-  virtual SMTExprRef mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkFPLt(RHS, LHS);
+  };
 
   /// Creates a floating-point less-than-or-equal operation
   virtual SMTExprRef mkFPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point greater-than-or-equal operation
-  virtual SMTExprRef mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkNot(mkFPLt(RHS, LHS));
+  };
 
   /// Creates a floating-point equality operation
   virtual SMTExprRef mkFPEqual(const SMTExprRef &LHS,
