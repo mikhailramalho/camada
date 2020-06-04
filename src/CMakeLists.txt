@@ -7,9 +7,11 @@ function(compile_solver)
     string(TOLOWER ${name} lower_name)
 
     if(CAMADA_ENABLE_SOLVER_${name})
-      set(libcamada_src_files "${libcamada_src_files}" "${lower_name}solver.cpp" PARENT_SCOPE)
+      list(APPEND solver_src_files ${lower_name}solver.cpp)
     endif()
   endforeach()
+
+  set(libcamada_src_files ${libcamada_src_files} ${solver_src_files} PARENT_SCOPE)
 endfunction()
 
 # Add base implementation
