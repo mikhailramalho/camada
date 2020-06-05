@@ -582,11 +582,11 @@ void Z3Solver::pop(unsigned NumStates) { Solver.pop(NumStates); }
 /// Reset the solver and remove all constraints.
 void Z3Solver::reset() { Solver.reset(); }
 
-void Z3Solver::dump() const {
+void Z3Solver::dump() {
   fmt::print(stderr, "{}\n", Z3_solver_to_string(*Context, Solver));
 }
 
-void Z3Solver::dumpModel() const {
+void Z3Solver::dumpModel() {
   fmt::print(stderr, "{}\n", Z3_model_to_string(*Context, Solver.get_model()));
 }
 

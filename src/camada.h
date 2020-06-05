@@ -426,10 +426,10 @@ public:
   virtual void reset() = 0;
 
   /// Dump formula
-  virtual void dump() const;
+  virtual void dump();
 
   /// Dump Model
-  virtual void dumpModel() const;
+  virtual void dumpModel();
 };
 
 /// Shared pointer for SMTSolvers.

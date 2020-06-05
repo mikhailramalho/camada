@@ -276,9 +276,9 @@ public:
   /// Reset the solver and remove all constraints.
   void reset() override;
 
-  void dump() const override;
+  void dump() override;
 
-  void dumpModel() const override;
+  void dumpModel() override;
 }; // end class Z3Solver
 
 } // namespace camada

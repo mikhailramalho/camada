@@ -680,7 +680,7 @@ void MathSATSolver::pop(unsigned NumStates) {
 
 void MathSATSolver::reset() { msat_reset_env(*Context); }
 
-void MathSATSolver::dump() const {
+void MathSATSolver::dump() {
   size_t num_of_asserted;
   msat_term *asserted_formulas =
       msat_get_asserted_formulas(*Context, &num_of_asserted);
@@ -690,7 +690,7 @@ void MathSATSolver::dump() const {
   msat_free(asserted_formulas);
 }
 
-void MathSATSolver::dumpModel() const {
+void MathSATSolver::dumpModel() {
   // we use a model iterator to retrieve the model values for all the
   // variables, and the necessary function instantiations
   msat_model_iterator iter = msat_create_model_iterator(*Context);
