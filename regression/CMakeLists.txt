@@ -7,18 +7,19 @@ function(compile_test)
     string(TOLOWER ${name} lower_name)
 
     if(CAMADA_ENABLE_SOLVER_${name})
-      set(test_src_files "${test_src_files}" "${lower_name}.test.cpp" PARENT_SCOPE)
+      list(APPEND solver_src_test_files "${lower_name}.test.cpp")
     endif()
+
+  set(solver_test_files ${solver_test_files} ${solver_src_test_files} PARENT_SCOPE)
   endforeach()
 endfunction()
 
-# Add base test
-set(test_src_files main.cpp)
-
-# And add each solver specific implementation, if it is enabled
+# add each solver specific implementation, if it is enabled
 compile_test(${CAMADA_AVAILABLE_SOLVERS})
 
-add_executable(camada-regression ${test_src_files})
+message("${solver_test_files}")
+
+add_executable(camada-regression main.cpp "${solver_test_files}")
 
 target_link_libraries(camada-regression
   PUBLIC camada Catch2::Catch2)
