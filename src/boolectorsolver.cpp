@@ -128,8 +128,7 @@ SMTSortRef BtorSolver::getRoundingModeSort() {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTSortRef BtorSolver::getFloatSort(const unsigned ExpWidth,
-                                    const unsigned SigWidth) {
+SMTSortRef BtorSolver::getFloatSort(const unsigned, const unsigned) {
   abortWithMessage("Boolector does not support fp");
 }
 
@@ -328,103 +327,103 @@ SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                                          toBtorExpr(*RHS).AST)));
 }
 
-SMTExprRef BtorSolver::mkFPNeg(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkFPNeg(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPIsInfinite(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkFPIsInfinite(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPIsNaN(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkFPIsNaN(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPIsNormal(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkFPIsNormal(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPIsZero(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkFPIsZero(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RoundingMode R) {
+SMTExprRef BtorSolver::mkFPMul(const SMTExprRef &, const SMTExprRef &,
+                               const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RoundingMode R) {
+SMTExprRef BtorSolver::mkFPDiv(const SMTExprRef &, const SMTExprRef &,
+                               const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkFPRem(const SMTExprRef &, const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RoundingMode R) {
+SMTExprRef BtorSolver::mkFPAdd(const SMTExprRef &, const SMTExprRef &,
+                               const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RoundingMode R) {
+SMTExprRef BtorSolver::mkFPSub(const SMTExprRef &, const SMTExprRef &,
+                               const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPSqrt(const SMTExprRef &Exp, const RoundingMode R) {
+SMTExprRef BtorSolver::mkFPSqrt(const SMTExprRef &, const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                               const SMTExprRef &Z, const RoundingMode R) {
+SMTExprRef BtorSolver::mkFPFMA(const SMTExprRef &, const SMTExprRef &,
+                               const SMTExprRef &, const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkFPLt(const SMTExprRef &, const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkFPGt(const SMTExprRef &, const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkFPLe(const SMTExprRef &, const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkFPGe(const SMTExprRef &, const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkFPEqual(const SMTExprRef &, const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                                const RoundingMode R) {
+SMTExprRef BtorSolver::mkFPtoFP(const SMTExprRef &, const SMTSortRef &,
+                                const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                                 const RoundingMode R) {
+SMTExprRef BtorSolver::mkSBVtoFP(const SMTExprRef &, const SMTSortRef &,
+                                 const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                                 const RoundingMode R) {
+SMTExprRef BtorSolver::mkUBVtoFP(const SMTExprRef &, const SMTSortRef &,
+                                 const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
+SMTExprRef BtorSolver::mkFPtoSBV(const SMTExprRef &, unsigned) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) {
+SMTExprRef BtorSolver::mkFPtoUBV(const SMTExprRef &, unsigned) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) {
+SMTExprRef BtorSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 };
 
@@ -465,11 +464,11 @@ int64_t BtorSolver::getBitvector(const SMTExprRef &Exp) {
   return finval;
 }
 
-float BtorSolver::getFloat(const SMTExprRef &Exp) {
+float BtorSolver::getFloat(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-double BtorSolver::getDouble(const SMTExprRef &Exp) {
+double BtorSolver::getDouble(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
@@ -479,11 +478,11 @@ bool BtorSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
   return true;
 }
 
-bool BtorSolver::getInterpretation(const SMTExprRef &Exp, float &Float) {
+bool BtorSolver::getInterpretation(const SMTExprRef &, float &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-bool BtorSolver::getInterpretation(const SMTExprRef &Exp, double &Double) {
+bool BtorSolver::getInterpretation(const SMTExprRef &, double &) {
   abortWithMessage("Boolector does not support fp");
 }
 
@@ -515,25 +514,23 @@ SMTExprRef BtorSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
   return inserted.first->second;
 }
 
-SMTExprRef BtorSolver::mkFloat(const float Float) {
+SMTExprRef BtorSolver::mkFloat(const float) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkDouble(const double Double) {
+SMTExprRef BtorSolver::mkDouble(const double) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkRoundingMode(const RoundingMode R) {
+SMTExprRef BtorSolver::mkRoundingMode(const RoundingMode) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkNaN(const bool Sgn, const unsigned ExpWidth,
-                             const unsigned SigWidth) {
+SMTExprRef BtorSolver::mkNaN(const bool, const unsigned, const unsigned) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkInf(const bool Sgn, const unsigned ExpWidth,
-                             const unsigned SigWidth) {
+SMTExprRef BtorSolver::mkInf(const bool, const unsigned, const unsigned) {
   abortWithMessage("Boolector does not support fp");
 }
 
