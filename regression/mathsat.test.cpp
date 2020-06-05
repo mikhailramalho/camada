@@ -7,13 +7,13 @@
 #include <mathsat.h>
 #include <mathsatsolver.h>
 
-TEST_CASE("Simple test", "[MathSAT]") {
+TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   // Create Mathsat Solver
   auto mathsat = camada::createMathSATSolver();
   equal_ten(mathsat);
 }
 
-TEST_CASE("Override Solver", "[MathSAT]") {
+TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
 
   class mySolver : public camada::MathSATSolver {
   public:

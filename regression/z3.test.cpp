@@ -7,13 +7,13 @@
 #include <z3++.h>
 #include <z3solver.h>
 
-TEST_CASE("Simple test", "[Z3]") {
+TEST_CASE("Simple Z3 test", "[Z3]") {
   // Create Z3 Solver
   auto z3 = camada::createZ3Solver();
   equal_ten(z3);
 }
 
-TEST_CASE("Override Solver", "[Z3]") {
+TEST_CASE("Override Z3 Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
