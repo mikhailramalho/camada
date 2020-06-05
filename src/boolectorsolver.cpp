@@ -550,7 +550,9 @@ checkResult BtorSolver::check() {
 
 void BtorSolver::push() { boolector_push(Context->Context, 1); }
 
-void BtorSolver::pop(unsigned NumStates) { boolector_pop(Context->Context, 1); }
+void BtorSolver::pop(unsigned NumStates) {
+  boolector_pop(Context->Context, NumStates);
+}
 
 void BtorSolver::reset() { Context.reset(); }
 
