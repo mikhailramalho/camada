@@ -674,7 +674,7 @@ checkResult MathSATSolver::check() {
 void MathSATSolver::push() { msat_push_backtrack_point(*Context); }
 
 void MathSATSolver::pop(unsigned NumStates) {
-  for (unsigned i = 0; i < NumStates; ++i)
+  while (NumStates--)
     msat_pop_backtrack_point(*Context);
 }
 
