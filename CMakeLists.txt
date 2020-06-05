@@ -165,4 +165,4 @@ config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 
 config_info_bool("Solver Z3" "${CAMADA_ENABLE_SOLVER_Z3}")
-config_info_bool("Solver MathSAT" "${CAMADA_ENABLE_SOLVER_MathSAT}")
+config_info_bool("Solver MathSAT" "${CAMADA_ENABLE_SOLVER_MATHSAT}")
