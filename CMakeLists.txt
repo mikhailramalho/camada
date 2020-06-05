@@ -117,15 +117,17 @@ config_solver(Z3 4.8.4)
 config_solver(MATHSAT 5.6.3)
 
 #-----------------------------------------------------------------------------#
-# Define targets
-
-add_subdirectory(src)
-
 # Generate ac_config.h
+
 configure_file (
  "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/cmake_config.in"
  "${CMAKE_CURRENT_BINARY_DIR}/src/ac_config.h"
 )
+
+#-----------------------------------------------------------------------------#
+# Define targets
+
+add_subdirectory(src)
 
 #-----------------------------------------------------------------------------#
 # Tests
