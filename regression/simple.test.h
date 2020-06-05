@@ -3,7 +3,7 @@
 
 #include <catch2/catch.hpp>
 
-void equal_ten(const camada::SMTSolverRef &solver) {
+inline void equal_ten(const camada::SMTSolverRef &solver) {
   // A free variable
   auto f = solver->mkSymbol("f", solver->getBitvectorSort(10));
 
