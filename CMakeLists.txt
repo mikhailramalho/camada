@@ -116,6 +116,7 @@ find_package(fmt REQUIRED)
 config_solver(Z3 4.8.4)
 config_solver(MATHSAT 5.6.3)
 config_solver(CVC4 "")
+config_solver(BOOLECTOR 3.2.1)
 
 #-----------------------------------------------------------------------------#
 # Generate ac_config.h
@@ -170,3 +171,4 @@ config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 config_info_bool("Solver Z3" "${CAMADA_ENABLE_SOLVER_Z3}")
 config_info_bool("Solver MathSAT" "${CAMADA_ENABLE_SOLVER_MATHSAT}")
 config_info_bool("Solver CVC4" "${CAMADA_ENABLE_SOLVER_CVC4}")
+config_info_bool("Solver Boolector" "${CAMADA_ENABLE_SOLVER_BOOLECTOR}")
