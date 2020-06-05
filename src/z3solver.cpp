@@ -7,7 +7,6 @@ using namespace camada;
 
 #ifdef SOLVER_Z3_ENABLED
 
-/// Default constructor, mainly used by make_shared
 Z3Sort::Z3Sort(Z3ContextRef C, const z3::sort &ZS)
     : Context(std::move(C)), Sort(ZS) {}
 
@@ -39,7 +38,6 @@ void Z3Sort::dump() const {
 Z3Expr::Z3Expr(Z3ContextRef C, const z3::expr &ZA)
     : Context(std::move(C)), AST(ZA) {}
 
-/// Comparison of AST equality, not model equivalence.
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       Z3_is_eq_sort(*Context, AST.get_sort(),
@@ -579,7 +577,6 @@ void Z3Solver::push() { Solver.push(); }
 
 void Z3Solver::pop(unsigned NumStates) { Solver.pop(NumStates); }
 
-/// Reset the solver and remove all constraints.
 void Z3Solver::reset() { Solver.reset(); }
 
 void Z3Solver::dump() {

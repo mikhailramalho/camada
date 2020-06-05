@@ -8,7 +8,6 @@ using namespace camada;
 
 #ifdef SOLVER_MATHSAT_ENABLED
 
-/// Default constructor, mainly used by make_shared
 MathSATSort::MathSATSort(MathSATContextRef C, const msat_type &MS)
     : Context(std::move(C)), Sort(MS) {}
 
@@ -55,7 +54,6 @@ void MathSATSort::dump() const {
 MathSATExpr::MathSATExpr(MathSATContextRef C, const msat_term &MA)
     : Context(std::move(C)), AST(MA) {}
 
-/// Comparison of AST equality, not model equivalence.
 bool MathSATExpr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       msat_type_equals(

@@ -7,7 +7,6 @@ using namespace camada;
 
 #ifdef SOLVER_CVC4_ENABLED
 
-/// Default constructor, mainly used by make_shared
 CVC4Sort::CVC4Sort(CVC4ContextRef C, const CVC4::Type &CS)
     : Context(std::move(C)), Sort(CS) {}
 
@@ -38,7 +37,6 @@ void CVC4Sort::dump() const { fmt::print(stderr, "{}\n", Sort.toString()); }
 CVC4Expr::CVC4Expr(CVC4ContextRef C, const CVC4::Expr &CA)
     : Context(std::move(C)), AST(CA) {}
 
-/// Comparison of AST equality, not model equivalence.
 bool CVC4Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       Context->getType(AST) ==
@@ -668,7 +666,6 @@ void CVC4Solver::pop(unsigned NumStates) {
     Solver.pop();
 }
 
-/// Reset the solver and remove all constraints.
 void CVC4Solver::reset() { Solver.reset(); }
 
 void CVC4Solver::dump() {
