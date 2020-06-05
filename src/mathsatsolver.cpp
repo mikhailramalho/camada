@@ -76,10 +76,15 @@ MathSATSolver::MathSATSolver() {
   msat_config cfg = msat_create_config();
   msat_set_option(cfg, "model_generation", "true");
   Context = std::make_shared<msat_env>(msat_create_env(cfg));
+  msat_destroy_config(cfg);
 }
 
-MathSATSolver::MathSATSolver(const msat_config &Config) {
-  Context = std::make_shared<msat_env>(msat_create_env(Config));
+MathSATSolver::MathSATSolver(const msat_config &Config)
+    : Context(std::make_shared<msat_env>(msat_create_env(Config))) {}
+
+MathSATSolver::~MathSATSolver() {
+  msat_destroy_env(*Context);
+  Context = nullptr;
 }
 
 void MathSATSolver::addConstraint(const SMTExprRef &Exp) {
@@ -495,8 +500,11 @@ int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
   mpz_t num;
   mpz_init(num);
   mpz_set(num, mpq_numref(val));
+  mpq_clear(val);
+
   char buffer[mpz_sizeinbase(num, 10) + 2];
   mpz_get_str(buffer, 10, num);
+  mpz_clear(num);
 
   camada::abortCondWithMessage(sizeof(int64_t) == sizeof(long int),
                                "Cannot convert GMP val to int");
@@ -522,8 +530,11 @@ static inline ResType GMPtoType(SMTExprRef t) {
   mpz_t num;
   mpz_init(num);
   mpz_set(num, mpq_numref(val));
+  mpq_clear(val);
+
   char buffer[mpz_sizeinbase(num, 10) + 2];
   mpz_get_str(buffer, 10, num);
+  mpz_clear(num);
 
   camada::abortCondWithMessage(sizeof(ResType) == sizeof(StrToFuncType),
                                "Cannot convert GMP val to int");

@@ -45,5 +45,7 @@ TEST_CASE("Override Solver", "[MathSAT]") {
 
   // Create custom MathSAT Solver
   camada::SMTSolverRef mathsat = std::make_shared<mySolver>(Config);
+  msat_destroy_config(Config);
+
   equal_ten(mathsat);
 }

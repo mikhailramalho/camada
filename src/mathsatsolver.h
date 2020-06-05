@@ -64,8 +64,11 @@ public:
   MathSATContextRef Context;
 
   explicit MathSATSolver();
+
+  /// Create MathSAT custom configuration. User is responsible for freeing
+  /// Config
   explicit MathSATSolver(const msat_config &Config);
-  ~MathSATSolver() = default;
+  ~MathSATSolver();
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
 
