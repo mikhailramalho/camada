@@ -17,8 +17,6 @@ endfunction()
 # add each solver specific implementation, if it is enabled
 compile_test(${CAMADA_AVAILABLE_SOLVERS})
 
-message("${solver_test_files}")
-
 add_executable(camada-regression main.cpp "${solver_test_files}")
 
 target_link_libraries(camada-regression
