@@ -412,7 +412,7 @@ int64_t YicesSolver::getBitvector(const SMTExprRef &Exp) {
                      toYicesExpr(*Exp).AST, data);
 
   int64_t val = 0;
-  for (unsigned i = width - 1; i; i--) {
+  for (int i = width - 1; i >= 0; i--) {
     val <<= 1;
     val |= data[i];
   }

@@ -457,7 +457,7 @@ int64_t BtorSolver::getBitvector(const SMTExprRef &Exp) {
   const char *bv =
       boolector_bv_assignment(Context->Context, toBtorExpr(*Exp).AST);
   char *foo;
-  int64_t finval = strtol(bv, &foo, 10);
+  int64_t finval = strtol(bv, &foo, 2);
 
   if (bv[0] != '\0' && (foo == bv || *foo != '\0'))
     camada::abortWithMessage(

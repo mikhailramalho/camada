@@ -20,4 +20,5 @@ inline void equal_ten(const camada::SMTSolverRef &solver) {
   int64_t f_res;
   REQUIRE(solver->getInterpretation(f, f_res));
   REQUIRE(f_res == solver->getBitvector(ten));
+  REQUIRE(f_res == 10);
 }
