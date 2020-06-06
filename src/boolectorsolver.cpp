@@ -66,7 +66,10 @@ unsigned BtorSort::getBitvectorSortSizeImpl() const {
   return boolector_bitvec_sort_get_width(Context->Context, Sort);
 }
 
-unsigned BtorSort::getFloatSortSizeImpl() const { return 0; }
+unsigned BtorSort::getFloatSortSizeImpl() const {
+  // Returning 0 should trigger a failure in camada::getFloatSortSize()
+  return 0;
+}
 
 bool BtorSort::equal_to(SMTSort const &Other) const {
   // boolector  API does not provide equality function for sort
@@ -428,7 +431,6 @@ SMTExprRef BtorSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
 };
 
 bool BtorSolver::getBoolean(const SMTExprRef &Exp) {
-
   const char *boolean =
       boolector_bv_assignment(Context->Context, toBtorExpr(*Exp).AST);
 
@@ -509,7 +511,7 @@ SMTExprRef BtorSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
                                               toBtorSort(*Sort).Sort, Name)))));
 
   abortCondWithMessage(inserted.second,
-                       "Could not create new Boolector variable");
+                       "Could not cache new Boolector variable");
 
   return inserted.first->second;
 }
