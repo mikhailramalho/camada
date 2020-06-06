@@ -1,0 +1,17 @@
+name: Camada Fast Health Checks
+
+on: [push, pull_request]
+jobs:
+
+  # Check project with clang-format
+  code-style:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      run: sudo apt-get update && sudo apt-get install clang-tools-9
+    - name: Run clang-format
+      run: find src -iname *.h -o -iname *.c -o -iname *.cpp -o -iname *.hpp -iname *.hh | grep -v src/ansi-c/cpp | xargs clang-format -style=file -i -fallback-style=none
+    - name: Throws error if changes were made
+      run: git diff --exit-code
+
