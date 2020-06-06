@@ -447,6 +447,9 @@ SMTSolverRef createCVC4Solver();
 /// Convenience method to create a BoolectorSolver object
 SMTSolverRef createBoolectorSolver();
 
+/// Convenience method to create a YicesSolver object
+SMTSolverRef createYicesSolver();
+
 } // namespace camada
 
 #endif
