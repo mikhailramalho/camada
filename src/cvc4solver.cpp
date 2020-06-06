@@ -567,7 +567,8 @@ SMTExprRef CVC4Solver::mkBoolean(const bool b) {
 
 SMTExprRef CVC4Solver::mkBitvector(const int64_t Int, unsigned BitWidth) {
   return newExprRef(CVC4Expr(
-      Context, Context->mkConst(CVC4::BitVector(BitWidth, (uint64_t)Int))));
+      Context,
+      Context->mkConst(CVC4::BitVector(BitWidth, static_cast<uint64_t>(Int)))));
 }
 
 SMTExprRef CVC4Solver::mkSymbol(const char *Name, SMTSortRef Sort) {

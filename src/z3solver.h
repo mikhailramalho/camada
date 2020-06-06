@@ -37,7 +37,7 @@ public:
 }; // end class Z3Sort
 
 static inline const Z3Sort &toZ3Sort(const SMTSort &S) {
-  return static_cast<const Z3Sort &>(S);
+  return dynamic_cast<const Z3Sort &>(S);
 }
 
 class Z3Expr : public SMTExpr {
@@ -56,7 +56,7 @@ public:
 }; // end class Z3Expr
 
 static inline const Z3Expr &toZ3Expr(const SMTExpr &E) {
-  return static_cast<const Z3Expr &>(E);
+  return dynamic_cast<const Z3Expr &>(E);
 }
 
 class Z3Solver : public camada::SMTSolver {
@@ -67,7 +67,7 @@ public:
 
   explicit Z3Solver();
   explicit Z3Solver(Z3ContextRef C, const z3::solver &S);
-  ~Z3Solver() = default;
+  virtual ~Z3Solver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
 

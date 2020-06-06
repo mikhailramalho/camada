@@ -37,7 +37,7 @@ public:
 }; // end class CVC4Sort
 
 static inline const CVC4Sort &toCVC4Sort(const SMTSort &S) {
-  return static_cast<const CVC4Sort &>(S);
+  return dynamic_cast<const CVC4Sort &>(S);
 }
 
 class CVC4Expr : public SMTExpr {
@@ -46,7 +46,7 @@ public:
 
   CVC4::Expr AST;
 
-  CVC4Expr(CVC4ContextRef C, const CVC4::Expr &ZA);
+  CVC4Expr(CVC4ContextRef C, const CVC4::Expr &CA);
   virtual ~CVC4Expr() = default;
 
   /// Comparison of AST equality, not model equivalence.
@@ -56,7 +56,7 @@ public:
 }; // end class CVC4Expr
 
 static inline const CVC4Expr &toCVC4Expr(const SMTExpr &E) {
-  return static_cast<const CVC4Expr &>(E);
+  return dynamic_cast<const CVC4Expr &>(E);
 }
 
 class CVC4Solver : public camada::SMTSolver {
@@ -68,7 +68,7 @@ public:
   CVC4::SymbolTable SymbolTable;
 
   explicit CVC4Solver();
-  ~CVC4Solver() = default;
+  virtual ~CVC4Solver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
 

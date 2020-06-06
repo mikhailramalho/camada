@@ -355,8 +355,7 @@ SMTExprRef MathSATSolver::mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
                        toMathSATExpr(*LHS).AST, toMathSATExpr(*RHS).AST)));
 }
 
-SMTExprRef MathSATSolver::mkFPRem(const SMTExprRef &LHS,
-                                  const SMTExprRef &RHS) {
+SMTExprRef MathSATSolver::mkFPRem(const SMTExprRef &, const SMTExprRef &) {
   abortWithMessage("MathSAT does not implement fp.rem");
 }
 
@@ -386,8 +385,8 @@ SMTExprRef MathSATSolver::mkFPSqrt(const SMTExprRef &Exp,
                                  toMathSATExpr(*Exp).AST)));
 };
 
-SMTExprRef MathSATSolver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                                  const SMTExprRef &Z, const RoundingMode R) {
+SMTExprRef MathSATSolver::mkFPFMA(const SMTExprRef &, const SMTExprRef &,
+                                  const SMTExprRef &, const RoundingMode) {
   abortWithMessage("MathSAT does not implement fp.fma");
 };
 
@@ -519,7 +518,7 @@ int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
 
 template <typename ResType, typename StrToFuncType,
           StrToFuncType (*StrToFunc)(const char *, char **)>
-static inline ResType GMPtoType(SMTExprRef t) {
+static inline ResType GMPtoType(const SMTExprRef &t) {
   // GMP rational value object.
   mpq_t val;
   mpq_init(val);
@@ -692,7 +691,8 @@ void MathSATSolver::dumpModel() {
   // we use a model iterator to retrieve the model values for all the
   // variables, and the necessary function instantiations
   msat_model_iterator iter = msat_create_model_iterator(*Context);
-  assert(!MSAT_ERROR_MODEL_ITERATOR(iter));
+  abortCondWithMessage(!MSAT_ERROR_MODEL_ITERATOR(iter),
+                       "Error when getting model iterator");
 
   fmt::print(stderr, "Model:\n");
   while (msat_model_iterator_has_next(iter)) {
@@ -700,11 +700,11 @@ void MathSATSolver::dumpModel() {
     char *s;
     msat_model_iterator_next(iter, &t, &v);
     s = msat_term_repr(t);
-    assert(s);
+    abortCondWithMessage(s, "Error when getting variable from model");
     fmt::print(stderr, "{} = ", s);
     msat_free(s);
     s = msat_term_repr(v);
-    assert(s);
+    abortCondWithMessage(s, "Error when getting variable value from model");
     fmt::print(stderr, "{}\n", s);
     msat_free(s);
   }

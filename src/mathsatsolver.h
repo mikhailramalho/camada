@@ -37,7 +37,7 @@ public:
 }; // end class MathSATSort
 
 static inline const MathSATSort &toMathSATSort(const SMTSort &S) {
-  return static_cast<const MathSATSort &>(S);
+  return dynamic_cast<const MathSATSort &>(S);
 }
 
 class MathSATExpr : public SMTExpr {
@@ -56,7 +56,7 @@ public:
 }; // end class MathSATExpr
 
 static inline const MathSATExpr &toMathSATExpr(const SMTExpr &E) {
-  return static_cast<const MathSATExpr &>(E);
+  return dynamic_cast<const MathSATExpr &>(E);
 }
 
 class MathSATSolver : public camada::SMTSolver {
@@ -68,7 +68,7 @@ public:
   /// Create MathSAT custom configuration. User is responsible for freeing
   /// Config
   explicit MathSATSolver(const msat_config &Config);
-  ~MathSATSolver();
+  virtual ~MathSATSolver();
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
 

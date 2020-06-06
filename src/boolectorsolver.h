@@ -51,7 +51,7 @@ public:
 }; // end class BtorSort
 
 static inline const BtorSort &toBtorSort(const SMTSort &S) {
-  return static_cast<const BtorSort &>(S);
+  return dynamic_cast<const BtorSort &>(S);
 }
 
 class BtorExpr : public SMTExpr {
@@ -70,19 +70,19 @@ public:
 }; // end class BtorExpr
 
 static inline const BtorExpr &toBtorExpr(const SMTExpr &E) {
-  return static_cast<const BtorExpr &>(E);
+  return dynamic_cast<const BtorExpr &>(E);
 }
 
 class BtorSolver : public camada::SMTSolver {
 public:
   BtorContextRef Context;
 
-  typedef std::unordered_map<std::string, SMTExprRef> SymbolTablet;
+  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
   SymbolTablet SymbolTable;
 
   explicit BtorSolver();
   explicit BtorSolver(BtorContextRef C);
-  ~BtorSolver() = default;
+  virtual ~BtorSolver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
 
