@@ -7,6 +7,10 @@ function(compile_solver)
     string(TOLOWER ${name} lower_name)
 
     if(CAMADA_ENABLE_SOLVER_${name})
+      if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/${lower_name}solver.cpp")
+        message(FATAL_ERROR "Could not find backend implementation file ${CMAKE_SOURCE_DIR}/src/${lower_name}solver.cpp")
+      endif()
+
       list(APPEND solver_src_files ${lower_name}solver.cpp)
     endif()
   endforeach()

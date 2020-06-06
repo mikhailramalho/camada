@@ -7,6 +7,9 @@ function(compile_test)
     string(TOLOWER ${name} lower_name)
 
     if(CAMADA_ENABLE_SOLVER_${name})
+      if(NOT EXISTS "${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
+        message(FATAL_ERROR "Could not find regression file ${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
+      endif()
       list(APPEND solver_src_test_files "${lower_name}.test.cpp")
     endif()
 
