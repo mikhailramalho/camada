@@ -1,4 +1,4 @@
-name: Camada Fast Health Checks
+name: Camada Code Style
 
 on: [push, pull_request]
 jobs:
