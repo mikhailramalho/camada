@@ -1,0 +1,31 @@
+name: Camada Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake bison flex gcc-multilib linux-libc-dev libboost-all-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
+    - name: Setup Catch2
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+    - name: Setup boolector
+      run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
+    - name: Configure CMake
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+    - name: Build Camada
+      run: cd build && cmake --build . && ninja install
+    - uses: actions/upload-artifact@v1
+      with:
+        name: release-linux
+        path: ./release
+    - name: Run tests
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
