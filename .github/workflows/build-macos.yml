@@ -1,4 +1,4 @@
-name: Camada MacOS Build
+name: MacOS Build
 
 on:
   push:
