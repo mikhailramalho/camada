@@ -39,7 +39,7 @@ endif()
 if(DEFINED GMP_DIR)
   find_library(LIBGMP_CUSTOM gmp NAMES libgmp.a PATHS ${GMP_DIR} PATH_SUFFIXES lib NO_DEFAULT_PATH)
   message(STATUS "Custom gmp for yices found: ${LIBGMP_CUSTOM}")
-  set(SOLVER_YICES_LIB "${SOLVER_YICES_LIB} ${LIBGMP_CUSTOM}")
+  list(APPEND SOLVER_YICES_LIB "${LIBGMP_CUSTOM}")
 endif ()
 
 # handle the QUIETLY and REQUIRED arguments and set YICES_FOUND to TRUE if
