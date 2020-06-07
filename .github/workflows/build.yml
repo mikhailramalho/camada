@@ -20,8 +20,7 @@ jobs:
     - name: Setup boolector
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
     - name: Setup Z3
-      run: wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.8/z3-4.8.8-x64-osx-10.14.6.zip && unzip z3-4.8.8-x64-osx-10.14.6.zip && mv z3-4.8.8-x64-osx-10.14.6
- z3
+      run: wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.8/z3-4.8.8-x64-osx-10.14.6.zip && unzip z3-4.8.8-x64-osx-10.14.6.zip && mv z3-4.8.8-x64-osx-10.14.6 z3
     - name: Setup MathSAT
       run: wget http://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-darwin-libcxx-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-darwin-libcxx-x86_64 mathsat
     - name: MathSAT brew hack
@@ -58,8 +57,7 @@ jobs:
     - name: Setup boolector
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
     - name: Setup Z3
-      run: wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.8/z3-4.8.8-x64-osx-10.14.6.zip && unzip z3-4.8.8-x64-osx-10.14.6.zip && mv z3-4.8.8-x64-osx-10.14.6
- z3
+      run: wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.8/z3-4.8.8-x64-osx-10.14.6.zip && unzip z3-4.8.8-x64-osx-10.14.6.zip && mv z3-4.8.8-x64-osx-10.14.6 z3
     - name: Setup MathSAT
       run: wget http://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-darwin-libcxx-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-darwin-libcxx-x86_64 mathsat
     - name: MathSAT brew hack
