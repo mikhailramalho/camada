@@ -514,7 +514,7 @@ void YicesSolver::pop(unsigned NumStates) {
     yices_pop(Context->Context);
 }
 
-void YicesSolver::reset() { yices_reset_context(Context->Context); }
+void YicesSolver::reset() { Context->reset(); }
 
 void YicesSolver::dumpModel() {
   char *model_str =

@@ -553,7 +553,7 @@ void BtorSolver::pop(unsigned NumStates) {
   boolector_pop(Context->Context, NumStates);
 }
 
-void BtorSolver::reset() { Context.reset(); }
+void BtorSolver::reset() { Context->reset(); }
 
 void BtorSolver::dump() { boolector_dump_smt2(Context->Context, stderr); }
 
