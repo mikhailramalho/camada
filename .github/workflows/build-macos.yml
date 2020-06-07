@@ -107,8 +107,10 @@ jobs:
       run: brew install cmake ninja python3 fmt && pip3 install PySMT toml
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+    - name: Setup Symfpu
+      run: git clone https://github.com/martin-cs/symfpu.git && cd symfpu && git reset --hard 8fbe139bf0071cbe0758d2f6690a546c69ff0053
     - name: Setup CVC4
-      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard b826fc8ae95fc && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --python3 --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
+      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard b826fc8ae95fc && ./contrib/get-antlr-3.4 && ./configure.sh --symfpu --symfpu-dir=../ --python3 --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
     - name: Configure CMake
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_CVC4_DIR=$PWD/../cvc4 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
