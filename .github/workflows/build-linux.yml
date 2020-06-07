@@ -20,7 +20,7 @@ jobs:
     - name: Setup boolector
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release-DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - uses: actions/upload-artifact@v1
