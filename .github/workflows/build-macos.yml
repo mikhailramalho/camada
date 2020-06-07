@@ -13,11 +13,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1.3.0
-      with:
-        java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake fmt && pip3 install PySMT toml
+      run: brew install cmake ninja fmt
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup boolector
@@ -37,11 +34,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1.3.0
-      with:
-        java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake fmt && pip3 install PySMT toml
+      run: brew install cmake ninja fmt
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Z3
@@ -61,11 +55,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1.3.0
-      with:
-        java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake fmt && pip3 install PySMT toml
+      run: brew install gmp cmake ninja fmt
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup MathSAT
@@ -88,11 +79,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1.3.0
-      with:
-        java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake fmt && pip3 install PySMT toml
+      run: brew install gmp ninja automake fmt
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Yices 2
@@ -108,7 +96,6 @@ jobs:
     - name: Run tests
       run: ctest -j4 --output-on-failure --progress .
 
-
   build-cvc4:
     runs-on: macos-latest
     steps:
@@ -117,7 +104,7 @@ jobs:
       with:
         java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake fmt && pip3 install PySMT toml
+      run: brew install cmake ninja python3 fmt && pip3 install PySMT toml
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup CVC4
@@ -132,3 +119,4 @@ jobs:
         path: ./release
     - name: Run tests
       run: ctest -j4 --output-on-failure --progress .
+

@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build libfmt-dev
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup boolector
@@ -24,14 +24,14 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: cd build/regression && ctest -j4 --output-on-failure --progress .
+      run: ctest -j4 --output-on-failure --progress .
 
   build-z3:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build libfmt-dev
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Z3
@@ -41,14 +41,14 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: cd build/regression && ctest -j4 --output-on-failure --progress .
+      run: ctest -j4 --output-on-failure --progress .
 
   build-mathsat:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
+      run: sudo apt-get update && sudo apt-get install libgmp-dev cmake linux-libc-dev ninja-build libfmt-dev
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup MathSAT
@@ -58,14 +58,14 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: cd build/regression && ctest -j4 --output-on-failure --progress .
+      run: ctest -j4 --output-on-failure --progress .
 
   build-yices:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
+      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build libfmt-dev
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Yices 2 (GMP)
@@ -77,14 +77,14 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: cd build/regression && ctest -j4 --output-on-failure --progress .
+      run: ctest -j4 --output-on-failure --progress .
 
   build-cvc4:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build libfmt-dev
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup CVC4
@@ -94,5 +94,5 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: cd build/regression && ctest -j4 --output-on-failure --progress .
+      run: ctest -j4 --output-on-failure --progress .
 
