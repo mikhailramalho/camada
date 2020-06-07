@@ -65,7 +65,7 @@ jobs:
     - name: Setup Yices 2
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j4 && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
     - name: Setup CVC4
-      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard b826fc8ae95fc && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
+      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard b826fc8ae95fc && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --python3 --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
     - name: Get current folder and files
       run: pwd && ls
     - name: Configure CMake
