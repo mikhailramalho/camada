@@ -22,8 +22,7 @@ compile_test(${CAMADA_AVAILABLE_SOLVERS})
 
 add_executable(camada-regression main.cpp "${solver_test_files}")
 
-target_link_libraries(camada-regression
-  PUBLIC camada Catch2::Catch2)
+target_link_libraries(camada-regression camada Catch2::Catch2 ${CAMADA_SOLVER_LIBS})
 
 include(Catch)
 catch_discover_tests(camada-regression)
