@@ -24,7 +24,7 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-z3:
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-mathsat:
     runs-on: ubuntu-latest
@@ -58,7 +58,7 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-yices:
     runs-on: ubuntu-latest
@@ -77,7 +77,7 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-cvc4:
     runs-on: ubuntu-latest
@@ -96,5 +96,5 @@ jobs:
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
