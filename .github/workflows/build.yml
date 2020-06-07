@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install libgmp-dev cmake linux-libc-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
+      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build python3-setuptools clang-tools-9 libfmt-dev && pip install toml
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup boolector
