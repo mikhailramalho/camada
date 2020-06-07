@@ -1,4 +1,4 @@
-name: Camada Build
+name: Camada Linux Build
 
 on:
   push:
