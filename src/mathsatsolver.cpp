@@ -29,9 +29,6 @@ using namespace camada;
 
 #ifdef SOLVER_MATHSAT_ENABLED
 
-MathSATSort::MathSATSort(MathSATContextRef C, const msat_type &MS)
-    : Context(std::move(C)), Sort(MS) {}
-
 bool MathSATSort::isBitvectorSortImpl() const {
   std::size_t w;
   return msat_is_bv_type(*Context, Sort, &w);

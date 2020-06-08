@@ -31,13 +31,9 @@ namespace camada {
 using Z3ContextRef = std::shared_ptr<z3::context>;
 
 /// Wrapper for Z3 Sort
-class Z3Sort : public SMTSort {
+class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
 public:
-  Z3ContextRef Context;
-
-  z3::sort Sort;
-
-  Z3Sort(Z3ContextRef C, const z3::sort &ZS);
+  using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
   virtual ~Z3Sort() = default;
 
   bool isBitvectorSortImpl() const override;

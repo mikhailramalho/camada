@@ -28,9 +28,6 @@ using namespace camada;
 
 #ifdef SOLVER_Z3_ENABLED
 
-Z3Sort::Z3Sort(Z3ContextRef C, const z3::sort &ZS)
-    : Context(std::move(C)), Sort(ZS) {}
-
 bool Z3Sort::isBitvectorSortImpl() const { return Sort.is_bv(); }
 
 bool Z3Sort::isBooleanSortImpl() const { return Sort.is_bool(); }

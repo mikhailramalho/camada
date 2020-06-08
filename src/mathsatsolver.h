@@ -31,13 +31,9 @@ namespace camada {
 using MathSATContextRef = std::shared_ptr<msat_env>;
 
 /// Wrapper for MathSAT Sort
-class MathSATSort : public SMTSort {
+class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
 public:
-  MathSATContextRef Context;
-
-  msat_type Sort;
-
-  MathSATSort(MathSATContextRef C, const msat_type &MS);
+  using SolverSort<MathSATContextRef, msat_type>::SolverSort;
   virtual ~MathSATSort() = default;
 
   bool isBitvectorSortImpl() const override;

@@ -47,13 +47,9 @@ public:
 using BtorContextRef = std::shared_ptr<BtorContext>;
 
 /// Wrapper for Boolector Sort
-class BtorSort : public SMTSort {
+class BtorSort : public SolverSort<BtorContextRef, BoolectorSort> {
 public:
-  BtorContextRef Context;
-
-  BoolectorSort Sort;
-
-  BtorSort(BtorContextRef C, const BoolectorSort &BS);
+  using SolverSort<BtorContextRef, BoolectorSort>::SolverSort;
   virtual ~BtorSort() = default;
 
   bool isBitvectorSortImpl() const override;

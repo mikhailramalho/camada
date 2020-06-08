@@ -31,13 +31,9 @@ namespace camada {
 using CVC4ContextRef = std::shared_ptr<CVC4::ExprManager>;
 
 /// Wrapper for CVC4 Sort
-class CVC4Sort : public SMTSort {
+class CVC4Sort : public SolverSort<CVC4ContextRef, CVC4::Type> {
 public:
-  CVC4ContextRef Context;
-
-  CVC4::Type Sort;
-
-  CVC4Sort(CVC4ContextRef C, const CVC4::Type &CS);
+  using SolverSort<CVC4ContextRef, CVC4::Type>::SolverSort;
   virtual ~CVC4Sort() = default;
 
   bool isBitvectorSortImpl() const override;

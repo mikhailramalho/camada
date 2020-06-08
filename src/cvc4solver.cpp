@@ -28,9 +28,6 @@ using namespace camada;
 
 #ifdef SOLVER_CVC4_ENABLED
 
-CVC4Sort::CVC4Sort(CVC4ContextRef C, const CVC4::Type &CS)
-    : Context(std::move(C)), Sort(CS) {}
-
 bool CVC4Sort::isBitvectorSortImpl() const { return Sort.isBitVector(); }
 
 bool CVC4Sort::isBooleanSortImpl() const { return Sort.isBoolean(); }

@@ -57,9 +57,6 @@ void BtorContext::reset() {
   createAndConfig();
 }
 
-BtorSort::BtorSort(BtorContextRef C, const BoolectorSort &BS)
-    : Context(std::move(C)), Sort(BS) {}
-
 bool BtorSort::isBitvectorSortImpl() const {
   return boolector_is_bitvec_sort(Context->Context, Sort);
 }

@@ -52,9 +52,6 @@ void YicesContext::reset() {
   createAndConfig();
 }
 
-YicesSort::YicesSort(YicesContextRef C, const type_t &YS)
-    : Context(std::move(C)), Sort(YS) {}
-
 bool YicesSort::isBitvectorSortImpl() const {
   return yices_type_is_bitvector(Sort);
 }

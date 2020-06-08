@@ -44,13 +44,9 @@ public:
 using YicesContextRef = std::shared_ptr<YicesContext>;
 
 /// Wrapper for Yices Sort
-class YicesSort : public SMTSort {
+class YicesSort : public SolverSort<YicesContextRef, type_t> {
 public:
-  YicesContextRef Context;
-
-  type_t Sort;
-
-  YicesSort(YicesContextRef C, const type_t &YS);
+  using SolverSort<YicesContextRef, type_t>::SolverSort;
   virtual ~YicesSort() = default;
 
   bool isBitvectorSortImpl() const override;
