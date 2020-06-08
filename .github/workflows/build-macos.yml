@@ -54,7 +54,7 @@ jobs:
     - name: Setup MathSAT
       run: wget http://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-darwin-libcxx-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-darwin-libcxx-x86_64 mathsat
     - name: Install MathSAT
-      run: ln -s /usr/local/include/gmp.h mathsat/include/gmp.h && mv mathsat/lib/libmathsat.dylib /usr/local/lib && mv mathsat/lib/libmathsat.a /usr/local/lib
+      run: ln -s /usr/local/include/gmp.h mathsat/include/gmp.h && cp mathsat/lib/libmathsat.dylib /usr/local/lib && cp mathsat/lib/libmathsat.a /usr/local/lib
     - name: Configure CMake
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
@@ -73,7 +73,7 @@ jobs:
     - name: Setup Yices 2
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j4 && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
     - name: Install yices
-      run: mv yices/lib/libyices.dylib /usr/local/lib && mv yices/lib/libyices.a /usr/local/lib
+      run: cp yices/lib/libyices.dylib /usr/local/lib && cp yices/lib/libyices.a /usr/local/lib
     - name: Configure CMake
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
