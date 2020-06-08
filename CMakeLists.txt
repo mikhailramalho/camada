@@ -113,7 +113,7 @@ find_package(fmt REQUIRED)
 #-----------------------------------------------------------------------------#
 # Solvers
 
-config_solver(Z3 4.8.4)
+config_solver(Z3 4.8.8)
 config_solver(MATHSAT 5.6.3)
 config_solver(CVC4 "")
 config_solver(BOOLECTOR 3.2.1)
