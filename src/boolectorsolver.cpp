@@ -102,9 +102,6 @@ bool BtorSort::equal_to(SMTSort const &Other) const {
   return false;
 }
 
-BtorExpr::BtorExpr(BtorContextRef C, BoolectorNode *BA)
-    : Context(std::move(C)), AST(BA) {}
-
 bool BtorExpr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       boolector_is_equal_sort(Context->Context, AST,

@@ -25,31 +25,11 @@
 #include <memory>
 #include <string>
 
+#include "camadaast.h"
 #include "camadasort.h"
 #include "utils.h"
 
 namespace camada {
-
-/// Generic base class for SMT exprs
-class SMTExpr {
-public:
-  SMTExpr() = default;
-  virtual ~SMTExpr() = default;
-
-  friend bool operator==(SMTExpr const &LHS, SMTExpr const &RHS) {
-    return LHS.equal_to(RHS);
-  }
-
-  virtual void dump() const;
-
-protected:
-  /// Query the SMT solver and returns true if two sorts are equal (same kind
-  /// and bit width). This does not check if the two sorts are the same objects.
-  virtual bool equal_to(SMTExpr const &other) const = 0;
-};
-
-/// Shared pointer for SMTExprs, used by SMTSolver API.
-using SMTExprRef = std::shared_ptr<SMTExpr>;
 
 /// Generic base class for SMT Solvers
 ///

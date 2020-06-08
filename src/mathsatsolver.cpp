@@ -69,9 +69,6 @@ void MathSATSort::dump() const {
   msat_free(s);
 }
 
-MathSATExpr::MathSATExpr(MathSATContextRef C, const msat_term &MA)
-    : Context(std::move(C)), AST(MA) {}
-
 bool MathSATExpr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       msat_type_equals(

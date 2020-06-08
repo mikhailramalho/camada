@@ -52,9 +52,6 @@ bool CVC4Sort::equal_to(SMTSort const &Other) const {
 
 void CVC4Sort::dump() const { fmt::print(stderr, "{}\n", Sort.toString()); }
 
-CVC4Expr::CVC4Expr(CVC4ContextRef C, const CVC4::Expr &CA)
-    : Context(std::move(C)), AST(CA) {}
-
 bool CVC4Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       Context->getType(AST) ==

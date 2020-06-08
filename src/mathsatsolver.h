@@ -57,13 +57,9 @@ static inline const MathSATSort &toMathSATSort(const SMTSort &S) {
   return dynamic_cast<const MathSATSort &>(S);
 }
 
-class MathSATExpr : public SMTExpr {
+class MathSATExpr : public SolverAST<MathSATContextRef, msat_term> {
 public:
-  MathSATContextRef Context;
-
-  msat_term AST;
-
-  MathSATExpr(MathSATContextRef C, const msat_term &MA);
+  using SolverAST<MathSATContextRef, msat_term>::SolverAST;
   virtual ~MathSATExpr() = default;
 
   /// Comparison of AST equality, not model equivalence.

@@ -57,13 +57,9 @@ static inline const CVC4Sort &toCVC4Sort(const SMTSort &S) {
   return dynamic_cast<const CVC4Sort &>(S);
 }
 
-class CVC4Expr : public SMTExpr {
+class CVC4Expr : public SolverAST<CVC4ContextRef, CVC4::Expr> {
 public:
-  CVC4ContextRef Context;
-
-  CVC4::Expr AST;
-
-  CVC4Expr(CVC4ContextRef C, const CVC4::Expr &CA);
+  using SolverAST<CVC4ContextRef, CVC4::Expr>::SolverAST;
   virtual ~CVC4Expr() = default;
 
   /// Comparison of AST equality, not model equivalence.

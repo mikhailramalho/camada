@@ -57,13 +57,9 @@ static inline const Z3Sort &toZ3Sort(const SMTSort &S) {
   return dynamic_cast<const Z3Sort &>(S);
 }
 
-class Z3Expr : public SMTExpr {
+class Z3Expr : public SolverAST<Z3ContextRef, z3::expr> {
 public:
-  Z3ContextRef Context;
-
-  z3::expr AST;
-
-  Z3Expr(Z3ContextRef C, const z3::expr &ZA);
+  using SolverAST<Z3ContextRef, z3::expr>::SolverAST;
   virtual ~Z3Expr() = default;
 
   /// Comparison of AST equality, not model equivalence.

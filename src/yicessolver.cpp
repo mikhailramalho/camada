@@ -93,9 +93,6 @@ void YicesSort::dump() const {
   yices_free_string(ty_str);
 }
 
-YicesExpr::YicesExpr(YicesContextRef C, const term_t &YA)
-    : Context(std::move(C)), AST(YA) {}
-
 bool YicesExpr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       YicesSort(Context, yices_type_of_term(AST))

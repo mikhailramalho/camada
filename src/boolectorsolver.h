@@ -71,13 +71,9 @@ static inline const BtorSort &toBtorSort(const SMTSort &S) {
   return dynamic_cast<const BtorSort &>(S);
 }
 
-class BtorExpr : public SMTExpr {
+class BtorExpr : public SolverAST<BtorContextRef, BoolectorNode *> {
 public:
-  BtorContextRef Context;
-
-  BoolectorNode *AST;
-
-  BtorExpr(BtorContextRef C, BoolectorNode *BA);
+  using SolverAST<BtorContextRef, BoolectorNode *>::SolverAST;
   virtual ~BtorExpr() = default;
 
   /// Comparison of AST equality, not model equivalence.

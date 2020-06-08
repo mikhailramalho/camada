@@ -53,9 +53,6 @@ void Z3Sort::dump() const {
   fmt::print(stderr, "{}\n", Z3_sort_to_string(*Context, Sort));
 }
 
-Z3Expr::Z3Expr(Z3ContextRef C, const z3::expr &ZA)
-    : Context(std::move(C)), AST(ZA) {}
-
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       Z3_is_eq_sort(*Context, AST.get_sort(),

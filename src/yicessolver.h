@@ -70,13 +70,9 @@ static inline const YicesSort &toYicesSort(const SMTSort &S) {
   return dynamic_cast<const YicesSort &>(S);
 }
 
-class YicesExpr : public SMTExpr {
+class YicesExpr : public SolverAST<YicesContextRef, term_t> {
 public:
-  YicesContextRef Context;
-
-  term_t AST;
-
-  YicesExpr(YicesContextRef C, const term_t &YA);
+  using SolverAST<YicesContextRef, term_t>::SolverAST;
   virtual ~YicesExpr() = default;
 
   /// Comparison of AST equality, not model equivalence.
