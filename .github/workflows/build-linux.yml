@@ -90,7 +90,7 @@ jobs:
     - name: Setup CVC4
       run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard b826fc8ae95fc && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_CVC4=ON -DSOLVER_CVC4_DIR=$PWD/../CVC4 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_CVC4=ON -DSOLVER_CVC4_DIR=$PWD/../cvc4 -DSOLVER_CVC4_SYMFPU_DIR=/home/mgadelha/tools/CVC4/deps/install/include -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests

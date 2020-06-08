@@ -13,7 +13,8 @@ if(CVC4_FOUND)
   set(SOLVER_CVC4_LIB "CVC4::cvc4")
 
   # Search for symfpu headers and set it a CVC4 include
-  find_path(SOLVER_CVC4_INCLUDE_DIR symfpu/core/unpackedFloat.h PATHS ${SOLVER_CVC4_DIR}/deps/install/include)
+  find_path(SOLVER_CVC4_SYMFPU_DIR symfpu/core/unpackedFloat.h PATHS)
+  set(SOLVER_CVC4_INCLUDE_DIR "${SOLVER_CVC4_SYMFPU_DIR}")
 
   # handle the QUIETLY and REQUIRED arguments and set CVC4_FOUND to TRUE if
   # all listed variables are TRUE
