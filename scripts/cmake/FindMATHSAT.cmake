@@ -36,6 +36,15 @@ if(SOLVER_MATHSAT_INCLUDE_DIR AND SOLVER_MATHSAT_LIB)
   check_mathsat_version(${SOLVER_MATHSAT_INCLUDE_DIR} ${SOLVER_MATHSAT_LIB})
 endif()
 
+# Alright, now create a list with MathSAT and it's dependencies
+if (NOT BUILD_SHARED_LIBS)
+  find_library(gmp gmp)
+  if (NOT gmp)
+      message(FATAL_ERROR "Could not find static GMP required by MathSAT")
+  endif ()
+  list(APPEND SOLVER_MATHSAT_LIB "${gmp}")
+endif ()
+
 # handle the QUIETLY and REQUIRED arguments and set MATHSAT_FOUND to TRUE if
 # all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
