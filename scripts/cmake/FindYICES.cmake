@@ -16,7 +16,7 @@ function(check_yices_version yices_include yices_lib)
   )
 
   if(NOT YICES_COMPILED)
-    message(FATAL_ERROR "MathSAT lib found in ${mathsat_lib_path} but test compilation failed")
+    message(FATAL_ERROR "Yices lib found in ${yices_lib_path} but test compilation failed")
   endif()
 
   string(REGEX MATCH "([0-9]*\\.[0-9]*\\.[0-9]*)" yices_version "${SRC_OUTPUT}")
