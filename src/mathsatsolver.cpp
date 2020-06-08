@@ -642,7 +642,6 @@ SMTExprRef MathSATSolver::mkRoundingMode(const RoundingMode R) {
 
 SMTExprRef MathSATSolver::mkNaN(const bool Sgn, const unsigned ExpWidth,
                                 const unsigned SigWidth) {
-  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
   SMTExprRef theNaN = newExprRef(
       MathSATExpr(Context, msat_make_fp_nan(*Context, ExpWidth, SigWidth - 1)));
 
@@ -651,7 +650,6 @@ SMTExprRef MathSATSolver::mkNaN(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef MathSATSolver::mkInf(const bool Sgn, const unsigned ExpWidth,
                                 const unsigned SigWidth) {
-  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth - 1);
   return newExprRef(MathSATExpr(
       Context, Sgn ? msat_make_fp_minus_inf(*Context, ExpWidth, SigWidth - 1)
                    : msat_make_fp_plus_inf(*Context, ExpWidth, SigWidth - 1)));
