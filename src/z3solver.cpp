@@ -28,22 +28,6 @@ using namespace camada;
 
 #ifdef SOLVER_Z3_ENABLED
 
-bool Z3Sort::isBitvectorSortImpl() const { return Sort.is_bv(); }
-
-bool Z3Sort::isBooleanSortImpl() const { return Sort.is_bool(); }
-
-bool Z3Sort::isFloatSortImpl() const { return Sort.is_fpa(); }
-
-bool Z3Sort::isRoundingModeSortImpl() const {
-  return (Z3_get_sort_kind(*Context, Sort) == Z3_ROUNDING_MODE_SORT);
-}
-
-unsigned Z3Sort::getBitvectorSortSizeImpl() const { return Sort.bv_size(); }
-
-unsigned Z3Sort::getFloatSortSizeImpl() const {
-  return Sort.fpa_ebits() + Sort.fpa_sbits();
-}
-
 bool Z3Sort::equal_to(SMTSort const &Other) const {
   return Z3_is_eq_sort(*Context, Sort,
                        dynamic_cast<const Z3Sort &>(Other).Sort);
@@ -85,34 +69,34 @@ void Z3Solver::addConstraint(const SMTExprRef &Exp) {
   Solver.add(toZ3Expr(*Exp).AST);
 }
 
-SMTSortRef Z3Solver::newSortRef(const SMTSort &Sort) const {
-  return std::make_shared<Z3Sort>(toZ3Sort(Sort));
-}
-
 SMTExprRef Z3Solver::newExprRef(const SMTExpr &Exp) const {
   return std::make_shared<Z3Expr>(toZ3Expr(Exp));
 }
 
 SMTSortRef Z3Solver::getBoolSort() {
-  return newSortRef(Z3Sort(Context, Context->bool_sort()));
+  return newSortRef<camada::SolverBoolSort<Z3Sort>>(
+      camada::SolverBoolSort<Z3Sort>(Context, Context->bool_sort()));
 }
 
 SMTSortRef Z3Solver::getBitvectorSort(unsigned BitWidth) {
-  return newSortRef(Z3Sort(Context, Context->bv_sort(BitWidth)));
+  return newSortRef<camada::SolverBVSort<Z3Sort>>(camada::SolverBVSort<Z3Sort>(
+      BitWidth, Context, Context->bv_sort(BitWidth)));
 }
 
 SMTSortRef Z3Solver::getRoundingModeSort() {
-  return newSortRef(Z3Sort(
+  return newSortRef<camada::SolverRMSort<Z3Sort>>(camada::SolverRMSort<Z3Sort>(
       Context, z3::to_sort(*Context, Z3_mk_fpa_rounding_mode_sort(*Context))));
 }
 
 SMTSortRef Z3Solver::getFloatSort(const unsigned ExpWidth,
                                   const unsigned SigWidth) {
-  return newSortRef(Z3Sort(Context, Context->fpa_sort(ExpWidth, SigWidth)));
+  return newSortRef<camada::SolverFPSort<Z3Sort>>(camada::SolverFPSort<Z3Sort>(
+      ExpWidth, SigWidth, Context, Context->fpa_sort(ExpWidth, SigWidth)));
 }
 
 SMTSortRef Z3Solver::getSort(const SMTExprRef &Exp) {
-  return newSortRef(Z3Sort(Context, toZ3Expr(*Exp).AST.get_sort()));
+  abortWithMessage("Currently unimplemented");
+  return nullptr;
 }
 
 SMTExprRef Z3Solver::mkBVNeg(const SMTExprRef &Exp) {
@@ -379,30 +363,30 @@ SMTExprRef Z3Solver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
                               const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
-      Context,
-      z3::to_expr(*Context, Z3_mk_fpa_to_fp_float(
-                                *Context, toZ3Expr(*roundingMode).AST,
-                                toZ3Expr(*From).AST, toZ3Sort(*To).Sort))));
+      Context, z3::to_expr(*Context, Z3_mk_fpa_to_fp_float(
+                                         *Context, toZ3Expr(*roundingMode).AST,
+                                         toZ3Expr(*From).AST,
+                                         toSolverSort<Z3Sort>(*To).Sort))));
 }
 
 SMTExprRef Z3Solver::mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
-      Context,
-      z3::to_expr(*Context, Z3_mk_fpa_to_fp_signed(
-                                *Context, toZ3Expr(*roundingMode).AST,
-                                toZ3Expr(*From).AST, toZ3Sort(*To).Sort))));
+      Context, z3::to_expr(*Context, Z3_mk_fpa_to_fp_signed(
+                                         *Context, toZ3Expr(*roundingMode).AST,
+                                         toZ3Expr(*From).AST,
+                                         toSolverSort<Z3Sort>(*To).Sort))));
 }
 
 SMTExprRef Z3Solver::mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
-      Context,
-      z3::to_expr(*Context, Z3_mk_fpa_to_fp_unsigned(
-                                *Context, toZ3Expr(*roundingMode).AST,
-                                toZ3Expr(*From).AST, toZ3Sort(*To).Sort))));
+      Context, z3::to_expr(*Context, Z3_mk_fpa_to_fp_unsigned(
+                                         *Context, toZ3Expr(*roundingMode).AST,
+                                         toZ3Expr(*From).AST,
+                                         toSolverSort<Z3Sort>(*To).Sort))));
 }
 
 SMTExprRef Z3Solver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
@@ -524,8 +508,8 @@ SMTExprRef Z3Solver::mkBitvector(const int64_t Int, unsigned BitWidth) {
 }
 
 SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
-  return newExprRef(
-      Z3Expr(Context, Context->constant(Name, toZ3Sort(*Sort).Sort)));
+  return newExprRef(Z3Expr(
+      Context, Context->constant(Name, toSolverSort<Z3Sort>(*Sort).Sort)));
 }
 
 SMTExprRef Z3Solver::mkFloat(const float Float) {
@@ -563,7 +547,8 @@ SMTExprRef Z3Solver::mkNaN(const bool Sgn, const unsigned ExpWidth,
   SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
   SMTExprRef theNaN = newExprRef(Z3Expr(
       Context,
-      z3::to_expr(*Context, Z3_mk_fpa_nan(*Context, toZ3Sort(*sort).Sort))));
+      z3::to_expr(*Context,
+                  Z3_mk_fpa_nan(*Context, toSolverSort<Z3Sort>(*sort).Sort))));
 
   return Sgn ? mkFPNeg(theNaN) : theNaN;
 }
@@ -571,10 +556,11 @@ SMTExprRef Z3Solver::mkNaN(const bool Sgn, const unsigned ExpWidth,
 SMTExprRef Z3Solver::mkInf(const bool Sgn, const unsigned ExpWidth,
                            const unsigned SigWidth) {
   SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
-  return newExprRef(
-      Z3Expr(Context,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_inf(*Context, toZ3Sort(*sort).Sort, Sgn))));
+  return newExprRef(Z3Expr(
+      Context,
+      z3::to_expr(
+          *Context,
+          Z3_mk_fpa_inf(*Context, toSolverSort<Z3Sort>(*sort).Sort, Sgn))));
 }
 
 checkResult Z3Solver::check() {

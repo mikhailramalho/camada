@@ -36,26 +36,10 @@ public:
   using SolverSort<CVC4ContextRef, CVC4::Type>::SolverSort;
   virtual ~CVC4Sort() = default;
 
-  bool isBitvectorSortImpl() const override;
-
-  bool isBooleanSortImpl() const override;
-
-  bool isFloatSortImpl() const override;
-
-  bool isRoundingModeSortImpl() const override;
-
-  unsigned getBitvectorSortSizeImpl() const override;
-
-  unsigned getFloatSortSizeImpl() const override;
-
   bool equal_to(SMTSort const &Other) const override;
 
   void dump() const override;
 }; // end class CVC4Sort
-
-static inline const CVC4Sort &toCVC4Sort(const SMTSort &S) {
-  return dynamic_cast<const CVC4Sort &>(S);
-}
 
 class CVC4Expr : public SolverAST<CVC4ContextRef, CVC4::Expr> {
 public:
@@ -84,8 +68,6 @@ public:
   virtual ~CVC4Solver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
-
-  camada::SMTSortRef newSortRef(const camada::SMTSort &Sort) const override;
 
   camada::SMTExprRef newExprRef(const camada::SMTExpr &Exp) const override;
 

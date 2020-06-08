@@ -36,26 +36,10 @@ public:
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
   virtual ~Z3Sort() = default;
 
-  bool isBitvectorSortImpl() const override;
-
-  bool isBooleanSortImpl() const override;
-
-  bool isFloatSortImpl() const override;
-
-  bool isRoundingModeSortImpl() const override;
-
-  unsigned getBitvectorSortSizeImpl() const override;
-
-  unsigned getFloatSortSizeImpl() const override;
-
   bool equal_to(SMTSort const &Other) const override;
 
   void dump() const override;
 }; // end class Z3Sort
-
-static inline const Z3Sort &toZ3Sort(const SMTSort &S) {
-  return dynamic_cast<const Z3Sort &>(S);
-}
 
 class Z3Expr : public SolverAST<Z3ContextRef, z3::expr> {
 public:
@@ -83,8 +67,6 @@ public:
   virtual ~Z3Solver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
-
-  camada::SMTSortRef newSortRef(const camada::SMTSort &Sort) const override;
 
   camada::SMTExprRef newExprRef(const camada::SMTExpr &Exp) const override;
 

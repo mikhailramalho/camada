@@ -28,24 +28,6 @@ using namespace camada;
 
 #ifdef SOLVER_CVC4_ENABLED
 
-bool CVC4Sort::isBitvectorSortImpl() const { return Sort.isBitVector(); }
-
-bool CVC4Sort::isBooleanSortImpl() const { return Sort.isBoolean(); }
-
-bool CVC4Sort::isFloatSortImpl() const { return Sort.isFloatingPoint(); }
-
-bool CVC4Sort::isRoundingModeSortImpl() const { return Sort.isRoundingMode(); }
-
-unsigned CVC4Sort::getBitvectorSortSizeImpl() const {
-  CVC4::BitVectorType bvType = static_cast<CVC4::BitVectorType>(Sort);
-  return bvType.getSize();
-}
-
-unsigned CVC4Sort::getFloatSortSizeImpl() const {
-  CVC4::FloatingPointType fpType = static_cast<CVC4::FloatingPointType>(Sort);
-  return fpType.getExponentSize() + fpType.getSignificandSize();
-}
-
 bool CVC4Sort::equal_to(SMTSort const &Other) const {
   return Sort == dynamic_cast<const CVC4Sort &>(Other).Sort;
 }
@@ -72,34 +54,37 @@ void CVC4Solver::addConstraint(const SMTExprRef &Exp) {
   Solver.assertFormula(toCVC4Expr(*Exp).AST);
 }
 
-SMTSortRef CVC4Solver::newSortRef(const SMTSort &Sort) const {
-  return std::make_shared<CVC4Sort>(toCVC4Sort(Sort));
-}
-
 SMTExprRef CVC4Solver::newExprRef(const SMTExpr &Exp) const {
   return std::make_shared<CVC4Expr>(toCVC4Expr(Exp));
 }
 
 SMTSortRef CVC4Solver::getBoolSort() {
-  return newSortRef(CVC4Sort(Context, Context->booleanType()));
+  return newSortRef<camada::SolverBoolSort<CVC4Sort>>(
+      camada::SolverBoolSort<CVC4Sort>(Context, Context->booleanType()));
 }
 
 SMTSortRef CVC4Solver::getBitvectorSort(unsigned BitWidth) {
-  return newSortRef(CVC4Sort(Context, Context->mkBitVectorType(BitWidth)));
+  return newSortRef<camada::SolverBVSort<CVC4Sort>>(
+      camada::SolverBVSort<CVC4Sort>(BitWidth, Context,
+                                     Context->mkBitVectorType(BitWidth)));
 }
 
 SMTSortRef CVC4Solver::getRoundingModeSort() {
-  return newSortRef(CVC4Sort(Context, Context->roundingModeType()));
+  return newSortRef<camada::SolverRMSort<CVC4Sort>>(
+      camada::SolverRMSort<CVC4Sort>(Context, Context->roundingModeType()));
 }
 
 SMTSortRef CVC4Solver::getFloatSort(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  return newSortRef(
-      CVC4Sort(Context, Context->mkFloatingPointType(ExpWidth, SigWidth)));
+  return newSortRef<camada::SolverFPSort<CVC4Sort>>(
+      camada::SolverFPSort<CVC4Sort>(
+          ExpWidth, SigWidth, Context,
+          Context->mkFloatingPointType(ExpWidth, SigWidth)));
 }
 
 SMTSortRef CVC4Solver::getSort(const SMTExprRef &Exp) {
-  return newSortRef(CVC4Sort(Context, Context->getType(toCVC4Expr(*Exp).AST)));
+  abortWithMessage("Currently unimplemented");
+  return nullptr;
 }
 
 SMTExprRef CVC4Solver::mkBVNeg(const SMTExprRef &Exp) {
@@ -425,7 +410,7 @@ SMTExprRef CVC4Solver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
 
   CVC4::FloatingPointType fto =
-      static_cast<CVC4::FloatingPointType>(toCVC4Sort(*To).Sort);
+      static_cast<CVC4::FloatingPointType>(toSolverSort<CVC4Sort>(*To).Sort);
   unsigned expWidth = fto.getExponentSize();
   unsigned mantWidth = fto.getSignificandSize();
 
@@ -442,7 +427,7 @@ SMTExprRef CVC4Solver::mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
 
   CVC4::FloatingPointType fto =
-      static_cast<CVC4::FloatingPointType>(toCVC4Sort(*To).Sort);
+      static_cast<CVC4::FloatingPointType>(toSolverSort<CVC4Sort>(*To).Sort);
   unsigned expWidth = fto.getExponentSize();
   unsigned mantWidth = fto.getSignificandSize();
 
@@ -459,7 +444,7 @@ SMTExprRef CVC4Solver::mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
 
   CVC4::FloatingPointType fto =
-      static_cast<CVC4::FloatingPointType>(toCVC4Sort(*To).Sort);
+      static_cast<CVC4::FloatingPointType>(toSolverSort<CVC4Sort>(*To).Sort);
   unsigned expWidth = fto.getExponentSize();
   unsigned mantWidth = fto.getSignificandSize();
 
@@ -594,8 +579,8 @@ SMTExprRef CVC4Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
     return newExprRef(CVC4Expr(Context, SymbolTable.lookup(Name)));
 
   // Time for a new one.
-  SMTExprRef sym = newExprRef(
-      CVC4Expr(Context, Context->mkVar(Name, toCVC4Sort(*Sort).Sort)));
+  SMTExprRef sym = newExprRef(CVC4Expr(
+      Context, Context->mkVar(Name, toSolverSort<CVC4Sort>(*Sort).Sort)));
   SymbolTable.bind(Name, toCVC4Expr(*sym).AST, true);
   return sym;
 }

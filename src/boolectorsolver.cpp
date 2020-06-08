@@ -57,37 +57,6 @@ void BtorContext::reset() {
   createAndConfig();
 }
 
-bool BtorSort::isBitvectorSortImpl() const {
-  return boolector_is_bitvec_sort(Context->Context, Sort);
-}
-
-bool BtorSort::isBooleanSortImpl() const {
-  // There is not is_boolean_sort, so we need to check if the sort is not
-  // everything else
-  return !(boolector_is_bitvec_sort(Context->Context, Sort) &&
-           boolector_is_fun_sort(Context->Context, Sort) &&
-           boolector_is_array_sort(Context->Context, Sort));
-}
-
-bool BtorSort::isFloatSortImpl() const {
-  // Always false: btor does not support fp
-  return false;
-}
-
-bool BtorSort::isRoundingModeSortImpl() const {
-  // Always false: btor does not support fp
-  return false;
-}
-
-unsigned BtorSort::getBitvectorSortSizeImpl() const {
-  return boolector_bitvec_sort_get_width(Context->Context, Sort);
-}
-
-unsigned BtorSort::getFloatSortSizeImpl() const {
-  // Returning 0 should trigger a failure in camada::getFloatSortSize()
-  return 0;
-}
-
 bool BtorSort::equal_to(SMTSort const &Other) const {
   // boolector  API does not provide equality function for sort
   const BtorSort &bs = dynamic_cast<const BtorSort &>(Other);
@@ -124,21 +93,21 @@ void BtorSolver::addConstraint(const SMTExprRef &Exp) {
   boolector_assert(Context->Context, toBtorExpr(*Exp).AST);
 }
 
-SMTSortRef BtorSolver::newSortRef(const SMTSort &Sort) const {
-  return std::make_shared<BtorSort>(toBtorSort(Sort));
-}
-
 SMTExprRef BtorSolver::newExprRef(const SMTExpr &Exp) const {
   return std::make_shared<BtorExpr>(toBtorExpr(Exp));
 }
 
 SMTSortRef BtorSolver::getBoolSort() {
-  return newSortRef(BtorSort(Context, boolector_bool_sort(Context->Context)));
+  return newSortRef<camada::SolverBoolSort<BtorSort>>(
+      camada::SolverBoolSort<BtorSort>(Context,
+                                       boolector_bool_sort(Context->Context)));
 }
 
 SMTSortRef BtorSolver::getBitvectorSort(unsigned BitWidth) {
-  return newSortRef(
-      BtorSort(Context, boolector_bitvec_sort(Context->Context, BitWidth)));
+  return newSortRef<camada::SolverBVSort<BtorSort>>(
+      camada::SolverBVSort<BtorSort>(
+          BitWidth, Context,
+          boolector_bitvec_sort(Context->Context, BitWidth)));
 }
 
 SMTSortRef BtorSolver::getRoundingModeSort() {
@@ -150,8 +119,8 @@ SMTSortRef BtorSolver::getFloatSort(const unsigned, const unsigned) {
 }
 
 SMTSortRef BtorSolver::getSort(const SMTExprRef &Exp) {
-  return newSortRef(BtorSort(
-      Context, boolector_get_sort(Context->Context, toBtorExpr(*Exp).AST)));
+  abortWithMessage("Currently unimplemented");
+  return nullptr;
 }
 
 SMTExprRef BtorSolver::mkBVNeg(const SMTExprRef &Exp) {
@@ -509,9 +478,10 @@ SMTExprRef BtorSolver::mkBoolean(const bool b) {
 
 SMTExprRef BtorSolver::mkBitvector(const int64_t Int, unsigned BitWidth) {
   const SMTSortRef Sort = getBitvectorSort(BitWidth);
-  return newExprRef(BtorExpr(
-      Context, boolector_constd(Context->Context, toBtorSort(*Sort).Sort,
-                                std::to_string(Int).c_str())));
+  return newExprRef(
+      BtorExpr(Context, boolector_constd(Context->Context,
+                                         toSolverSort<BtorSort>(*Sort).Sort,
+                                         std::to_string(Int).c_str())));
 }
 
 SMTExprRef BtorSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
@@ -520,9 +490,10 @@ SMTExprRef BtorSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
     return it->second;
 
   auto inserted = SymbolTable.insert(SymbolTablet::value_type(
-      Name, newExprRef(BtorExpr(Context,
-                                boolector_var(Context->Context,
-                                              toBtorSort(*Sort).Sort, Name)))));
+      Name,
+      newExprRef(BtorExpr(
+          Context, boolector_var(Context->Context,
+                                 toSolverSort<BtorSort>(*Sort).Sort, Name)))));
 
   abortCondWithMessage(inserted.second,
                        "Could not cache new Boolector variable");

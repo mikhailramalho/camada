@@ -42,7 +42,10 @@ public:
   virtual ~SMTSolver() = default;
 
   /// Wrapper to create new SMTSort
-  virtual SMTSortRef newSortRef(const SMTSort &Sort) const = 0;
+  template <typename SolverSort>
+  SMTSortRef newSortRef(const SMTSort &Sort) const {
+    return std::make_shared<SolverSort>(toSolverSort<SolverSort>(Sort));
+  };
 
   /// Wrapper to create new SMTExpr
   virtual SMTExprRef newExprRef(const SMTExpr &Exp) const = 0;

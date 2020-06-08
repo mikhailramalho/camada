@@ -49,26 +49,10 @@ public:
   using SolverSort<YicesContextRef, type_t>::SolverSort;
   virtual ~YicesSort() = default;
 
-  bool isBitvectorSortImpl() const override;
-
-  bool isBooleanSortImpl() const override;
-
-  bool isFloatSortImpl() const override;
-
-  bool isRoundingModeSortImpl() const override;
-
-  unsigned getBitvectorSortSizeImpl() const override;
-
-  unsigned getFloatSortSizeImpl() const override;
-
   bool equal_to(SMTSort const &Other) const override;
 
   void dump() const override;
 }; // end class YicesSort
-
-static inline const YicesSort &toYicesSort(const SMTSort &S) {
-  return dynamic_cast<const YicesSort &>(S);
-}
 
 class YicesExpr : public SolverAST<YicesContextRef, term_t> {
 public:
@@ -97,8 +81,6 @@ public:
   virtual ~YicesSolver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
-
-  camada::SMTSortRef newSortRef(const camada::SMTSort &Sort) const override;
 
   camada::SMTExprRef newExprRef(const camada::SMTExpr &Exp) const override;
 

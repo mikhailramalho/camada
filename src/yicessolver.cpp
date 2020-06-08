@@ -52,31 +52,6 @@ void YicesContext::reset() {
   createAndConfig();
 }
 
-bool YicesSort::isBitvectorSortImpl() const {
-  return yices_type_is_bitvector(Sort);
-}
-
-bool YicesSort::isBooleanSortImpl() const { return yices_type_is_bool(Sort); }
-
-bool YicesSort::isFloatSortImpl() const {
-  // Always false: yices does not support fp
-  return false;
-}
-
-bool YicesSort::isRoundingModeSortImpl() const {
-  // Always false: yices does not support fp
-  return false;
-}
-
-unsigned YicesSort::getBitvectorSortSizeImpl() const {
-  return yices_bvtype_size(Sort);
-}
-
-unsigned YicesSort::getFloatSortSizeImpl() const {
-  // Returning 0 should trigger a failure in camada::getFloatSortSize()
-  return 0;
-}
-
 bool YicesSort::equal_to(SMTSort const &Other) const {
   // yices does not provide equality function for types,
   // but subtipe relations, so x == y <==> (x <= y /\ y <= x)
@@ -117,12 +92,6 @@ void YicesSolver::addConstraint(const SMTExprRef &Exp) {
   yices_assert_formula(Context->Context, toYicesExpr(*Exp).AST);
 }
 
-SMTSortRef YicesSolver::newSortRef(const SMTSort &Sort) const {
-  abortCondWithMessage(toYicesSort(Sort).Sort != NULL_TYPE,
-                       "Error when creating Yices sort.");
-  return std::make_shared<YicesSort>(toYicesSort(Sort));
-}
-
 SMTExprRef YicesSolver::newExprRef(const SMTExpr &Exp) const {
   abortCondWithMessage(toYicesExpr(Exp).AST != NULL_TERM,
                        "Error when creating Yices expr.");
@@ -130,11 +99,14 @@ SMTExprRef YicesSolver::newExprRef(const SMTExpr &Exp) const {
 }
 
 SMTSortRef YicesSolver::getBoolSort() {
-  return newSortRef(YicesSort(Context, yices_bool_type()));
+  return newSortRef<camada::SolverBoolSort<YicesSort>>(
+      camada::SolverBoolSort<YicesSort>(Context, yices_bool_type()));
 }
 
 SMTSortRef YicesSolver::getBitvectorSort(unsigned BitWidth) {
-  return newSortRef(YicesSort(Context, yices_bv_type(BitWidth)));
+  return newSortRef<camada::SolverBVSort<YicesSort>>(
+      camada::SolverBVSort<YicesSort>(BitWidth, Context,
+                                      yices_bv_type(BitWidth)));
 }
 
 SMTSortRef YicesSolver::getRoundingModeSort() {
@@ -146,8 +118,8 @@ SMTSortRef YicesSolver::getFloatSort(const unsigned, const unsigned) {
 }
 
 SMTSortRef YicesSolver::getSort(const SMTExprRef &Exp) {
-  return newSortRef(
-      YicesSort(Context, yices_type_of_term(toYicesExpr(*Exp).AST)));
+  abortWithMessage("Currently unimplemented");
+  return nullptr;
 }
 
 SMTExprRef YicesSolver::mkBVNeg(const SMTExprRef &Exp) {
@@ -476,7 +448,7 @@ SMTExprRef YicesSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
   abortCondWithMessage(yices_get_term_by_name(Name) == NULL_TERM,
                        "Trying to create a symbol but it already exists");
 
-  term_t t = yices_new_uninterpreted_term(toYicesSort(*Sort).Sort);
+  term_t t = yices_new_uninterpreted_term(toSolverSort<YicesSort>(*Sort).Sort);
   abortCondWithMessage(t != NULL_TERM,
                        "Error when trying to create new a symbol");
 

@@ -29,36 +29,6 @@ using namespace camada;
 
 #ifdef SOLVER_MATHSAT_ENABLED
 
-bool MathSATSort::isBitvectorSortImpl() const {
-  std::size_t w;
-  return msat_is_bv_type(*Context, Sort, &w);
-}
-
-bool MathSATSort::isBooleanSortImpl() const {
-  return msat_is_bool_type(*Context, Sort);
-}
-
-bool MathSATSort::isFloatSortImpl() const {
-  std::size_t exp, sig;
-  return msat_is_fp_type(*Context, Sort, &exp, &sig);
-}
-
-bool MathSATSort::isRoundingModeSortImpl() const {
-  return msat_is_fp_roundingmode_type(*Context, Sort);
-}
-
-unsigned MathSATSort::getBitvectorSortSizeImpl() const {
-  std::size_t w;
-  msat_is_bv_type(*Context, Sort, &w);
-  return w;
-}
-
-unsigned MathSATSort::getFloatSortSizeImpl() const {
-  std::size_t exp, sig;
-  msat_is_fp_type(*Context, Sort, &exp, &sig);
-  return exp + sig + 1;
-}
-
 bool MathSATSort::equal_to(SMTSort const &Other) const {
   return msat_type_equals(Sort, dynamic_cast<const MathSATSort &>(Other).Sort);
 }
@@ -104,12 +74,6 @@ void MathSATSolver::addConstraint(const SMTExprRef &Exp) {
   msat_assert_formula(*Context, toMathSATExpr(*Exp).AST);
 }
 
-SMTSortRef MathSATSolver::newSortRef(const SMTSort &Sort) const {
-  abortCondWithMessage(!MSAT_ERROR_TYPE(toMathSATSort(Sort).Sort),
-                       "Error when creating MathSAT sort.");
-  return std::make_shared<MathSATSort>(toMathSATSort(Sort));
-}
-
 SMTExprRef MathSATSolver::newExprRef(const SMTExpr &Exp) const {
   abortCondWithMessage(!MSAT_ERROR_TERM(toMathSATExpr(Exp).AST),
                        "Error when creating MathSAT expr.");
@@ -117,27 +81,34 @@ SMTExprRef MathSATSolver::newExprRef(const SMTExpr &Exp) const {
 }
 
 SMTSortRef MathSATSolver::getBoolSort() {
-  return newSortRef(MathSATSort(Context, msat_get_bool_type(*Context)));
+  return newSortRef<camada::SolverBoolSort<MathSATSort>>(
+      camada::SolverBoolSort<MathSATSort>(Context,
+                                          msat_get_bool_type(*Context)));
 }
 
 SMTSortRef MathSATSolver::getBitvectorSort(unsigned BitWidth) {
-  return newSortRef(MathSATSort(Context, msat_get_bv_type(*Context, BitWidth)));
+  return newSortRef<camada::SolverBVSort<MathSATSort>>(
+      camada::SolverBVSort<MathSATSort>(BitWidth, Context,
+                                        msat_get_bv_type(*Context, BitWidth)));
 }
 
 SMTSortRef MathSATSolver::getRoundingModeSort() {
-  return newSortRef(
-      MathSATSort(Context, msat_get_fp_roundingmode_type(*Context)));
+  return newSortRef<camada::SolverRMSort<MathSATSort>>(
+      camada::SolverRMSort<MathSATSort>(
+          Context, msat_get_fp_roundingmode_type(*Context)));
 }
 
 SMTSortRef MathSATSolver::getFloatSort(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return newSortRef(
-      MathSATSort(Context, msat_get_fp_type(*Context, ExpWidth, SigWidth)));
+  return newSortRef<camada::SolverFPSort<MathSATSort>>(
+      camada::SolverFPSort<MathSATSort>(
+          ExpWidth, SigWidth, Context,
+          msat_get_fp_type(*Context, ExpWidth, SigWidth)));
 }
 
 SMTSortRef MathSATSolver::getSort(const SMTExprRef &Exp) {
-  return newSortRef(
-      MathSATSort(Context, msat_term_get_type(toMathSATExpr(*Exp).AST)));
+  abortWithMessage("Currently unimplemented");
+  return nullptr;
 }
 
 SMTExprRef MathSATSolver::mkBVNeg(const SMTExprRef &Exp) {
@@ -428,7 +399,8 @@ SMTExprRef MathSATSolver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                    const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   std::size_t ExpWidth, MantWidth;
-  msat_is_fp_type(*Context, toMathSATSort(*To).Sort, &ExpWidth, &MantWidth);
+  msat_is_fp_type(*Context, toSolverSort<MathSATSort>(*To).Sort, &ExpWidth,
+                  &MantWidth);
   return newExprRef(
       MathSATExpr(Context, msat_make_fp_cast(*Context, ExpWidth, MantWidth,
                                              toMathSATExpr(*roundingMode).AST,
@@ -440,7 +412,8 @@ SMTExprRef MathSATSolver::mkSBVtoFP(const SMTExprRef &From,
                                     const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   std::size_t ExpWidth, MantWidth;
-  msat_is_fp_type(*Context, toMathSATSort(*To).Sort, &ExpWidth, &MantWidth);
+  msat_is_fp_type(*Context, toSolverSort<MathSATSort>(*To).Sort, &ExpWidth,
+                  &MantWidth);
   return newExprRef(MathSATExpr(
       Context, msat_make_fp_from_sbv(*Context, ExpWidth, MantWidth,
                                      toMathSATExpr(*roundingMode).AST,
@@ -452,7 +425,8 @@ SMTExprRef MathSATSolver::mkUBVtoFP(const SMTExprRef &From,
                                     const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   std::size_t ExpWidth, MantWidth;
-  msat_is_fp_type(*Context, toMathSATSort(*To).Sort, &ExpWidth, &MantWidth);
+  msat_is_fp_type(*Context, toSolverSort<MathSATSort>(*To).Sort, &ExpWidth,
+                  &MantWidth);
   return newExprRef(MathSATExpr(
       Context, msat_make_fp_from_ubv(*Context, ExpWidth, MantWidth,
                                      toMathSATExpr(*roundingMode).AST,
@@ -603,8 +577,8 @@ SMTExprRef MathSATSolver::mkBitvector(const int64_t Int, unsigned BitWidth) {
 }
 
 SMTExprRef MathSATSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
-  msat_decl d =
-      msat_declare_function(*Context, Name, toMathSATSort(*Sort).Sort);
+  msat_decl d = msat_declare_function(*Context, Name,
+                                      toSolverSort<MathSATSort>(*Sort).Sort);
   abortCondWithMessage(!MSAT_ERROR_DECL(d),
                        "Invalid function symbol declaration sort");
 

@@ -36,26 +36,10 @@ public:
   using SolverSort<MathSATContextRef, msat_type>::SolverSort;
   virtual ~MathSATSort() = default;
 
-  bool isBitvectorSortImpl() const override;
-
-  bool isBooleanSortImpl() const override;
-
-  bool isFloatSortImpl() const override;
-
-  bool isRoundingModeSortImpl() const override;
-
-  unsigned getBitvectorSortSizeImpl() const override;
-
-  unsigned getFloatSortSizeImpl() const override;
-
   bool equal_to(SMTSort const &Other) const override;
 
   void dump() const override;
 }; // end class MathSATSort
-
-static inline const MathSATSort &toMathSATSort(const SMTSort &S) {
-  return dynamic_cast<const MathSATSort &>(S);
-}
 
 class MathSATExpr : public SolverAST<MathSATContextRef, msat_term> {
 public:
@@ -84,8 +68,6 @@ public:
   virtual ~MathSATSolver();
 
   void addConstraint(const camada::SMTExprRef &Exp) override;
-
-  camada::SMTSortRef newSortRef(const camada::SMTSort &Sort) const override;
 
   camada::SMTExprRef newExprRef(const camada::SMTExpr &Exp) const override;
 
