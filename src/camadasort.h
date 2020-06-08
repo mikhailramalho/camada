@@ -98,6 +98,7 @@ protected:
 /// Shared pointer for SMTSorts, used by SMTSolver API.
 using SMTSortRef = std::shared_ptr<SMTSort>;
 
+/// Template to hold Solver specific Context and Sort
 template <typename SolverContextRef, typename TheSort>
 class SolverSort : public SMTSort {
 public:
