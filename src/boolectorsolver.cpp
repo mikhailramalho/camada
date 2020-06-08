@@ -562,13 +562,3 @@ void BtorSolver::dumpModel() {
 }
 
 #endif
-
-SMTSolverRef camada::createBoolectorSolver() {
-#if SOLVER_BOOLECTOR_ENABLED
-  return std::make_shared<BtorSolver>();
-#else
-  fmt::print(stderr, "Camada was not compiled with Boolector support, rebuild "
-                     "with -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON\n");
-  abort();
-#endif
-}

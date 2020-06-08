@@ -678,13 +678,3 @@ void CVC4Solver::dump() {
 void CVC4Solver::dumpModel() { Solver.printSynthSolution(std::cerr); }
 
 #endif
-
-SMTSolverRef camada::createCVC4Solver() {
-#if SOLVER_CVC4_ENABLED
-  return std::make_shared<CVC4Solver>();
-#else
-  fmt::print(stderr, "Camada was not compiled with CVC4 support, rebuild with "
-                     "-DCAMADA_ENABLE_SOLVER_CVC4=ON\n");
-  abort();
-#endif
-}

@@ -588,13 +588,3 @@ void Z3Solver::dumpModel() {
 }
 
 #endif
-
-SMTSolverRef camada::createZ3Solver() {
-#if SOLVER_Z3_ENABLED
-  return std::make_shared<Z3Solver>();
-#else
-  fmt::print(stderr, "Camada was not compiled with Z3 support, rebuild with "
-                     "-DCAMADA_ENABLE_SOLVER_Z3=ON\n");
-  abort();
-#endif
-}

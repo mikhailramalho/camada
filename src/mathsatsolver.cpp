@@ -710,14 +710,3 @@ void MathSATSolver::dumpModel() {
 }
 
 #endif
-
-SMTSolverRef camada::createMathSATSolver() {
-#if SOLVER_MATHSAT_ENABLED
-  return std::make_shared<MathSATSolver>();
-#else
-  fmt::print(stderr,
-             "Camada was not compiled with MathSAT support, rebuild with "
-             "-DCAMADA_ENABLE_SOLVER_MATHSAT=ON\n");
-  abort();
-#endif
-}

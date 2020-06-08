@@ -524,13 +524,3 @@ void YicesSolver::dumpModel() {
 }
 
 #endif
-
-SMTSolverRef camada::createYicesSolver() {
-#if SOLVER_YICES_ENABLED
-  return std::make_shared<YicesSolver>();
-#else
-  fmt::print(stderr, "Camada was not compiled with YICES support, rebuild with "
-                     "-DCAMADA_ENABLE_SOLVER_YICES=ON\n");
-  abort();
-#endif
-}
