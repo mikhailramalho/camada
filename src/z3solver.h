@@ -41,9 +41,9 @@ public:
   void dump() const override;
 }; // end class Z3Sort
 
-class Z3Expr : public SolverAST<Z3ContextRef, z3::expr> {
+class Z3Expr : public SolverExpr<Z3ContextRef, z3::expr> {
 public:
-  using SolverAST<Z3ContextRef, z3::expr>::SolverAST;
+  using SolverExpr<Z3ContextRef, z3::expr>::SolverExpr;
   virtual ~Z3Expr() = default;
 
   /// Comparison of AST equality, not model equivalence.

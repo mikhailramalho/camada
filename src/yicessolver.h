@@ -54,9 +54,9 @@ public:
   void dump() const override;
 }; // end class YicesSort
 
-class YicesExpr : public SolverAST<YicesContextRef, term_t> {
+class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
 public:
-  using SolverAST<YicesContextRef, term_t>::SolverAST;
+  using SolverExpr<YicesContextRef, term_t>::SolverExpr;
   virtual ~YicesExpr() = default;
 
   /// Comparison of AST equality, not model equivalence.

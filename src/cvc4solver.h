@@ -41,9 +41,9 @@ public:
   void dump() const override;
 }; // end class CVC4Sort
 
-class CVC4Expr : public SolverAST<CVC4ContextRef, CVC4::Expr> {
+class CVC4Expr : public SolverExpr<CVC4ContextRef, CVC4::Expr> {
 public:
-  using SolverAST<CVC4ContextRef, CVC4::Expr>::SolverAST;
+  using SolverExpr<CVC4ContextRef, CVC4::Expr>::SolverExpr;
   virtual ~CVC4Expr() = default;
 
   /// Comparison of AST equality, not model equivalence.

@@ -55,9 +55,9 @@ public:
   bool equal_to(SMTSort const &Other) const override;
 }; // end class BtorSort
 
-class BtorExpr : public SolverAST<BtorContextRef, BoolectorNode *> {
+class BtorExpr : public SolverExpr<BtorContextRef, BoolectorNode *> {
 public:
-  using SolverAST<BtorContextRef, BoolectorNode *>::SolverAST;
+  using SolverExpr<BtorContextRef, BoolectorNode *>::SolverExpr;
   virtual ~BtorExpr() = default;
 
   /// Comparison of AST equality, not model equivalence.

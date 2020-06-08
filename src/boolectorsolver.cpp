@@ -73,16 +73,16 @@ bool BtorSort::equal_to(SMTSort const &Other) const {
 
 bool BtorExpr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
-      boolector_is_equal_sort(Context->Context, AST,
-                              dynamic_cast<const BtorExpr &>(Other).AST),
+      boolector_is_equal_sort(Context->Context, Expr,
+                              dynamic_cast<const BtorExpr &>(Other).Expr),
       "AST's must have the same sort");
-  return (boolector_get_node_id(Context->Context, AST) ==
+  return (boolector_get_node_id(Context->Context, Expr) ==
           boolector_get_node_id(Context->Context,
-                                dynamic_cast<const BtorExpr &>(Other).AST));
+                                dynamic_cast<const BtorExpr &>(Other).Expr));
 }
 
 void BtorExpr::dump() const {
-  boolector_dump_smt2_node(Context->Context, stderr, AST);
+  boolector_dump_smt2_node(Context->Context, stderr, Expr);
 }
 
 BtorSolver::BtorSolver() : Context(std::make_shared<BtorContext>()) {}
@@ -90,7 +90,7 @@ BtorSolver::BtorSolver() : Context(std::make_shared<BtorContext>()) {}
 BtorSolver::BtorSolver(BtorContextRef C) : Context(std::move(C)) {}
 
 void BtorSolver::addConstraint(const SMTExprRef &Exp) {
-  boolector_assert(Context->Context, toBtorExpr(*Exp).AST);
+  boolector_assert(Context->Context, toBtorExpr(*Exp).Expr);
 }
 
 SMTExprRef BtorSolver::newExprRef(const SMTExpr &Exp) const {
@@ -124,193 +124,193 @@ SMTSortRef BtorSolver::getSort(const SMTExprRef &Exp) {
 }
 
 SMTExprRef BtorSolver::mkBVNeg(const SMTExprRef &Exp) {
-  return newExprRef(
-      BtorExpr(Context, boolector_neg(Context->Context, toBtorExpr(*Exp).AST)));
+  return newExprRef(BtorExpr(
+      Context, boolector_neg(Context->Context, toBtorExpr(*Exp).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVNot(const SMTExprRef &Exp) {
-  return newExprRef(
-      BtorExpr(Context, boolector_not(Context->Context, toBtorExpr(*Exp).AST)));
+  return newExprRef(BtorExpr(
+      Context, boolector_not(Context->Context, toBtorExpr(*Exp).Expr)));
 }
 
 SMTExprRef BtorSolver::mkNot(const SMTExprRef &Exp) {
-  return newExprRef(
-      BtorExpr(Context, boolector_not(Context->Context, toBtorExpr(*Exp).AST)));
+  return newExprRef(BtorExpr(
+      Context, boolector_not(Context->Context, toBtorExpr(*Exp).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_add(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_add(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_sub(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_sub(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_mul(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_mul(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_srem(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_srem(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_urem(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_urem(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_sdiv(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_sdiv(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_udiv(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_udiv(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_sll(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_sll(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_sra(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_sra(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_srl(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_srl(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_xor(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_xor(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_or(Context->Context, toBtorExpr(*LHS).AST,
-                                     toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_or(Context->Context, toBtorExpr(*LHS).Expr,
+                                     toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_and(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_and(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_ult(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_ult(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_slt(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_slt(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_ugt(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_ugt(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_sgt(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_sgt(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_ugte(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_ugte(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_slte(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_slte(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_ugte(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_ugte(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_sgte(Context->Context, toBtorExpr(*LHS).AST,
-                                       toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_sgte(Context->Context, toBtorExpr(*LHS).Expr,
+                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_and(Context->Context, toBtorExpr(*LHS).AST,
-                                      toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_and(Context->Context, toBtorExpr(*LHS).Expr,
+                                      toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_or(Context->Context, toBtorExpr(*LHS).AST,
-                                     toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_or(Context->Context, toBtorExpr(*LHS).Expr,
+                                     toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, boolector_eq(Context->Context, toBtorExpr(*LHS).AST,
-                                     toBtorExpr(*RHS).AST)));
+      BtorExpr(Context, boolector_eq(Context->Context, toBtorExpr(*LHS).Expr,
+                                     toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                              const SMTExprRef &F) {
   return newExprRef(BtorExpr(
-      Context, boolector_cond(Context->Context, toBtorExpr(*Cond).AST,
-                              toBtorExpr(*T).AST, toBtorExpr(*F).AST)));
+      Context, boolector_cond(Context->Context, toBtorExpr(*Cond).Expr,
+                              toBtorExpr(*T).Expr, toBtorExpr(*F).Expr)));
 }
 
 SMTExprRef BtorSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, boolector_sext(Context->Context, toBtorExpr(*Exp).AST, i)));
+      Context, boolector_sext(Context->Context, toBtorExpr(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, boolector_uext(Context->Context, toBtorExpr(*Exp).AST, i)));
+      Context, boolector_uext(Context->Context, toBtorExpr(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVExtract(unsigned High, unsigned Low,
                                    const SMTExprRef &Exp) {
   return newExprRef(
-      BtorExpr(Context, boolector_slice(Context->Context, toBtorExpr(*Exp).AST,
+      BtorExpr(Context, boolector_slice(Context->Context, toBtorExpr(*Exp).Expr,
                                         High, Low)));
 }
 
 SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-  return newExprRef(
-      BtorExpr(Context, boolector_concat(Context->Context, toBtorExpr(*LHS).AST,
-                                         toBtorExpr(*RHS).AST)));
+  return newExprRef(BtorExpr(Context, boolector_concat(Context->Context,
+                                                       toBtorExpr(*LHS).Expr,
+                                                       toBtorExpr(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkFPNeg(const SMTExprRef &) {
@@ -415,7 +415,7 @@ SMTExprRef BtorSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
 
 bool BtorSolver::getBoolean(const SMTExprRef &Exp) {
   const char *boolean =
-      boolector_bv_assignment(Context->Context, toBtorExpr(*Exp).AST);
+      boolector_bv_assignment(Context->Context, toBtorExpr(*Exp).Expr);
 
   abortCondWithMessage(boolean != nullptr,
                        "Boolector returned null bv assignment string");
@@ -438,7 +438,7 @@ bool BtorSolver::getBoolean(const SMTExprRef &Exp) {
 
 int64_t BtorSolver::getBitvector(const SMTExprRef &Exp) {
   const char *bv =
-      boolector_bv_assignment(Context->Context, toBtorExpr(*Exp).AST);
+      boolector_bv_assignment(Context->Context, toBtorExpr(*Exp).Expr);
   char *foo;
   int64_t finval = strtol(bv, &foo, 2);
 

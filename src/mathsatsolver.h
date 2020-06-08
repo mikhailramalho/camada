@@ -41,9 +41,9 @@ public:
   void dump() const override;
 }; // end class MathSATSort
 
-class MathSATExpr : public SolverAST<MathSATContextRef, msat_term> {
+class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
 public:
-  using SolverAST<MathSATContextRef, msat_term>::SolverAST;
+  using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
   virtual ~MathSATExpr() = default;
 
   /// Comparison of AST equality, not model equivalence.

@@ -39,14 +39,14 @@ void Z3Sort::dump() const {
 
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
-      Z3_is_eq_sort(*Context, AST.get_sort(),
-                    dynamic_cast<const Z3Expr &>(Other).AST.get_sort()),
+      Z3_is_eq_sort(*Context, Expr.get_sort(),
+                    dynamic_cast<const Z3Expr &>(Other).Expr.get_sort()),
       "AST's must have the same sort");
-  return z3::eq(AST, dynamic_cast<const Z3Expr &>(Other).AST);
+  return z3::eq(Expr, dynamic_cast<const Z3Expr &>(Other).Expr);
 }
 
 void Z3Expr::dump() const {
-  fmt::print(stderr, "{}\n", Z3_ast_to_string(*Context, AST));
+  fmt::print(stderr, "{}\n", Z3_ast_to_string(*Context, Expr));
 }
 
 // Function used to report errors
@@ -66,7 +66,7 @@ Z3Solver::Z3Solver(Z3ContextRef C, const z3::solver &S)
 }
 
 void Z3Solver::addConstraint(const SMTExprRef &Exp) {
-  Solver.add(toZ3Expr(*Exp).AST);
+  Solver.add(toZ3Expr(*Exp).Expr);
 }
 
 SMTExprRef Z3Solver::newExprRef(const SMTExpr &Exp) const {
@@ -100,176 +100,180 @@ SMTSortRef Z3Solver::getSort(const SMTExprRef &Exp) {
 }
 
 SMTExprRef Z3Solver::mkBVNeg(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, -toZ3Expr(*Exp).AST));
+  return newExprRef(Z3Expr(Context, -toZ3Expr(*Exp).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVNot(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, ~toZ3Expr(*Exp).AST));
+  return newExprRef(Z3Expr(Context, ~toZ3Expr(*Exp).Expr));
 }
 
 SMTExprRef Z3Solver::mkNot(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, !toZ3Expr(*Exp).AST));
+  return newExprRef(Z3Expr(Context, !toZ3Expr(*Exp).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST + toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr + toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST - toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr - toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST * toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr * toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::srem(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::srem(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::urem(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::urem(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST / toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr / toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::udiv(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::udiv(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::shl(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::shl(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::ashr(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::ashr(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::lshr(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::lshr(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST ^ toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr ^ toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST | toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr | toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST & toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr & toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::ult(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::ult(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::slt(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::slt(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::ugt(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::ugt(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST > toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr > toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::ule(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::ule(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::sle(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::sle(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::uge(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::uge(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST >= toZ3Expr(*RHS).AST));
+  return newExprRef(
+      Z3Expr(Context, toZ3Expr(*LHS).Expr >= toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST && toZ3Expr(*RHS).AST));
+  return newExprRef(
+      Z3Expr(Context, toZ3Expr(*LHS).Expr && toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST || toZ3Expr(*RHS).AST));
+  return newExprRef(
+      Z3Expr(Context, toZ3Expr(*LHS).Expr || toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST == toZ3Expr(*RHS).AST));
+  return newExprRef(
+      Z3Expr(Context, toZ3Expr(*LHS).Expr == toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                            const SMTExprRef &F) {
   return newExprRef(
-      Z3Expr(Context,
-             z3::ite(toZ3Expr(*Cond).AST, toZ3Expr(*T).AST, toZ3Expr(*F).AST)));
+      Z3Expr(Context, z3::ite(toZ3Expr(*Cond).Expr, toZ3Expr(*T).Expr,
+                              toZ3Expr(*F).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, z3::sext(toZ3Expr(*Exp).AST, i)));
+  return newExprRef(Z3Expr(Context, z3::sext(toZ3Expr(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, z3::zext(toZ3Expr(*Exp).AST, i)));
+  return newExprRef(Z3Expr(Context, z3::zext(toZ3Expr(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVExtract(unsigned High, unsigned Low,
                                  const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*Exp).AST.extract(High, Low)));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*Exp).Expr.extract(High, Low)));
 }
 
 SMTExprRef Z3Solver::mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::concat(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::concat(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkFPNeg(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, -toZ3Expr(*Exp).AST));
+  return newExprRef(Z3Expr(Context, -toZ3Expr(*Exp).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPIsInfinite(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
       Context, z3::to_expr(*Context, Z3_mk_fpa_is_infinite(
-                                         *Context, toZ3Expr(*Exp).AST))));
+                                         *Context, toZ3Expr(*Exp).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPIsNaN(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
       Context,
-      z3::to_expr(*Context, Z3_mk_fpa_is_nan(*Context, toZ3Expr(*Exp).AST))));
+      z3::to_expr(*Context, Z3_mk_fpa_is_nan(*Context, toZ3Expr(*Exp).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPIsNormal(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
-      Context, z3::to_expr(*Context,
-                           Z3_mk_fpa_is_normal(*Context, toZ3Expr(*Exp).AST))));
+      Context, z3::to_expr(*Context, Z3_mk_fpa_is_normal(
+                                         *Context, toZ3Expr(*Exp).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPIsZero(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
       Context,
-      z3::to_expr(*Context, Z3_mk_fpa_is_zero(*Context, toZ3Expr(*Exp).AST))));
+      z3::to_expr(*Context, Z3_mk_fpa_is_zero(*Context, toZ3Expr(*Exp).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -278,8 +282,8 @@ SMTExprRef Z3Solver::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
   return newExprRef(Z3Expr(
       Context,
       z3::to_expr(*Context,
-                  Z3_mk_fpa_mul(*Context, toZ3Expr(*roundingMode).AST,
-                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+                  Z3_mk_fpa_mul(*Context, toZ3Expr(*roundingMode).Expr,
+                                toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -288,13 +292,13 @@ SMTExprRef Z3Solver::mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
   return newExprRef(Z3Expr(
       Context,
       z3::to_expr(*Context,
-                  Z3_mk_fpa_div(*Context, toZ3Expr(*roundingMode).AST,
-                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+                  Z3_mk_fpa_div(*Context, toZ3Expr(*roundingMode).Expr,
+                                toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      Z3Expr(Context, z3::rem(toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST)));
+      Z3Expr(Context, z3::rem(toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -303,8 +307,8 @@ SMTExprRef Z3Solver::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
   return newExprRef(Z3Expr(
       Context,
       z3::to_expr(*Context,
-                  Z3_mk_fpa_add(*Context, toZ3Expr(*roundingMode).AST,
-                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+                  Z3_mk_fpa_add(*Context, toZ3Expr(*roundingMode).Expr,
+                                toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -313,50 +317,52 @@ SMTExprRef Z3Solver::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
   return newExprRef(Z3Expr(
       Context,
       z3::to_expr(*Context,
-                  Z3_mk_fpa_sub(*Context, toZ3Expr(*roundingMode).AST,
-                                toZ3Expr(*LHS).AST, toZ3Expr(*RHS).AST))));
+                  Z3_mk_fpa_sub(*Context, toZ3Expr(*roundingMode).Expr,
+                                toZ3Expr(*LHS).Expr, toZ3Expr(*RHS).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPSqrt(const SMTExprRef &Exp, const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
-      Context, z3::to_expr(*Context,
-                           Z3_mk_fpa_sqrt(*Context, toZ3Expr(*roundingMode).AST,
-                                          toZ3Expr(*Exp).AST))));
+      Context, z3::to_expr(*Context, Z3_mk_fpa_sqrt(
+                                         *Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*Exp).Expr))));
 };
 
 SMTExprRef Z3Solver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
                              const SMTExprRef &Z, const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
-      Context,
-      z3::to_expr(*Context, Z3_mk_fpa_fma(*Context, toZ3Expr(*roundingMode).AST,
-                                          toZ3Expr(*X).AST, toZ3Expr(*Y).AST,
-                                          toZ3Expr(*Z).AST))));
+      Context, z3::to_expr(*Context,
+                           Z3_mk_fpa_fma(*Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*X).Expr, toZ3Expr(*Y).Expr,
+                                         toZ3Expr(*Z).Expr))));
 };
 
 SMTExprRef Z3Solver::mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST < toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr < toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST > toZ3Expr(*RHS).AST));
+  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).Expr > toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, toZ3Expr(*LHS).AST <= toZ3Expr(*RHS).AST));
+  return newExprRef(
+      Z3Expr(Context, toZ3Expr(*LHS).Expr <= toZ3Expr(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, z3::to_expr(*Context, Z3_mk_fpa_geq(*Context, toZ3Expr(*LHS).AST,
-                                                   toZ3Expr(*RHS).AST))));
+  return newExprRef(
+      Z3Expr(Context,
+             z3::to_expr(*Context, Z3_mk_fpa_geq(*Context, toZ3Expr(*LHS).Expr,
+                                                 toZ3Expr(*RHS).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(
-      Context, z3::to_expr(*Context, Z3_mk_fpa_eq(*Context, toZ3Expr(*LHS).AST,
-                                                  toZ3Expr(*RHS).AST))));
+      Context, z3::to_expr(*Context, Z3_mk_fpa_eq(*Context, toZ3Expr(*LHS).Expr,
+                                                  toZ3Expr(*RHS).Expr))));
 }
 
 SMTExprRef Z3Solver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
@@ -364,8 +370,8 @@ SMTExprRef Z3Solver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
       Context, z3::to_expr(*Context, Z3_mk_fpa_to_fp_float(
-                                         *Context, toZ3Expr(*roundingMode).AST,
-                                         toZ3Expr(*From).AST,
+                                         *Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*From).Expr,
                                          toSolverSort<Z3Sort>(*To).Sort))));
 }
 
@@ -374,8 +380,8 @@ SMTExprRef Z3Solver::mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
       Context, z3::to_expr(*Context, Z3_mk_fpa_to_fp_signed(
-                                         *Context, toZ3Expr(*roundingMode).AST,
-                                         toZ3Expr(*From).AST,
+                                         *Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*From).Expr,
                                          toSolverSort<Z3Sort>(*To).Sort))));
 }
 
@@ -384,8 +390,8 @@ SMTExprRef Z3Solver::mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
       Context, z3::to_expr(*Context, Z3_mk_fpa_to_fp_unsigned(
-                                         *Context, toZ3Expr(*roundingMode).AST,
-                                         toZ3Expr(*From).AST,
+                                         *Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*From).Expr,
                                          toSolverSort<Z3Sort>(*To).Sort))));
 }
 
@@ -395,8 +401,8 @@ SMTExprRef Z3Solver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
   SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
   return newExprRef(Z3Expr(
       Context, z3::to_expr(*Context, Z3_mk_fpa_to_sbv(
-                                         *Context, toZ3Expr(*roundingMode).AST,
-                                         toZ3Expr(*From).AST, ToWidth))));
+                                         *Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*From).Expr, ToWidth))));
 }
 
 SMTExprRef Z3Solver::mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) {
@@ -405,25 +411,25 @@ SMTExprRef Z3Solver::mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) {
   SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
   return newExprRef(Z3Expr(
       Context, z3::to_expr(*Context, Z3_mk_fpa_to_ubv(
-                                         *Context, toZ3Expr(*roundingMode).AST,
-                                         toZ3Expr(*From).AST, ToWidth))));
+                                         *Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*From).Expr, ToWidth))));
 }
 
 SMTExprRef Z3Solver::mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(Z3Expr(
       Context, z3::to_expr(*Context, Z3_mk_fpa_round_to_integral(
-                                         *Context, toZ3Expr(*roundingMode).AST,
-                                         toZ3Expr(*From).AST))));
+                                         *Context, toZ3Expr(*roundingMode).Expr,
+                                         toZ3Expr(*From).Expr))));
 };
 
 bool Z3Solver::getBoolean(const SMTExprRef &Exp) {
-  return toZ3Expr(*Exp).AST.bool_value();
+  return toZ3Expr(*Exp).Expr.bool_value();
 }
 
 int64_t Z3Solver::getBitvector(const SMTExprRef &Exp) {
   int64_t bv;
-  bool is_num = toZ3Expr(*Exp).AST.is_numeral_i64(bv);
+  bool is_num = toZ3Expr(*Exp).Expr.is_numeral_i64(bv);
   camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
   return bv;
 }
@@ -433,17 +439,18 @@ template <typename FPType, typename IntType,
 static inline FPType getFP(const Z3ContextRef &C, const z3::model &Model,
                            const SMTExprRef &Exp) {
   // TODO: what about negative NaN?
-  if (Z3_fpa_is_numeral_nan(*C, toZ3Expr(*Exp).AST))
+  if (Z3_fpa_is_numeral_nan(*C, toZ3Expr(*Exp).Expr))
     return NAN;
 
-  if (Z3_fpa_is_numeral_inf(*C, toZ3Expr(*Exp).AST))
-    return Z3_fpa_is_numeral_positive(*C, toZ3Expr(*Exp).AST) ? INFINITY
-                                                              : -INFINITY;
+  if (Z3_fpa_is_numeral_inf(*C, toZ3Expr(*Exp).Expr))
+    return Z3_fpa_is_numeral_positive(*C, toZ3Expr(*Exp).Expr) ? INFINITY
+                                                               : -INFINITY;
 
   // Convert the float to bv
   Z3_ast fp_value;
-  bool eval = Z3_model_eval(
-      *C, Model, Z3_mk_fpa_to_ieee_bv(*C, toZ3Expr(*Exp).AST), true, &fp_value);
+  bool eval =
+      Z3_model_eval(*C, Model, Z3_mk_fpa_to_ieee_bv(*C, toZ3Expr(*Exp).Expr),
+                    true, &fp_value);
   camada::abortCondWithMessage(eval, "Failed to convert FP to BV in Z3");
 
   IntType FP_as_int;
@@ -470,32 +477,32 @@ double Z3Solver::getDouble(const SMTExprRef &Exp) {
 }
 
 bool Z3Solver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
-  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
+  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).Expr.decl()))
     return false;
 
   Inter = getBitvector(newExprRef(
       Z3Expr(Context,
-             Solver.get_model().get_const_interp(toZ3Expr(*Exp).AST.decl()))));
+             Solver.get_model().get_const_interp(toZ3Expr(*Exp).Expr.decl()))));
   return true;
 }
 
 bool Z3Solver::getInterpretation(const SMTExprRef &Exp, float &Float) {
-  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
+  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).Expr.decl()))
     return false;
 
   Float =
       getFloat(newExprRef(Z3Expr(Context, Solver.get_model().get_const_interp(
-                                              toZ3Expr(*Exp).AST.decl()))));
+                                              toZ3Expr(*Exp).Expr.decl()))));
   return true;
 }
 
 bool Z3Solver::getInterpretation(const SMTExprRef &Exp, double &Double) {
-  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).AST.decl()))
+  if (!Solver.get_model().has_interp(toZ3Expr(*Exp).Expr.decl()))
     return false;
 
   Double =
       getDouble(newExprRef(Z3Expr(Context, Solver.get_model().get_const_interp(
-                                               toZ3Expr(*Exp).AST.decl()))));
+                                               toZ3Expr(*Exp).Expr.decl()))));
   return true;
 }
 

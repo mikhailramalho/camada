@@ -24,6 +24,7 @@
 
 #include <memory>
 
+#include "camadasort.h"
 #include "utils.h"
 
 namespace camada {
@@ -49,18 +50,18 @@ protected:
 /// Shared pointer for SMTExprs, used by SMTSolver API.
 using SMTExprRef = std::shared_ptr<SMTExpr>;
 
-/// Template to hold Solver specific Context and AST
-template <typename SolverContextRef, typename TheAST>
-class SolverAST : public SMTExpr {
+/// Template to hold Solver specific Context and Expr
+template <typename SolverContextRef, typename TheExpr>
+class SolverExpr : public SMTExpr {
 public:
   SolverContextRef Context;
 
-  TheAST AST;
+  TheExpr Expr;
 
-  SolverAST(SolverContextRef C, const TheAST &SA)
-      : Context(std::move(C)), AST(SA) {}
+  SolverExpr(SolverContextRef C, const TheExpr &SA)
+      : Context(std::move(C)), Expr(SA) {}
 
-  virtual ~SolverAST() = default;
+  virtual ~SolverExpr() = default;
 
   virtual bool equal_to(SMTExpr const &other) const = 0;
 };

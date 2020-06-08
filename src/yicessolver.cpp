@@ -70,16 +70,16 @@ void YicesSort::dump() const {
 
 bool YicesExpr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
-      YicesSort(Context, yices_type_of_term(AST))
+      YicesSort(Context, yices_type_of_term(Expr))
           .equal_to(YicesSort(
               Context,
-              yices_type_of_term(static_cast<const YicesExpr &>(Other).AST))),
+              yices_type_of_term(static_cast<const YicesExpr &>(Other).Expr))),
       "AST's must have the same sort");
-  return (AST == dynamic_cast<const YicesExpr &>(Other).AST);
+  return (Expr == dynamic_cast<const YicesExpr &>(Other).Expr);
 }
 
 void YicesExpr::dump() const {
-  char *term_str = yices_term_to_string(AST, 160, 80, 0);
+  char *term_str = yices_term_to_string(Expr, 160, 80, 0);
   fmt::print(stderr, "{}\n", term_str);
   yices_free_string(term_str);
 }
@@ -89,11 +89,11 @@ YicesSolver::YicesSolver() : Context(std::make_shared<YicesContext>()) {}
 // YicesSolver::YicesSolver(YicesContextRef C) : Context(std::move(C)) {}
 
 void YicesSolver::addConstraint(const SMTExprRef &Exp) {
-  yices_assert_formula(Context->Context, toYicesExpr(*Exp).AST);
+  yices_assert_formula(Context->Context, toYicesExpr(*Exp).Expr);
 }
 
 SMTExprRef YicesSolver::newExprRef(const SMTExpr &Exp) const {
-  abortCondWithMessage(toYicesExpr(Exp).AST != NULL_TERM,
+  abortCondWithMessage(toYicesExpr(Exp).Expr != NULL_TERM,
                        "Error when creating Yices expr.");
   return std::make_shared<YicesExpr>(toYicesExpr(Exp));
 }
@@ -123,164 +123,173 @@ SMTSortRef YicesSolver::getSort(const SMTExprRef &Exp) {
 }
 
 SMTExprRef YicesSolver::mkBVNeg(const SMTExprRef &Exp) {
-  return newExprRef(YicesExpr(Context, yices_neg(toYicesExpr(*Exp).AST)));
+  return newExprRef(YicesExpr(Context, yices_neg(toYicesExpr(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVNot(const SMTExprRef &Exp) {
-  return newExprRef(YicesExpr(Context, yices_bvnot(toYicesExpr(*Exp).AST)));
+  return newExprRef(YicesExpr(Context, yices_bvnot(toYicesExpr(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkNot(const SMTExprRef &Exp) {
-  return newExprRef(YicesExpr(Context, yices_not(toYicesExpr(*Exp).AST)));
+  return newExprRef(YicesExpr(Context, yices_not(toYicesExpr(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvadd(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvadd(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvsub(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvsub(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvmul(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvmul(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvsrem(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvsrem(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvrem(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvrem(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvsdiv(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvsdiv(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvdiv(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvdiv(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvshl(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvshl(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvashr(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvashr(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvlshr(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvlshr(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvxor2(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvxor2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvor2(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvor2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_bvand2(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_bvand2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvlt_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvlt_atom(toYicesExpr(*LHS).Expr,
+                                         toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvslt_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvslt_atom(toYicesExpr(*LHS).Expr,
+                                          toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvgt_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvgt_atom(toYicesExpr(*LHS).Expr,
+                                         toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvsgt_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvsgt_atom(toYicesExpr(*LHS).Expr,
+                                          toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvle_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvle_atom(toYicesExpr(*LHS).Expr,
+                                         toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvsle_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvsle_atom(toYicesExpr(*LHS).Expr,
+                                          toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvge_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvge_atom(toYicesExpr(*LHS).Expr,
+                                         toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvsge_atom(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvsge_atom(toYicesExpr(*LHS).Expr,
+                                          toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_and2(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_and2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_or2(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_or2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(
-      Context, yices_eq(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+      Context, yices_eq(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                               const SMTExprRef &F) {
-  return newExprRef(
-      YicesExpr(Context, yices_ite(toYicesExpr(*Cond).AST, toYicesExpr(*T).AST,
-                                   toYicesExpr(*F).AST)));
+  return newExprRef(YicesExpr(Context, yices_ite(toYicesExpr(*Cond).Expr,
+                                                 toYicesExpr(*T).Expr,
+                                                 toYicesExpr(*F).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      YicesExpr(Context, yices_sign_extend(toYicesExpr(*Exp).AST, i)));
+      YicesExpr(Context, yices_sign_extend(toYicesExpr(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      YicesExpr(Context, yices_zero_extend(toYicesExpr(*Exp).AST, i)));
+      YicesExpr(Context, yices_zero_extend(toYicesExpr(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVExtract(unsigned High, unsigned Low,
                                     const SMTExprRef &Exp) {
   return newExprRef(
-      YicesExpr(Context, yices_bvextract(toYicesExpr(*Exp).AST, Low, High)));
+      YicesExpr(Context, yices_bvextract(toYicesExpr(*Exp).Expr, Low, High)));
 }
 
 SMTExprRef YicesSolver::mkBVConcat(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvconcat2(toYicesExpr(*LHS).AST, toYicesExpr(*RHS).AST)));
+  return newExprRef(
+      YicesExpr(Context, yices_bvconcat2(toYicesExpr(*LHS).Expr,
+                                         toYicesExpr(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkFPNeg(const SMTExprRef &) {
@@ -386,17 +395,17 @@ SMTExprRef YicesSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
 bool YicesSolver::getBoolean(const SMTExprRef &Exp) {
   int32_t val;
   auto res = yices_get_bool_value(yices_get_model(Context->Context, 1),
-                                  toYicesExpr(*Exp).AST, &val);
+                                  toYicesExpr(*Exp).Expr, &val);
   abortCondWithMessage(res, "Can't get boolean value from Yices");
   return val ? true : false;
 }
 
 int64_t YicesSolver::getBitvector(const SMTExprRef &Exp) {
-  unsigned width = yices_term_bitsize(toYicesExpr(*Exp).AST);
+  unsigned width = yices_term_bitsize(toYicesExpr(*Exp).Expr);
 
   int32_t data[width];
   yices_get_bv_value(yices_get_model(Context->Context, 1),
-                     toYicesExpr(*Exp).AST, data);
+                     toYicesExpr(*Exp).Expr, data);
 
   int64_t val = 0;
   for (int i = width - 1; i >= 0; i--) {
