@@ -13,7 +13,7 @@ function(compile_test)
       list(APPEND solver_src_test_files "${lower_name}.test.cpp")
     endif()
 
-  set(solver_test_files ${solver_test_files} ${solver_src_test_files} PARENT_SCOPE)
+  set(solver_test_files ${solver_src_test_files} PARENT_SCOPE)
   endforeach()
 endfunction()
 
