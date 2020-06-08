@@ -25,96 +25,10 @@
 #include <memory>
 #include <string>
 
+#include "camadasort.h"
+#include "utils.h"
+
 namespace camada {
-
-/// Return camada version
-std::string getCamadaVersion();
-
-/// Abort program if Cond is false and prints Msg to stderr
-void abortCondWithMessage(bool Cond, const std::string &Msg);
-
-/// Abort program and prints Msg to stderr
-[[noreturn]] void abortWithMessage(const std::string &Msg);
-
-enum class checkResult { SAT, UNSAT, UNKNOWN };
-
-enum class RoundingMode {
-  ROUND_TO_EVEN,
-  ROUND_TO_AWAY,
-  ROUND_TO_PLUS_INF,
-  ROUND_TO_MINUS_INF,
-  ROUND_TO_ZERO
-};
-
-/// Generic base class for SMT sorts
-class SMTSort {
-public:
-  SMTSort() = default;
-  virtual ~SMTSort() = default;
-
-  /// Returns true if the sort is a bitvector, calls isBitvectorSortImpl().
-  virtual bool isBitvectorSort() const { return isBitvectorSortImpl(); }
-
-  /// Returns true if the sort is a boolean, calls isBooleanSortImpl().
-  virtual bool isBooleanSort() const { return isBooleanSortImpl(); }
-
-  /// Returns true if the sort is a floating-point, calls isFloatSortImpl().
-  virtual bool isFloatSort() const { return isFloatSortImpl(); }
-
-  /// Returns true if the sort is a rounding mode, calls
-  /// isRoundingModeSortImpl().
-  virtual bool isRoundingModeSort() const { return isRoundingModeSortImpl(); }
-
-  /// Returns the bitvector size, fails if the sort is not a bitvector
-  /// Calls getBitvectorSortSizeImpl().
-  virtual unsigned getBitvectorSortSize() const {
-    abortCondWithMessage(isBitvectorSort(), "Not a bitvector sort!");
-    unsigned size = getBitvectorSortSizeImpl();
-    abortCondWithMessage(size, "Bitvector size is zero!");
-    return size;
-  };
-
-  /// Returns the floating-point size, fails if the sort is not a floating-point
-  /// Calls getFloatSortSizeImpl().
-  virtual unsigned getFloatSortSize() const {
-    abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
-    unsigned size = getFloatSortSizeImpl();
-    abortCondWithMessage(size, "Floating-point size is zero!");
-    return size;
-  };
-
-  friend bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
-    return LHS.equal_to(RHS);
-  }
-
-  virtual void dump() const;
-
-protected:
-  /// Query the SMT solver and returns true if two sorts are equal (same kind
-  /// and bit width). This does not check if the two sorts are the same objects.
-  virtual bool equal_to(SMTSort const &other) const = 0;
-
-  /// Query the SMT solver and checks if a sort is bitvector.
-  virtual bool isBitvectorSortImpl() const = 0;
-
-  /// Query the SMT solver and checks if a sort is boolean.
-  virtual bool isBooleanSortImpl() const = 0;
-
-  /// Query the SMT solver and checks if a sort is floating-point.
-  virtual bool isFloatSortImpl() const = 0;
-
-  /// Query the SMT solver and checks if a sort is rounding mode.
-  virtual bool isRoundingModeSortImpl() const = 0;
-
-  /// Query the SMT solver and returns the sort bit width.
-  virtual unsigned getBitvectorSortSizeImpl() const = 0;
-
-  /// Query the SMT solver and returns the sort bit width.
-  virtual unsigned getFloatSortSizeImpl() const = 0;
-};
-
-/// Shared pointer for SMTSorts, used by SMTSolver API.
-using SMTSortRef = std::shared_ptr<SMTSort>;
 
 /// Generic base class for SMT exprs
 class SMTExpr {
