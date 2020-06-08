@@ -15,11 +15,12 @@ function(check_mathsat_version mathsat_include mathsat_lib)
     RUN_OUTPUT_VARIABLE SRC_OUTPUT
   )
 
-  if(MATHSAT_COMPILED)
-    string(REGEX REPLACE "([0-9]*\\.[0-9]*\\.[0-9]*)" "\\1"
-           mathsat_version "${SRC_OUTPUT}")
-    set(MATHSAT_VERSION_STRING ${mathsat_version} PARENT_SCOPE)
+  if(NOT MATHSAT_COMPILED)
+    message(FATAL_ERROR "MathSAT lib found in ${mathsat_lib_path} but test compilation failed")
   endif()
+
+  string(REGEX MATCH "([0-9]*\\.[0-9]*\\.[0-9]*)" mathsat_version "${SRC_OUTPUT}")
+  set(MATHSAT_VERSION_STRING ${mathsat_version} PARENT_SCOPE)
 endfunction(check_mathsat_version)
 
 # Looking for MATHSAT in SOLVER_MATHSAT_INCLUDE_DIR

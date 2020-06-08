@@ -15,11 +15,12 @@ function(check_yices_version yices_include yices_lib)
     RUN_OUTPUT_VARIABLE SRC_OUTPUT
   )
 
-  if(YICES_COMPILED)
-    string(REGEX REPLACE "([0-9]*\\.[0-9]*\\.[0-9]*)" "\\1"
-           yices_version "${SRC_OUTPUT}")
-    set(YICES_VERSION_STRING ${yices_version} PARENT_SCOPE)
+  if(NOT YICES_COMPILED)
+    message(FATAL_ERROR "MathSAT lib found in ${mathsat_lib_path} but test compilation failed")
   endif()
+
+  string(REGEX MATCH "([0-9]*\\.[0-9]*\\.[0-9]*)" yices_version "${SRC_OUTPUT}")
+  set(YICES_VERSION_STRING ${yices_version} PARENT_SCOPE)
 endfunction(check_yices_version)
 
 # Looking for YICES in SOLVER_YICES_INCLUDE_DIR
