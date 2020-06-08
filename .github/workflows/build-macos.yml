@@ -23,12 +23,8 @@ jobs:
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
-    - uses: actions/upload-artifact@v1
-      with:
-        name: release-macos
-        path: ./release
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-z3:
     runs-on: macos-latest
@@ -44,12 +40,8 @@ jobs:
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
-    - uses: actions/upload-artifact@v1
-      with:
-        name: release-macos
-        path: ./release
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-mathsat:
     runs-on: macos-latest
@@ -68,12 +60,8 @@ jobs:
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
-    - uses: actions/upload-artifact@v1
-      with:
-        name: release-macos
-        path: ./release
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-yices:
     runs-on: macos-latest
@@ -89,12 +77,8 @@ jobs:
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
-    - uses: actions/upload-artifact@v1
-      with:
-        name: release-macos
-        path: ./release
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
   build-cvc4:
     runs-on: macos-latest
@@ -113,10 +97,6 @@ jobs:
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_CVC4_DIR=$PWD/../cvc4 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
-    - uses: actions/upload-artifact@v1
-      with:
-        name: release-macos
-        path: ./release
     - name: Run tests
-      run: ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
