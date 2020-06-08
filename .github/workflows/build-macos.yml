@@ -20,7 +20,7 @@ jobs:
     - name: Setup boolector
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
     - name: Run tests
@@ -37,7 +37,7 @@ jobs:
     - name: Setup Z3
       run: wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.8/z3-4.8.8-x64-osx-10.14.6.zip && unzip z3-4.8.8-x64-osx-10.14.6.zip && mv z3-4.8.8-x64-osx-10.14.6 z3
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
     - name: Run tests
@@ -57,7 +57,7 @@ jobs:
       # This is needed because CMake does not include /usr/local/include when trying to compile mathsat
       run: ln -s /usr/local/include/gmp.h mathsat/include/gmp.h
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
     - name: Run tests
@@ -74,7 +74,7 @@ jobs:
     - name: Setup Yices 2
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j4 && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
     - name: Run tests
@@ -94,7 +94,7 @@ jobs:
     - name: Setup CVC4
       run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard b826fc8ae95fc && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --symfpu-dir=../symfpu --python3 --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DSOLVER_CVC4_DIR=$PWD/../CVC4 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_CVC4=ON -DSOLVER_CVC4_DIR=$PWD/../CVC4 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
     - name: Run tests
