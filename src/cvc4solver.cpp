@@ -35,10 +35,8 @@ bool CVC4Sort::equal_to(SMTSort const &Other) const {
 void CVC4Sort::dump() const { fmt::print(stderr, "{}\n", Sort.toString()); }
 
 bool CVC4Expr::equal_to(SMTExpr const &Other) const {
-  camada::abortCondWithMessage(
-      Context->getType(Expr) ==
-          Context->getType(dynamic_cast<const CVC4Expr &>(Other).Expr),
-      "Expr's must have the same sort");
+  if (Sort != Other.Sort)
+    return false;
   return (Expr == dynamic_cast<const CVC4Expr &>(Other).Expr);
 }
 

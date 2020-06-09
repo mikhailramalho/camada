@@ -40,11 +40,8 @@ void MathSATSort::dump() const {
 }
 
 bool MathSATExpr::equal_to(SMTExpr const &Other) const {
-  camada::abortCondWithMessage(
-      msat_type_equals(
-          msat_term_get_type(Expr),
-          msat_term_get_type(dynamic_cast<const MathSATExpr &>(Other).Expr)),
-      "Expr's must have the same sort");
+  if (Sort != Other.Sort)
+    return false;
   return (msat_term_id(Expr) ==
           msat_term_id(dynamic_cast<const MathSATExpr &>(Other).Expr));
 }

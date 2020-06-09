@@ -69,12 +69,8 @@ void YicesSort::dump() const {
 }
 
 bool YicesExpr::equal_to(SMTExpr const &Other) const {
-  camada::abortCondWithMessage(
-      YicesSort(Context, yices_type_of_term(Expr))
-          .equal_to(YicesSort(
-              Context,
-              yices_type_of_term(static_cast<const YicesExpr &>(Other).Expr))),
-      "Expr's must have the same sort");
+  if (Sort != Other.Sort)
+    return false;
   return (Expr == dynamic_cast<const YicesExpr &>(Other).Expr);
 }
 

@@ -38,10 +38,8 @@ void Z3Sort::dump() const {
 }
 
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
-  camada::abortCondWithMessage(
-      Z3_is_eq_sort(*Context, Expr.get_sort(),
-                    dynamic_cast<const Z3Expr &>(Other).Expr.get_sort()),
-      "Expr's must have the same sort");
+  if (Sort != Other.Sort)
+    return false;
   return z3::eq(Expr, dynamic_cast<const Z3Expr &>(Other).Expr);
 }
 
