@@ -295,19 +295,16 @@ SMTExprRef CVC4Solver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 }
 
 SMTExprRef CVC4Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
-  CVC4::BitVectorSignExtend ext(i);
-  SMTExprRef ext2r =
-      newExprRef(CVC4Expr(Context, Exp->Sort, Context->mkConst(ext)));
   return newExprRef(
-      CVC4Expr(Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+      CVC4Expr(Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
                Context->mkExpr(CVC4::kind::BITVECTOR_SIGN_EXTEND,
-                               toSolverExpr<CVC4Expr>(*ext2r).Expr,
+                               Context->mkConst(CVC4::BitVectorSignExtend(i)),
                                toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+      CVC4Expr(Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
                Context->mkExpr(CVC4::kind::BITVECTOR_ZERO_EXTEND,
                                Context->mkConst(CVC4::BitVectorZeroExtend(i)),
                                toSolverExpr<CVC4Expr>(*Exp).Expr)));

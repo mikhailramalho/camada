@@ -255,15 +255,15 @@ SMTExprRef Z3Solver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 }
 
 SMTExprRef Z3Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context,
-                           getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
-                           z3::sext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
+  return newExprRef(
+      Z3Expr(Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+             z3::sext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context,
-                           getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
-                           z3::zext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
+  return newExprRef(
+      Z3Expr(Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+             z3::zext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVExtract(unsigned High, unsigned Low,

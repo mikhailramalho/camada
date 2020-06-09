@@ -299,13 +299,13 @@ SMTExprRef BtorSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef BtorSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
       boolector_sext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
       boolector_uext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 

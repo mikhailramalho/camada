@@ -288,13 +288,13 @@ SMTExprRef MathSATSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef MathSATSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
       msat_make_bv_sext(*Context, i, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
       msat_make_bv_zext(*Context, i, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 

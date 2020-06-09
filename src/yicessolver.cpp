@@ -285,15 +285,15 @@ SMTExprRef YicesSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 }
 
 SMTExprRef YicesSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      YicesExpr(Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
-                yices_sign_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
+  return newExprRef(YicesExpr(
+      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+      yices_sign_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      YicesExpr(Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
-                yices_zero_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
+  return newExprRef(YicesExpr(
+      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+      yices_zero_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVExtract(unsigned High, unsigned Low,
