@@ -36,8 +36,6 @@ public:
   using SolverSort<CVC4ContextRef, CVC4::Type>::SolverSort;
   virtual ~CVC4Sort() = default;
 
-  bool equal_to(SMTSort const &Other) const override;
-
   void dump() const override;
 }; // end class CVC4Sort
 

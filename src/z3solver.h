@@ -36,8 +36,6 @@ public:
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
   virtual ~Z3Sort() = default;
 
-  bool equal_to(SMTSort const &Other) const override;
-
   void dump() const override;
 }; // end class Z3Sort
 

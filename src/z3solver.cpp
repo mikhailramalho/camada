@@ -28,11 +28,6 @@ using namespace camada;
 
 #ifdef SOLVER_Z3_ENABLED
 
-bool Z3Sort::equal_to(SMTSort const &Other) const {
-  return Z3_is_eq_sort(*Context, Sort,
-                       dynamic_cast<const Z3Sort &>(Other).Sort);
-}
-
 void Z3Sort::dump() const {
   fmt::print(stderr, "{}\n", Z3_sort_to_string(*Context, Sort));
 }

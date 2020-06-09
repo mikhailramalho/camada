@@ -49,8 +49,6 @@ public:
   using SolverSort<YicesContextRef, type_t>::SolverSort;
   virtual ~YicesSort() = default;
 
-  bool equal_to(SMTSort const &Other) const override;
-
   void dump() const override;
 }; // end class YicesSort
 

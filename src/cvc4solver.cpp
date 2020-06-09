@@ -28,10 +28,6 @@ using namespace camada;
 
 #ifdef SOLVER_CVC4_ENABLED
 
-bool CVC4Sort::equal_to(SMTSort const &Other) const {
-  return Sort == dynamic_cast<const CVC4Sort &>(Other).Sort;
-}
-
 void CVC4Sort::dump() const { fmt::print(stderr, "{}\n", Sort.toString()); }
 
 bool CVC4Expr::equal_to(SMTExpr const &Other) const {

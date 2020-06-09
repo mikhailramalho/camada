@@ -52,16 +52,6 @@ void YicesContext::reset() {
   createAndConfig();
 }
 
-bool YicesSort::equal_to(SMTSort const &Other) const {
-  // yices does not provide equality function for types,
-  // but subtipe relations, so x == y <==> (x <= y /\ y <= x)
-
-  type_t x = Sort;
-  type_t y = static_cast<const YicesSort &>(Other).Sort;
-
-  return yices_test_subtype(x, y) && yices_test_subtype(y, x);
-}
-
 void YicesSort::dump() const {
   char *ty_str = yices_type_to_string(Sort, 160, 80, 0);
   fmt::print(stderr, "{}\n", ty_str);

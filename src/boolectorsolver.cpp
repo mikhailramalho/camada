@@ -57,20 +57,6 @@ void BtorContext::reset() {
   createAndConfig();
 }
 
-bool BtorSort::equal_to(SMTSort const &Other) const {
-  // boolector  API does not provide equality function for sort
-  const BtorSort &bs = dynamic_cast<const BtorSort &>(Other);
-  if (isBooleanSortImpl() && bs.isBooleanSortImpl())
-    return true;
-
-  if (isBitvectorSortImpl() && bs.isBitvectorSortImpl() &&
-      (getBitvectorSortSizeImpl() == bs.getBitvectorSortSizeImpl()))
-    return true;
-
-  // TODO: add here checks for arrays and uninterpreted functions if necessary
-  return false;
-}
-
 bool BtorExpr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort)
     return false;

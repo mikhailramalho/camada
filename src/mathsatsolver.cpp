@@ -29,10 +29,6 @@ using namespace camada;
 
 #ifdef SOLVER_MATHSAT_ENABLED
 
-bool MathSATSort::equal_to(SMTSort const &Other) const {
-  return msat_type_equals(Sort, dynamic_cast<const MathSATSort &>(Other).Sort);
-}
-
 void MathSATSort::dump() const {
   char *s = msat_type_repr(Sort);
   fmt::print(stderr, "{}\n", s);

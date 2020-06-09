@@ -34,21 +34,20 @@ public:
   SMTSort() = default;
   virtual ~SMTSort() = default;
 
-  /// Returns true if the sort is a bitvector, calls isBitvectorSortImpl().
-  virtual bool isBitvectorSort() const { return isBitvectorSortImpl(); }
+  /// Returns true if the sort is a bitvector.
+  virtual bool isBitvectorSort() const = 0;
 
-  /// Returns true if the sort is a boolean, calls isBooleanSortImpl().
-  virtual bool isBooleanSort() const { return isBooleanSortImpl(); }
+  /// Returns true if the sort is a boolean.
+  virtual bool isBooleanSort() const = 0;
 
-  /// Returns true if the sort is a floating-point, calls isFloatSortImpl().
-  virtual bool isFloatSort() const { return isFloatSortImpl(); }
+  /// Returns true if the sort is a floating-point.
+  virtual bool isFloatSort() const = 0;
 
-  /// Returns true if the sort is a rounding mode, calls
-  /// isRoundingModeSortImpl().
-  virtual bool isRoundingModeSort() const { return isRoundingModeSortImpl(); }
+  /// Returns true if the sort is a rounding mode.
+  virtual bool isRoundingModeSort() const = 0;
 
-  /// Returns the bitvector size, fails if the sort is not a bitvector
-  /// Calls getBitvectorSortSizeImpl().
+  /// Returns the bitvector size, fails if the sort is not a bitvector or if the
+  /// size is zero. Calls getBitvectorSortSizeImpl().
   virtual unsigned getBitvectorSortSize() const {
     abortCondWithMessage(isBitvectorSort(), "Not a bitvector sort!");
     unsigned size = getBitvectorSortSizeImpl();
@@ -57,7 +56,7 @@ public:
   };
 
   /// Returns the floating-point size, fails if the sort is not a floating-point
-  /// Calls getFloatSortSizeImpl().
+  /// floating-point or if the size is zero. Calls getFloatSortSizeImpl().
   virtual unsigned getFloatSortSize() const {
     abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
     unsigned size = getFloatSortSizeImpl();
@@ -65,34 +64,58 @@ public:
     return size;
   };
 
+  /// Returns the floating-point significand size, fails if the sort is not a
+  /// floating-point or if the size is zero. Calls
+  /// getFloatSignificandSizeImpl().
+  virtual unsigned getFloatSignificandSize() const {
+    abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
+    unsigned size = getFloatSignificandSizeImpl();
+    abortCondWithMessage(size, "Floating-point significand size is zero!");
+    return size;
+  };
+
+  /// Returns the floating-point exponent size, fails if the sort is not a
+  /// floating-point or if the size is zero.
+  virtual unsigned getFloatExponentSize() const {
+    abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
+    unsigned size = getFloatExponentSizeImpl();
+    abortCondWithMessage(size, "Floating-point exponent size is zero!");
+    return size;
+  }
+
+  /// Returns true if two sorts are equal (same kind and bit width). This does
+  /// not check if the two sorts are the same objects.
   friend bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
-    return LHS.equal_to(RHS);
+    if (LHS.isBooleanSort() && RHS.isBooleanSort())
+      return true;
+
+    if (LHS.isRoundingModeSort() && RHS.isRoundingModeSort())
+      return true;
+
+    if (LHS.isBitvectorSort() && RHS.isBitvectorSort())
+      return (LHS.getBitvectorSortSize() == RHS.getBitvectorSortSize());
+
+    if (LHS.isFloatSort() && RHS.isFloatSort())
+      return (LHS.getFloatSignificandSize() == RHS.getFloatSignificandSize()) &&
+             (LHS.getFloatExponentSize() == RHS.getFloatExponentSize());
+
+    return false;
   }
 
   virtual void dump() const;
 
 protected:
-  /// Query the SMT solver and returns true if two sorts are equal (same kind
-  /// and bit width). This does not check if the two sorts are the same objects.
-  virtual bool equal_to(SMTSort const &other) const = 0;
-
-  /// Query the SMT solver and checks if a sort is bitvector.
-  virtual bool isBitvectorSortImpl() const = 0;
-
-  /// Query the SMT solver and checks if a sort is boolean.
-  virtual bool isBooleanSortImpl() const = 0;
-
-  /// Query the SMT solver and checks if a sort is floating-point.
-  virtual bool isFloatSortImpl() const = 0;
-
-  /// Query the SMT solver and checks if a sort is rounding mode.
-  virtual bool isRoundingModeSortImpl() const = 0;
-
-  /// Query the SMT solver and returns the sort bit width.
+  /// Returns the bitvector sort bit width.
   virtual unsigned getBitvectorSortSizeImpl() const = 0;
 
-  /// Query the SMT solver and returns the sort bit width.
+  /// Returns the floating-point sort bit width.
   virtual unsigned getFloatSortSizeImpl() const = 0;
+
+  /// Returns the floating-point sort significand bit width.
+  virtual unsigned getFloatSignificandSizeImpl() const = 0;
+
+  /// Returns the floating-point sort exponent bit width.
+  virtual unsigned getFloatExponentSizeImpl() const = 0;
 };
 
 /// Template to hold Solver specific Context and Sort
@@ -111,19 +134,19 @@ public:
 
   virtual ~SolverSort() = default;
 
-  virtual bool isBitvectorSortImpl() const {
+  virtual bool isBitvectorSort() const {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual bool isBooleanSortImpl() const {
+  virtual bool isBooleanSort() const {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual bool isFloatSortImpl() const {
+  virtual bool isFloatSort() const {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual bool isRoundingModeSortImpl() const {
+  virtual bool isRoundingModeSort() const {
     abortWithMessage("Unimplemented for current type");
   }
 
@@ -135,7 +158,13 @@ public:
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual bool equal_to(SMTSort const &Other) const = 0;
+  virtual unsigned getFloatSignificandSizeImpl() const {
+    abortWithMessage("Unimplemented for current type");
+  };
+
+  virtual unsigned getFloatExponentSizeImpl() const {
+    abortWithMessage("Unimplemented for current type");
+  };
 };
 
 template <typename SolverSortBase> class SolverBVSort : public SolverSortBase {
@@ -147,13 +176,9 @@ public:
       : Width(W), SolverSortBase(C, S){};
   virtual ~SolverBVSort() = default;
 
-  virtual bool isBitvectorSortImpl() const { return true; }
+  virtual bool isBitvectorSort() const { return true; }
 
-  virtual unsigned getBitvectorSortSizeImpl() const { return Width; }
-
-  virtual bool equal_to(SMTSort const &Other) const {
-    return SolverSortBase::equal_to(Other);
-  }
+  virtual unsigned getBitvectorSortSize() const { return Width; }
 };
 
 template <typename SolverSortBase>
@@ -164,13 +189,9 @@ public:
       : SolverSortBase(C, S){};
   virtual ~SolverBoolSort() = default;
 
-  virtual bool isBooleanSortImpl() const { return true; }
+  virtual bool isBooleanSort() const { return true; }
 
-  virtual unsigned getBitvectorSortSizeImpl() const { return 1; }
-
-  virtual bool equal_to(SMTSort const &Other) const {
-    return SolverSortBase::equal_to(Other);
-  }
+  virtual unsigned getBitvectorSortSize() const { return 1; }
 };
 
 template <typename SolverSortBase> class SolverFPSort : public SolverSortBase {
@@ -183,13 +204,13 @@ public:
       : ExpWidth(EW), SigWidth(SW), SolverSortBase(C, S){};
   virtual ~SolverFPSort() = default;
 
-  virtual bool isFloatSortImpl() const { return true; }
+  virtual bool isFloatSort() const { return true; }
 
-  virtual unsigned getFloatSortSizeImpl() const { return ExpWidth + SigWidth; }
+  virtual unsigned getFloatSortSize() const { return ExpWidth + SigWidth; }
 
-  virtual bool equal_to(SMTSort const &Other) const {
-    return SolverSortBase::equal_to(Other);
-  }
+  virtual unsigned getFloatSignificandSize() const { return SigWidth; };
+
+  virtual unsigned getFloatExponentSize() const { return ExpWidth; };
 };
 
 template <typename SolverSortBase> class SolverRMSort : public SolverSortBase {
@@ -199,11 +220,7 @@ public:
       : SolverSortBase(C, S){};
   virtual ~SolverRMSort() = default;
 
-  virtual bool isRoundingModeSortImpl() const { return true; }
-
-  virtual bool equal_to(SMTSort const &Other) const {
-    return SolverSortBase::equal_to(Other);
-  }
+  virtual bool isRoundingModeSort() const { return true; }
 };
 
 /// Shared pointer for SMTSorts, used by SMTSolver API.
