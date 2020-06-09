@@ -44,7 +44,7 @@ bool MathSATExpr::equal_to(SMTExpr const &Other) const {
       msat_type_equals(
           msat_term_get_type(Expr),
           msat_term_get_type(dynamic_cast<const MathSATExpr &>(Other).Expr)),
-      "AST's must have the same sort");
+      "Expr's must have the same sort");
   return (msat_term_id(Expr) ==
           msat_term_id(dynamic_cast<const MathSATExpr &>(Other).Expr));
 }

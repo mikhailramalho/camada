@@ -19,8 +19,8 @@
  *
  **************************************************************************/
 
-#ifndef CAMADAAST_H_
-#define CAMADAAST_H_
+#ifndef CAMADAEXPR_H_
+#define CAMADAEXPR_H_
 
 #include <memory>
 
@@ -56,8 +56,8 @@ public:
   virtual void dump() const;
 
 protected:
-  /// Query the SMT solver and returns true if two asts are equal (same kind
-  /// and bit width). This does not check if the two asts are the same objects.
+  /// Query the SMT solver and returns true if two Exprs are equal (same kind
+  /// and bit width). This does not check if the two Exprs are the same objects.
   virtual bool equal_to(SMTExpr const &other) const = 0;
 };
 

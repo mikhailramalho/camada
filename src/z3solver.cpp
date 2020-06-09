@@ -41,7 +41,7 @@ bool Z3Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       Z3_is_eq_sort(*Context, Expr.get_sort(),
                     dynamic_cast<const Z3Expr &>(Other).Expr.get_sort()),
-      "AST's must have the same sort");
+      "Expr's must have the same sort");
   return z3::eq(Expr, dynamic_cast<const Z3Expr &>(Other).Expr);
 }
 
@@ -593,8 +593,8 @@ SMTExprRef Z3Solver::mkBoolean(const bool b) {
 }
 
 SMTExprRef Z3Solver::mkBitvector(const int64_t Int, unsigned BitWidth) {
-  const SMTSortRef Sort = getBitvectorSort(BitWidth);
-  return newExprRef(Z3Expr(Context, Sort, Context->bv_val(Int, BitWidth)));
+  const SMTSortRef sort = getBitvectorSort(BitWidth);
+  return newExprRef(Z3Expr(Context, sort, Context->bv_val(Int, BitWidth)));
 }
 
 SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {

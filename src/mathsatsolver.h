@@ -46,7 +46,7 @@ public:
   using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
   virtual ~MathSATExpr() = default;
 
-  /// Comparison of AST equality, not model equivalence.
+  /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;

@@ -46,7 +46,7 @@ public:
   using SolverExpr<CVC4ContextRef, CVC4::Expr>::SolverExpr;
   virtual ~CVC4Expr() = default;
 
-  /// Comparison of AST equality, not model equivalence.
+  /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;

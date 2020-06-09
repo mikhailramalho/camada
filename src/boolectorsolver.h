@@ -60,7 +60,7 @@ public:
   using SolverExpr<BtorContextRef, BoolectorNode *>::SolverExpr;
   virtual ~BtorExpr() = default;
 
-  /// Comparison of AST equality, not model equivalence.
+  /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;

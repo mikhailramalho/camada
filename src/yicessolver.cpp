@@ -74,7 +74,7 @@ bool YicesExpr::equal_to(SMTExpr const &Other) const {
           .equal_to(YicesSort(
               Context,
               yices_type_of_term(static_cast<const YicesExpr &>(Other).Expr))),
-      "AST's must have the same sort");
+      "Expr's must have the same sort");
   return (Expr == dynamic_cast<const YicesExpr &>(Other).Expr);
 }
 

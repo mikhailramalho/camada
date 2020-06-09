@@ -75,7 +75,7 @@ bool BtorExpr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       boolector_is_equal_sort(Context->Context, Expr,
                               dynamic_cast<const BtorExpr &>(Other).Expr),
-      "AST's must have the same sort");
+      "Expr's must have the same sort");
   return (boolector_get_node_id(Context->Context, Expr) ==
           boolector_get_node_id(Context->Context,
                                 dynamic_cast<const BtorExpr &>(Other).Expr));

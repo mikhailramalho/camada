@@ -48,7 +48,7 @@ function(install_solver_header)
 endfunction()
 
 # Install camada header
-install(FILES camada.h camadasort.h camadaast.h utils.h DESTINATION include)
+install(FILES camada.h camadasort.h camadaexpr.h utils.h DESTINATION include)
 
 # And header for each enabled solver
 install_solver_header(${CAMADA_AVAILABLE_SOLVERS})

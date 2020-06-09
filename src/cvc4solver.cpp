@@ -38,7 +38,7 @@ bool CVC4Expr::equal_to(SMTExpr const &Other) const {
   camada::abortCondWithMessage(
       Context->getType(Expr) ==
           Context->getType(dynamic_cast<const CVC4Expr &>(Other).Expr),
-      "AST's must have the same sort");
+      "Expr's must have the same sort");
   return (Expr == dynamic_cast<const CVC4Expr &>(Other).Expr);
 }
 

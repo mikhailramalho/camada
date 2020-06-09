@@ -46,7 +46,7 @@ public:
   using SolverExpr<Z3ContextRef, z3::expr>::SolverExpr;
   virtual ~Z3Expr() = default;
 
-  /// Comparison of AST equality, not model equivalence.
+  /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;

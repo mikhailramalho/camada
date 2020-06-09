@@ -25,7 +25,7 @@
 #include <memory>
 #include <string>
 
-#include "camadaast.h"
+#include "camadaexpr.h"
 #include "camadasort.h"
 #include "utils.h"
 
@@ -35,7 +35,7 @@ namespace camada {
 ///
 /// This class is responsible for wrapping all sorts and expression generation,
 /// through the mk* methods. It also provides methods to create SMT expressions
-/// straight from clang's AST, through the from* methods.
+/// straight from clang's Expr, through the from* methods.
 class SMTSolver {
 public:
   SMTSolver() = default;
