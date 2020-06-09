@@ -481,55 +481,40 @@ SMTExprRef CVC4Solver::mkFPEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 SMTExprRef CVC4Solver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                 const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
-
-  CVC4::FloatingPointType fto =
-      static_cast<CVC4::FloatingPointType>(toSolverSort<CVC4Sort>(*To).Sort);
-  unsigned expWidth = fto.getExponentSize();
-  unsigned mantWidth = fto.getSignificandSize();
-
   return newExprRef(CVC4Expr(
       Context, To,
-      Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_FP_FLOATINGPOINT,
-                      Context->mkConst(CVC4::FloatingPointToFPFloatingPoint(
-                          expWidth, mantWidth)),
-                      toSolverExpr<CVC4Expr>(*roundingMode).Expr,
-                      toSolverExpr<CVC4Expr>(*From).Expr)));
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_FLOATINGPOINT,
+          Context->mkConst(CVC4::FloatingPointToFPFloatingPoint(
+              To->getFloatExponentSize(), To->getFloatSignificandSize())),
+          toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+          toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                  const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
-
-  CVC4::FloatingPointType fto =
-      static_cast<CVC4::FloatingPointType>(toSolverSort<CVC4Sort>(*To).Sort);
-  unsigned expWidth = fto.getExponentSize();
-  unsigned mantWidth = fto.getSignificandSize();
-
   return newExprRef(CVC4Expr(
       Context, To,
-      Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_FP_SIGNED_BITVECTOR,
-                      Context->mkConst(CVC4::FloatingPointToFPSignedBitVector(
-                          expWidth, mantWidth)),
-                      toSolverExpr<CVC4Expr>(*roundingMode).Expr,
-                      toSolverExpr<CVC4Expr>(*From).Expr)));
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_SIGNED_BITVECTOR,
+          Context->mkConst(CVC4::FloatingPointToFPSignedBitVector(
+              To->getFloatExponentSize(), To->getFloatSignificandSize())),
+          toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+          toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                  const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
-
-  CVC4::FloatingPointType fto =
-      static_cast<CVC4::FloatingPointType>(toSolverSort<CVC4Sort>(*To).Sort);
-  unsigned expWidth = fto.getExponentSize();
-  unsigned mantWidth = fto.getSignificandSize();
-
   return newExprRef(CVC4Expr(
       Context, To,
-      Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_FP_UNSIGNED_BITVECTOR,
-                      Context->mkConst(CVC4::FloatingPointToFPUnsignedBitVector(
-                          expWidth, mantWidth)),
-                      toSolverExpr<CVC4Expr>(*roundingMode).Expr,
-                      toSolverExpr<CVC4Expr>(*From).Expr)));
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_UNSIGNED_BITVECTOR,
+          Context->mkConst(CVC4::FloatingPointToFPUnsignedBitVector(
+              To->getFloatExponentSize(), To->getFloatSignificandSize())),
+          toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+          toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {

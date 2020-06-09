@@ -431,12 +431,10 @@ SMTExprRef MathSATSolver::mkFPEqual(const SMTExprRef &LHS,
 SMTExprRef MathSATSolver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                    const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
-  std::size_t ExpWidth, MantWidth;
-  msat_is_fp_type(*Context, toSolverSort<MathSATSort>(*To).Sort, &ExpWidth,
-                  &MantWidth);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_cast(*Context, ExpWidth, MantWidth,
+      msat_make_fp_cast(*Context, To->getFloatExponentSize(),
+                        To->getFloatSignificandSize(),
                         toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                         toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -445,12 +443,10 @@ SMTExprRef MathSATSolver::mkSBVtoFP(const SMTExprRef &From,
                                     const SMTSortRef &To,
                                     const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
-  std::size_t ExpWidth, MantWidth;
-  msat_is_fp_type(*Context, toSolverSort<MathSATSort>(*To).Sort, &ExpWidth,
-                  &MantWidth);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_sbv(*Context, ExpWidth, MantWidth,
+      msat_make_fp_from_sbv(*Context, To->getFloatExponentSize(),
+                            To->getFloatSignificandSize(),
                             toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -459,12 +455,10 @@ SMTExprRef MathSATSolver::mkUBVtoFP(const SMTExprRef &From,
                                     const SMTSortRef &To,
                                     const RoundingMode R) {
   SMTExprRef roundingMode = mkRoundingMode(R);
-  std::size_t ExpWidth, MantWidth;
-  msat_is_fp_type(*Context, toSolverSort<MathSATSort>(*To).Sort, &ExpWidth,
-                  &MantWidth);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_ubv(*Context, ExpWidth, MantWidth,
+      msat_make_fp_from_ubv(*Context, To->getFloatExponentSize(),
+                            To->getFloatSignificandSize(),
                             toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }

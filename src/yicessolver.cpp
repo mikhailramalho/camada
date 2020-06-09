@@ -422,7 +422,7 @@ bool YicesSolver::getBoolean(const SMTExprRef &Exp) {
 }
 
 int64_t YicesSolver::getBitvector(const SMTExprRef &Exp) {
-  unsigned width = yices_term_bitsize(toSolverExpr<YicesExpr>(*Exp).Expr);
+  unsigned width = Exp->Sort->getBitvectorSortSize();
 
   int32_t data[width];
   yices_get_bv_value(yices_get_model(Context->Context, 1),
