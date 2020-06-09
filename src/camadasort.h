@@ -75,7 +75,7 @@ public:
   };
 
   /// Returns the floating-point exponent size, fails if the sort is not a
-  /// floating-point or if the size is zero.
+  /// floating-point or if the size is zero. Calls getFloatExponentSizeImpl().
   virtual unsigned getFloatExponentSize() const {
     abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
     unsigned size = getFloatExponentSizeImpl();
