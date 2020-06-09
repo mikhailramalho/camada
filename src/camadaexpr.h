@@ -25,7 +25,7 @@
 #include <memory>
 
 #include "camadasort.h"
-#include "utils.h"
+#include "camadautils.h"
 
 namespace camada {
 
@@ -65,6 +65,9 @@ protected:
 template <typename SolverContextRef, typename TheExpr>
 class SolverExpr : public SMTExpr {
 public:
+  typedef SolverContextRef ContextType;
+  typedef TheExpr ExprType;
+
   SolverContextRef Context;
 
   TheExpr Expr;
