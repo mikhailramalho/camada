@@ -69,7 +69,7 @@ public:
 
   TheExpr Expr;
 
-  SolverExpr(SolverContextRef C, SMTSortRef S, const TheExpr &SA)
+  SolverExpr(SolverContextRef C, const SMTSortRef &S, const TheExpr &SA)
       : SMTExpr(S), Context(std::move(C)), Expr(SA) {}
 
   virtual ~SolverExpr() = default;
