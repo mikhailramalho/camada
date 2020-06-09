@@ -52,10 +52,6 @@ public:
   void dump() const override;
 }; // end class MathSATExpr
 
-static inline const MathSATExpr &toMathSATExpr(const SMTExpr &E) {
-  return dynamic_cast<const MathSATExpr &>(E);
-}
-
 class MathSATSolver : public camada::SMTSolver {
 public:
   MathSATContextRef Context;
@@ -79,8 +75,6 @@ public:
 
   SMTSortRef getFloatSort(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
-
-  camada::SMTSortRef getSort(const camada::SMTExprRef &Exp) override;
 
   camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
 

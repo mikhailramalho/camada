@@ -89,13 +89,13 @@ YicesSolver::YicesSolver() : Context(std::make_shared<YicesContext>()) {}
 // YicesSolver::YicesSolver(YicesContextRef C) : Context(std::move(C)) {}
 
 void YicesSolver::addConstraint(const SMTExprRef &Exp) {
-  yices_assert_formula(Context->Context, toYicesExpr(*Exp).Expr);
+  yices_assert_formula(Context->Context, toSolverExpr<YicesExpr>(*Exp).Expr);
 }
 
 SMTExprRef YicesSolver::newExprRef(const SMTExpr &Exp) const {
-  abortCondWithMessage(toYicesExpr(Exp).Expr != NULL_TERM,
+  abortCondWithMessage(toSolverExpr<YicesExpr>(Exp).Expr != NULL_TERM,
                        "Error when creating Yices expr.");
-  return std::make_shared<YicesExpr>(toYicesExpr(Exp));
+  return std::make_shared<YicesExpr>(toSolverExpr<YicesExpr>(Exp));
 }
 
 SMTSortRef YicesSolver::getBoolSort() {
@@ -117,179 +117,214 @@ SMTSortRef YicesSolver::getFloatSort(const unsigned, const unsigned) {
   abortWithMessage("Yices does not support fp");
 }
 
-SMTSortRef YicesSolver::getSort(const SMTExprRef &Exp) {
-  abortWithMessage("Currently unimplemented");
-  return nullptr;
-}
-
 SMTExprRef YicesSolver::mkBVNeg(const SMTExprRef &Exp) {
-  return newExprRef(YicesExpr(Context, yices_neg(toYicesExpr(*Exp).Expr)));
+  return newExprRef(YicesExpr(Context, Exp->Sort,
+                              yices_neg(toSolverExpr<YicesExpr>(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVNot(const SMTExprRef &Exp) {
-  return newExprRef(YicesExpr(Context, yices_bvnot(toYicesExpr(*Exp).Expr)));
+  return newExprRef(YicesExpr(Context, Exp->Sort,
+                              yices_bvnot(toSolverExpr<YicesExpr>(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkNot(const SMTExprRef &Exp) {
-  return newExprRef(YicesExpr(Context, yices_not(toYicesExpr(*Exp).Expr)));
+  return newExprRef(YicesExpr(Context, Exp->Sort,
+                              yices_not(toSolverExpr<YicesExpr>(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvadd(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_bvadd(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvsub(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_bvsub(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvmul(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_bvmul(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvsrem(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, LHS->Sort,
+                yices_bvsrem(toSolverExpr<YicesExpr>(*LHS).Expr,
+                             toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvrem(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_bvrem(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvsdiv(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, LHS->Sort,
+                yices_bvsdiv(toSolverExpr<YicesExpr>(*LHS).Expr,
+                             toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvdiv(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_bvdiv(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvshl(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_bvshl(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvashr(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, LHS->Sort,
+                yices_bvashr(toSolverExpr<YicesExpr>(*LHS).Expr,
+                             toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvlshr(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, LHS->Sort,
+                yices_bvlshr(toSolverExpr<YicesExpr>(*LHS).Expr,
+                             toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvxor2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, LHS->Sort,
+                yices_bvxor2(toSolverExpr<YicesExpr>(*LHS).Expr,
+                             toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvor2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_bvor2(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_bvand2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, LHS->Sort,
+                yices_bvand2(toSolverExpr<YicesExpr>(*LHS).Expr,
+                             toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvlt_atom(toYicesExpr(*LHS).Expr,
-                                         toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvlt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvslt_atom(toYicesExpr(*LHS).Expr,
-                                          toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvslt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvgt_atom(toYicesExpr(*LHS).Expr,
-                                         toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvgt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvsgt_atom(toYicesExpr(*LHS).Expr,
-                                          toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvsgt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvle_atom(toYicesExpr(*LHS).Expr,
-                                         toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvle_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvsle_atom(toYicesExpr(*LHS).Expr,
-                                          toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvsle_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvge_atom(toYicesExpr(*LHS).Expr,
-                                         toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvge_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvsge_atom(toYicesExpr(*LHS).Expr,
-                                          toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context, LHS->Sort,
+                yices_bvsge_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_and2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, getBoolSort(),
+                              yices_and2(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                         toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_or2(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, getBoolSort(),
+                              yices_or2(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                        toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, yices_eq(toYicesExpr(*LHS).Expr, toYicesExpr(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, getBoolSort(),
+                              yices_eq(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                       toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                               const SMTExprRef &F) {
-  return newExprRef(YicesExpr(Context, yices_ite(toYicesExpr(*Cond).Expr,
-                                                 toYicesExpr(*T).Expr,
-                                                 toYicesExpr(*F).Expr)));
+  return newExprRef(YicesExpr(Context, T->Sort,
+                              yices_ite(toSolverExpr<YicesExpr>(*Cond).Expr,
+                                        toSolverExpr<YicesExpr>(*T).Expr,
+                                        toSolverExpr<YicesExpr>(*F).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      YicesExpr(Context, yices_sign_extend(toYicesExpr(*Exp).Expr, i)));
+      YicesExpr(Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+                yices_sign_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      YicesExpr(Context, yices_zero_extend(toYicesExpr(*Exp).Expr, i)));
+      YicesExpr(Context, getBitvectorSort(Exp->Sort->getBitvectorSortSize()),
+                yices_zero_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVExtract(unsigned High, unsigned Low,
                                     const SMTExprRef &Exp) {
-  return newExprRef(
-      YicesExpr(Context, yices_bvextract(toYicesExpr(*Exp).Expr, Low, High)));
+  return newExprRef(YicesExpr(
+      Context, getBitvectorSort(High - Low + 1),
+      yices_bvextract(toSolverExpr<YicesExpr>(*Exp).Expr, Low, High)));
 }
 
 SMTExprRef YicesSolver::mkBVConcat(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, yices_bvconcat2(toYicesExpr(*LHS).Expr,
-                                         toYicesExpr(*RHS).Expr)));
+      YicesExpr(Context,
+                getBitvectorSort(LHS->Sort->getBitvectorSortSize() +
+                                 RHS->Sort->getBitvectorSortSize()),
+                yices_bvconcat2(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkFPNeg(const SMTExprRef &) {
@@ -395,17 +430,17 @@ SMTExprRef YicesSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
 bool YicesSolver::getBoolean(const SMTExprRef &Exp) {
   int32_t val;
   auto res = yices_get_bool_value(yices_get_model(Context->Context, 1),
-                                  toYicesExpr(*Exp).Expr, &val);
+                                  toSolverExpr<YicesExpr>(*Exp).Expr, &val);
   abortCondWithMessage(res, "Can't get boolean value from Yices");
   return val ? true : false;
 }
 
 int64_t YicesSolver::getBitvector(const SMTExprRef &Exp) {
-  unsigned width = yices_term_bitsize(toYicesExpr(*Exp).Expr);
+  unsigned width = yices_term_bitsize(toSolverExpr<YicesExpr>(*Exp).Expr);
 
   int32_t data[width];
   yices_get_bv_value(yices_get_model(Context->Context, 1),
-                     toYicesExpr(*Exp).Expr, data);
+                     toSolverExpr<YicesExpr>(*Exp).Expr, data);
 
   int64_t val = 0;
   for (int i = width - 1; i >= 0; i--) {
@@ -439,11 +474,14 @@ bool YicesSolver::getInterpretation(const SMTExprRef &, double &) {
 }
 
 SMTExprRef YicesSolver::mkBoolean(const bool b) {
-  return newExprRef(YicesExpr(Context, b ? yices_true() : yices_false()));
+  return newExprRef(
+      YicesExpr(Context, getBoolSort(), b ? yices_true() : yices_false()));
 }
 
 SMTExprRef YicesSolver::mkBitvector(const int64_t Int, unsigned BitWidth) {
-  return newExprRef(YicesExpr(Context, yices_bvconst_int64(BitWidth, Int)));
+  const SMTSortRef Sort = getBitvectorSort(BitWidth);
+  return newExprRef(
+      YicesExpr(Context, Sort, yices_bvconst_int64(BitWidth, Int)));
 }
 
 SMTExprRef YicesSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
@@ -465,7 +503,7 @@ SMTExprRef YicesSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
                        "Error when trying to set symbol name");
 
   auto inserted = SymbolTable.insert(
-      SymbolTablet::value_type(Name, newExprRef(YicesExpr(Context, t))));
+      SymbolTablet::value_type(Name, newExprRef(YicesExpr(Context, Sort, t))));
 
   abortCondWithMessage(inserted.second, "Could not cache new Yices variable");
 

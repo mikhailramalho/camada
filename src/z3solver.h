@@ -52,10 +52,6 @@ public:
   void dump() const override;
 }; // end class Z3Expr
 
-static inline const Z3Expr &toZ3Expr(const SMTExpr &E) {
-  return dynamic_cast<const Z3Expr &>(E);
-}
-
 class Z3Solver : public camada::SMTSolver {
 public:
   Z3ContextRef Context;
@@ -78,8 +74,6 @@ public:
 
   SMTSortRef getFloatSort(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
-
-  camada::SMTSortRef getSort(const camada::SMTExprRef &Exp) override;
 
   camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
 

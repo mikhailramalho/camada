@@ -66,10 +66,6 @@ public:
   void dump() const override;
 }; // end class BtorExpr
 
-static inline const BtorExpr &toBtorExpr(const SMTExpr &E) {
-  return dynamic_cast<const BtorExpr &>(E);
-}
-
 class BtorSolver : public camada::SMTSolver {
 public:
   BtorContextRef Context;
@@ -93,8 +89,6 @@ public:
 
   SMTSortRef getFloatSort(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
-
-  camada::SMTSortRef getSort(const camada::SMTExprRef &Exp) override;
 
   camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
 

@@ -68,9 +68,6 @@ public:
   /// Convenience method to create a 64 bits long a floating-point sort.
   SMTSortRef getFloat64Sort() { return getFloatSort(11, 53); }
 
-  /// Returns an appropriate sort for the given AST.
-  virtual SMTSortRef getSort(const SMTExprRef &AST) = 0;
-
   /// Given a constraint, adds it to the solver
   virtual void addConstraint(const SMTExprRef &Exp) = 0;
 

@@ -52,10 +52,6 @@ public:
   void dump() const override;
 }; // end class CVC4Expr
 
-static inline const CVC4Expr &toCVC4Expr(const SMTExpr &E) {
-  return dynamic_cast<const CVC4Expr &>(E);
-}
-
 class CVC4Solver : public camada::SMTSolver {
 public:
   CVC4ContextRef Context;
@@ -79,8 +75,6 @@ public:
 
   SMTSortRef getFloatSort(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
-
-  camada::SMTSortRef getSort(const camada::SMTExprRef &Exp) override;
 
   camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
 

@@ -32,12 +32,26 @@ namespace camada {
 /// Generic base class for SMT exprs
 class SMTExpr {
 public:
-  SMTExpr() = default;
+  SMTSortRef Sort;
+
+  SMTExpr(SMTSortRef S) : Sort(std::move(S)){};
   virtual ~SMTExpr() = default;
 
   friend bool operator==(SMTExpr const &LHS, SMTExpr const &RHS) {
     return LHS.equal_to(RHS);
   }
+
+  /// Returns true if the expr sort is bitvector
+  virtual bool isBitvectorSort() const = 0;
+
+  /// Returns true if the expr sort is boolean
+  virtual bool isBooleanSort() const = 0;
+
+  /// Returns true if the expr sort is floating-point
+  virtual bool isFloatSort() const = 0;
+
+  /// Returns true if the expr sort is rounding mode
+  virtual bool isRoundingModeSort() = 0;
 
   virtual void dump() const;
 
@@ -47,9 +61,6 @@ protected:
   virtual bool equal_to(SMTExpr const &other) const = 0;
 };
 
-/// Shared pointer for SMTExprs, used by SMTSolver API.
-using SMTExprRef = std::shared_ptr<SMTExpr>;
-
 /// Template to hold Solver specific Context and Expr
 template <typename SolverContextRef, typename TheExpr>
 class SolverExpr : public SMTExpr {
@@ -58,13 +69,30 @@ public:
 
   TheExpr Expr;
 
-  SolverExpr(SolverContextRef C, const TheExpr &SA)
-      : Context(std::move(C)), Expr(SA) {}
+  SolverExpr(SolverContextRef C, SMTSortRef S, const TheExpr &SA)
+      : SMTExpr(S), Context(std::move(C)), Expr(SA) {}
 
   virtual ~SolverExpr() = default;
 
+  virtual bool isBitvectorSort() const { return Sort->isBitvectorSort(); }
+
+  virtual bool isBooleanSort() const { return Sort->isBooleanSort(); }
+
+  virtual bool isFloatSort() const { return Sort->isFloatSort(); }
+
+  virtual bool isRoundingModeSort() { return Sort->isRoundingModeSort(); }
+
   virtual bool equal_to(SMTExpr const &other) const = 0;
 };
+
+/// Shared pointer for SMTExprs, used by SMTSolver API.
+using SMTExprRef = std::shared_ptr<SMTExpr>;
+
+/// Wrapper to downcast from SMTExpr to Solver specific expr
+template <typename SolverExpr>
+static inline const SolverExpr &toSolverExpr(const SMTExpr &S) {
+  return dynamic_cast<const SolverExpr &>(S);
+}
 
 } // namespace camada
 

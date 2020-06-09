@@ -65,10 +65,6 @@ public:
   void dump() const override;
 }; // end class YicesExpr
 
-static inline const YicesExpr &toYicesExpr(const SMTExpr &E) {
-  return dynamic_cast<const YicesExpr &>(E);
-}
-
 class YicesSolver : public camada::SMTSolver {
 public:
   YicesContextRef Context;
@@ -92,8 +88,6 @@ public:
 
   SMTSortRef getFloatSort(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
-
-  camada::SMTSortRef getSort(const camada::SMTExprRef &Exp) override;
 
   camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
 
