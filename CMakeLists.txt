@@ -128,6 +128,23 @@ configure_file (
 )
 
 #-----------------------------------------------------------------------------#
+# Install version file
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/CamadaConfigVersion.cmake
+  VERSION ${CAMADA_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+# Install the config, configversion and custom find modules
+install(FILES
+  ${CMAKE_CURRENT_LIST_DIR}/scripts/cmake/CamadaConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/CamadaConfigVersion.cmake
+  DESTINATION lib/cmake/Camada
+)
+
+#-----------------------------------------------------------------------------#
 # Define targets
 
 add_subdirectory(src)

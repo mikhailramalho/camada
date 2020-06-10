@@ -25,15 +25,23 @@ set(libcamada_src_files camada.cpp)
 compile_solver(${CAMADA_AVAILABLE_SOLVERS})
 
 add_library(camada ${libcamada_src_files})
-target_link_libraries(camada fmt::fmt ${CAMADA_SOLVER_LIBS})
+target_link_libraries(camada PRIVATE fmt::fmt ${CAMADA_SOLVER_LIBS})
 
-target_include_directories(camada INTERFACE ./)
+target_include_directories(camada INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
 
 install(TARGETS camada
   EXPORT camada-export
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
 )
+
+install(EXPORT camada-export
+  FILE CamadaTargets.cmake
+  NAMESPACE Camada::
+  DESTINATION lib/cmake/Camada)
 
 #-----------------------------------------------------------------------------#
 # Macro to add solver header to install

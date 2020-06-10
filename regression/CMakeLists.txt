@@ -1,4 +1,4 @@
-include_directories(${CMAKE_BINARY_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/src)
 
 #-----------------------------------------------------------------------------#
 # Macro to add solver files to test
