@@ -298,6 +298,12 @@ SMTExprRef SMTFPSolverBase::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                       const unsigned SigWidth) {}
 
 SMTExprRef SMTFPSolverBase::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
-                                             const SMTSortRef &To) {}
+                                             const SMTSortRef &To) {
+  Exp->Sort = To;
+  return Exp;
+}
 
-SMTExprRef SMTFPSolverBase::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {}
+SMTExprRef SMTFPSolverBase::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
+  // Do nothing, it's already a bitvector
+  return Exp;
+}
