@@ -37,7 +37,7 @@ public:
   YicesContext();
   virtual ~YicesContext();
 
-  void createAndConfig();
+  virtual void createAndConfig();
   void reset();
 }; // end class YicesContext
 
@@ -71,7 +71,7 @@ public:
   SymbolTablet SymbolTable;
 
   explicit YicesSolver();
-  // explicit YicesSolver(YicesContextRef C);
+  explicit YicesSolver(YicesContextRef C);
   virtual ~YicesSolver() = default;
 
   void addConstraint(const camada::SMTExprRef &Exp) override;

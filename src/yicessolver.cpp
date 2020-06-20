@@ -72,7 +72,7 @@ void YicesExpr::dump() const {
 
 YicesSolver::YicesSolver() : Context(std::make_shared<YicesContext>()) {}
 
-// YicesSolver::YicesSolver(YicesContextRef C) : Context(std::move(C)) {}
+YicesSolver::YicesSolver(YicesContextRef C) : Context(std::move(C)) {}
 
 void YicesSolver::addConstraint(const SMTExprRef &Exp) {
   yices_assert_formula(Context->Context, toSolverExpr<YicesExpr>(*Exp).Expr);
