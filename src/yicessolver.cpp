@@ -313,6 +313,10 @@ SMTExprRef YicesSolver::mkBVConcat(const SMTExprRef &LHS,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
+SMTExprRef YicesSolver::mkFPAbs(const SMTExprRef &) {
+  abortWithMessage("Yices does not support fp");
+}
+
 SMTExprRef YicesSolver::mkFPNeg(const SMTExprRef &) {
   abortWithMessage("Yices does not support fp");
 }
@@ -322,6 +326,10 @@ SMTExprRef YicesSolver::mkFPIsInfinite(const SMTExprRef &) {
 }
 
 SMTExprRef YicesSolver::mkFPIsNaN(const SMTExprRef &) {
+  abortWithMessage("Yices does not support fp");
+}
+
+SMTExprRef YicesSolver::mkFPIsDenormal(const SMTExprRef &) {
   abortWithMessage("Yices does not support fp");
 }
 

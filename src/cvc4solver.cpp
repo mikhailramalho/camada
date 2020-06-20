@@ -330,6 +330,13 @@ SMTExprRef CVC4Solver::mkBVConcat(const SMTExprRef &LHS,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
+SMTExprRef CVC4Solver::mkFPAbs(const SMTExprRef &Exp) {
+  return newExprRef(
+      CVC4Expr(Context, Exp->Sort,
+               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ABS,
+                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+}
+
 SMTExprRef CVC4Solver::mkFPNeg(const SMTExprRef &Exp) {
   return newExprRef(
       CVC4Expr(Context, Exp->Sort,
@@ -348,6 +355,13 @@ SMTExprRef CVC4Solver::mkFPIsNaN(const SMTExprRef &Exp) {
   return newExprRef(
       CVC4Expr(Context, getBoolSort(),
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISNAN,
+                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+}
+
+SMTExprRef CVC4Solver::mkFPIsDenormal(const SMTExprRef &Exp) {
+  return newExprRef(
+      CVC4Expr(Context, getBoolSort(),
+               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISSN,
                                toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 

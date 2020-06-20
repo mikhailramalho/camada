@@ -179,6 +179,9 @@ public:
                                 const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point negation operation
+  virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) = 0;
+
+  /// Creates a floating-point negation operation
   virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) = 0;
 
   /// Creates a floating-point isInfinite operation
@@ -186,6 +189,9 @@ public:
 
   /// Creates a floating-point isNaN operation
   virtual SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) = 0;
+
+  /// Creates a floating-point isNormal operation
+  virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) = 0;
 
   /// Creates a floating-point isNormal operation
   virtual SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) = 0;

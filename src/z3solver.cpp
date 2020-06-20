@@ -280,6 +280,13 @@ SMTExprRef Z3Solver::mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                       toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
+SMTExprRef Z3Solver::mkFPAbs(const SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context, getBoolSort(),
+      z3::to_expr(*Context,
+                  Z3_mk_fpa_abs(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+}
+
 SMTExprRef Z3Solver::mkFPNeg(const SMTExprRef &Exp) {
   return newExprRef(
       Z3Expr(Context, Exp->Sort, -toSolverExpr<Z3Expr>(*Exp).Expr));
@@ -296,6 +303,13 @@ SMTExprRef Z3Solver::mkFPIsNaN(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
       Context, getBoolSort(),
       z3::to_expr(*Context, Z3_mk_fpa_is_nan(
+                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+}
+
+SMTExprRef Z3Solver::mkFPIsDenormal(const SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context, getBoolSort(),
+      z3::to_expr(*Context, Z3_mk_fpa_is_subnormal(
                                 *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
 }
 

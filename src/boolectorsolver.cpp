@@ -327,6 +327,10 @@ SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                        toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
+SMTExprRef BtorSolver::mkFPAbs(const SMTExprRef &) {
+  abortWithMessage("Boolector does not support fp");
+}
+
 SMTExprRef BtorSolver::mkFPNeg(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
@@ -340,6 +344,10 @@ SMTExprRef BtorSolver::mkFPIsNaN(const SMTExprRef &) {
 }
 
 SMTExprRef BtorSolver::mkFPIsNormal(const SMTExprRef &) {
+  abortWithMessage("Boolector does not support fp");
+}
+
+SMTExprRef BtorSolver::mkFPIsDenormal(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 

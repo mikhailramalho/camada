@@ -168,11 +168,15 @@ public:
   camada::SMTExprRef mkBVConcat(const camada::SMTExprRef &LHS,
                                 const camada::SMTExprRef &RHS) override;
 
+  SMTExprRef mkFPAbs(const SMTExprRef &Exp) override;
+
   SMTExprRef mkFPNeg(const SMTExprRef &Exp) override;
 
   SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override;
 
   SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override;
 
   SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override;
 

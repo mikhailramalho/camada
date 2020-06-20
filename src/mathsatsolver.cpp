@@ -316,6 +316,12 @@ SMTExprRef MathSATSolver::mkBVConcat(const SMTExprRef &LHS,
                           toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
+SMTExprRef MathSATSolver::mkFPAbs(const SMTExprRef &Exp) {
+  return newExprRef(MathSATExpr(
+      Context, Exp->Sort,
+      msat_make_fp_abs(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
+}
+
 SMTExprRef MathSATSolver::mkFPNeg(const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
       Context, Exp->Sort,
@@ -332,6 +338,13 @@ SMTExprRef MathSATSolver::mkFPIsNaN(const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
       Context, getBoolSort(),
       msat_make_fp_isnan(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
+}
+
+SMTExprRef MathSATSolver::mkFPIsDenormal(const SMTExprRef &Exp) {
+  return newExprRef(
+      MathSATExpr(Context, getBoolSort(),
+                  msat_make_fp_issubnormal(
+                      *Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkFPIsNormal(const SMTExprRef &Exp) {
