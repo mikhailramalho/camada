@@ -339,6 +339,13 @@ public:
 
   /// Dump Model
   virtual void dumpModel();
+
+protected:
+  /// Flag to enable encoding floating-points using bitvectors even if the
+  /// solver supports floating-points. For solvers that don't support
+  /// floating-point arithmetic, bitvectors will be used even if this flag is
+  /// false
+  bool useCamadaFP = false;
 };
 
 /// Shared pointer for SMTSolvers.
