@@ -81,12 +81,12 @@ SMTExprRef SMTFPSolverBase::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
   SMTExprRef sig = extractSig(*this, Exp);
 
   // exp == 1^n , sig == 0
-  SMTExprRef top_exp = mkTopExp(*this, exp->Sort->getBitvectorSortSize());
+  SMTExprRef topExp = mkTopExp(*this, exp->Sort->getBitvectorSortSize());
 
   SMTExprRef zero = mkBitvector(0, sig->Sort->getBitvectorSortSize());
-  SMTExprRef sig_is_zero = mkEqual(sig, zero);
-  SMTExprRef exp_is_top = mkEqual(exp, top_exp);
-  return mkAnd(exp_is_top, sig_is_zero);
+  SMTExprRef sigIsZero = mkEqual(sig, zero);
+  SMTExprRef expIsTop = mkEqual(exp, topExp);
+  return mkAnd(expIsTop, sigIsZero);
 }
 
 SMTExprRef SMTFPSolverBase::mkFPIsNaNImpl(const SMTExprRef &Exp) {
@@ -95,12 +95,12 @@ SMTExprRef SMTFPSolverBase::mkFPIsNaNImpl(const SMTExprRef &Exp) {
   SMTExprRef sig = extractSig(*this, Exp);
 
   // exp == 1^n , sig != 0
-  SMTExprRef top_exp = mkTopExp(*this, exp->Sort->getBitvectorSortSize());
+  SMTExprRef topExp = mkTopExp(*this, exp->Sort->getBitvectorSortSize());
 
   SMTExprRef zero = mkBitvector(0, sig->Sort->getBitvectorSortSize());
   SMTExprRef sigIsNotZero = mkNot(mkEqual(sig, zero));
-  SMTExprRef exp_is_top = mkEqual(exp, top_exp);
-  return mkAnd(exp_is_top, sigIsNotZero);
+  SMTExprRef expIsTop = mkEqual(exp, topExp);
+  return mkAnd(expIsTop, sigIsNotZero);
 }
 
 SMTExprRef SMTFPSolverBase::mkFPIsDenormalImpl(const SMTExprRef &Exp) {

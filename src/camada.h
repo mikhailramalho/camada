@@ -178,7 +178,7 @@ public:
   virtual SMTExprRef mkBVConcat(const SMTExprRef &LHS,
                                 const SMTExprRef &RHS) = 0;
 
-  /// Creates a floating-point negation operation
+  /// Creates a floating-point absolute operation
   virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) = 0;
 
   /// Creates a floating-point negation operation
