@@ -38,11 +38,11 @@ void abortCondWithMessage(bool Cond, const std::string &Msg);
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 
 enum class RoundingMode {
-  ROUND_TO_EVEN,
-  ROUND_TO_AWAY,
-  ROUND_TO_PLUS_INF,
-  ROUND_TO_MINUS_INF,
-  ROUND_TO_ZERO
+  ROUND_TO_EVEN = 0,
+  ROUND_TO_AWAY = 1,
+  ROUND_TO_PLUS_INF = 2,
+  ROUND_TO_MINUS_INF = 3,
+  ROUND_TO_ZERO = 4,
 };
 
 } // namespace camada
