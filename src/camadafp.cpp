@@ -289,7 +289,9 @@ SMTExprRef SMTFPSolverBase::mkFloatImpl(const float Float) {}
 
 SMTExprRef SMTFPSolverBase::mkDoubleImpl(const double Double) {}
 
-SMTExprRef SMTFPSolverBase::mkRoundingModeImpl(const RoundingMode R) {}
+SMTExprRef SMTFPSolverBase::mkRoundingModeImpl(const RoundingMode R) {
+  return mkBitvector(static_cast<int64_t>(R), 3);
+}
 
 SMTExprRef SMTFPSolverBase::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                       const unsigned SigWidth) {
