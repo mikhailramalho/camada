@@ -561,25 +561,36 @@ int64_t CVC4Solver::getBitvector(const SMTExprRef &Exp) {
       .getUnsignedLong();
 }
 
+template <class FPType>
+static inline bool isNaNOrInf(const CVC4::FloatingPoint &FP, FPType &Res) {
+  // TODO: what about negative NaN?
+  if (FP.isNaN()) {
+    Res = NAN;
+    return true;
+  }
+
+  // Convert the float to bv
+  if (FP.isInfinite()) {
+    Res = FP.isPositive() ? INFINITY : -INFINITY;
+    return true;
+  }
+
+  return false;
+}
+
 float CVC4Solver::getFloat(const SMTExprRef &Exp) {
   CVC4::FloatingPoint fp = Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
                                .getConst<CVC4::FloatingPoint>();
 
-  // TODO: what about negative NaN?
-  if (fp.isNaN())
-    return NAN;
-
-  // Convert the float to bv
-  if (fp.isInfinite())
-    return fp.isPositive() ? INFINITY : -INFINITY;
-
-  auto FP_as_int = fp.pack().toInteger().getSignedInt();
+  float result;
+  if (isNaNOrInf(fp, result))
+    return result;
 
   // Convert the integer to float. We assume that floats are 32 bits long
+  auto FP_as_int = fp.pack().toInteger().getSignedInt();
   camada::abortCondWithMessage(sizeof(float) == sizeof(FP_as_int),
                                "Cannot convert int to floating-point");
 
-  float result;
   memcpy(&result, &FP_as_int, sizeof(float));
   return result;
 }
@@ -588,21 +599,15 @@ double CVC4Solver::getDouble(const SMTExprRef &Exp) {
   CVC4::FloatingPoint fp = Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
                                .getConst<CVC4::FloatingPoint>();
 
-  // TODO: what about negative NaN?
-  if (fp.isNaN())
-    return NAN;
-
-  // Convert the float to bv
-  if (fp.isInfinite())
-    return fp.isPositive() ? INFINITY : -INFINITY;
-
-  auto FP_as_int = fp.pack().toInteger().getLong();
+  double result;
+  if (isNaNOrInf(fp, result))
+    return result;
 
   // Convert the integer to float. We assume that floats are 32 bits long
+  auto FP_as_int = fp.pack().toInteger().getLong();
   camada::abortCondWithMessage(sizeof(double) == sizeof(FP_as_int),
                                "Cannot convert int to floating-point");
 
-  double result;
   memcpy(&result, &FP_as_int, sizeof(double));
   return result;
 }
