@@ -173,7 +173,7 @@ public:
 
   SolverBVSort(unsigned W, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
-      : Width(W), SolverSortBase(C, S){};
+      : SolverSortBase(C, S), Width(W){};
   virtual ~SolverBVSort() = default;
 
   virtual bool isBitvectorSort() const { return true; }
@@ -201,7 +201,7 @@ public:
 
   SolverFPSort(unsigned EW, unsigned SW, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
-      : ExpWidth(EW), SigWidth(SW), SolverSortBase(C, S){};
+      : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW){};
   virtual ~SolverFPSort() = default;
 
   virtual bool isFloatSort() const { return true; }
