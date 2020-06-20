@@ -25,6 +25,11 @@
 
 using namespace camada;
 
+static inline SMTExprRef extractSgn(SMTSolver &S, const SMTExprRef &Exp) {
+  return S.mkBVExtract(Exp->Sort->getBitvectorSortSize() - 1,
+                       Exp->Sort->getBitvectorSortSize() - 1, Exp);
+}
+
 static inline SMTExprRef extractExp(SMTSolver &S, const SMTExprRef &Exp) {
   unsigned int expTop = Exp->Sort->getFloatSortSize() - 2;
   unsigned int expBot = Exp->Sort->getFloatSignificandSize() - 2;
@@ -71,9 +76,21 @@ SMTSortRef SMTFPSolverBase::getRoundingModeSortImpl() {}
 SMTSortRef SMTFPSolverBase::getFloatSortImpl(const unsigned ExpWidth,
                                              const unsigned SigWidth) {}
 
-SMTExprRef SMTFPSolverBase::mkFPAbsImpl(const SMTExprRef &Exp) {}
+SMTExprRef SMTFPSolverBase::mkFPAbsImpl(const SMTExprRef &Exp) {
+  // Extract everything but the sign bit
+  SMTExprRef ew_sw = extractExpSig(*this, Exp);
 
-SMTExprRef SMTFPSolverBase::mkFPNegImpl(const SMTExprRef &Exp) {}
+  // Concat that with '0'
+  SMTExprRef zero = mkBitvector(0, 1);
+  return mkBVToIEEEFP(mkBVConcat(zero, ew_sw), Exp->Sort);
+}
+
+SMTExprRef SMTFPSolverBase::mkFPNegImpl(const SMTExprRef &Exp) {
+  // Extract everything but the sign bit
+  SMTExprRef ew_sw = extractExpSig(*this, Exp);
+  SMTExprRef sgn = extractSgn(*this, Exp);
+  return mkBVToIEEEFP(mkBVConcat(mkBVNot(sgn), ew_sw), Exp->Sort);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
   // Extract the exponent and significand
