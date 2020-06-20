@@ -475,14 +475,8 @@ SMTExprRef MathSATSolver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
 }
 
 SMTExprRef MathSATSolver::mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) {
-  // Conversion from float to integers always truncate, so we assume
-  // the round mode to be toward zero
-  SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
-  return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(ToWidth),
-      msat_make_fp_to_bv(*Context, ToWidth,
-                         toSolverExpr<MathSATExpr>(*roundingMode).Expr,
-                         toSolverExpr<MathSATExpr>(*From).Expr)));
+  // We just need to call mkFPtoSBV
+  return mkFPtoSBV(From, ToWidth);
 }
 
 SMTExprRef MathSATSolver::mkFPtoIntegral(const SMTExprRef &From,
