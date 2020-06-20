@@ -302,7 +302,13 @@ SMTExprRef SMTFPSolverBase::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 }
 
 SMTExprRef SMTFPSolverBase::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
-                                      const unsigned SigWidth) {}
+                                      const unsigned SigWidth) {
+  SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
+  return mkBVToIEEEFP(
+      mkBVConcat(mkBitvector(Sgn, 1),
+                 mkBVConcat(top_exp, mkBitvector(0, SigWidth - 1))),
+      getFloatSort(ExpWidth, SigWidth - 1));
+}
 
 SMTExprRef SMTFPSolverBase::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                              const SMTSortRef &To) {
