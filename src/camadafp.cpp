@@ -71,6 +71,8 @@ SMTSortRef SMTFPSolverBase::getRoundingModeSortImpl() {}
 SMTSortRef SMTFPSolverBase::getFloatSortImpl(const unsigned ExpWidth,
                                              const unsigned SigWidth) {}
 
+SMTExprRef SMTFPSolverBase::mkFPAbsImpl(const SMTExprRef &Exp) {}
+
 SMTExprRef SMTFPSolverBase::mkFPNegImpl(const SMTExprRef &Exp) {}
 
 SMTExprRef SMTFPSolverBase::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
@@ -100,6 +102,8 @@ SMTExprRef SMTFPSolverBase::mkFPIsNaNImpl(const SMTExprRef &Exp) {
   SMTExprRef exp_is_top = mkEqual(exp, top_exp);
   return mkAnd(exp_is_top, sigIsNotZero);
 }
+
+SMTExprRef SMTFPSolverBase::mkFPIsDenormalImpl(const SMTExprRef &Exp) {}
 
 SMTExprRef SMTFPSolverBase::mkFPIsNormalImpl(const SMTExprRef &Exp) {}
 

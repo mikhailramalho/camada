@@ -37,11 +37,15 @@ protected:
   virtual SMTSortRef getFloatSortImpl(const unsigned ExpWidth,
                                       const unsigned SigWidth);
 
+  virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
+
   virtual SMTExprRef mkFPNegImpl(const SMTExprRef &Exp);
 
   virtual SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp);
 
   virtual SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp);
+
+  virtual SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp);
 
   virtual SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp);
 
@@ -127,6 +131,12 @@ public:
     return getFloatSortImpl(ExpWidth, SigWidth);
   }
 
+  virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolverBase::mkFPAbsImpl(Exp);
+    return mkFPAbsImpl(Exp);
+  }
+
   virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) override {
     if (useCamadaFP)
       return SMTFPSolverBase::mkFPNegImpl(Exp);
@@ -143,6 +153,12 @@ public:
     if (useCamadaFP)
       return SMTFPSolverBase::mkFPIsNaNImpl(Exp);
     return mkFPIsNaNImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolverBase::mkFPIsDenormalImpl(Exp);
+    return mkFPIsDenormalImpl(Exp);
   }
 
   virtual SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override {
