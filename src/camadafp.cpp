@@ -93,7 +93,7 @@ SMTExprRef SMTFPSolverBase::mkFPIsNaNImpl(const SMTExprRef &Exp) {
   SMTExprRef sig = extractSig(*this, Exp);
 
   // exp == 1^n , sig != 0
-  SMTExprRef top_exp = mkTopExp(*this, Exp->Sort->getFloatSortSize());
+  SMTExprRef top_exp = mkTopExp(*this, exp->Sort->getBitvectorSortSize());
 
   SMTExprRef zero = mkBitvector(0, sig->Sort->getBitvectorSortSize());
   SMTExprRef sigIsNotZero = mkNot(mkEqual(sig, zero));
