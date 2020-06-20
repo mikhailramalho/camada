@@ -23,6 +23,10 @@
 
 using namespace camada;
 
+static inline SMTExprRef extractExpSig(SMTSolver &S, const SMTExprRef &Exp) {
+  return S.mkBVExtract(Exp->Sort->getFloatSortSize() - 2, 0, Exp);
+}
+
 SMTSortRef SMTFPSolverBase::getRoundingModeSortImpl() {}
 
 SMTSortRef SMTFPSolverBase::getFloatSortImpl(const unsigned ExpWidth,
@@ -36,7 +40,15 @@ SMTExprRef SMTFPSolverBase::mkFPIsNaNImpl(const SMTExprRef &Exp) {}
 
 SMTExprRef SMTFPSolverBase::mkFPIsNormalImpl(const SMTExprRef &Exp) {}
 
-SMTExprRef SMTFPSolverBase::mkFPIsZeroImpl(const SMTExprRef &Exp) {}
+SMTExprRef SMTFPSolverBase::mkFPIsZeroImpl(const SMTExprRef &Exp) {
+  // Both -0 and 0 should return true
+
+  // Extract everything but the sign bit
+  SMTExprRef ew_sw = extractExpSig(*this, Exp);
+
+  // Then compare it with zero of the same size
+  return mkEqual(ew_sw, mkBitvector(0, Exp->Sort->getBitvectorSortSize() - 1));
+}
 
 SMTExprRef SMTFPSolverBase::mkFPMulImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS,
