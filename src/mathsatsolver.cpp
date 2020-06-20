@@ -399,12 +399,12 @@ SMTExprRef MathSATSolver::mkFPSqrt(const SMTExprRef &Exp,
       Context, Exp->Sort,
       msat_make_fp_sqrt(*Context, toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                         toSolverExpr<MathSATExpr>(*Exp).Expr)));
-};
+}
 
 SMTExprRef MathSATSolver::mkFPFMA(const SMTExprRef &, const SMTExprRef &,
                                   const SMTExprRef &, const RoundingMode) {
   abortWithMessage("MathSAT does not implement fp.fma");
-};
+}
 
 SMTExprRef MathSATSolver::mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(

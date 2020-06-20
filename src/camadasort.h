@@ -53,7 +53,7 @@ public:
     unsigned size = getBitvectorSortSizeImpl();
     abortCondWithMessage(size, "Bitvector size is zero!");
     return size;
-  };
+  }
 
   /// Returns the floating-point size, fails if the sort is not a floating-point
   /// floating-point or if the size is zero. Calls getFloatSortSizeImpl().
@@ -62,7 +62,7 @@ public:
     unsigned size = getFloatSortSizeImpl();
     abortCondWithMessage(size, "Floating-point size is zero!");
     return size;
-  };
+  }
 
   /// Returns the floating-point significand size, fails if the sort is not a
   /// floating-point or if the size is zero. Calls
@@ -72,7 +72,7 @@ public:
     unsigned size = getFloatSignificandSizeImpl();
     abortCondWithMessage(size, "Floating-point significand size is zero!");
     return size;
-  };
+  }
 
   /// Returns the floating-point exponent size, fails if the sort is not a
   /// floating-point or if the size is zero. Calls getFloatExponentSizeImpl().
@@ -160,11 +160,11 @@ public:
 
   virtual unsigned getFloatSignificandSizeImpl() const {
     abortWithMessage("Unimplemented for current type");
-  };
+  }
 
   virtual unsigned getFloatExponentSizeImpl() const {
     abortWithMessage("Unimplemented for current type");
-  };
+  }
 };
 
 template <typename SolverSortBase> class SolverBVSort : public SolverSortBase {
@@ -173,7 +173,7 @@ public:
 
   SolverBVSort(unsigned W, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S), Width(W){};
+      : SolverSortBase(C, S), Width(W) {}
   virtual ~SolverBVSort() = default;
 
   virtual bool isBitvectorSort() const { return true; }
@@ -186,7 +186,7 @@ class SolverBoolSort : public SolverSortBase {
 public:
   SolverBoolSort(typename SolverSortBase::ContextType C,
                  typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S){};
+      : SolverSortBase(C, S) {}
   virtual ~SolverBoolSort() = default;
 
   virtual bool isBooleanSort() const { return true; }
@@ -201,23 +201,23 @@ public:
 
   SolverFPSort(unsigned EW, unsigned SW, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW){};
+      : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
   virtual ~SolverFPSort() = default;
 
   virtual bool isFloatSort() const { return true; }
 
   virtual unsigned getFloatSortSize() const { return ExpWidth + SigWidth; }
 
-  virtual unsigned getFloatSignificandSize() const { return SigWidth; };
+  virtual unsigned getFloatSignificandSize() const { return SigWidth; }
 
-  virtual unsigned getFloatExponentSize() const { return ExpWidth; };
+  virtual unsigned getFloatExponentSize() const { return ExpWidth; }
 };
 
 template <typename SolverSortBase> class SolverRMSort : public SolverSortBase {
 public:
   SolverRMSort(typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S){};
+      : SolverSortBase(C, S) {}
   virtual ~SolverRMSort() = default;
 
   virtual bool isRoundingModeSort() const { return true; }

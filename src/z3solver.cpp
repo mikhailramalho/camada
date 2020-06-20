@@ -375,7 +375,7 @@ SMTExprRef Z3Solver::mkFPSqrt(const SMTExprRef &Exp, const RoundingMode R) {
                   Z3_mk_fpa_sqrt(*Context,
                                  toSolverExpr<Z3Expr>(*roundingMode).Expr,
                                  toSolverExpr<Z3Expr>(*Exp).Expr))));
-};
+}
 
 SMTExprRef Z3Solver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
                              const SMTExprRef &Z, const RoundingMode R) {
@@ -388,7 +388,7 @@ SMTExprRef Z3Solver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
                                        toSolverExpr<Z3Expr>(*X).Expr,
                                        toSolverExpr<Z3Expr>(*Y).Expr,
                                        toSolverExpr<Z3Expr>(*Z).Expr))));
-};
+}
 
 SMTExprRef Z3Solver::mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, getBoolSort(),
@@ -492,7 +492,7 @@ SMTExprRef Z3Solver::mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) {
                          Z3_mk_fpa_round_to_integral(
                              *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
                              toSolverExpr<Z3Expr>(*From).Expr))));
-};
+}
 
 bool Z3Solver::getBoolean(const SMTExprRef &Exp) {
   return toSolverExpr<Z3Expr>(*Exp).Expr.bool_value();

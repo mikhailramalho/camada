@@ -45,7 +45,7 @@ public:
   template <typename SolverSort>
   SMTSortRef newSortRef(const SMTSort &Sort) const {
     return std::make_shared<SolverSort>(toSolverSort<SolverSort>(Sort));
-  };
+  }
 
   /// Wrapper to create new SMTExpr
   virtual SMTExprRef newExprRef(const SMTExpr &Exp) const = 0;
@@ -225,7 +225,7 @@ public:
   /// Creates a floating-point greater-than operation
   virtual SMTExprRef mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
     return mkFPLt(RHS, LHS);
-  };
+  }
 
   /// Creates a floating-point less-than-or-equal operation
   virtual SMTExprRef mkFPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
@@ -233,7 +233,7 @@ public:
   /// Creates a floating-point greater-than-or-equal operation
   virtual SMTExprRef mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) {
     return mkNot(mkFPLt(RHS, LHS));
-  };
+  }
 
   /// Creates a floating-point equality operation
   virtual SMTExprRef mkFPEqual(const SMTExprRef &LHS,

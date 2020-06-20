@@ -411,7 +411,7 @@ SMTExprRef YicesSolver::mkFPtoUBV(const SMTExprRef &, unsigned) {
 
 SMTExprRef YicesSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
   abortWithMessage("Yices does not support fp");
-};
+}
 
 bool YicesSolver::getBoolean(const SMTExprRef &Exp) {
   int32_t val;

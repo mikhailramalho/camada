@@ -34,7 +34,7 @@ class SMTExpr {
 public:
   SMTSortRef Sort;
 
-  SMTExpr(SMTSortRef S) : Sort(std::move(S)){};
+  SMTExpr(SMTSortRef S) : Sort(std::move(S)) {}
   virtual ~SMTExpr() = default;
 
   friend bool operator==(SMTExpr const &LHS, SMTExpr const &RHS) {

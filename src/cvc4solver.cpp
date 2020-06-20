@@ -424,7 +424,7 @@ SMTExprRef CVC4Solver::mkFPSqrt(const SMTExprRef &Exp, const RoundingMode R) {
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_SQRT,
                                toSolverExpr<CVC4Expr>(*roundingMode).Expr,
                                toSolverExpr<CVC4Expr>(*Exp).Expr)));
-};
+}
 
 SMTExprRef CVC4Solver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
                                const SMTExprRef &Z, const RoundingMode R) {
@@ -436,7 +436,7 @@ SMTExprRef CVC4Solver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
                                toSolverExpr<CVC4Expr>(*X).Expr,
                                toSolverExpr<CVC4Expr>(*Y).Expr,
                                toSolverExpr<CVC4Expr>(*Z).Expr)));
-};
+}
 
 SMTExprRef CVC4Solver::mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
@@ -548,7 +548,7 @@ SMTExprRef CVC4Solver::mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) {
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_RTI,
                                toSolverExpr<CVC4Expr>(*roundingMode).Expr,
                                toSolverExpr<CVC4Expr>(*From).Expr)));
-};
+}
 
 bool CVC4Solver::getBoolean(const SMTExprRef &Exp) {
   return Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr).getConst<bool>();

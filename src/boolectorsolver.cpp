@@ -425,7 +425,7 @@ SMTExprRef BtorSolver::mkFPtoUBV(const SMTExprRef &, unsigned) {
 
 SMTExprRef BtorSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
   abortWithMessage("Boolector does not support fp");
-};
+}
 
 bool BtorSolver::getBoolean(const SMTExprRef &Exp) {
   const char *boolean = boolector_bv_assignment(
