@@ -192,7 +192,24 @@ SMTExprRef SMTFPSolverBase::mkFPLeImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {}
 
 SMTExprRef SMTFPSolverBase::mkFPEqualImpl(const SMTExprRef &LHS,
-                                          const SMTExprRef &RHS) {}
+                                          const SMTExprRef &RHS) {
+  // +0 and -0 should return true
+  SMTExprRef isZeroLHS = mkFPIsZero(LHS);
+  SMTExprRef isZeroRHS = mkFPIsZero(RHS);
+  SMTExprRef bothZero = mkAnd(isZeroLHS, isZeroRHS);
+
+  // Check if they are NaN
+  SMTExprRef isNanLHS = mkFPIsNaN(LHS);
+  SMTExprRef isNanRHS = mkFPIsNaN(RHS);
+  SMTExprRef nan = mkOr(isNanLHS, isNanRHS);
+
+  // Otherwise compare them bitwise
+  SMTExprRef are_equal = mkEqual(LHS, RHS);
+
+  // They are equal if they are either +0 and -0 (and vice-versa) or bitwise
+  // equal and neither is NaN
+  return mkAnd(mkOr(bothZero, are_equal), mkNot(nan));
+}
 
 SMTExprRef SMTFPSolverBase::mkFPtoFPImpl(const SMTExprRef &From,
                                          const SMTSortRef &To,
