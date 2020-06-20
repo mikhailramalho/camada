@@ -103,9 +103,33 @@ SMTExprRef SMTFPSolverBase::mkFPIsNaNImpl(const SMTExprRef &Exp) {
   return mkAnd(exp_is_top, sigIsNotZero);
 }
 
-SMTExprRef SMTFPSolverBase::mkFPIsDenormalImpl(const SMTExprRef &Exp) {}
+SMTExprRef SMTFPSolverBase::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
+  // Extract the exponent
+  SMTExprRef exp = extractExp(*this, Exp);
 
-SMTExprRef SMTFPSolverBase::mkFPIsNormalImpl(const SMTExprRef &Exp) {}
+  SMTExprRef zero = mkBitvector(0, exp->Sort->getBitvectorSortSize());
+  SMTExprRef zExp = mkEqual(exp, zero);
+  SMTExprRef isZero = mkFPIsZero(Exp);
+  SMTExprRef nIsZero = mkNot(isZero);
+  return mkAnd(nIsZero, zExp);
+}
+
+SMTExprRef SMTFPSolverBase::mkFPIsNormalImpl(const SMTExprRef &Exp) {
+  // Extract the exponent
+  SMTExprRef exp = extractExp(*this, Exp);
+
+  SMTExprRef isDenormal = mkFPIsDenormal(Exp);
+  SMTExprRef isZero = mkFPIsZero(Exp);
+
+  unsigned eWidth = exp->Sort->getBitvectorSortSize();
+  SMTExprRef p = mkBitvector(power2m1(eWidth, false), eWidth);
+
+  SMTExprRef isSpecial = mkEqual(exp, p);
+
+  SMTExprRef orEx = mkOr(isSpecial, isDenormal);
+  orEx = mkOr(isZero, orEx);
+  return mkNot(orEx);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPIsZeroImpl(const SMTExprRef &Exp) {
   // Both -0 and 0 should return true
