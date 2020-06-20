@@ -73,7 +73,19 @@ SMTSortRef SMTFPSolverBase::getFloatSortImpl(const unsigned ExpWidth,
 
 SMTExprRef SMTFPSolverBase::mkFPNegImpl(const SMTExprRef &Exp) {}
 
-SMTExprRef SMTFPSolverBase::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {}
+SMTExprRef SMTFPSolverBase::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
+  // Extract the exponent and significand
+  SMTExprRef exp = extractExp(*this, Exp);
+  SMTExprRef sig = extractSig(*this, Exp);
+
+  // exp == 1^n , sig == 0
+  SMTExprRef top_exp = mkTopExp(*this, exp->Sort->getBitvectorSortSize());
+
+  SMTExprRef zero = mkBitvector(0, sig->Sort->getBitvectorSortSize());
+  SMTExprRef sig_is_zero = mkEqual(sig, zero);
+  SMTExprRef exp_is_top = mkEqual(exp, top_exp);
+  return mkAnd(exp_is_top, sig_is_zero);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPIsNaNImpl(const SMTExprRef &Exp) {
   // Extract the exponent and significand
