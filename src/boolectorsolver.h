@@ -40,7 +40,7 @@ public:
   BtorContext();
   virtual ~BtorContext();
 
-  void createAndConfig();
+  virtual void createAndConfig();
   void reset();
 }; // end class BtorContext
 
