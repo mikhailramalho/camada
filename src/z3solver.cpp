@@ -548,6 +548,11 @@ double Z3Solver::getDouble(const SMTExprRef &Exp) {
                                                       Solver.get_model(), Exp);
 }
 
+static inline bool hasZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
+  return S.Solver.get_model().has_interp(
+      toSolverExpr<Z3Expr>(*Exp).Expr.decl());
+}
+
 static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
   return S.newExprRef(Z3Expr(S.Context, Exp->Sort,
                              S.Solver.get_model().get_const_interp(
@@ -555,7 +560,7 @@ static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
 }
 
 bool Z3Solver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
-  if (!Solver.get_model().has_interp(toSolverExpr<Z3Expr>(*Exp).Expr.decl()))
+  if (!hasZ3Interp(*this, Exp))
     return false;
 
   Inter = getBitvector(getZ3Interp(*this, Exp));
@@ -563,7 +568,7 @@ bool Z3Solver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
 }
 
 bool Z3Solver::getInterpretation(const SMTExprRef &Exp, float &Float) {
-  if (!Solver.get_model().has_interp(toSolverExpr<Z3Expr>(*Exp).Expr.decl()))
+  if (!hasZ3Interp(*this, Exp))
     return false;
 
   Float = getFloat(getZ3Interp(*this, Exp));
@@ -571,7 +576,7 @@ bool Z3Solver::getInterpretation(const SMTExprRef &Exp, float &Float) {
 }
 
 bool Z3Solver::getInterpretation(const SMTExprRef &Exp, double &Double) {
-  if (!Solver.get_model().has_interp(toSolverExpr<Z3Expr>(*Exp).Expr.decl()))
+  if (!hasZ3Interp(*this, Exp))
     return false;
 
   Double = getDouble(getZ3Interp(*this, Exp));
