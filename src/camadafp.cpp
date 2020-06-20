@@ -186,7 +186,46 @@ SMTExprRef SMTFPSolverBase::mkFPFMAImpl(const SMTExprRef &X,
                                         const RoundingMode R) {}
 
 SMTExprRef SMTFPSolverBase::mkFPLtImpl(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS) {}
+                                       const SMTExprRef &RHS) {
+  SMTExprRef x_is_nan = mkFPIsNaN(LHS);
+  SMTExprRef y_is_nan = mkFPIsNaN(RHS);
+  SMTExprRef c1 = mkOr(x_is_nan, y_is_nan);
+  SMTExprRef x_is_zero = mkFPIsZero(LHS);
+  SMTExprRef y_is_zero = mkFPIsZero(RHS);
+  SMTExprRef c2 = mkAnd(x_is_zero, y_is_zero);
+
+  SMTExprRef x_sgn = extractSgn(*this, LHS);
+  SMTExprRef x_sig = extractSig(*this, LHS);
+  SMTExprRef x_exp = extractExp(*this, LHS);
+
+  SMTExprRef y_sgn = extractSgn(*this, RHS);
+  SMTExprRef y_sig = extractSig(*this, RHS);
+  SMTExprRef y_exp = extractExp(*this, RHS);
+
+  SMTExprRef one_1 = mkBitvector(1, 1);
+  SMTExprRef nil_1 = mkBitvector(0, 1);
+  SMTExprRef c3 = mkEqual(x_sgn, one_1);
+
+  SMTExprRef y_sgn_eq_0 = mkEqual(y_sgn, nil_1);
+  SMTExprRef y_lt_x_exp = mkBVUlt(y_exp, x_exp);
+  SMTExprRef y_lt_x_sig = mkBVUlt(y_sig, x_sig);
+  SMTExprRef y_eq_x_exp = mkEqual(y_exp, x_exp);
+  SMTExprRef y_le_x_sig_exp = mkAnd(y_eq_x_exp, y_lt_x_sig);
+  SMTExprRef t3_or = mkOr(y_lt_x_exp, y_le_x_sig_exp);
+  SMTExprRef t3 = mkIte(y_sgn_eq_0, mkBoolean(true), t3_or);
+
+  SMTExprRef y_sgn_eq_1 = mkEqual(y_sgn, one_1);
+  SMTExprRef x_lt_y_exp = mkBVUlt(x_exp, y_exp);
+  SMTExprRef x_eq_y_exp = mkEqual(x_exp, y_exp);
+  SMTExprRef x_lt_y_sig = mkBVUlt(x_sig, y_sig);
+  SMTExprRef x_le_y_sig_exp = mkAnd(x_eq_y_exp, x_lt_y_sig);
+  SMTExprRef t4_or = mkOr(x_lt_y_exp, x_le_y_sig_exp);
+  SMTExprRef t4 = mkIte(y_sgn_eq_1, mkBoolean(false), t4_or);
+
+  SMTExprRef c3t3t4 = mkIte(c3, t3, t4);
+  SMTExprRef c2else = mkIte(c2, mkBoolean(false), c3t3t4);
+  return mkIte(c1, mkBoolean(false), c2else);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPLeImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {}
