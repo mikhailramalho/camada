@@ -19,12 +19,51 @@
  *
  **************************************************************************/
 
+#include <cmath>
+
 #include "camadafp.h"
 
 using namespace camada;
 
+static inline SMTExprRef extractExp(SMTSolver &S, const SMTExprRef &Exp) {
+  unsigned int expTop = Exp->Sort->getFloatSortSize() - 2;
+  unsigned int expBot = Exp->Sort->getFloatSignificandSize() - 2;
+  return S.mkBVExtract(expTop, expBot + 1, Exp);
+}
+
+static inline SMTExprRef extractSig(SMTSolver &S, const SMTExprRef &Exp) {
+  return S.mkBVExtract(Exp->Sort->getFloatSignificandSize() - 2, 0, Exp);
+}
+
 static inline SMTExprRef extractExpSig(SMTSolver &S, const SMTExprRef &Exp) {
   return S.mkBVExtract(Exp->Sort->getFloatSortSize() - 2, 0, Exp);
+}
+
+static inline unsigned int power2(unsigned int N, bool Negated) {
+  unsigned int b = pow(2, N);
+  return Negated ? -b : b;
+}
+
+static inline unsigned int power2m1(unsigned int N, bool Negated) {
+  unsigned int b = pow(2, N);
+  b -= 1;
+  return Negated ? -b : b;
+}
+
+SMTExprRef mkMinExp(SMTSolver &S, unsigned int ExpWidth) {
+  return S.mkBitvector(power2m1(ExpWidth - 1, true) + 1, ExpWidth);
+}
+
+SMTExprRef mkMaxExp(SMTSolver &S, unsigned int ExpWidth) {
+  return S.mkBitvector(power2m1(ExpWidth - 1, false), ExpWidth);
+}
+
+static inline SMTExprRef mkTopExp(SMTSolver &S, unsigned int ExpWidth) {
+  return S.mkBitvector(power2m1(ExpWidth, false), ExpWidth);
+}
+
+static inline SMTExprRef mkBotExp(SMTSolver &S, unsigned int ExpWidth) {
+  return S.mkBitvector(0, ExpWidth);
 }
 
 SMTSortRef SMTFPSolverBase::getRoundingModeSortImpl() {}
