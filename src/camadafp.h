@@ -111,6 +111,10 @@ protected:
 
   virtual SMTExprRef mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                const unsigned SigWidth);
+
+  virtual SMTExprRef mkBVToIEEEFPImpl(SMTExprRef Exp, SMTSortRef To);
+
+  virtual SMTExprRef mkIEEEFPToBVImpl(SMTExprRef Exp);
 };
 
 template <typename SMTSolverImpl> class SMTFPSolver : public SMTFPSolverBase {
@@ -339,6 +343,18 @@ public:
     if (useCamadaFP)
       return SMTFPSolverBase::mkInfImpl(Sgn, ExpWidth, SigWidth);
     return mkInfImpl(Sgn, ExpWidth, SigWidth);
+  }
+
+  virtual SMTExprRef mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) override {
+    if (useCamadaFP)
+      return SMTFPSolverBase::mkBVToIEEEFPImpl(Exp, To);
+    return mkBVToIEEEFPImpl(Exp, To);
+  }
+
+  virtual SMTExprRef mkIEEEFPToBV(SMTExprRef Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolverBase::mkIEEEFPToBVImpl(Exp);
+    return mkIEEEFPToBVImpl(Exp);
   }
 };
 
