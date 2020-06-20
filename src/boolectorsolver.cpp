@@ -242,7 +242,7 @@ SMTExprRef BtorSolver::mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 SMTExprRef BtorSolver::mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(BtorExpr(
       Context, LHS->Sort,
-      boolector_ugte(Context->Context, toSolverExpr<BtorExpr>(*LHS).Expr,
+      boolector_ulte(Context->Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                      toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
