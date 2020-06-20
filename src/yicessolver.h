@@ -270,11 +270,6 @@ public:
 
   camada::checkResult check() override;
 
-  void push() override;
-
-  void pop(unsigned NumStates = 1) override;
-
-  /// Reset the solver and remove all constraints.
   void reset() override;
 
   void dumpModel() override;

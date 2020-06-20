@@ -736,13 +736,6 @@ checkResult CVC4Solver::check() {
   return checkResult::UNSAT;
 }
 
-void CVC4Solver::push() { Solver.push(); }
-
-void CVC4Solver::pop(unsigned NumStates) {
-  while (NumStates--)
-    Solver.pop();
-}
-
 void CVC4Solver::reset() { Solver.reset(); }
 
 void CVC4Solver::dump() {

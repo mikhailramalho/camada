@@ -663,10 +663,6 @@ checkResult Z3Solver::check() {
   return checkResult::UNKNOWN;
 }
 
-void Z3Solver::push() { Solver.push(); }
-
-void Z3Solver::pop(unsigned NumStates) { Solver.pop(NumStates); }
-
 void Z3Solver::reset() { Solver.reset(); }
 
 void Z3Solver::dump() {

@@ -331,12 +331,6 @@ public:
   /// Check if the constraints are satisfiable
   virtual checkResult check() = 0;
 
-  /// Push the current solver state
-  virtual void push() = 0;
-
-  /// Pop the previous solver state
-  virtual void pop(unsigned NumStates = 1) = 0;
-
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
 

@@ -527,13 +527,6 @@ checkResult YicesSolver::check() {
   return checkResult::UNKNOWN;
 }
 
-void YicesSolver::push() { yices_push(Context->Context); }
-
-void YicesSolver::pop(unsigned NumStates) {
-  while (NumStates--)
-    yices_pop(Context->Context);
-}
-
 void YicesSolver::reset() { Context->reset(); }
 
 void YicesSolver::dumpModel() {
