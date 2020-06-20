@@ -228,7 +228,11 @@ SMTExprRef SMTFPSolverBase::mkFPLtImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolverBase::mkFPLeImpl(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS) {}
+                                       const SMTExprRef &RHS) {
+  SMTExprRef lt = mkFPLt(LHS, RHS);
+  SMTExprRef eq = mkFPEqual(LHS, RHS);
+  return mkOr(lt, eq);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPEqualImpl(const SMTExprRef &LHS,
                                           const SMTExprRef &RHS) {
