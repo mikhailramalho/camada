@@ -666,6 +666,22 @@ SMTExprRef Z3Solver::mkInf(const bool Sgn, const unsigned ExpWidth,
           Z3_mk_fpa_inf(*Context, toSolverSort<Z3Sort>(*sort).Sort, Sgn))));
 }
 
+SMTExprRef Z3Solver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
+  return newExprRef(Z3Expr(
+      Context, To,
+      z3::to_expr(*Context,
+                  Z3_mk_fpa_to_fp_bv(*Context, toSolverExpr<Z3Expr>(*Exp).Expr,
+                                     toSolverSort<Z3Sort>(*To).Sort))));
+}
+
+SMTExprRef Z3Solver::mkIEEEFPToBV(SMTExprRef Exp) {
+  SMTSortRef to = getBitvectorSort(Exp->Sort->getFloatSortSize());
+  return newExprRef(Z3Expr(
+      Context, to,
+      z3::to_expr(*Context, Z3_mk_fpa_to_ieee_bv(
+                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+}
+
 checkResult Z3Solver::check() {
   z3::check_result res = Solver.check();
   if (res == z3::check_result::sat)

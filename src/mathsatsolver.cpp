@@ -668,6 +668,21 @@ SMTExprRef MathSATSolver::mkInf(const bool Sgn, const unsigned ExpWidth,
           : msat_make_fp_plus_inf(*Context, ExpWidth, SigWidth - 1)));
 }
 
+SMTExprRef MathSATSolver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
+  return newExprRef(MathSATExpr(
+      Context, To,
+      msat_make_fp_from_ieeebv(*Context, To->getFloatExponentSize(),
+                               To->getFloatSignificandSize() - 1,
+                               toSolverExpr<MathSATExpr>(*Exp).Expr)));
+}
+
+SMTExprRef MathSATSolver::mkIEEEFPToBV(SMTExprRef Exp) {
+  SMTSortRef to = getBitvectorSort(Exp->Sort->getFloatSortSize());
+  return newExprRef(MathSATExpr(
+      Context, to,
+      msat_make_fp_as_ieeebv(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
+}
+
 checkResult MathSATSolver::check() {
   msat_result res = msat_solve(*Context);
   if (res == MSAT_SAT)

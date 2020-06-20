@@ -739,6 +739,33 @@ SMTExprRef CVC4Solver::mkInf(const bool Sgn, const unsigned ExpWidth,
                    CVC4::FloatingPointSize(ExpWidth, SigWidth), Sgn))));
 }
 
+SMTExprRef CVC4Solver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
+  return newExprRef(CVC4Expr(
+      Context, To,
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_IEEE_BITVECTOR,
+          Context->mkConst(CVC4::FloatingPointToFPIEEEBitVector(
+              To->getFloatExponentSize(), To->getFloatSignificandSize())),
+          toSolverExpr<CVC4Expr>(*Exp).Expr)));
+}
+
+SMTExprRef CVC4Solver::mkIEEEFPToBV(SMTExprRef Exp) {
+
+  // CVC4 does not provide a direct way to convert from fp
+  // to bv, so we create a new symbol
+  const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
+
+  SMTExprRef newSymbol = mkSymbol(
+      name.c_str(), getBitvectorSort(Exp->Sort->getBitvectorSortSize()));
+
+  // and constraint it to be the conversion of the fp, since
+  // (fp_matches_bv f bv) <-> (= f ((_ to_fp E S) bv))
+  addConstraint(mkEqual(Exp, mkBVToIEEEFP(newSymbol, Exp->Sort)));
+
+  // NewSymbol is the resulting bitvector
+  return newSymbol;
+}
+
 checkResult CVC4Solver::check() {
   CVC4::Result res = Solver.checkSat();
   if (res.isSat())

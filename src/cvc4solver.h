@@ -58,6 +58,8 @@ public:
 
   CVC4::SymbolTable SymbolTable;
 
+  unsigned int ToBVCounter = 0;
+
   explicit CVC4Solver();
   virtual ~CVC4Solver() = default;
 
@@ -258,6 +260,10 @@ public:
 
   SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
                    const unsigned SigWidth) override;
+
+  SMTExprRef mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) override;
+
+  SMTExprRef mkIEEEFPToBV(SMTExprRef Exp) override;
 
   camada::checkResult check() override;
 
