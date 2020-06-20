@@ -524,11 +524,11 @@ SMTExprRef YicesSolver::mkInf(const bool, const unsigned, const unsigned) {
   abortWithMessage("Yices does not support fp");
 }
 
-SMTExprRef YicesSolver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
+SMTExprRef YicesSolver::mkBVToIEEEFP(const SMTExprRef &, const SMTSortRef &) {
   abortWithMessage("Yices does not support fp");
 }
 
-SMTExprRef YicesSolver::mkIEEEFPToBV(SMTExprRef Exp) {
+SMTExprRef YicesSolver::mkIEEEFPToBV(const SMTExprRef &) {
   abortWithMessage("Yices does not support fp");
 }
 

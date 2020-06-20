@@ -739,7 +739,8 @@ SMTExprRef CVC4Solver::mkInf(const bool Sgn, const unsigned ExpWidth,
                    CVC4::FloatingPointSize(ExpWidth, SigWidth), Sgn))));
 }
 
-SMTExprRef CVC4Solver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
+SMTExprRef CVC4Solver::mkBVToIEEEFP(const SMTExprRef &Exp,
+                                    const SMTSortRef &To) {
   return newExprRef(CVC4Expr(
       Context, To,
       Context->mkExpr(
@@ -749,7 +750,7 @@ SMTExprRef CVC4Solver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
           toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
-SMTExprRef CVC4Solver::mkIEEEFPToBV(SMTExprRef Exp) {
+SMTExprRef CVC4Solver::mkIEEEFPToBV(const SMTExprRef &Exp) {
 
   // CVC4 does not provide a direct way to convert from fp
   // to bv, so we create a new symbol

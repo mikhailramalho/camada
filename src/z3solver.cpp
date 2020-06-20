@@ -666,7 +666,7 @@ SMTExprRef Z3Solver::mkInf(const bool Sgn, const unsigned ExpWidth,
           Z3_mk_fpa_inf(*Context, toSolverSort<Z3Sort>(*sort).Sort, Sgn))));
 }
 
-SMTExprRef Z3Solver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
+SMTExprRef Z3Solver::mkBVToIEEEFP(const SMTExprRef &Exp, const SMTSortRef &To) {
   return newExprRef(Z3Expr(
       Context, To,
       z3::to_expr(*Context,
@@ -674,7 +674,7 @@ SMTExprRef Z3Solver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
                                      toSolverSort<Z3Sort>(*To).Sort))));
 }
 
-SMTExprRef Z3Solver::mkIEEEFPToBV(SMTExprRef Exp) {
+SMTExprRef Z3Solver::mkIEEEFPToBV(const SMTExprRef &Exp) {
   SMTSortRef to = getBitvectorSort(Exp->Sort->getFloatSortSize());
   return newExprRef(Z3Expr(
       Context, to,

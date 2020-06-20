@@ -544,11 +544,11 @@ SMTExprRef BtorSolver::mkInf(const bool, const unsigned, const unsigned) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) {
+SMTExprRef BtorSolver::mkBVToIEEEFP(const SMTExprRef &, const SMTSortRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 
-SMTExprRef BtorSolver::mkIEEEFPToBV(SMTExprRef Exp) {
+SMTExprRef BtorSolver::mkIEEEFPToBV(const SMTExprRef &) {
   abortWithMessage("Boolector does not support fp");
 }
 

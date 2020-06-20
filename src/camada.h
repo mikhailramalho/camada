@@ -335,10 +335,11 @@ public:
   SMTExprRef mkInf64(const bool Sgn) { return mkInf(Sgn, 11, 53); }
 
   /// Reinterpret a bitvector as a floating-point, using the IEEE format
-  virtual SMTExprRef mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) = 0;
+  virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
+                                  const SMTSortRef &To) = 0;
 
   /// Reinterpret a floating-point as a bitvector, using the IEEE format
-  virtual SMTExprRef mkIEEEFPToBV(SMTExprRef Exp) = 0;
+  virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) = 0;
 
   /// Check if the constraints are satisfiable
   virtual checkResult check() = 0;

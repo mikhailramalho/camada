@@ -297,6 +297,7 @@ SMTExprRef SMTFPSolverBase::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 SMTExprRef SMTFPSolverBase::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                       const unsigned SigWidth) {}
 
-SMTExprRef SMTFPSolverBase::mkBVToIEEEFPImpl(SMTExprRef Exp, SMTSortRef To) {}
+SMTExprRef SMTFPSolverBase::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
+                                             const SMTSortRef &To) {}
 
-SMTExprRef SMTFPSolverBase::mkIEEEFPToBVImpl(SMTExprRef Exp) {}
+SMTExprRef SMTFPSolverBase::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {}

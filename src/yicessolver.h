@@ -272,9 +272,9 @@ public:
   SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
                    const unsigned SigWidth) override;
 
-  SMTExprRef mkBVToIEEEFP(SMTExprRef Exp, SMTSortRef To) override;
+  SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp, const SMTSortRef &To) override;
 
-  SMTExprRef mkIEEEFPToBV(SMTExprRef Exp) override;
+  SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override;
 
   camada::checkResult check() override;
 
