@@ -499,12 +499,13 @@ bool MathSATSolver::getBoolean(const SMTExprRef &Exp) {
   abortWithMessage("Boolean is neither true nor false");
 }
 
-// TODO: Can we unify getBitvector with the float template? The only
-// difference if the number of arguments in strtol
-int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
-  SMTExprRef t = newExprRef(MathSATExpr(
-      Context, Exp->Sort,
-      msat_get_model_value(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
+template <typename ResType, typename StrToFuncType>
+static inline ResType GMPtoType(MathSATSolver &S, const SMTExprRef &Exp,
+                                StrToFuncType StrToFunc) {
+
+  SMTExprRef t = S.newExprRef(MathSATExpr(
+      S.Context, Exp->Sort,
+      msat_get_model_value(*S.Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 
   // GMP rational value object.
   mpq_t val;
@@ -517,66 +518,35 @@ int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
   mpz_set(num, mpq_numref(val));
   mpq_clear(val);
 
-  char buffer[mpz_sizeinbase(num, 10) + 2];
+  char *buffer = new char[mpz_sizeinbase(num, 10) + 2];
   mpz_get_str(buffer, 10, num);
   mpz_clear(num);
 
-  camada::abortCondWithMessage(sizeof(int64_t) == sizeof(long int),
-                               "Cannot convert GMP val to int");
-
-  char *foo = buffer;
-  int64_t finval = strtol(buffer, &foo, 10);
-
-  if (buffer[0] != '\0' && (foo == buffer || *foo != '\0'))
-    camada::abortWithMessage(
-        "Couldn't parse string representation of Bitvector");
-
-  return finval;
+  return StrToFunc(buffer);
 }
 
-template <typename ResType, typename StrToFuncType,
-          StrToFuncType (*StrToFunc)(const char *, char **)>
-static inline ResType GMPtoType(const SMTExprRef &t) {
-  // GMP rational value object.
-  mpq_t val;
-  mpq_init(val);
-  msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context,
-                      toSolverExpr<MathSATExpr>(*t).Expr, val);
+int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
+  camada::abortCondWithMessage(sizeof(int64_t) == sizeof(long int),
+                               "Cannot convert GMP value to int");
 
-  mpz_t num;
-  mpz_init(num);
-  mpz_set(num, mpq_numref(val));
-  mpq_clear(val);
-
-  char buffer[mpz_sizeinbase(num, 10) + 2];
-  mpz_get_str(buffer, 10, num);
-  mpz_clear(num);
-
-  camada::abortCondWithMessage(sizeof(ResType) == sizeof(StrToFuncType),
-                               "Cannot convert GMP val to int");
-
-  char *foo = buffer;
-  ResType finval = StrToFunc(buffer, &foo);
-
-  if (buffer[0] != '\0' && (foo == buffer || *foo != '\0'))
-    camada::abortWithMessage(
-        "Couldn't parse string representation of Floating-point");
-
-  return finval;
+  return GMPtoType<int64_t>(*this, Exp, [](char *buffer) -> int64_t {
+    char *buffer_end = nullptr;
+    return std::strtol(buffer, &buffer_end, 10);
+  });
 }
 
 float MathSATSolver::getFloat(const SMTExprRef &Exp) {
-  SMTExprRef t = newExprRef(MathSATExpr(
-      Context, Exp->Sort,
-      msat_get_model_value(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
-  return GMPtoType<float, float, std::strtof>(t);
+  return GMPtoType<float>(*this, Exp, [](char *buffer) -> float {
+    char *buffer_end = nullptr;
+    return std::strtof(buffer, &buffer_end);
+  });
 }
 
 double MathSATSolver::getDouble(const SMTExprRef &Exp) {
-  SMTExprRef t = newExprRef(MathSATExpr(
-      Context, Exp->Sort,
-      msat_get_model_value(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
-  return GMPtoType<double, double, std::strtod>(t);
+  return GMPtoType<double>(*this, Exp, [](char *buffer) -> double {
+    char *buffer_end = nullptr;
+    return std::strtod(buffer, &buffer_end);
+  });
 }
 
 bool MathSATSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
