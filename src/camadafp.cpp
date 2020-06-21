@@ -19,6 +19,7 @@
  *
  **************************************************************************/
 
+#include <cassert>
 #include <cmath>
 
 #include "camadafp.h"
@@ -71,10 +72,117 @@ static inline SMTExprRef mkBotExp(SMTSolver &S, unsigned int ExpWidth) {
   return S.mkBitvector(0, ExpWidth);
 }
 
-SMTSortRef SMTFPSolverBase::getRoundingModeSortImpl() {}
+static inline SMTExprRef mk_unbias(SMTSolver &S, SMTExprRef &Src) {
+  unsigned ebits = Src->Sort->getBitvectorSortSize();
+
+  SMTExprRef e_plus_one = S.mkBVAdd(Src, S.mkBitvector(1, ebits));
+
+  SMTExprRef leading = S.mkBVExtract(ebits - 1, ebits - 1, e_plus_one);
+  SMTExprRef n_leading = S.mkBVNot(leading);
+  SMTExprRef rest = S.mkBVExtract(ebits - 2, 0, e_plus_one);
+  return S.mkBVConcat(n_leading, rest);
+}
+SMTExprRef mk_leading_zeros(SMTSolver &S, SMTExprRef &Src,
+                            unsigned int MaxBits) {
+  std::size_t bv_sz = Src->Sort->getBitvectorSortSize();
+  if (bv_sz == 0)
+    return S.mkBitvector(0, MaxBits);
+
+  if (bv_sz == 1) {
+    SMTExprRef nil_1 = S.mkBitvector(0, 1);
+    SMTExprRef one_m = S.mkBitvector(1, MaxBits);
+    SMTExprRef nil_m = S.mkBitvector(0, MaxBits);
+
+    SMTExprRef eq = S.mkEqual(Src, nil_1);
+    return S.mkIte(eq, one_m, nil_m);
+  }
+
+  SMTExprRef H = S.mkBVExtract(bv_sz - 1, bv_sz / 2, Src);
+  SMTExprRef L = S.mkBVExtract(bv_sz / 2 - 1, 0, Src);
+
+  unsigned H_size = H->Sort->getBitvectorSortSize();
+
+  SMTExprRef lzH = mk_leading_zeros(S, H, MaxBits); /* recursive! */
+  SMTExprRef lzL = mk_leading_zeros(S, L, MaxBits);
+
+  SMTExprRef nil_h = S.mkBitvector(0, H_size);
+  SMTExprRef H_is_zero = S.mkEqual(H, nil_h);
+
+  SMTExprRef h_m = S.mkBitvector(H_size, MaxBits);
+  SMTExprRef sum = S.mkBVAdd(h_m, lzL);
+  return S.mkIte(H_is_zero, sum, lzH);
+}
+
+static inline void unpack(SMTSolver &S, SMTExprRef &Src, SMTExprRef &Sgn,
+                          SMTExprRef &Sig, SMTExprRef &Exp, SMTExprRef &LZ,
+                          bool Normalize) {
+  unsigned sbits = Src->Sort->getFloatSignificandSize();
+  unsigned ebits = Src->Sort->getFloatExponentSize();
+
+  // Extract parts
+  Sgn = extractSgn(S, Src);
+  Exp = extractExp(S, Src);
+  Sig = extractSig(S, Src);
+
+  assert(Sgn->Sort->getBitvectorSortSize() == 1);
+  assert(Exp->Sort->getBitvectorSortSize() == ebits);
+  assert(Sig->Sort->getBitvectorSortSize() == sbits - 1);
+
+  SMTExprRef is_normal = S.mkFPIsNormal(Src);
+  SMTExprRef normal_sig = S.mkBVConcat(S.mkBitvector(1, 1), Sig);
+  SMTExprRef normal_exp = mk_unbias(S, Exp);
+
+  SMTExprRef denormal_sig = S.mkBVZeroExt(1, Sig);
+  SMTExprRef denormal_exp = S.mkBitvector(1, ebits);
+  denormal_exp = mk_unbias(S, denormal_exp);
+
+  SMTExprRef zero_e = S.mkBitvector(0, ebits);
+  if (Normalize) {
+    SMTExprRef zero_s = S.mkBitvector(0, sbits);
+    SMTExprRef is_sig_zero = S.mkEqual(zero_s, denormal_sig);
+
+    SMTExprRef lz_d = mk_leading_zeros(S, denormal_sig, ebits);
+
+    SMTExprRef norm_or_zero = S.mkOr(is_normal, is_sig_zero);
+    LZ = S.mkIte(norm_or_zero, zero_e, lz_d);
+
+    SMTExprRef shift = S.mkIte(is_sig_zero, zero_e, LZ);
+    assert(shift->Sort->getBitvectorSortSize() == ebits);
+
+    if (ebits <= sbits) {
+      SMTExprRef q = S.mkBVZeroExt(sbits - ebits, shift);
+      denormal_sig = S.mkBVShl(denormal_sig, q);
+    } else {
+      // the maximum shift is `sbits', because after that the mantissa
+      // would be zero anyways. So we can safely cut the shift variable down,
+      // as long as we check the higher bits.
+      SMTExprRef zero_ems = S.mkBitvector(0, ebits - sbits);
+      SMTExprRef sbits_s = S.mkBitvector(sbits, sbits);
+      SMTExprRef sh = S.mkBVExtract(ebits - 1, sbits, shift);
+      SMTExprRef is_sh_zero = S.mkEqual(zero_ems, sh);
+      SMTExprRef short_shift = S.mkBVExtract(sbits - 1, 0, shift);
+      SMTExprRef sl = S.mkIte(is_sh_zero, short_shift, sbits_s);
+      denormal_sig = S.mkBVShl(denormal_sig, sl);
+    }
+  } else
+    LZ = zero_e;
+
+  Sig = S.mkIte(is_normal, normal_sig, denormal_sig);
+  Exp = S.mkIte(is_normal, normal_exp, denormal_exp);
+
+  assert(Sgn->Sort->getBitvectorSortSize() == 1);
+  assert(Exp->Sort->getBitvectorSortSize() == ebits);
+  assert(Sig->Sort->getBitvectorSortSize() == sbits);
+}
+
+SMTSortRef SMTFPSolverBase::getRoundingModeSortImpl() {
+  return getRoundingModeSort();
+}
 
 SMTSortRef SMTFPSolverBase::getFloatSortImpl(const unsigned ExpWidth,
-                                             const unsigned SigWidth) {}
+                                             const unsigned SigWidth) {
+  return getFloatSort(ExpWidth, SigWidth);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPAbsImpl(const SMTExprRef &Exp) {
   // Extract everything but the sign bit
