@@ -123,21 +123,13 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
   return false;
 }
 
-bool SMTSort::isBitvectorSort() const {
-  abortWithMessage("Unimplemented for current type");
-}
+bool SMTSort::isBitvectorSort() const { return false; }
 
-bool SMTSort::isBooleanSort() const {
-  abortWithMessage("Unimplemented for current type");
-}
+bool SMTSort::isBooleanSort() const { return false; }
 
-bool SMTSort::isFloatSort() const {
-  abortWithMessage("Unimplemented for current type");
-}
+bool SMTSort::isFloatSort() const { return false; }
 
-bool SMTSort::isRoundingModeSort() const {
-  abortWithMessage("Unimplemented for current type");
-}
+bool SMTSort::isRoundingModeSort() const { return false; }
 
 unsigned SMTSort::getFloatSignificandWidthImpl() const {
   abortWithMessage("Unimplemented for current type");
