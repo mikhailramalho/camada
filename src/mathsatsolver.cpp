@@ -603,12 +603,12 @@ SMTExprRef MathSATSolver::mkBoolean(const bool Bool) {
                   Bool ? msat_make_true(*Context) : msat_make_false(*Context)));
 }
 
-SMTExprRef MathSATSolver::mkBitvector(const int64_t Int, unsigned BitWidth) {
-  const SMTSortRef Sort = getBitvectorSort(BitWidth);
+SMTExprRef MathSATSolver::mkBitvector(const int64_t Int,
+                                      const SMTSortRef &Sort) {
   return newExprRef(
       MathSATExpr(Context, Sort,
                   msat_make_bv_number(*Context, std::to_string(Int).c_str(),
-                                      BitWidth, 10)));
+                                      Sort->getWidth(), 10)));
 }
 
 SMTExprRef MathSATSolver::mkSymbol(const char *Name, SMTSortRef Sort) {

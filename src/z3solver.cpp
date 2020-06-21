@@ -617,9 +617,9 @@ SMTExprRef Z3Solver::mkBoolean(const bool b) {
   return newExprRef(Z3Expr(Context, getBoolSort(), Context->bool_val(b)));
 }
 
-SMTExprRef Z3Solver::mkBitvector(const int64_t Int, unsigned BitWidth) {
-  const SMTSortRef sort = getBitvectorSort(BitWidth);
-  return newExprRef(Z3Expr(Context, sort, Context->bv_val(Int, BitWidth)));
+SMTExprRef Z3Solver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
+  return newExprRef(
+      Z3Expr(Context, Sort, Context->bv_val(Int, Sort->getWidth())));
 }
 
 SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {

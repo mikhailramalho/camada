@@ -666,11 +666,11 @@ SMTExprRef CVC4Solver::mkBoolean(const bool b) {
   return newExprRef(CVC4Expr(Context, getBoolSort(), Context->mkConst(b)));
 }
 
-SMTExprRef CVC4Solver::mkBitvector(const int64_t Int, unsigned BitWidth) {
-  const SMTSortRef sort = getBitvectorSort(BitWidth);
-  return newExprRef(CVC4Expr(
-      Context, sort,
-      Context->mkConst(CVC4::BitVector(BitWidth, static_cast<uint64_t>(Int)))));
+SMTExprRef CVC4Solver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
+  return newExprRef(
+      CVC4Expr(Context, Sort,
+               Context->mkConst(CVC4::BitVector(Sort->getWidth(),
+                                                static_cast<uint64_t>(Int)))));
 }
 
 SMTExprRef CVC4Solver::mkSymbol(const char *Name, SMTSortRef Sort) {

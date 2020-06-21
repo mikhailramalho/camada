@@ -516,8 +516,7 @@ SMTExprRef BtorSolver::mkBoolean(const bool b) {
                                : boolector_false(Context->Context)));
 }
 
-SMTExprRef BtorSolver::mkBitvector(const int64_t Int, unsigned BitWidth) {
-  const SMTSortRef Sort = getBitvectorSort(BitWidth);
+SMTExprRef BtorSolver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
   return newExprRef(BtorExpr(
       Context, Sort,
       boolector_constd(Context->Context, toSolverSort<BtorSort>(*Sort).Sort,

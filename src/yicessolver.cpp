@@ -488,10 +488,9 @@ SMTExprRef YicesSolver::mkBoolean(const bool b) {
       YicesExpr(Context, getBoolSort(), b ? yices_true() : yices_false()));
 }
 
-SMTExprRef YicesSolver::mkBitvector(const int64_t Int, unsigned BitWidth) {
-  const SMTSortRef Sort = getBitvectorSort(BitWidth);
+SMTExprRef YicesSolver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
   return newExprRef(
-      YicesExpr(Context, Sort, yices_bvconst_int64(BitWidth, Int)));
+      YicesExpr(Context, Sort, yices_bvconst_int64(Sort->getWidth(), Int)));
 }
 
 SMTExprRef YicesSolver::mkSymbol(const char *Name, SMTSortRef Sort) {

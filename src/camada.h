@@ -335,7 +335,12 @@ public:
   virtual SMTExprRef mkBoolean(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an integer and its bit width
-  virtual SMTExprRef mkBitvector(const int64_t Int, unsigned BitWidth) = 0;
+  virtual SMTExprRef mkBitvector(const int64_t Int, const SMTSortRef &Sort) = 0;
+
+  /// Convinience method to create a bitvector using the value and the bitwidth
+  virtual SMTExprRef mkBitvector(const int64_t Int, unsigned BitWidth) {
+    return mkBitvector(Int, getBitvectorSort(BitWidth));
+  }
 
   /// Creates a new symbol, given a name and a sort
   virtual SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) = 0;

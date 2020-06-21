@@ -234,7 +234,8 @@ public:
 
   camada::SMTExprRef mkBoolean(const bool b) override;
 
-  camada::SMTExprRef mkBitvector(const int64_t Int, unsigned BitWidth) override;
+  camada::SMTExprRef mkBitvector(const int64_t Int,
+                                 const SMTSortRef &Sort) override;
 
   camada::SMTExprRef mkSymbol(const char *Name,
                               camada::SMTSortRef Sort) override;
