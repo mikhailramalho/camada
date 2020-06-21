@@ -729,7 +729,270 @@ SMTExprRef SMTFPSolverBase::mkFPSqrtImpl(const SMTExprRef &Exp,
 SMTExprRef SMTFPSolverBase::mkFPFMAImpl(const SMTExprRef &X,
                                         const SMTExprRef &Y,
                                         const SMTExprRef &Z,
-                                        const RoundingMode R) {}
+                                        const RoundingMode R) {
+  assert(X->Sort->getBitvectorSortSize() == Y->Sort->getBitvectorSortSize());
+  assert(X->Sort->getFloatExponentSize() == Y->Sort->getFloatExponentSize());
+  assert(X->Sort->getBitvectorSortSize() == Y->Sort->getBitvectorSortSize());
+  assert(X->Sort->getFloatExponentSize() == Y->Sort->getFloatExponentSize());
+
+  unsigned ebits = X->Sort->getFloatExponentSize();
+  unsigned sbits = X->Sort->getFloatSignificandSize();
+
+  SMTExprRef nan = mkNaN(false, ebits, sbits);
+  SMTExprRef nzero = mkNZero(*this, ebits, sbits);
+  SMTExprRef pzero = mkPZero(*this, ebits, sbits);
+  SMTExprRef ninf = mkNInf(*this, ebits, sbits);
+  SMTExprRef pinf = mkPInf(*this, ebits, sbits);
+
+  SMTExprRef x_is_nan = mkFPIsNaN(X);
+  SMTExprRef x_is_zero = mkFPIsZero(X);
+  SMTExprRef x_is_pos = mkIsPos(*this, X);
+  SMTExprRef x_is_neg = mkIsNeg(*this, X);
+  SMTExprRef y_is_nan = mkFPIsNaN(Y);
+  SMTExprRef y_is_zero = mkFPIsZero(Y);
+  SMTExprRef y_is_pos = mkIsPos(*this, Y);
+  SMTExprRef y_is_neg = mkIsNeg(*this, Y);
+  SMTExprRef z_is_nan = mkFPIsNaN(Z);
+  SMTExprRef z_is_zero = mkFPIsZero(Z);
+  SMTExprRef z_is_neg = mkIsNeg(*this, Z);
+  SMTExprRef z_is_inf = mkFPIsInfinite(Z);
+
+  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef rm_is_to_neg = mkIsRM(*this, rm, RoundingMode::ROUND_TO_MINUS_INF);
+
+  SMTExprRef inf_xor = mkXor(x_is_neg, y_is_neg);
+  inf_xor = mkXor(inf_xor, z_is_neg);
+  SMTExprRef inf_cond = mkAnd(z_is_inf, inf_xor);
+
+  // (x is NaN) || (y is NaN) || (z is Nan) -> NaN
+  SMTExprRef c1 = mkOr(mkOr(x_is_nan, y_is_nan), z_is_nan);
+  SMTExprRef v1 = nan;
+
+  // (x is +oo) -> if (y is 0) then NaN else inf with y's sign.
+  SMTExprRef c2 = mkIsPInf(*this, X);
+  SMTExprRef y_sgn_inf = mkIte(y_is_pos, pinf, ninf);
+  SMTExprRef inf_or = mkOr(y_is_zero, inf_cond);
+  SMTExprRef v2 = mkIte(inf_or, nan, y_sgn_inf);
+
+  // (y is +oo) -> if (x is 0) then NaN else inf with x's sign.
+  SMTExprRef c3 = mkIsPInf(*this, Y);
+  SMTExprRef x_sgn_inf = mkIte(x_is_pos, pinf, ninf);
+  inf_or = mkOr(x_is_zero, inf_cond);
+  SMTExprRef v3 = mkIte(inf_or, nan, x_sgn_inf);
+
+  // (x is -oo) -> if (y is 0) then NaN else inf with -y's sign.
+  SMTExprRef c4 = mkIsNInf(*this, X);
+  SMTExprRef neg_y_sgn_inf = mkIte(y_is_pos, ninf, pinf);
+  inf_or = mkOr(y_is_zero, inf_cond);
+  SMTExprRef v4 = mkIte(inf_or, nan, neg_y_sgn_inf);
+
+  // (y is -oo) -> if (x is 0) then NaN else inf with -x's sign.
+  SMTExprRef c5 = mkIsNInf(*this, Y);
+  SMTExprRef neg_x_sgn_inf = mkIte(x_is_pos, ninf, pinf);
+  inf_or = mkOr(x_is_zero, inf_cond);
+  SMTExprRef v5 = mkIte(inf_or, nan, neg_x_sgn_inf);
+
+  // z is +-INF -> z.
+  SMTExprRef c6 = mkFPIsInfinite(Z);
+  SMTExprRef v6 = Z;
+
+  // (x is 0) || (y is 0) -> z
+  SMTExprRef c7 = mkOr(x_is_zero, y_is_zero);
+  SMTExprRef xy_sgn = mkXor(x_is_neg, y_is_neg);
+
+  SMTExprRef xyz_sgn = mkXor(xy_sgn, z_is_neg);
+  SMTExprRef c71 = mkAnd(z_is_zero, xyz_sgn);
+
+  SMTExprRef zero_cond = mkIte(rm_is_to_neg, nzero, pzero);
+  SMTExprRef v7 = mkIte(c71, zero_cond, Z);
+
+  // else comes the fused multiplication.
+  SMTExprRef one_1 = mkBitvector(1, 1);
+  SMTExprRef zero_1 = mkBitvector(0, 1);
+
+  SMTExprRef a_sgn, a_sig, a_exp, a_lz;
+  SMTExprRef b_sgn, b_sig, b_exp, b_lz;
+  SMTExprRef c_sgn, c_sig, c_exp, c_lz;
+  unpack(*this, X, a_sgn, a_sig, a_exp, a_lz, true);
+  unpack(*this, Y, b_sgn, b_sig, b_exp, b_lz, true);
+  unpack(*this, Z, c_sgn, c_sig, c_exp, c_lz, true);
+
+  SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
+  SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
+  SMTExprRef c_lz_ext = mkBVZeroExt(2, c_lz);
+
+  SMTExprRef a_sig_ext = mkBVZeroExt(sbits, a_sig);
+  SMTExprRef b_sig_ext = mkBVZeroExt(sbits, b_sig);
+
+  SMTExprRef a_exp_ext = mkBVSignExt(2, a_exp);
+  SMTExprRef b_exp_ext = mkBVSignExt(2, b_exp);
+  SMTExprRef c_exp_ext = mkBVSignExt(2, c_exp);
+
+  SMTExprRef mul_sgn = mkBVXor(a_sgn, b_sgn);
+
+  SMTExprRef mul_exp =
+      mkBVAdd(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+
+  SMTExprRef mul_sig = mkBVMul(a_sig_ext, b_sig_ext);
+
+  assert(mul_sig->Sort->getBitvectorSortSize() == 2 * sbits);
+  assert(mul_exp->Sort->getBitvectorSortSize() == ebits + 2);
+
+  // The product has the form [-1][0].[2*sbits - 2].
+
+  // Extend c
+  SMTExprRef c_sig_ext =
+      mkBVZeroExt(1, mkBVConcat(c_sig, mkBitvector(0, sbits + 2)));
+  c_exp_ext = mkBVSub(c_exp_ext, c_lz_ext);
+  mul_sig = mkBVConcat(mul_sig, mkBitvector(0, 3));
+
+  assert(mul_sig->Sort->getBitvectorSortSize() == 2 * sbits + 3);
+  assert(c_sig_ext->Sort->getBitvectorSortSize() == 2 * sbits + 3);
+
+  SMTExprRef swap_cond = mkBVSle(mul_exp, c_exp_ext);
+
+  SMTExprRef e_sgn = mkIte(swap_cond, c_sgn, mul_sgn);
+  SMTExprRef e_sig = mkIte(swap_cond, c_sig_ext, mul_sig); // has 2 * sbits + 3
+  SMTExprRef e_exp = mkIte(swap_cond, c_exp_ext, mul_exp); // has ebits + 2
+  SMTExprRef f_sgn = mkIte(swap_cond, mul_sgn, c_sgn);
+  SMTExprRef f_sig = mkIte(swap_cond, mul_sig, c_sig_ext); // has 2 * sbits + 3
+  SMTExprRef f_exp = mkIte(swap_cond, mul_exp, c_exp_ext); // has ebits + 2
+
+  assert(e_sig->Sort->getBitvectorSortSize() == 2 * sbits + 3);
+  assert(f_sig->Sort->getBitvectorSortSize() == 2 * sbits + 3);
+  assert(e_exp->Sort->getBitvectorSortSize() == ebits + 2);
+  assert(f_exp->Sort->getBitvectorSortSize() == ebits + 2);
+
+  SMTExprRef exp_delta = mkBVSub(e_exp, f_exp);
+
+  // cap the delta
+
+  SMTExprRef cap = mkBitvector(2 * sbits + 3, ebits + 2);
+  SMTExprRef cap_le_delta = mkBVUle(cap, exp_delta);
+  exp_delta = mkIte(cap_le_delta, cap, exp_delta);
+  assert(exp_delta->Sort->getBitvectorSortSize() == ebits + 2);
+
+  // Alignment shift with sticky bit computation.
+  SMTExprRef shifted_big =
+      mkBVLshr(mkBVConcat(f_sig, mkBitvector(0, sbits)),
+               mkBVZeroExt((3 * sbits + 3) - (ebits + 2), exp_delta));
+  SMTExprRef shifted_f_sig = mkBVExtract(3 * sbits + 2, sbits, shifted_big);
+  SMTExprRef alignment_sticky_raw = mkBVExtract(sbits - 1, 0, shifted_big);
+  SMTExprRef alignment_sticky = mkBVRedOr(alignment_sticky_raw);
+  assert(shifted_f_sig->Sort->getBitvectorSortSize() == 2 * sbits + 3);
+
+  // Significant addition.
+  // Two extra bits for the sign and for catching overflows.
+  e_sig = mkBVZeroExt(2, e_sig);
+  shifted_f_sig = mkBVZeroExt(2, shifted_f_sig);
+
+  SMTExprRef eq_sgn = mkEqual(e_sgn, f_sgn);
+
+  assert(e_sig->Sort->getBitvectorSortSize() == 2 * sbits + 5);
+  assert(shifted_f_sig->Sort->getBitvectorSortSize() == 2 * sbits + 5);
+
+  SMTExprRef sticky_wide = mkBVZeroExt(2 * sbits + 4, alignment_sticky);
+  SMTExprRef e_plus_f = mkBVAdd(e_sig, shifted_f_sig);
+  e_plus_f = mkIte(mkEqual(mkBVExtract(0, 0, e_plus_f), zero_1),
+                   mkBVAdd(e_plus_f, sticky_wide), e_plus_f);
+  SMTExprRef e_minus_f = mkBVSub(e_sig, shifted_f_sig);
+  e_minus_f = mkIte(mkEqual(mkBVExtract(0, 0, e_minus_f), zero_1),
+                    mkBVSub(e_minus_f, sticky_wide), e_minus_f);
+
+  SMTExprRef sum = mkIte(eq_sgn, e_plus_f, e_minus_f);
+  assert(sum->Sort->getBitvectorSortSize() == 2 * sbits + 5);
+
+  SMTExprRef sign_bv = mkBVExtract(2 * sbits + 4, 2 * sbits + 4, sum);
+  SMTExprRef n_sum = mkBVNeg(sum);
+
+  SMTExprRef res_sig_eq = mkEqual(sign_bv, one_1);
+  SMTExprRef sig_abs = mkIte(res_sig_eq, n_sum, sum);
+
+  SMTExprRef not_e_sgn = mkBVNot(e_sgn);
+  SMTExprRef not_f_sgn = mkBVNot(f_sgn);
+  SMTExprRef not_sign_bv = mkBVNot(sign_bv);
+
+  SMTExprRef res_sgn_c1 = mkBVAnd(mkBVAnd(not_e_sgn, f_sgn), sign_bv);
+  SMTExprRef res_sgn_c2 = mkBVAnd(mkBVAnd(e_sgn, not_f_sgn), not_sign_bv);
+  SMTExprRef res_sgn_c3 = mkBVAnd(e_sgn, f_sgn);
+  SMTExprRef res_sgn = mkBVOr(mkBVOr(res_sgn_c1, res_sgn_c2), res_sgn_c3);
+
+  SMTExprRef is_sig_neg =
+      mkEqual(one_1, mkBVExtract(2 * sbits + 4, 2 * sbits + 4, sig_abs));
+  sig_abs = mkIte(is_sig_neg, mkBVNeg(sig_abs), sig_abs);
+
+  // Result could have overflown into 4.xxx.
+  assert(sig_abs->Sort->getBitvectorSortSize() == 2 * sbits + 5);
+  SMTExprRef extra = mkBVExtract(2 * sbits + 4, 2 * sbits + 3, sig_abs);
+  SMTExprRef extra_is_zero = mkEqual(extra, mkBitvector(0, 2));
+
+  SMTExprRef res_exp =
+      mkIte(extra_is_zero, e_exp, mkBVAdd(e_exp, mkBitvector(1, ebits + 2)));
+
+  // Renormalize
+  SMTExprRef zero_e2 = mkBitvector(0, ebits + 2);
+  SMTExprRef min_exp = mkMinExp(*this, ebits);
+  min_exp = mkBVSignExt(2, min_exp);
+  SMTExprRef sig_lz = mkLeadingZeros(*this, sig_abs, ebits + 2);
+  sig_lz = mkBVSub(sig_lz, mkBitvector(2, ebits + 2));
+  SMTExprRef max_exp_delta = mkBVSub(res_exp, min_exp);
+  SMTExprRef sig_lz_capped =
+      mkIte(mkBVSle(sig_lz, max_exp_delta), sig_lz, max_exp_delta);
+  SMTExprRef renorm_delta =
+      mkIte(mkBVSle(zero_e2, sig_lz_capped), sig_lz_capped, zero_e2);
+  res_exp = mkBVSub(res_exp, renorm_delta);
+  sig_abs = mkBVShl(sig_abs, mkBVZeroExt(2 * sbits + 3 - ebits, renorm_delta));
+
+  unsigned too_short = 0;
+  if (sbits < 5) {
+    too_short = 6 - sbits + 1;
+    sig_abs = mkBVConcat(sig_abs, mkBitvector(0, too_short));
+  }
+
+  SMTExprRef sticky_h1 = mkBVExtract(sbits + too_short - 2, 0, sig_abs);
+  SMTExprRef sig_abs_h1 =
+      mkBVExtract(2 * sbits + too_short + 4, sbits - 1 + too_short, sig_abs);
+  SMTExprRef sticky_h1_red = mkBVZeroExt(sbits + 5, mkBVRedOr(sticky_h1));
+  SMTExprRef sig_abs_h1_f = mkBVOr(sig_abs_h1, sticky_h1_red);
+  SMTExprRef res_sig_1 = mkBVExtract(sbits + 3, 0, sig_abs_h1_f);
+  assert(sticky_h1->Sort->getBitvectorSortSize() == sbits + too_short - 1);
+  assert(sig_abs_h1->Sort->getBitvectorSortSize() == sbits + 6);
+  assert(sticky_h1_red->Sort->getBitvectorSortSize() == sbits + 6);
+  assert(sig_abs_h1_f->Sort->getBitvectorSortSize() == sbits + 6);
+  assert(res_sig_1->Sort->getBitvectorSortSize() == sbits + 4);
+
+  SMTExprRef sig_abs_h2 =
+      mkBVExtract(2 * sbits + too_short + 4, sbits + too_short, sig_abs);
+  SMTExprRef sticky_h2_red = mkBVZeroExt(sbits + 4, mkBVRedOr(sticky_h1));
+  SMTExprRef sig_abs_h2_f = mkBVZeroExt(1, mkBVOr(sig_abs_h2, sticky_h2_red));
+  SMTExprRef res_sig_2 = mkBVExtract(sbits + 3, 0, sig_abs_h2_f);
+  assert(sig_abs_h2->Sort->getBitvectorSortSize() == sbits + 5);
+  assert(sticky_h2_red->Sort->getBitvectorSortSize() == sbits + 5);
+  assert(sig_abs_h2_f->Sort->getBitvectorSortSize() == sbits + 6);
+  assert(res_sig_2->Sort->getBitvectorSortSize() == sbits + 4);
+
+  SMTExprRef res_sig = mkIte(extra_is_zero, res_sig_1, res_sig_2);
+
+  assert(res_sig->Sort->getBitvectorSortSize() == sbits + 4);
+
+  SMTExprRef nil_sbits4 = mkBitvector(0, sbits + 4);
+  SMTExprRef is_zero_sig = mkEqual(res_sig, nil_sbits4);
+
+  SMTExprRef zero_case = mkIte(rm_is_to_neg, nzero, pzero);
+
+  SMTExprRef rounded = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+
+  SMTExprRef v8 = mkIte(is_zero_sig, zero_case, rounded);
+
+  // And finally, we tie them together.
+  SMTExprRef result = mkIte(c7, v7, v8);
+  result = mkIte(c6, v6, result);
+  result = mkIte(c5, v5, result);
+  result = mkIte(c4, v4, result);
+  result = mkIte(c3, v3, result);
+  result = mkIte(c2, v2, result);
+  return mkIte(c1, v1, result);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPLtImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
