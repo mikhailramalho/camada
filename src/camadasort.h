@@ -143,6 +143,8 @@ public:
       : SolverSortBase(C, S) {}
   virtual ~SolverRMSort() = default;
 
+  virtual unsigned getWidth() const override { return 3; }
+
   virtual bool isRoundingModeSort() const override { return true; }
 };
 

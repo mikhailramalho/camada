@@ -1899,32 +1899,34 @@ static inline IntType FPasInt(const FPType FP) {
 }
 
 SMTExprRef SMTFPSolver::mkFloatImpl(const float Float) {
-  return mkBitvector(FPasInt<float, int32_t>(Float), 32);
+  return mkBitvector(FPasInt<float, int32_t>(Float), getFloat32Sort());
 }
 
 SMTExprRef SMTFPSolver::mkDoubleImpl(const double Double) {
-  return mkBitvector(FPasInt<double, int64_t>(Double), 64);
+  return mkBitvector(FPasInt<double, int64_t>(Double), getFloat64Sort());
 }
 
 SMTExprRef SMTFPSolver::mkRoundingModeImpl(const RoundingMode R) {
-  return mkBitvector(static_cast<int64_t>(R), 3);
+  return mkBitvector(static_cast<int64_t>(R), getRoundingModeSort());
 }
 
 SMTExprRef SMTFPSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                   const unsigned SigWidth) {
   // we always create the same NaN: sgn = Sgn, exp = all 1, sig = 0...01
   SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
-  return mkBVToIEEEFP(mkBVConcat(mkBitvector(Sgn, 1),
-                                 mkBVConcat(top_exp, mkBitvector(1, SigWidth))),
-                      getFloatSort(ExpWidth, SigWidth));
+  return mkBVToIEEEFP(
+      mkBVConcat(mkBitvector(Sgn, 1),
+                 mkBVConcat(top_exp, mkBitvector(1, SigWidth - 1))),
+      getFloatSort(ExpWidth, SigWidth));
 }
 
 SMTExprRef SMTFPSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                   const unsigned SigWidth) {
   SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
-  return mkBVToIEEEFP(mkBVConcat(mkBitvector(Sgn, 1),
-                                 mkBVConcat(top_exp, mkBitvector(0, SigWidth))),
-                      getFloatSort(ExpWidth, SigWidth));
+  return mkBVToIEEEFP(
+      mkBVConcat(mkBitvector(Sgn, 1),
+                 mkBVConcat(top_exp, mkBitvector(0, SigWidth - 1))),
+      getFloatSort(ExpWidth, SigWidth));
 }
 
 SMTExprRef SMTFPSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
