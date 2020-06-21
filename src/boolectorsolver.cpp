@@ -29,9 +29,7 @@ using namespace camada;
 #ifdef SOLVER_BOOLECTOR_ENABLED
 
 // Function used to report errors
-void BtorErrorHandler(const char *msg) {
-  fmt::print(stderr, "Btor error: {}\n", msg);
-}
+void BtorErrorHandler(const char *msg) { abortWithMessage(msg); }
 
 BtorContext::BtorContext() : Context(nullptr) {
   boolector_set_abort(BtorErrorHandler);
