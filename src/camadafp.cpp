@@ -1839,13 +1839,51 @@ SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
   return mkIte(c1, v1, result);
 }
 
-float SMTFPSolver::getFloatImpl(const SMTExprRef &Exp) {}
+template <typename FPType>
+static inline FPType getFP(SMTFPSolver &S, const SMTExprRef &Exp) {
+  unsigned int ebits = Exp->Sort->getFloatExponentWidth();
+  unsigned int sbits = Exp->Sort->getFloatSignificandWidth();
 
-double SMTFPSolver::getDoubleImpl(const SMTExprRef &Exp) {}
+  // Extract parts
+  int64_t sgn = S.getBitvector(extractSgn(S, Exp));
+  int64_t exp = S.getBitvector(extractExp(S, Exp));
+  int64_t sig = S.getBitvector(extractSig(S, Exp));
 
-bool SMTFPSolver::getInterpretationImpl(const SMTExprRef &Exp, float &Float) {}
+  // In our circuits the hidden bit is visible, so remove it
+  sig &= power2m1(sbits, false);
+
+  if (power2m1(ebits, false) == exp) {
+    // This is either a NaN
+    if (sig)
+      return sgn ? -NAN : NAN;
+
+    // or an inf
+    return sgn ? -INFINITY : INFINITY;
+  }
+
+  FPType result;
+  memcpy(&result, &sig, sizeof(FPType));
+  return result;
+}
+
+float SMTFPSolver::getFloatImpl(const SMTExprRef &Exp) {
+  return getFP<float>(*this, Exp);
+}
+
+double SMTFPSolver::getDoubleImpl(const SMTExprRef &Exp) {
+  return getFP<double>(*this, Exp);
+}
+
+bool SMTFPSolver::getInterpretationImpl(const SMTExprRef &Exp, float &Float) {
+  // TODO: never fails?
+  Float = getFloat(Exp);
+  return true;
+}
 
 bool SMTFPSolver::getInterpretationImpl(const SMTExprRef &Exp, double &Double) {
+  // TODO: never fails?
+  Double = getDouble(Exp);
+  return true;
 }
 
 template <typename FPType, typename IntType>
