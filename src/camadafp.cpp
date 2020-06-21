@@ -402,7 +402,9 @@ SMTExprRef SMTFPSolverBase::mkFPDivImpl(const SMTExprRef &LHS,
                                         const RoundingMode R) {}
 
 SMTExprRef SMTFPSolverBase::mkFPRemImpl(const SMTExprRef &LHS,
-                                        const SMTExprRef &RHS) {}
+                                        const SMTExprRef &RHS) {
+  return mkBVSub(LHS, mkBVMul(mkBVSDiv(LHS, RHS), RHS));
+}
 
 SMTExprRef SMTFPSolverBase::mkFPAddImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS,
