@@ -75,9 +75,10 @@ public:
   /// Returns an appropriate bitvector sort for the given bitwidth.
   virtual SMTSortRef getBitvectorSort(const unsigned BitWidth) = 0;
 
-  /// Returns an appropriate bitvector sort for the given bitwidth.
+  /// Returns an appropriate rounding mode sort.
   virtual SMTSortRef getRoundingModeSort() = 0;
 
+  /// Returns an appropriate floating-point sort for the given bitwidth.
   virtual SMTSortRef getFloatSort(const unsigned ExpWidth,
                                   const unsigned SigWidth) = 0;
 
@@ -393,6 +394,13 @@ protected:
   /// floating-point arithmetic, bitvectors will be used even if this flag is
   /// false
   bool useCamadaFP = false;
+
+  /// Returns an appropriate floating-point sort, encoded as a bitvector.
+  virtual SMTSortRef getBVFloatSort(const unsigned ExpWidth,
+                                    const unsigned SigWidth) = 0;
+
+  /// Returns an appropriate rounding mode sort, encoded as a bitvector.
+  virtual SMTSortRef getBVRoundingModeSort() = 0;
 };
 
 /// Shared pointer for SMTSolvers.

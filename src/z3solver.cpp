@@ -83,8 +83,21 @@ SMTSortRef Z3Solver::getRoundingModeSort() {
 
 SMTSortRef Z3Solver::getFloatSort(const unsigned ExpWidth,
                                   const unsigned SigWidth) {
-  return newSortRef<camada::SolverFPSort<Z3Sort>>(camada::SolverFPSort<Z3Sort>(
-      ExpWidth, SigWidth, Context, Context->fpa_sort(ExpWidth, SigWidth)));
+  return newSortRef<camada::SolverFPSort<Z3Sort>>(
+      camada::SolverFPSort<Z3Sort>(ExpWidth, SigWidth + 1, Context,
+                                   Context->fpa_sort(ExpWidth, SigWidth + 1)));
+}
+
+SMTSortRef Z3Solver::getBVRoundingModeSort() {
+  return newSortRef<camada::SolverRMSort<Z3Sort>>(
+      camada::SolverRMSort<Z3Sort>(Context, Context->bv_sort(3)));
+}
+
+SMTSortRef Z3Solver::getBVFloatSort(const unsigned ExpWidth,
+                                    const unsigned SigWidth) {
+  return newSortRef<camada::SolverFPSort<Z3Sort>>(
+      camada::SolverFPSort<Z3Sort>(ExpWidth, SigWidth + 1, Context,
+                                   Context->bv_sort(ExpWidth + SigWidth + 1)));
 }
 
 SMTExprRef Z3Solver::mkBVNeg(const SMTExprRef &Exp) {

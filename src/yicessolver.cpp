@@ -103,6 +103,18 @@ SMTSortRef YicesSolver::getFloatSort(const unsigned, const unsigned) {
   abortWithMessage("Yices does not support fp");
 }
 
+SMTSortRef YicesSolver::getBVRoundingModeSort() {
+  return newSortRef<camada::SolverRMSort<YicesSort>>(
+      camada::SolverRMSort<YicesSort>(Context, yices_bv_type(3)));
+}
+
+SMTSortRef YicesSolver::getBVFloatSort(const unsigned ExpWidth,
+                                       const unsigned SigWidth) {
+  return newSortRef<camada::SolverFPSort<YicesSort>>(
+      camada::SolverFPSort<YicesSort>(ExpWidth, SigWidth + 1, Context,
+                                      yices_bv_type(ExpWidth + SigWidth + 1)));
+}
+
 SMTExprRef YicesSolver::mkBVNeg(const SMTExprRef &Exp) {
   return newExprRef(YicesExpr(Context, Exp->Sort,
                               yices_neg(toSolverExpr<YicesExpr>(*Exp).Expr)));

@@ -72,8 +72,21 @@ SMTSortRef CVC4Solver::getFloatSort(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<CVC4Sort>>(
       camada::SolverFPSort<CVC4Sort>(
-          ExpWidth, SigWidth, Context,
+          ExpWidth, SigWidth + 1, Context,
           Context->mkFloatingPointType(ExpWidth, SigWidth)));
+}
+
+SMTSortRef CVC4Solver::getBVRoundingModeSort() {
+  return newSortRef<camada::SolverRMSort<CVC4Sort>>(
+      camada::SolverRMSort<CVC4Sort>(Context, Context->mkBitVectorType(3)));
+}
+
+SMTSortRef CVC4Solver::getBVFloatSort(const unsigned ExpWidth,
+                                      const unsigned SigWidth) {
+  return newSortRef<camada::SolverFPSort<CVC4Sort>>(
+      camada::SolverFPSort<CVC4Sort>(
+          ExpWidth, SigWidth + 1, Context,
+          Context->mkBitVectorType(ExpWidth + SigWidth + 1)));
 }
 
 SMTExprRef CVC4Solver::mkBVNeg(const SMTExprRef &Exp) {

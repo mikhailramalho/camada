@@ -102,6 +102,20 @@ SMTSortRef BtorSolver::getFloatSort(const unsigned, const unsigned) {
   abortWithMessage("Boolector does not support fp");
 }
 
+SMTSortRef BtorSolver::getBVFloatSort(const unsigned ExpWidth,
+                                      const unsigned SigWidth) {
+  return newSortRef<camada::SolverFPSort<BtorSort>>(
+      camada::SolverFPSort<BtorSort>(
+          ExpWidth, SigWidth + 1, Context,
+          boolector_bitvec_sort(Context->Context, ExpWidth + SigWidth + 1)));
+}
+
+SMTSortRef BtorSolver::getBVRoundingModeSort() {
+  return newSortRef<camada::SolverRMSort<BtorSort>>(
+      camada::SolverRMSort<BtorSort>(
+          Context, boolector_bitvec_sort(Context->Context, 3)));
+}
+
 SMTExprRef BtorSolver::mkBVNeg(const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
       Context, Exp->Sort,

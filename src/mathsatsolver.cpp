@@ -95,8 +95,22 @@ SMTSortRef MathSATSolver::getFloatSort(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<MathSATSort>>(
       camada::SolverFPSort<MathSATSort>(
-          ExpWidth, SigWidth, Context,
+          ExpWidth, SigWidth + 1, Context,
           msat_get_fp_type(*Context, ExpWidth, SigWidth)));
+}
+
+SMTSortRef MathSATSolver::getBVRoundingModeSort() {
+  return newSortRef<camada::SolverRMSort<MathSATSort>>(
+      camada::SolverRMSort<MathSATSort>(Context,
+                                        msat_get_bv_type(*Context, 3)));
+}
+
+SMTSortRef MathSATSolver::getBVFloatSort(const unsigned ExpWidth,
+                                         const unsigned SigWidth) {
+  return newSortRef<camada::SolverFPSort<MathSATSort>>(
+      camada::SolverFPSort<MathSATSort>(
+          ExpWidth, SigWidth + 1, Context,
+          msat_get_bv_type(*Context, ExpWidth + SigWidth + 1)));
 }
 
 SMTExprRef MathSATSolver::mkBVNeg(const SMTExprRef &Exp) {
