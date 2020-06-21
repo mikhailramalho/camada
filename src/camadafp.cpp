@@ -395,7 +395,104 @@ SMTExprRef SMTFPSolverBase::mkFPIsZeroImpl(const SMTExprRef &Exp) {
 
 SMTExprRef SMTFPSolverBase::mkFPMulImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS,
-                                        const RoundingMode R) {}
+                                        const RoundingMode R) {
+  assert(LHS->Sort->getBitvectorSortSize() ==
+         RHS->Sort->getBitvectorSortSize());
+  assert(LHS->Sort->getFloatExponentSize() ==
+         RHS->Sort->getFloatExponentSize());
+
+  std::size_t ebits = LHS->Sort->getFloatExponentSize();
+  std::size_t sbits = LHS->Sort->getFloatSignificandSize();
+
+  SMTExprRef nan = mkNaN(false, ebits, sbits);
+  SMTExprRef nzero = mkNZero(*this, ebits, sbits);
+  SMTExprRef pzero = mkPZero(*this, ebits, sbits);
+  SMTExprRef ninf = mkNInf(*this, ebits, sbits);
+  SMTExprRef pinf = mkPInf(*this, ebits, sbits);
+
+  SMTExprRef x_is_nan = mkFPIsNaN(LHS);
+  SMTExprRef x_is_zero = mkFPIsZero(LHS);
+  SMTExprRef x_is_pos = mkIsPos(*this, LHS);
+  SMTExprRef y_is_nan = mkFPIsNaN(RHS);
+  SMTExprRef y_is_zero = mkFPIsZero(RHS);
+  SMTExprRef y_is_pos = mkIsPos(*this, RHS);
+
+  // (x is NaN) || (y is NaN) -> NaN
+  SMTExprRef c1 = mkOr(x_is_nan, y_is_nan);
+  SMTExprRef v1 = nan;
+
+  // (x is +oo) -> if (y is 0) then NaN else inf with y's sign.
+  SMTExprRef c2 = mkIsPInf(*this, LHS);
+  SMTExprRef y_sgn_inf = mkIte(y_is_pos, pinf, ninf);
+  SMTExprRef v2 = mkIte(y_is_zero, nan, y_sgn_inf);
+
+  // (y is +oo) -> if (x is 0) then NaN else inf with x's sign.
+  SMTExprRef c3 = mkIsPInf(*this, RHS);
+  SMTExprRef x_sgn_inf = mkIte(x_is_pos, pinf, ninf);
+  SMTExprRef v3 = mkIte(x_is_zero, nan, x_sgn_inf);
+
+  // (x is -oo) -> if (y is 0) then NaN else inf with -y's sign.
+  SMTExprRef c4 = mkIsNInf(*this, LHS);
+  SMTExprRef neg_y_sgn_inf = mkIte(y_is_pos, ninf, pinf);
+  SMTExprRef v4 = mkIte(y_is_zero, nan, neg_y_sgn_inf);
+
+  // (y is -oo) -> if (x is 0) then NaN else inf with -x's sign.
+  SMTExprRef c5 = mkIsNInf(*this, RHS);
+  SMTExprRef neg_x_sgn_inf = mkIte(x_is_pos, ninf, pinf);
+  SMTExprRef v5 = mkIte(x_is_zero, nan, neg_x_sgn_inf);
+
+  // (x is 0) || (y is 0) -> x but with sign = x.sign ^ y.sign
+  SMTExprRef c6 = mkOr(x_is_zero, y_is_zero);
+  SMTExprRef sign_xor = mkXor(x_is_pos, y_is_pos);
+  SMTExprRef v6 = mkIte(sign_xor, nzero, pzero);
+
+  // else comes the actual multiplication.
+  SMTExprRef a_sgn, a_sig, a_exp, a_lz, b_sgn, b_sig, b_exp, b_lz;
+  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
+  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
+
+  SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
+  SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
+
+  SMTExprRef a_sig_ext = mkBVZeroExt(sbits, a_sig);
+  SMTExprRef b_sig_ext = mkBVZeroExt(sbits, b_sig);
+
+  SMTExprRef a_exp_ext = mkBVSignExt(2, a_exp);
+  SMTExprRef b_exp_ext = mkBVSignExt(2, b_exp);
+
+  SMTExprRef res_sgn, res_sig, res_exp;
+  res_sgn = mkBVXor(a_sgn, b_sgn);
+
+  res_exp = mkBVAdd(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+
+  SMTExprRef product = mkBVMul(a_sig_ext, b_sig_ext);
+
+  assert(product->Sort->getBitvectorSortSize() == 2 * sbits);
+
+  SMTExprRef h_p = mkBVExtract(2 * sbits - 1, sbits, product);
+  SMTExprRef l_p = mkBVExtract(sbits - 1, 0, product);
+
+  SMTExprRef rbits;
+  if (sbits >= 4) {
+    SMTExprRef sticky = mkBVRedOr(mkBVExtract(sbits - 4, 0, product));
+    rbits = mkBVConcat(mkBVExtract(sbits - 1, sbits - 3, product), sticky);
+  } else
+    rbits = mkBVConcat(l_p, mkBitvector(0, 4 - sbits));
+
+  assert(rbits->Sort->getBitvectorSortSize() == 4);
+  res_sig = mkBVConcat(h_p, rbits);
+
+  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef v7 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+
+  // And finally, we tie them together.
+  SMTExprRef result = mkIte(c6, v6, v7);
+  result = mkIte(c5, v5, result);
+  result = mkIte(c4, v4, result);
+  result = mkIte(c3, v3, result);
+  result = mkIte(c2, v2, result);
+  return mkIte(c1, v1, result);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPDivImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS,
