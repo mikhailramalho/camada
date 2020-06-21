@@ -25,7 +25,6 @@
 #include <memory>
 
 #include "camadasort.h"
-#include "camadautils.h"
 
 namespace camada {
 

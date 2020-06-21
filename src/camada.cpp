@@ -22,6 +22,8 @@
 #include "camada.h"
 #include "ac_config.h"
 
+using namespace camada;
+
 #if SOLVER_Z3_ENABLED
 #include "z3solver.h"
 #endif
@@ -100,7 +102,7 @@ unsigned SMTSort::getFloatExponentSize() const {
   return size;
 }
 
-bool SMTSort::operator==(SMTSort const &LHS, SMTSort const &RHS) {
+bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
   if (LHS.isBooleanSort() && RHS.isBooleanSort())
     return true;
 
@@ -115,6 +117,42 @@ bool SMTSort::operator==(SMTSort const &LHS, SMTSort const &RHS) {
            (LHS.getFloatExponentSize() == RHS.getFloatExponentSize());
 
   return false;
+}
+
+bool SMTSort::isBitvectorSort() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+bool SMTSort::isBooleanSort() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+bool SMTSort::isFloatSort() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+bool SMTSort::isRoundingModeSort() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+/// Returns the bitvector sort bit width.
+unsigned SMTSort::getBitvectorSortSizeImpl() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+/// Returns the floating-point sort bit width.
+unsigned SMTSort::getFloatSortSizeImpl() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+/// Returns the floating-point sort significand bit width.
+unsigned SMTSort::getFloatSignificandSizeImpl() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+/// Returns the floating-point sort exponent bit width.
+unsigned SMTSort::getFloatExponentSizeImpl() const {
+  abortWithMessage("Unimplemented for current type");
 }
 
 camada::SMTSolverRef camada::createZ3Solver() {

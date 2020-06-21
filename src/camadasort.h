@@ -24,8 +24,6 @@
 
 #include <memory>
 
-#include "camadautils.h"
-
 namespace camada {
 
 /// Generic base class for SMT sorts
@@ -35,16 +33,16 @@ public:
   virtual ~SMTSort() = default;
 
   /// Returns true if the sort is a bitvector.
-  virtual bool isBitvectorSort() const = 0;
+  virtual bool isBitvectorSort() const;
 
   /// Returns true if the sort is a boolean.
-  virtual bool isBooleanSort() const = 0;
+  virtual bool isBooleanSort() const;
 
   /// Returns true if the sort is a floating-point.
-  virtual bool isFloatSort() const = 0;
+  virtual bool isFloatSort() const;
 
   /// Returns true if the sort is a rounding mode.
-  virtual bool isRoundingModeSort() const = 0;
+  virtual bool isRoundingModeSort() const;
 
   /// Returns the bitvector size, fails if the sort is not a bitvector or if the
   /// size is zero. Calls getBitvectorSortSizeImpl().
@@ -71,16 +69,16 @@ public:
 
 protected:
   /// Returns the bitvector sort bit width.
-  virtual unsigned getBitvectorSortSizeImpl() const = 0;
+  virtual unsigned getBitvectorSortSizeImpl() const;
 
   /// Returns the floating-point sort bit width.
-  virtual unsigned getFloatSortSizeImpl() const = 0;
+  virtual unsigned getFloatSortSizeImpl() const;
 
   /// Returns the floating-point sort significand bit width.
-  virtual unsigned getFloatSignificandSizeImpl() const = 0;
+  virtual unsigned getFloatSignificandSizeImpl() const;
 
   /// Returns the floating-point sort exponent bit width.
-  virtual unsigned getFloatExponentSizeImpl() const = 0;
+  virtual unsigned getFloatExponentSizeImpl() const;
 };
 
 /// Template to hold Solver specific Context and Sort
@@ -98,38 +96,6 @@ public:
       : Context(std::move(C)), Sort(SS) {}
 
   virtual ~SolverSort() = default;
-
-  virtual bool isBitvectorSort() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
-
-  virtual bool isBooleanSort() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
-
-  virtual bool isFloatSort() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
-
-  virtual bool isRoundingModeSort() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
-
-  virtual unsigned getBitvectorSortSizeImpl() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
-
-  virtual unsigned getFloatSortSizeImpl() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
-
-  virtual unsigned getFloatSignificandSizeImpl() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
-
-  virtual unsigned getFloatExponentSizeImpl() const override {
-    abortWithMessage("Unimplemented for current type");
-  }
 };
 
 template <typename SolverSortBase> class SolverBVSort : public SolverSortBase {

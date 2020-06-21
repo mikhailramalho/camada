@@ -28,9 +28,27 @@
 
 #include "camadaexpr.h"
 #include "camadasort.h"
-#include "camadautils.h"
 
 namespace camada {
+
+/// Return camada version
+std::string getCamadaVersion();
+
+/// Abort program if Cond is false and prints Msg to stderr
+void abortCondWithMessage(bool Cond, const std::string &Msg);
+
+/// Abort program and prints Msg to stderr
+[[noreturn]] void abortWithMessage(const std::string &Msg);
+
+enum class checkResult { SAT, UNSAT, UNKNOWN };
+
+enum class RoundingMode {
+  ROUND_TO_EVEN = 0,
+  ROUND_TO_AWAY = 1,
+  ROUND_TO_PLUS_INF = 2,
+  ROUND_TO_MINUS_INF = 3,
+  ROUND_TO_ZERO = 4,
+};
 
 /// Generic base class for SMT Solvers
 ///
