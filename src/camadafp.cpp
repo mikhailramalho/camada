@@ -21,6 +21,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstring>
 
 #include "camadafp.h"
 
@@ -448,9 +449,25 @@ bool SMTFPSolverBase::getInterpretationImpl(const SMTExprRef &Exp,
 bool SMTFPSolverBase::getInterpretationImpl(const SMTExprRef &Exp,
                                             double &Double) {}
 
-SMTExprRef SMTFPSolverBase::mkFloatImpl(const float Float) {}
+template <typename FPType, typename IntType>
+static inline IntType FPasInt(const FPType FP) {
+  // Convert the integer to float/double
+  // We assume that floats are 32 bits long and doubles are 64 bits long
+  camada::abortCondWithMessage(sizeof(FPType) == sizeof(IntType),
+                               "Cannot convert int to floating-point");
 
-SMTExprRef SMTFPSolverBase::mkDoubleImpl(const double Double) {}
+  IntType FPAsInt;
+  memcpy(&FPAsInt, &FP, sizeof(FPType));
+  return FPAsInt;
+}
+
+SMTExprRef SMTFPSolverBase::mkFloatImpl(const float Float) {
+  return mkBitvector(FPasInt<float, int32_t>(Float), 32);
+}
+
+SMTExprRef SMTFPSolverBase::mkDoubleImpl(const double Double) {
+  return mkBitvector(FPasInt<double, int64_t>(Double), 64);
+}
 
 SMTExprRef SMTFPSolverBase::mkRoundingModeImpl(const RoundingMode R) {
   return mkBitvector(static_cast<int64_t>(R), 3);
