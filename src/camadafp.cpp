@@ -73,10 +73,16 @@ static inline SMTExprRef mkBotExp(SMTSolver &S, unsigned int ExpWidth) {
   return S.mkBitvector(0, ExpWidth);
 }
 
-static inline SMTExprRef mkIsPos(SMTSolver &S, SMTExprRef Exp) {
+static inline SMTExprRef mkIsPos(SMTSolver &S, const SMTExprRef &Exp) {
   SMTExprRef sgn = extractSgn(S, Exp);
   SMTExprRef zero = S.mkBitvector(0, sgn->Sort->getBitvectorSortSize());
   return S.mkEqual(sgn, zero);
+}
+
+static inline SMTExprRef mkIsNeg(SMTSolver &S, SMTExprRef Exp) {
+  SMTExprRef sgn = extractSgn(S, Exp);
+  SMTExprRef one = S.mkBitvector(1, sgn->Sort->getBitvectorSortSize());
+  return S.mkEqual(sgn, one);
 }
 
 static inline SMTExprRef mkPZero(SMTSolver &S, unsigned int EWidth,
@@ -97,10 +103,38 @@ static inline SMTExprRef mkNZero(SMTSolver &S, unsigned int EWidth,
       S.getFloatSort(EWidth, SWidth - 1));
 }
 
-static inline SMTExprRef mkIsNeg(SMTSolver &S, SMTExprRef Exp) {
-  SMTExprRef sgn = extractSgn(S, Exp);
-  SMTExprRef one = S.mkBitvector(1, sgn->Sort->getBitvectorSortSize());
-  return S.mkEqual(sgn, one);
+static inline SMTExprRef mkPInf(SMTSolver &S, unsigned int EWidth,
+                                unsigned int SWidth) {
+  SMTExprRef top_exp = mkTopExp(S, EWidth);
+  return S.mkBVToIEEEFP(
+      S.mkBVConcat(S.mkBitvector(0, 1),
+                   S.mkBVConcat(top_exp, S.mkBitvector(0, SWidth - 1))),
+      S.getFloatSort(EWidth, SWidth - 1));
+}
+
+static inline SMTExprRef mkNInf(SMTSolver &S, unsigned int EWidth,
+                                unsigned int SWidth) {
+  SMTExprRef top_exp = mkTopExp(S, EWidth);
+  return S.mkBVToIEEEFP(
+      S.mkBVConcat(S.mkBitvector(1, 1),
+                   S.mkBVConcat(top_exp, S.mkBitvector(0, SWidth - 1))),
+      S.getFloatSort(EWidth, SWidth - 1));
+}
+
+static inline SMTExprRef mkIsPZero(SMTSolver &S, const SMTExprRef &Exp) {
+  return S.mkAnd(S.mkFPIsZero(Exp), mkIsPos(S, Exp));
+}
+
+static inline SMTExprRef mkIsNZero(SMTSolver &S, const SMTExprRef &Exp) {
+  return S.mkAnd(S.mkFPIsZero(Exp), mkIsNeg(S, Exp));
+}
+
+static inline SMTExprRef mkIsPInf(SMTSolver &S, const SMTExprRef &Exp) {
+  return S.mkAnd(S.mkFPIsInfinite(Exp), mkIsPos(S, Exp));
+}
+
+static inline SMTExprRef mkIsNInf(SMTSolver &S, const SMTExprRef &Exp) {
+  return S.mkAnd(S.mkFPIsInfinite(Exp), mkIsNeg(S, Exp));
 }
 
 SMTExprRef mkOne(SMTSolver &S, SMTExprRef Sgn, unsigned int EWidth,
@@ -459,7 +493,130 @@ SMTExprRef SMTFPSolverBase::mkFPEqualImpl(const SMTExprRef &LHS,
 
 SMTExprRef SMTFPSolverBase::mkFPtoFPImpl(const SMTExprRef &From,
                                          const SMTSortRef &To,
-                                         const RoundingMode R) {}
+                                         const RoundingMode R) {
+  unsigned from_sbits = From->Sort->getFloatSignificandSize();
+  unsigned from_ebits = From->Sort->getFloatExponentSize();
+  unsigned to_sbits = To->getFloatSignificandSize();
+  unsigned to_ebits = To->getFloatExponentSize();
+
+  if (from_sbits == to_sbits && from_ebits == to_ebits)
+    return From;
+
+  SMTExprRef one1 = mkBitvector(1, 1);
+  SMTExprRef pinf = mkPInf(*this, to_ebits, to_sbits);
+  SMTExprRef ninf = mkNInf(*this, to_ebits, to_sbits);
+
+  // NaN -> NaN
+  SMTExprRef c1 = mkFPIsNaN(From);
+  SMTExprRef v1 = mkIte(mkIsNeg(*this, From), mkNaN(true, to_ebits, to_sbits),
+                        mkNaN(false, to_ebits, to_sbits));
+
+  // +0 -> +0
+  SMTExprRef c2 = mkIsPZero(*this, From);
+  SMTExprRef v2 = mkPZero(*this, to_ebits, to_sbits);
+
+  // -0 -> -0
+  SMTExprRef c3 = mkIsNZero(*this, From);
+  SMTExprRef v3 = mkNZero(*this, to_ebits, to_sbits);
+
+  // +oo -> +oo
+  SMTExprRef c4 = mkIsPInf(*this, From);
+  SMTExprRef v4 = pinf;
+
+  // -oo -> -oo
+  SMTExprRef c5 = mkIsNInf(*this, From);
+  SMTExprRef v5 = ninf;
+
+  // otherwise: the actual conversion with rounding.
+  SMTExprRef sgn, sig, exp, lz;
+  unpack(*this, From, sgn, sig, exp, lz, true);
+
+  SMTExprRef res_sgn = sgn;
+
+  assert(sgn->Sort->getBitvectorSortSize() == 1);
+  assert(sig->Sort->getBitvectorSortSize() == from_sbits);
+  assert(exp->Sort->getBitvectorSortSize() == from_ebits);
+  assert(lz->Sort->getBitvectorSortSize() == from_ebits);
+
+  SMTExprRef res_sig;
+  if (from_sbits < (to_sbits + 3)) {
+    // make sure that sig has at least to_sbits + 3
+    res_sig = mkBVConcat(sig, mkBitvector(0, to_sbits + 3 - from_sbits));
+  } else if (from_sbits > (to_sbits + 3)) {
+    // collapse the extra bits into a sticky bit.
+    SMTExprRef high =
+        mkBVExtract(from_sbits - 1, from_sbits - to_sbits - 2, sig);
+    assert(high->Sort->getBitvectorSortSize() == to_sbits + 2);
+    SMTExprRef low = mkBVExtract(from_sbits - to_sbits - 3, 0, sig);
+    SMTExprRef sticky = mkBVRedOr(low);
+    assert(sticky->Sort->getBitvectorSortSize() == 1);
+    res_sig = mkBVConcat(high, sticky);
+    assert(res_sig->Sort->getBitvectorSortSize() == to_sbits + 3);
+  } else
+    res_sig = sig;
+
+  // extra zero in the front for the rounder.
+  res_sig = mkBVZeroExt(1, res_sig);
+  assert(res_sig->Sort->getBitvectorSortSize() == to_sbits + 4);
+
+  SMTExprRef exponent_overflow = mkBoolean(false);
+
+  SMTExprRef res_exp;
+  if (from_ebits < (to_ebits + 2)) {
+    res_exp = mkBVSignExt(to_ebits - from_ebits + 2, exp);
+
+    // subtract lz for subnormal numbers.
+    SMTExprRef lz_ext = mkBVZeroExt(to_ebits - from_ebits + 2, lz);
+    res_exp = mkBVSub(res_exp, lz_ext);
+  } else if (from_ebits > (to_ebits + 2)) {
+    unsigned ebits_diff = from_ebits - (to_ebits + 2);
+
+    // subtract lz for subnormal numbers.
+    SMTExprRef exp_sub_lz = mkBVSub(mkBVSignExt(2, exp), mkBVSignExt(2, lz));
+
+    // check whether exponent is within roundable (to_ebits+2) range.
+    unsigned int z = power2(to_ebits + 1, true);
+    SMTExprRef max_exp =
+        mkBVConcat(mkBitvector(power2m1(to_ebits, false), to_ebits + 1),
+                   mkBitvector(0, 1));
+    SMTExprRef min_exp = mkBitvector(z + 2, to_ebits + 2);
+
+    unsigned int ovft = power2m1(to_ebits + 1, false);
+    SMTExprRef first_ovf_exp = mkBitvector(ovft, from_ebits + 2);
+    SMTExprRef first_udf_exp = mkBVConcat(
+        mkBVNeg(mkBitvector(1, ebits_diff + 3)), mkBitvector(1, to_ebits + 1));
+
+    SMTExprRef exp_in_range = mkBVExtract(to_ebits + 1, 0, exp_sub_lz);
+    assert(exp_in_range->Sort->getBitvectorSortSize() == to_ebits + 2);
+
+    SMTExprRef ovf_cond = mkBVSle(first_ovf_exp, exp_sub_lz);
+    SMTExprRef udf_cond = mkBVSle(exp_sub_lz, first_udf_exp);
+
+    res_exp = exp_in_range;
+    res_exp = mkIte(ovf_cond, max_exp, res_exp);
+    res_exp = mkIte(udf_cond, min_exp, res_exp);
+  } else {
+    // from_ebits == (to_ebits + 2)
+    res_exp = mkBVSub(exp, lz);
+  }
+
+  assert(res_exp->Sort->getBitvectorSortSize() == to_ebits + 2);
+
+  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef rounded = round(rm, res_sgn, res_sig, res_exp, to_ebits, to_sbits);
+
+  SMTExprRef is_neg = mkEqual(sgn, one1);
+  SMTExprRef sig_inf = mkIte(is_neg, ninf, pinf);
+
+  SMTExprRef v6 = mkIte(exponent_overflow, sig_inf, rounded);
+
+  // And finally, we tie them together.
+  SMTExprRef result = mkIte(c5, v5, v6);
+  result = mkIte(c4, v4, result);
+  result = mkIte(c3, v3, result);
+  result = mkIte(c2, v2, result);
+  return mkIte(c1, v1, result);
+}
 
 SMTExprRef SMTFPSolverBase::mkSBVtoFPImpl(const SMTExprRef &From,
                                           const SMTSortRef &To,
