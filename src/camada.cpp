@@ -72,6 +72,51 @@ void camada::SMTSolver::dumpModel() {
   fmt::printf("SMTSolver model dump not implemented.\n");
 }
 
+unsigned SMTSort::getBitvectorSortSize() const {
+  abortCondWithMessage(isBitvectorSort(), "Not a bitvector sort!");
+  unsigned size = getBitvectorSortSizeImpl();
+  abortCondWithMessage(size, "Bitvector size is zero!");
+  return size;
+}
+
+unsigned SMTSort::getFloatSortSize() const {
+  abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
+  unsigned size = getFloatSortSizeImpl();
+  abortCondWithMessage(size, "Floating-point size is zero!");
+  return size;
+}
+
+unsigned SMTSort::getFloatSignificandSize() const {
+  abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
+  unsigned size = getFloatSignificandSizeImpl();
+  abortCondWithMessage(size, "Floating-point significand size is zero!");
+  return size;
+}
+
+unsigned SMTSort::getFloatExponentSize() const {
+  abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
+  unsigned size = getFloatExponentSizeImpl();
+  abortCondWithMessage(size, "Floating-point exponent size is zero!");
+  return size;
+}
+
+bool SMTSort::operator==(SMTSort const &LHS, SMTSort const &RHS) {
+  if (LHS.isBooleanSort() && RHS.isBooleanSort())
+    return true;
+
+  if (LHS.isRoundingModeSort() && RHS.isRoundingModeSort())
+    return true;
+
+  if (LHS.isBitvectorSort() && RHS.isBitvectorSort())
+    return (LHS.getBitvectorSortSize() == RHS.getBitvectorSortSize());
+
+  if (LHS.isFloatSort() && RHS.isFloatSort())
+    return (LHS.getFloatSignificandSize() == RHS.getFloatSignificandSize()) &&
+           (LHS.getFloatExponentSize() == RHS.getFloatExponentSize());
+
+  return false;
+}
+
 camada::SMTSolverRef camada::createZ3Solver() {
 #if SOLVER_Z3_ENABLED
   return std::make_shared<Z3Solver>();

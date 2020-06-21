@@ -48,59 +48,24 @@ public:
 
   /// Returns the bitvector size, fails if the sort is not a bitvector or if the
   /// size is zero. Calls getBitvectorSortSizeImpl().
-  virtual unsigned getBitvectorSortSize() const {
-    abortCondWithMessage(isBitvectorSort(), "Not a bitvector sort!");
-    unsigned size = getBitvectorSortSizeImpl();
-    abortCondWithMessage(size, "Bitvector size is zero!");
-    return size;
-  }
+  virtual unsigned getBitvectorSortSize() const;
 
   /// Returns the floating-point size, fails if the sort is not a floating-point
   /// floating-point or if the size is zero. Calls getFloatSortSizeImpl().
-  virtual unsigned getFloatSortSize() const {
-    abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
-    unsigned size = getFloatSortSizeImpl();
-    abortCondWithMessage(size, "Floating-point size is zero!");
-    return size;
-  }
+  virtual unsigned getFloatSortSize() const;
 
   /// Returns the floating-point significand size, fails if the sort is not a
   /// floating-point or if the size is zero. Calls
   /// getFloatSignificandSizeImpl().
-  virtual unsigned getFloatSignificandSize() const {
-    abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
-    unsigned size = getFloatSignificandSizeImpl();
-    abortCondWithMessage(size, "Floating-point significand size is zero!");
-    return size;
-  }
+  virtual unsigned getFloatSignificandSize() const;
 
   /// Returns the floating-point exponent size, fails if the sort is not a
   /// floating-point or if the size is zero. Calls getFloatExponentSizeImpl().
-  virtual unsigned getFloatExponentSize() const {
-    abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
-    unsigned size = getFloatExponentSizeImpl();
-    abortCondWithMessage(size, "Floating-point exponent size is zero!");
-    return size;
-  }
+  virtual unsigned getFloatExponentSize() const;
 
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
-  friend bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
-    if (LHS.isBooleanSort() && RHS.isBooleanSort())
-      return true;
-
-    if (LHS.isRoundingModeSort() && RHS.isRoundingModeSort())
-      return true;
-
-    if (LHS.isBitvectorSort() && RHS.isBitvectorSort())
-      return (LHS.getBitvectorSortSize() == RHS.getBitvectorSortSize());
-
-    if (LHS.isFloatSort() && RHS.isFloatSort())
-      return (LHS.getFloatSignificandSize() == RHS.getFloatSignificandSize()) &&
-             (LHS.getFloatExponentSize() == RHS.getFloatExponentSize());
-
-    return false;
-  }
+  friend bool operator==(SMTSort const &LHS, SMTSort const &RHS);
 
   virtual void dump() const;
 
