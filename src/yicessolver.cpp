@@ -117,7 +117,7 @@ SMTSortRef YicesSolver::getBVFloatSort(const unsigned ExpWidth,
 
 SMTExprRef YicesSolver::mkBVNeg(const SMTExprRef &Exp) {
   return newExprRef(YicesExpr(Context, Exp->Sort,
-                              yices_neg(toSolverExpr<YicesExpr>(*Exp).Expr)));
+                              yices_bvneg(toSolverExpr<YicesExpr>(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkBVNot(const SMTExprRef &Exp) {
