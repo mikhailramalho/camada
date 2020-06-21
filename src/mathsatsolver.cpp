@@ -266,6 +266,11 @@ SMTExprRef MathSATSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
+SMTExprRef MathSATSolver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  // Do this as and(or(a,b),not(and(a,b)))
+  return mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
+}
+
 SMTExprRef MathSATSolver::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(

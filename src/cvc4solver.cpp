@@ -278,6 +278,13 @@ SMTExprRef CVC4Solver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                       toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
+SMTExprRef CVC4Solver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  return newExprRef(CVC4Expr(
+      Context, getBoolSort(),
+      Context->mkExpr(CVC4::kind::XOR, toSolverExpr<CVC4Expr>(*LHS).Expr,
+                      toSolverExpr<CVC4Expr>(*RHS).Expr)));
+}
+
 SMTExprRef CVC4Solver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(CVC4Expr(
       Context, getBoolSort(),

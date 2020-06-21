@@ -240,6 +240,12 @@ SMTExprRef Z3Solver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
+SMTExprRef Z3Solver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, getBoolSort(),
+                           toSolverExpr<Z3Expr>(*LHS).Expr ||
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
+}
+
 SMTExprRef Z3Solver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, getBoolSort(),
                            toSolverExpr<Z3Expr>(*LHS).Expr ==

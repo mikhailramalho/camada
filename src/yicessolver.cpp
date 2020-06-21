@@ -270,6 +270,12 @@ SMTExprRef YicesSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                         toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
+SMTExprRef YicesSolver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(Context, getBoolSort(),
+                              yices_xor2(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                         toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
 SMTExprRef YicesSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(Context, getBoolSort(),
                               yices_eq(toSolverExpr<YicesExpr>(*LHS).Expr,

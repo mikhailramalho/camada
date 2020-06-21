@@ -281,6 +281,13 @@ SMTExprRef BtorSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                             toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
+SMTExprRef BtorSolver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  return newExprRef(BtorExpr(Context, getBoolSort(),
+                             boolector_xor(Context->Context,
+                                           toSolverExpr<BtorExpr>(*LHS).Expr,
+                                           toSolverExpr<BtorExpr>(*RHS).Expr)));
+}
+
 SMTExprRef BtorSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, getBoolSort(),
