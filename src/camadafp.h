@@ -118,6 +118,8 @@ protected:
   virtual SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp);
 
 protected:
+  SMTExprRef mkToBV(SMTExprRef x, bool is_signed, unsigned int width);
+
   SMTExprRef round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
                    SMTExprRef &Exp, unsigned EWidth, unsigned SWidth);
 };
@@ -312,12 +314,14 @@ public:
       return SMTFPSolverBase::getInterpretationImpl(Exp, Float);
     return getInterpretationImpl(Exp, Float);
   }
+
   virtual bool getInterpretation(const SMTExprRef &Exp,
                                  double &Double) override {
     if (useCamadaFP)
       return SMTFPSolverBase::getInterpretationImpl(Exp, Double);
     return getInterpretationImpl(Exp, Double);
   }
+
   virtual SMTExprRef mkFloat(const float Float) override {
     if (useCamadaFP)
       return SMTFPSolverBase::mkFloatImpl(Float);
