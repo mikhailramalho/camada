@@ -164,7 +164,7 @@ static inline SMTExprRef mkUnbias(SMTSolver &S, SMTExprRef &Src) {
   return S.mkBVConcat(n_leading, rest);
 }
 
-static inline SMTExprRef mkLeadingZeros(SMTSolver &S, SMTExprRef &Src,
+static inline SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
                                         unsigned int MaxBits) {
   std::size_t bv_sz = Src->Sort->getBitvectorSortSize();
   if (bv_sz == 0)
@@ -620,11 +620,206 @@ SMTExprRef SMTFPSolverBase::mkFPtoFPImpl(const SMTExprRef &From,
 
 SMTExprRef SMTFPSolverBase::mkSBVtoFPImpl(const SMTExprRef &From,
                                           const SMTSortRef &To,
-                                          const RoundingMode R) {}
+                                          const RoundingMode R) {
+  // This is a conversion from unsigned bitvector to float:
+  // ((_ to_fp_unsigned eb sb) RoundingMode (_ BitVec m) (_ FloatingPoint eb
+  // sb)) Semantics:
+  //    Let b in[[(_ BitVec m)]] and let n be the unsigned integer represented
+  //    by b.
+  //    [[(_ to_fp_unsigned eb sb)]](r, x) = +infinity if n is too large to be
+  //    represented as a finite number of[[(_ FloatingPoint eb sb)]];
+  //    [[(_ to_fp_unsigned eb sb)]](r, x) = y otherwise, where y is the finite
+  //    number such that[[fp.to_real]](y) is closest to n according to rounding
+  //    mode r.
+
+  unsigned ebits = To->getFloatExponentSize();
+  unsigned sbits = To->getFloatSignificandSize();
+  unsigned bv_sz = From->Sort->getBitvectorSortSize();
+
+  SMTExprRef bv1_1 = mkBitvector(1, 1);
+  SMTExprRef bv0_sz = mkBitvector(0, bv_sz);
+
+  SMTExprRef is_zero = mkEqual(From, bv0_sz);
+
+  SMTExprRef pzero = mkPZero(*this, ebits, sbits);
+
+  // Special case: x == 0 -> p/n zero
+  SMTExprRef c1 = is_zero;
+  SMTExprRef v1 = pzero;
+
+  // Special case: x != 0
+  SMTExprRef is_neg_bit = mkBVExtract(bv_sz - 1, bv_sz - 1, From);
+  SMTExprRef is_neg = mkEqual(is_neg_bit, bv1_1);
+  SMTExprRef neg_x = mkBVNeg(From);
+  SMTExprRef x_abs = mkIte(is_neg, neg_x, From);
+
+  // x is [bv_sz-1] . [bv_sz-2 ... 0] * 2^(bv_sz-1)
+  // bv_sz-1 is the "1.0" bit for the rounder.
+
+  SMTExprRef lz = mkLeadingZeros(*this, x_abs, bv_sz);
+  SMTExprRef shifted_sig = mkBVShl(x_abs, lz);
+
+  // shifted_sig is [bv_sz-1, bv_sz-2] . [bv_sz-3 ... 0] * 2^(bv_sz-2) * 2^(-lz)
+  unsigned sig_sz = sbits + 4; // we want extra rounding bits.
+
+  SMTExprRef sig_4, sticky;
+  if (sig_sz <= bv_sz) {
+    // one short
+    sig_4 = mkBVExtract(bv_sz - 1, bv_sz - sig_sz + 1, shifted_sig);
+
+    SMTExprRef sig_rest = mkBVExtract(bv_sz - sig_sz, 0, shifted_sig);
+    sticky = mkBVRedOr(sig_rest);
+    sig_4 = mkBVConcat(sig_4, sticky);
+  } else {
+    unsigned extra_bits = sig_sz - bv_sz;
+    SMTExprRef extra_zeros = mkBitvector(0, extra_bits);
+    sig_4 = mkBVConcat(shifted_sig, extra_zeros);
+    lz = mkBVAdd(mkBVConcat(extra_zeros, lz), mkBitvector(extra_bits, sig_sz));
+    bv_sz = bv_sz + extra_bits;
+  }
+  assert(sig_4->Sort->getBitvectorSortSize() == sig_sz);
+
+  SMTExprRef s_exp = mkBVSub(mkBitvector(bv_sz - 2, bv_sz), lz);
+
+  // s_exp = (bv_sz-2) + (-lz) signed
+  assert(s_exp->Sort->getBitvectorSortSize() == bv_sz);
+
+  unsigned exp_sz = ebits + 2; // (+2 for rounder)
+  SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
+
+  // the remaining bits are 0 if ebits is large enough.
+  SMTExprRef exp_too_large = mkBoolean(false);
+
+  // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
+  // exp < bv_sz (+sign bit which is [0])
+  unsigned exp_worst_case_sz =
+      (unsigned)((log((double)bv_sz) / log((double)2)) + 1.0);
+
+  if (exp_sz < exp_worst_case_sz) {
+    // exp_sz < exp_worst_case_sz and exp >= 0.
+    // Take the maximum legal exponent; this
+    // allows us to keep the most precision.
+    SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
+    SMTExprRef max_exp_bvsz = mkBVZeroExt(bv_sz - exp_sz, max_exp);
+
+    exp_too_large =
+        mkBVSle(mkBVAdd(max_exp_bvsz, mkBitvector(1, bv_sz)), s_exp);
+    SMTExprRef zero_sig_sz = mkBitvector(0, sig_sz);
+    sig_4 = mkIte(exp_too_large, zero_sig_sz, sig_4);
+    exp_2 = mkIte(exp_too_large, max_exp, exp_2);
+  }
+
+  SMTExprRef sgn, sig, exp;
+  sgn = is_neg_bit;
+  sig = sig_4;
+  exp = exp_2;
+
+  assert(sig->Sort->getBitvectorSortSize() == sbits + 4);
+  assert(exp->Sort->getBitvectorSortSize() == ebits + 2);
+
+  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef v2 = round(rm, sgn, sig, exp, ebits, sbits);
+  return mkIte(c1, v1, v2);
+}
 
 SMTExprRef SMTFPSolverBase::mkUBVtoFPImpl(const SMTExprRef &From,
                                           const SMTSortRef &To,
-                                          const RoundingMode R) {}
+                                          const RoundingMode R) {
+  // This is a conversion from unsigned bitvector to float:
+  // ((_ to_fp_unsigned eb sb) RoundingMode (_ BitVec m) (_ FloatingPoint eb
+  // sb)) Semantics:
+  //    Let b in[[(_ BitVec m)]] and let n be the unsigned integer represented
+  //    by b.
+  //    [[(_ to_fp_unsigned eb sb)]](r, x) = +infinity if n is too large to be
+  //    represented as a finite number of[[(_ FloatingPoint eb sb)]];
+  //    [[(_ to_fp_unsigned eb sb)]](r, x) = y otherwise, where y is the finite
+  //    number such that[[fp.to_real]](y) is closest to n according to rounding
+  //    mode r.
+
+  unsigned ebits = To->getFloatExponentSize();
+  unsigned sbits = To->getFloatSignificandSize();
+  unsigned bv_sz = From->Sort->getBitvectorSortSize();
+
+  SMTExprRef bv0_1 = mkBitvector(0, 1);
+  SMTExprRef bv0_sz = mkBitvector(0, bv_sz);
+
+  SMTExprRef is_zero = mkEqual(From, bv0_sz);
+
+  SMTExprRef pzero = mkPZero(*this, ebits, sbits);
+
+  // Special case: x == 0 -> p/n zero
+  SMTExprRef c1 = is_zero;
+  SMTExprRef v1 = pzero;
+
+  // Special case: x != 0
+  // x is [bv_sz-1] . [bv_sz-2 ... 0] * 2^(bv_sz-1)
+  // bv_sz-1 is the "1.0" bit for the rounder.
+
+  SMTExprRef lz = mkLeadingZeros(*this, From, bv_sz);
+  SMTExprRef shifted_sig = mkBVShl(From, lz);
+
+  // shifted_sig is [bv_sz-1] . [bv_sz-2 ... 0] * 2^(bv_sz-1) * 2^(-lz)
+  unsigned sig_sz = sbits + 4; // we want extra rounding bits.
+
+  SMTExprRef sig_4, sticky;
+  if (sig_sz <= bv_sz) {
+    // one short
+    sig_4 = mkBVExtract(bv_sz - 1, bv_sz - sig_sz + 1, shifted_sig);
+
+    SMTExprRef sig_rest = mkBVExtract(bv_sz - sig_sz, 0, shifted_sig);
+    sticky = mkBVRedOr(sig_rest);
+    sig_4 = mkBVConcat(sig_4, sticky);
+  } else {
+    unsigned extra_bits = sig_sz - bv_sz;
+    SMTExprRef extra_zeros = mkBitvector(0, extra_bits);
+    sig_4 = mkBVConcat(shifted_sig, extra_zeros);
+    lz = mkBVAdd(mkBVConcat(extra_zeros, lz), mkBitvector(extra_bits, sig_sz));
+    bv_sz = bv_sz + extra_bits;
+  }
+  assert(sig_4->Sort->getBitvectorSortSize() == sig_sz);
+
+  SMTExprRef s_exp = mkBVSub(mkBitvector(bv_sz - 2, bv_sz), lz);
+
+  // s_exp = (bv_sz-2) + (-lz) signed
+  assert(s_exp->Sort->getBitvectorSortSize() == bv_sz);
+
+  unsigned exp_sz = ebits + 2; // (+2 for rounder)
+  SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
+
+  // the remaining bits are 0 if ebits is large enough.
+  SMTExprRef exp_too_large = mkBoolean(false); // This is always in range.
+
+  // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
+  // exp < bv_sz (+sign bit which is [0])
+  unsigned exp_worst_case_sz =
+      (unsigned)((log((double)bv_sz) / log((double)2)) + 1.0);
+
+  if (exp_sz < exp_worst_case_sz) {
+    // exp_sz < exp_worst_case_sz and exp >= 0.
+    // Take the maximum legal exponent; this
+    // allows us to keep the most precision.
+    SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
+    SMTExprRef max_exp_bvsz = mkBVZeroExt(bv_sz - exp_sz, max_exp);
+
+    exp_too_large =
+        mkBVSle(mkBVAdd(max_exp_bvsz, mkBitvector(1, bv_sz)), s_exp);
+    SMTExprRef zero_sig_sz = mkBitvector(0, sig_sz);
+    sig_4 = mkIte(exp_too_large, zero_sig_sz, sig_4);
+    exp_2 = mkIte(exp_too_large, max_exp, exp_2);
+  }
+
+  SMTExprRef sgn, sig, exp;
+  sgn = bv0_1;
+  sig = sig_4;
+  exp = exp_2;
+
+  assert(sig->Sort->getBitvectorSortSize() == sbits + 4);
+  assert(exp->Sort->getBitvectorSortSize() == ebits + 2);
+
+  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef v2 = round(rm, sgn, sig, exp, ebits, sbits);
+  return mkIte(c1, v1, v2);
+}
 
 SMTExprRef SMTFPSolverBase::mkToBV(SMTExprRef Exp, bool isSigned,
                                    unsigned int ToWidth) {
