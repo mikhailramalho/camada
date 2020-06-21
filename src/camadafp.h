@@ -116,6 +116,10 @@ protected:
                                       const SMTSortRef &To);
 
   virtual SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp);
+
+protected:
+  SMTExprRef round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
+                   SMTExprRef &Exp, unsigned EWidth, unsigned SWidth);
 };
 
 template <typename SMTSolverImpl> class SMTFPSolver : public SMTFPSolverBase {

@@ -22,6 +22,7 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
+#include <climits>
 #include <memory>
 #include <string>
 
@@ -177,6 +178,20 @@ public:
   /// Creates a bitvector concat operation
   virtual SMTExprRef mkBVConcat(const SMTExprRef &LHS,
                                 const SMTExprRef &RHS) = 0;
+
+  SMTExprRef mkBVRedOr(SMTExprRef Exp) {
+    // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
+    SMTExprRef comp =
+        mkEqual(Exp, mkBitvector(0, Exp->Sort->getBitvectorSortSize()));
+    return mkIte(mkNot(comp), mkBitvector(1, 1), mkBitvector(0, 1));
+  }
+
+  SMTExprRef mkBVRedAnd(SMTExprRef Exp) {
+    // bvredand = bvcomp(x,-1) ? bv1 : bv0;
+    SMTExprRef comp = mkEqual(
+        Exp, mkBitvector(ULLONG_MAX, Exp->Sort->getBitvectorSortSize()));
+    return mkIte(comp, mkBitvector(1, 1), mkBitvector(0, 1));
+  }
 
   /// Creates a floating-point absolute operation
   virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) = 0;
