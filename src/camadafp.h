@@ -26,10 +26,248 @@
 
 namespace camada {
 
-class SMTFPSolverBase : public SMTSolver {
+class SMTFPSolver : public SMTSolver {
 public:
-  SMTFPSolverBase() = default;
-  ~SMTFPSolverBase() = default;
+  SMTFPSolver() = default;
+  ~SMTFPSolver() = default;
+
+  virtual SMTSortRef getRoundingModeSort() override {
+    if (useCamadaFP)
+      return SMTFPSolver::getRoundingModeSortImpl();
+    return getRoundingModeSortImpl();
+  }
+
+  virtual SMTSortRef getFloatSort(const unsigned ExpWidth,
+                                  const unsigned SigWidth) override {
+    if (useCamadaFP)
+      return SMTFPSolver::getFloatSortImpl(ExpWidth, SigWidth);
+    return getFloatSortImpl(ExpWidth, SigWidth);
+  }
+
+  virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPAbsImpl(Exp);
+    return mkFPAbsImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPNegImpl(Exp);
+    return mkFPNegImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPIsInfiniteImpl(Exp);
+    return mkFPIsInfiniteImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPIsNaNImpl(Exp);
+    return mkFPIsNaNImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPIsDenormalImpl(Exp);
+    return mkFPIsDenormalImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPIsNormalImpl(Exp);
+    return mkFPIsNormalImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPIsZeroImpl(Exp);
+    return mkFPIsZeroImpl(Exp);
+  }
+
+  virtual SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                             const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPMulImpl(LHS, RHS, R);
+    return mkFPMulImpl(LHS, RHS, R);
+  }
+
+  virtual SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                             const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPDivImpl(LHS, RHS, R);
+    return mkFPDivImpl(LHS, RHS, R);
+  }
+
+  virtual SMTExprRef mkFPRem(const SMTExprRef &LHS,
+                             const SMTExprRef &RHS) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPRemImpl(LHS, RHS);
+    return mkFPRemImpl(LHS, RHS);
+  }
+
+  virtual SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                             const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPAddImpl(LHS, RHS, R);
+    return mkFPAddImpl(LHS, RHS, R);
+  }
+
+  virtual SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                             const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPSubImpl(LHS, RHS, R);
+    return mkFPSubImpl(LHS, RHS, R);
+  }
+
+  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp,
+                              const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPSqrtImpl(Exp, R);
+    return mkFPSqrtImpl(Exp, R);
+  }
+
+  virtual SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
+                             const SMTExprRef &Z,
+                             const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPFMAImpl(X, Y, Z, R);
+    return mkFPFMAImpl(X, Y, Z, R);
+  };
+
+  virtual SMTExprRef mkFPLt(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPLtImpl(LHS, RHS);
+    return mkFPLtImpl(LHS, RHS);
+  }
+
+  virtual SMTExprRef mkFPLe(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPLeImpl(LHS, RHS);
+    return mkFPLeImpl(LHS, RHS);
+  }
+
+  virtual SMTExprRef mkFPEqual(const SMTExprRef &LHS,
+                               const SMTExprRef &RHS) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPEqualImpl(LHS, RHS);
+    return mkFPEqualImpl(LHS, RHS);
+  }
+
+  virtual SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
+                              const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPtoFPImpl(From, To, R);
+    return mkFPtoFPImpl(From, To, R);
+  }
+
+  virtual SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
+                               const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkSBVtoFPImpl(From, To, R);
+    return mkSBVtoFPImpl(From, To, R);
+  }
+
+  virtual SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
+                               const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkUBVtoFPImpl(From, To, R);
+    return mkUBVtoFPImpl(From, To, R);
+  }
+
+  virtual SMTExprRef mkFPtoSBV(const SMTExprRef &From,
+                               unsigned ToWidth) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPtoSBVImpl(From, ToWidth);
+    return mkFPtoSBVImpl(From, ToWidth);
+  }
+
+  virtual SMTExprRef mkFPtoUBV(const SMTExprRef &From,
+                               unsigned ToWidth) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPtoUBVImpl(From, ToWidth);
+    return mkFPtoUBVImpl(From, ToWidth);
+  }
+
+  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
+                                    RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFPtoIntegralImpl(From, R);
+    return mkFPtoIntegralImpl(From, R);
+  }
+
+  virtual float getFloat(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::getFloatImpl(Exp);
+    return getFloatImpl(Exp);
+  }
+
+  virtual double getDouble(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::getDoubleImpl(Exp);
+    return getDoubleImpl(Exp);
+  }
+
+  virtual bool getInterpretation(const SMTExprRef &Exp, float &Float) override {
+    if (useCamadaFP)
+      return SMTFPSolver::getInterpretationImpl(Exp, Float);
+    return getInterpretationImpl(Exp, Float);
+  }
+
+  virtual bool getInterpretation(const SMTExprRef &Exp,
+                                 double &Double) override {
+    if (useCamadaFP)
+      return SMTFPSolver::getInterpretationImpl(Exp, Double);
+    return getInterpretationImpl(Exp, Double);
+  }
+
+  virtual SMTExprRef mkFloat(const float Float) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkFloatImpl(Float);
+    return mkFloatImpl(Float);
+  }
+
+  virtual SMTExprRef mkDouble(const double Double) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkDoubleImpl(Double);
+    return mkDoubleImpl(Double);
+  }
+
+  virtual SMTExprRef mkRoundingMode(const RoundingMode R) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkRoundingModeImpl(R);
+    return mkRoundingModeImpl(R);
+  }
+
+  virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
+                           const unsigned SigWidth) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkNaNImpl(Sgn, ExpWidth, SigWidth);
+    return mkNaNImpl(Sgn, ExpWidth, SigWidth);
+  }
+
+  virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
+                           const unsigned SigWidth) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkInfImpl(Sgn, ExpWidth, SigWidth);
+    return mkInfImpl(Sgn, ExpWidth, SigWidth);
+  }
+
+  virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
+                                  const SMTSortRef &To) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkBVToIEEEFPImpl(Exp, To);
+    return mkBVToIEEEFPImpl(Exp, To);
+  }
+
+  virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override {
+    if (useCamadaFP)
+      return SMTFPSolver::mkIEEEFPToBVImpl(Exp);
+    return mkIEEEFPToBVImpl(Exp);
+  }
 
 protected:
   virtual SMTSortRef getRoundingModeSortImpl();
@@ -117,255 +355,10 @@ protected:
 
   virtual SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp);
 
-protected:
   SMTExprRef mkToBV(SMTExprRef x, bool is_signed, unsigned int width);
 
   SMTExprRef round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
                    SMTExprRef &Exp, unsigned EWidth, unsigned SWidth);
-};
-
-template <typename SMTSolverImpl> class SMTFPSolver : public SMTFPSolverBase {
-public:
-  SMTFPSolver() = default;
-  virtual ~SMTFPSolver() = default;
-
-  virtual SMTSortRef getRoundingModeSort() override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::getRoundingModeSortImpl();
-    return getRoundingModeSortImpl();
-  }
-
-  virtual SMTSortRef getFloatSort(const unsigned ExpWidth,
-                                  const unsigned SigWidth) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::getFloatSortImpl(ExpWidth, SigWidth);
-    return getFloatSortImpl(ExpWidth, SigWidth);
-  }
-
-  virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPAbsImpl(Exp);
-    return mkFPAbsImpl(Exp);
-  }
-
-  virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPNegImpl(Exp);
-    return mkFPNegImpl(Exp);
-  }
-
-  virtual SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPIsInfiniteImpl(Exp);
-    return mkFPIsInfiniteImpl(Exp);
-  }
-
-  virtual SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPIsNaNImpl(Exp);
-    return mkFPIsNaNImpl(Exp);
-  }
-
-  virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPIsDenormalImpl(Exp);
-    return mkFPIsDenormalImpl(Exp);
-  }
-
-  virtual SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPIsNormalImpl(Exp);
-    return mkFPIsNormalImpl(Exp);
-  }
-
-  virtual SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPIsZeroImpl(Exp);
-    return mkFPIsZeroImpl(Exp);
-  }
-
-  virtual SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPMulImpl(LHS, RHS, R);
-    return mkFPMulImpl(LHS, RHS, R);
-  }
-
-  virtual SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPDivImpl(LHS, RHS, R);
-    return mkFPDivImpl(LHS, RHS, R);
-  }
-
-  virtual SMTExprRef mkFPRem(const SMTExprRef &LHS,
-                             const SMTExprRef &RHS) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPRemImpl(LHS, RHS);
-    return mkFPRemImpl(LHS, RHS);
-  }
-
-  virtual SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPAddImpl(LHS, RHS, R);
-    return mkFPAddImpl(LHS, RHS, R);
-  }
-
-  virtual SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPSubImpl(LHS, RHS, R);
-    return mkFPSubImpl(LHS, RHS, R);
-  }
-
-  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp,
-                              const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPSqrtImpl(Exp, R);
-    return mkFPSqrtImpl(Exp, R);
-  }
-
-  virtual SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                             const SMTExprRef &Z,
-                             const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPFMAImpl(X, Y, Z, R);
-    return mkFPFMAImpl(X, Y, Z, R);
-  };
-
-  virtual SMTExprRef mkFPLt(const SMTExprRef &LHS,
-                            const SMTExprRef &RHS) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPLtImpl(LHS, RHS);
-    return mkFPLtImpl(LHS, RHS);
-  }
-
-  virtual SMTExprRef mkFPLe(const SMTExprRef &LHS,
-                            const SMTExprRef &RHS) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPLeImpl(LHS, RHS);
-    return mkFPLeImpl(LHS, RHS);
-  }
-
-  virtual SMTExprRef mkFPEqual(const SMTExprRef &LHS,
-                               const SMTExprRef &RHS) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPEqualImpl(LHS, RHS);
-    return mkFPEqualImpl(LHS, RHS);
-  }
-
-  virtual SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                              const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPtoFPImpl(From, To, R);
-    return mkFPtoFPImpl(From, To, R);
-  }
-
-  virtual SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkSBVtoFPImpl(From, To, R);
-    return mkSBVtoFPImpl(From, To, R);
-  }
-
-  virtual SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkUBVtoFPImpl(From, To, R);
-    return mkUBVtoFPImpl(From, To, R);
-  }
-
-  virtual SMTExprRef mkFPtoSBV(const SMTExprRef &From,
-                               unsigned ToWidth) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPtoSBVImpl(From, ToWidth);
-    return mkFPtoSBVImpl(From, ToWidth);
-  }
-
-  virtual SMTExprRef mkFPtoUBV(const SMTExprRef &From,
-                               unsigned ToWidth) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPtoUBVImpl(From, ToWidth);
-    return mkFPtoUBVImpl(From, ToWidth);
-  }
-
-  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
-                                    RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFPtoIntegralImpl(From, R);
-    return mkFPtoIntegralImpl(From, R);
-  }
-
-  virtual float getFloat(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::getFloatImpl(Exp);
-    return getFloatImpl(Exp);
-  }
-
-  virtual double getDouble(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::getDoubleImpl(Exp);
-    return getDoubleImpl(Exp);
-  }
-
-  virtual bool getInterpretation(const SMTExprRef &Exp, float &Float) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::getInterpretationImpl(Exp, Float);
-    return getInterpretationImpl(Exp, Float);
-  }
-
-  virtual bool getInterpretation(const SMTExprRef &Exp,
-                                 double &Double) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::getInterpretationImpl(Exp, Double);
-    return getInterpretationImpl(Exp, Double);
-  }
-
-  virtual SMTExprRef mkFloat(const float Float) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkFloatImpl(Float);
-    return mkFloatImpl(Float);
-  }
-
-  virtual SMTExprRef mkDouble(const double Double) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkDoubleImpl(Double);
-    return mkDoubleImpl(Double);
-  }
-
-  virtual SMTExprRef mkRoundingMode(const RoundingMode R) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkRoundingModeImpl(R);
-    return mkRoundingModeImpl(R);
-  }
-
-  virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkNaNImpl(Sgn, ExpWidth, SigWidth);
-    return mkNaNImpl(Sgn, ExpWidth, SigWidth);
-  }
-
-  virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkInfImpl(Sgn, ExpWidth, SigWidth);
-    return mkInfImpl(Sgn, ExpWidth, SigWidth);
-  }
-
-  virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
-                                  const SMTSortRef &To) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkBVToIEEEFPImpl(Exp, To);
-    return mkBVToIEEEFPImpl(Exp, To);
-  }
-
-  virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override {
-    if (useCamadaFP)
-      return SMTFPSolverBase::mkIEEEFPToBVImpl(Exp);
-    return mkIEEEFPToBVImpl(Exp);
-  }
 };
 
 } // namespace camada
