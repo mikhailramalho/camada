@@ -59,7 +59,22 @@ void camada::abortCondWithMessage(bool Cond, const std::string &Msg) {
 }
 
 void camada::SMTSort::dump() const {
-  fmt::printf("SMTSort dump not implemented.\n");
+  std::string k;
+  if (isBooleanSort())
+    k = "Bool";
+  else if (isBitvectorSort())
+    k = "Bitvector";
+  else if (isRoundingModeSort())
+    k = "RoundingMode";
+  else if (isFloatSort())
+    k = "Floating-point";
+
+  fmt::print(stderr, "kind: {}\n", k);
+  fmt::print(stderr, "width: {}", getWidth());
+  if (isFloatSort())
+    fmt::print(stderr, " (exp: {}, sig: {})", getFloatExponentWidth(),
+               getFloatSignificandWidth());
+  fmt::print(stderr, "\n");
 }
 
 void camada::SMTExpr::dump() const {
