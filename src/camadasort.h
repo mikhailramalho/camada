@@ -134,35 +134,35 @@ public:
 
   virtual ~SolverSort() = default;
 
-  virtual bool isBitvectorSort() const {
+  virtual bool isBitvectorSort() const override {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual bool isBooleanSort() const {
+  virtual bool isBooleanSort() const override {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual bool isFloatSort() const {
+  virtual bool isFloatSort() const override {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual bool isRoundingModeSort() const {
+  virtual bool isRoundingModeSort() const override {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual unsigned getBitvectorSortSizeImpl() const {
+  virtual unsigned getBitvectorSortSizeImpl() const override {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual unsigned getFloatSortSizeImpl() const {
+  virtual unsigned getFloatSortSizeImpl() const override {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual unsigned getFloatSignificandSizeImpl() const {
+  virtual unsigned getFloatSignificandSizeImpl() const override {
     abortWithMessage("Unimplemented for current type");
   }
 
-  virtual unsigned getFloatExponentSizeImpl() const {
+  virtual unsigned getFloatExponentSizeImpl() const override {
     abortWithMessage("Unimplemented for current type");
   }
 };
