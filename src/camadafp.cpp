@@ -627,7 +627,104 @@ SMTExprRef SMTFPSolverBase::mkFPSubImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolverBase::mkFPSqrtImpl(const SMTExprRef &Exp,
-                                         const RoundingMode R) {}
+                                         const RoundingMode RM) {
+  unsigned ebits = Exp->Sort->getFloatExponentSize();
+  unsigned sbits = Exp->Sort->getFloatSignificandSize();
+
+  SMTExprRef nan = mkNaN(false, ebits, sbits);
+
+  SMTExprRef x_is_nan = mkFPIsNaN(Exp);
+
+  SMTExprRef zero1 = mkBitvector(0, 1);
+  SMTExprRef one1 = mkBitvector(1, 1);
+
+  // (x is NaN) -> NaN
+  SMTExprRef c1 = x_is_nan;
+  SMTExprRef v1 = Exp;
+
+  // (x is +oo) -> +oo
+  SMTExprRef c2 = mkIsPInf(*this, Exp);
+  SMTExprRef v2 = Exp;
+
+  // (x is +-0) -> +-0
+  SMTExprRef c3 = mkFPIsZero(Exp);
+  SMTExprRef v3 = Exp;
+
+  // (x < 0) -> NaN
+  SMTExprRef c4 = mkIsNeg(*this, Exp);
+  SMTExprRef v4 = nan;
+
+  // else comes the actual square root.
+
+  SMTExprRef a_sgn, a_sig, a_exp, a_lz;
+  unpack(*this, Exp, a_sgn, a_sig, a_exp, a_lz, true);
+
+  assert(a_sig->Sort->getBitvectorSortSize() == sbits);
+  assert(a_exp->Sort->getBitvectorSortSize() == ebits);
+
+  SMTExprRef res_sgn = zero1;
+
+  SMTExprRef real_exp = mkBVSub(mkBVSignExt(1, a_exp), mkBVZeroExt(1, a_lz));
+  SMTExprRef res_exp = mkBVSignExt(2, mkBVExtract(ebits, 1, real_exp));
+
+  SMTExprRef e_is_odd = mkEqual(mkBVExtract(0, 0, real_exp), one1);
+
+  SMTExprRef a_z = mkBVConcat(a_sig, zero1);
+  SMTExprRef z_a = mkBVConcat(zero1, a_sig);
+  SMTExprRef sig_prime = mkIte(e_is_odd, a_z, z_a);
+  assert(sig_prime->Sort->getBitvectorSortSize() == sbits + 1);
+
+  // This is algorithm 10.2 in the Handbook of Floating-Point Arithmetic
+  auto p2 = power2(sbits + 3, false);
+  SMTExprRef Q = mkBitvector(p2, sbits + 5);
+  SMTExprRef R = mkBVSub(mkBVConcat(sig_prime, mkBitvector(0, 4)), Q);
+  SMTExprRef S = Q;
+
+  SMTExprRef T;
+  for (unsigned i = 0; i < sbits + 3; i++) {
+    S = mkBVConcat(zero1, mkBVExtract(sbits + 4, 1, S));
+
+    SMTExprRef twoQ_plus_S =
+        mkBVAdd(mkBVConcat(Q, zero1), mkBVConcat(zero1, S));
+    T = mkBVSub(mkBVConcat(R, zero1), twoQ_plus_S);
+
+    assert(Q->Sort->getBitvectorSortSize() == sbits + 5);
+    assert(R->Sort->getBitvectorSortSize() == sbits + 5);
+    assert(S->Sort->getBitvectorSortSize() == sbits + 5);
+    assert(T->Sort->getBitvectorSortSize() == sbits + 6);
+
+    SMTExprRef T_lsds5 = mkBVExtract(sbits + 5, sbits + 5, T);
+    SMTExprRef t_lt_0 = mkEqual(T_lsds5, one1);
+
+    SMTExprRef Q_or_S = mkBVOr(Q, S);
+    Q = mkIte(t_lt_0, Q, Q_or_S);
+    SMTExprRef R_shftd = mkBVConcat(mkBVExtract(sbits + 3, 0, R), zero1);
+    SMTExprRef T_lsds4 = mkBVExtract(sbits + 4, 0, T);
+    R = mkIte(t_lt_0, R_shftd, T_lsds4);
+  }
+
+  SMTExprRef zero_sbits5 = mkBitvector(0, sbits + 5);
+  SMTExprRef is_exact = mkEqual(R, zero_sbits5);
+
+  SMTExprRef last = mkBVExtract(0, 0, Q);
+  SMTExprRef rest = mkBVExtract(sbits + 3, 1, Q);
+  SMTExprRef rest_ext = mkBVZeroExt(1, rest);
+  SMTExprRef last_ext = mkBVZeroExt(sbits + 3, last);
+  SMTExprRef one_sbits4 = mkBitvector(1, sbits + 4);
+  SMTExprRef sticky = mkIte(is_exact, last_ext, one_sbits4);
+  SMTExprRef res_sig = mkBVOr(rest_ext, sticky);
+
+  assert(res_sig->Sort->getBitvectorSortSize() == sbits + 4);
+
+  SMTExprRef rm = mkRoundingMode(RM);
+  SMTExprRef v5 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+
+  // And finally, we tie them together.
+  SMTExprRef result = mkIte(c4, v4, v5);
+  result = mkIte(c3, v3, result);
+  result = mkIte(c2, v2, result);
+  return mkIte(c1, v1, result);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPFMAImpl(const SMTExprRef &X,
                                         const SMTExprRef &Y,
