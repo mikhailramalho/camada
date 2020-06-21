@@ -293,13 +293,13 @@ SMTExprRef MathSATSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef MathSATSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->getWidth()),
       msat_make_bv_sext(*Context, i, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->getWidth()),
       msat_make_bv_zext(*Context, i, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
@@ -314,9 +314,7 @@ SMTExprRef MathSATSolver::mkBVExtract(unsigned High, unsigned Low,
 SMTExprRef MathSATSolver::mkBVConcat(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(
-      Context,
-      getBitvectorSort(LHS->Sort->getBitvectorSortSize() +
-                       RHS->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(LHS->getWidth() + RHS->getWidth()),
       msat_make_bv_concat(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
                           toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
@@ -451,8 +449,8 @@ SMTExprRef MathSATSolver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_cast(*Context, To->getFloatExponentSize(),
-                        To->getFloatSignificandSize(),
+      msat_make_fp_cast(*Context, To->getFloatExponentWidth(),
+                        To->getFloatSignificandWidth(),
                         toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                         toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -463,8 +461,8 @@ SMTExprRef MathSATSolver::mkSBVtoFP(const SMTExprRef &From,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_sbv(*Context, To->getFloatExponentSize(),
-                            To->getFloatSignificandSize(),
+      msat_make_fp_from_sbv(*Context, To->getFloatExponentWidth(),
+                            To->getFloatSignificandWidth(),
                             toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -475,8 +473,8 @@ SMTExprRef MathSATSolver::mkUBVtoFP(const SMTExprRef &From,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_ubv(*Context, To->getFloatExponentSize(),
-                            To->getFloatSignificandSize(),
+      msat_make_fp_from_ubv(*Context, To->getFloatExponentWidth(),
+                            To->getFloatSignificandWidth(),
                             toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -677,13 +675,13 @@ SMTExprRef MathSATSolver::mkBVToIEEEFP(const SMTExprRef &Exp,
                                        const SMTSortRef &To) {
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_ieeebv(*Context, To->getFloatExponentSize(),
-                               To->getFloatSignificandSize() - 1,
+      msat_make_fp_from_ieeebv(*Context, To->getFloatExponentWidth(),
+                               To->getFloatSignificandWidth() - 1,
                                toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkIEEEFPToBV(const SMTExprRef &Exp) {
-  SMTSortRef to = getBitvectorSort(Exp->Sort->getFloatSortSize());
+  SMTSortRef to = getBitvectorSort(Exp->getWidth());
   return newExprRef(MathSATExpr(
       Context, to,
       msat_make_fp_as_ieeebv(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));

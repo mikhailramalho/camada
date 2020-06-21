@@ -52,6 +52,9 @@ public:
   /// Returns true if the expr sort is rounding mode
   virtual bool isRoundingModeSort() = 0;
 
+  /// Returns this expr's sort width
+  unsigned getWidth() { return Sort->getWidth(); }
+
   virtual void dump() const;
 
 protected:

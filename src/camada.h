@@ -202,15 +202,13 @@ public:
 
   SMTExprRef mkBVRedOr(SMTExprRef Exp) {
     // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
-    SMTExprRef comp =
-        mkEqual(Exp, mkBitvector(0, Exp->Sort->getBitvectorSortSize()));
+    SMTExprRef comp = mkEqual(Exp, mkBitvector(0, Exp->getWidth()));
     return mkIte(mkNot(comp), mkBitvector(1, 1), mkBitvector(0, 1));
   }
 
   SMTExprRef mkBVRedAnd(SMTExprRef Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(
-        Exp, mkBitvector(ULLONG_MAX, Exp->Sort->getBitvectorSortSize()));
+    SMTExprRef comp = mkEqual(Exp, mkBitvector(ULLONG_MAX, Exp->getWidth()));
     return mkIte(comp, mkBitvector(1, 1), mkBitvector(0, 1));
   }
 

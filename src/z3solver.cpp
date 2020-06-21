@@ -261,15 +261,13 @@ SMTExprRef Z3Solver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 }
 
 SMTExprRef Z3Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      Z3Expr(Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
-             z3::sext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
+  return newExprRef(Z3Expr(Context, getBitvectorSort(i + Exp->getWidth()),
+                           z3::sext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      Z3Expr(Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
-             z3::zext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
+  return newExprRef(Z3Expr(Context, getBitvectorSort(i + Exp->getWidth()),
+                           z3::zext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVExtract(unsigned High, unsigned Low,
@@ -280,8 +278,7 @@ SMTExprRef Z3Solver::mkBVExtract(unsigned High, unsigned Low,
 
 SMTExprRef Z3Solver::mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context,
-                           getBitvectorSort(LHS->Sort->getBitvectorSortSize() +
-                                            RHS->Sort->getBitvectorSortSize()),
+                           getBitvectorSort(LHS->getWidth() + RHS->getWidth()),
                            z3::concat(toSolverExpr<Z3Expr>(*LHS).Expr,
                                       toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
@@ -681,7 +678,7 @@ SMTExprRef Z3Solver::mkBVToIEEEFP(const SMTExprRef &Exp, const SMTSortRef &To) {
 }
 
 SMTExprRef Z3Solver::mkIEEEFPToBV(const SMTExprRef &Exp) {
-  SMTSortRef to = getBitvectorSort(Exp->Sort->getFloatSortSize());
+  SMTSortRef to = getBitvectorSort(Exp->getWidth());
   return newExprRef(Z3Expr(
       Context, to,
       z3::to_expr(*Context, Z3_mk_fpa_to_ieee_bv(

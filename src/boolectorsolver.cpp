@@ -306,13 +306,13 @@ SMTExprRef BtorSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef BtorSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->getWidth()),
       boolector_sext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBitvectorSort(i + Exp->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(i + Exp->getWidth()),
       boolector_uext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
@@ -327,9 +327,7 @@ SMTExprRef BtorSolver::mkBVExtract(unsigned High, unsigned Low,
 SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(BtorExpr(
-      Context,
-      getBitvectorSort(LHS->Sort->getBitvectorSortSize() +
-                       RHS->Sort->getBitvectorSortSize()),
+      Context, getBitvectorSort(LHS->getWidth() + RHS->getWidth()),
       boolector_concat(Context->Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                        toSolverExpr<BtorExpr>(*RHS).Expr)));
 }

@@ -44,22 +44,16 @@ public:
   /// Returns true if the sort is a rounding mode.
   virtual bool isRoundingModeSort() const;
 
-  /// Returns the bitvector size, fails if the sort is not a bitvector or if the
-  /// size is zero. Calls getBitvectorSortSizeImpl().
-  virtual unsigned getBitvectorSortSize() const;
+  /// Returns the sort width.
+  virtual unsigned getWidth() const;
 
-  /// Returns the floating-point size, fails if the sort is not a floating-point
-  /// floating-point or if the size is zero. Calls getFloatSortSizeImpl().
-  virtual unsigned getFloatSortSize() const;
+  /// Returns the floating-point significand width, fails if the sort is not a
+  /// floating-point.
+  virtual unsigned getFloatSignificandWidth() const;
 
-  /// Returns the floating-point significand size, fails if the sort is not a
-  /// floating-point or if the size is zero. Calls
-  /// getFloatSignificandSizeImpl().
-  virtual unsigned getFloatSignificandSize() const;
-
-  /// Returns the floating-point exponent size, fails if the sort is not a
-  /// floating-point or if the size is zero. Calls getFloatExponentSizeImpl().
-  virtual unsigned getFloatExponentSize() const;
+  /// Returns the floating-point exponent width, fails if the sort is not a
+  /// floating-point.
+  virtual unsigned getFloatExponentWidth() const;
 
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
@@ -68,17 +62,11 @@ public:
   virtual void dump() const;
 
 protected:
-  /// Returns the bitvector sort bit width.
-  virtual unsigned getBitvectorSortSizeImpl() const;
-
-  /// Returns the floating-point sort bit width.
-  virtual unsigned getFloatSortSizeImpl() const;
-
   /// Returns the floating-point sort significand bit width.
-  virtual unsigned getFloatSignificandSizeImpl() const;
+  virtual unsigned getFloatSignificandWidthImpl() const;
 
   /// Returns the floating-point sort exponent bit width.
-  virtual unsigned getFloatExponentSizeImpl() const;
+  virtual unsigned getFloatExponentWidthImpl() const;
 };
 
 /// Template to hold Solver specific Context and Sort
@@ -107,9 +95,9 @@ public:
       : SolverSortBase(C, S), Width(W) {}
   virtual ~SolverBVSort() = default;
 
-  virtual bool isBitvectorSort() const { return true; }
+  virtual bool isBitvectorSort() const override { return true; }
 
-  virtual unsigned getBitvectorSortSize() const { return Width; }
+  virtual unsigned getWidth() const override { return Width; }
 };
 
 template <typename SolverSortBase>
@@ -120,9 +108,9 @@ public:
       : SolverSortBase(C, S) {}
   virtual ~SolverBoolSort() = default;
 
-  virtual bool isBooleanSort() const { return true; }
+  virtual bool isBooleanSort() const override { return true; }
 
-  virtual unsigned getBitvectorSortSize() const { return 1; }
+  virtual unsigned getWidth() const override { return 1; }
 };
 
 template <typename SolverSortBase> class SolverFPSort : public SolverSortBase {
@@ -135,13 +123,17 @@ public:
       : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
   virtual ~SolverFPSort() = default;
 
-  virtual bool isFloatSort() const { return true; }
+  virtual bool isFloatSort() const override { return true; }
 
-  virtual unsigned getFloatSortSize() const { return ExpWidth + SigWidth; }
+  virtual unsigned getWidth() const override { return ExpWidth + SigWidth; }
 
-  virtual unsigned getFloatSignificandSize() const { return SigWidth; }
+  virtual unsigned getFloatSignificandWidthImpl() const override {
+    return SigWidth;
+  }
 
-  virtual unsigned getFloatExponentSize() const { return ExpWidth; }
+  virtual unsigned getFloatExponentWidthImpl() const override {
+    return ExpWidth;
+  }
 };
 
 template <typename SolverSortBase> class SolverRMSort : public SolverSortBase {
@@ -151,7 +143,7 @@ public:
       : SolverSortBase(C, S) {}
   virtual ~SolverRMSort() = default;
 
-  virtual bool isRoundingModeSort() const { return true; }
+  virtual bool isRoundingModeSort() const override { return true; }
 };
 
 /// Shared pointer for SMTSorts, used by SMTSolver API.
