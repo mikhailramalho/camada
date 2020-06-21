@@ -283,7 +283,9 @@ SMTExprRef SMTFPSolverBase::mkFPAddImpl(const SMTExprRef &LHS,
 
 SMTExprRef SMTFPSolverBase::mkFPSubImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS,
-                                        const RoundingMode R) {}
+                                        const RoundingMode R) {
+  return mkFPAdd(LHS, mkFPNeg(RHS), R);
+}
 
 SMTExprRef SMTFPSolverBase::mkFPSqrtImpl(const SMTExprRef &Exp,
                                          const RoundingMode R) {}
