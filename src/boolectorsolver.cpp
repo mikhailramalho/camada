@@ -386,7 +386,7 @@ SMTExprRef BtorSolver::mkBoolean(const bool b) {
 
 SMTExprRef BtorSolver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
   // Prevent creating a bitvector with size greater than the bitwidth
-  int64_t newInt = Int & (1 << Sort->getWidth()) - 1;
+  int64_t newInt = Int & ((1 << Sort->getWidth()) - 1);
 
   return newExprRef(BtorExpr(
       Context, Sort,
