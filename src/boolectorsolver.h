@@ -22,7 +22,7 @@
 #ifndef BOOLECTORSOLVER_H_
 #define BOOLECTORSOLVER_H_
 
-#include "camada.h"
+#include "camadafp.h"
 
 #include <unordered_map>
 
@@ -60,7 +60,7 @@ public:
   void dump() const override;
 }; // end class BtorExpr
 
-class BtorSolver : public camada::SMTSolver {
+class BtorSolver : public camada::SMTFPSolver {
 public:
   BtorContextRef Context;
 
@@ -78,11 +78,6 @@ public:
   camada::SMTSortRef getBoolSort() override;
 
   camada::SMTSortRef getBitvectorSort(unsigned BitWidth) override;
-
-  camada::SMTSortRef getRoundingModeSort() override;
-
-  SMTSortRef getFloatSort(const unsigned ExpWidth,
-                          const unsigned SigWidth) override;
 
   SMTSortRef getBVFloatSort(const unsigned ExpWidth,
                             const unsigned SigWidth) override;
@@ -186,77 +181,11 @@ public:
   camada::SMTExprRef mkBVConcat(const camada::SMTExprRef &LHS,
                                 const camada::SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPAbs(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPNeg(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
-
-  SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
-
-  SMTExprRef mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
-
-  SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
-
-  SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RoundingMode R) override;
-
-  SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                     const SMTExprRef &Z, const RoundingMode R) override;
-
-  SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                      const RoundingMode R) override;
-
-  SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RoundingMode R) override;
-
-  SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RoundingMode R) override;
-
-  SMTExprRef mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) override;
-
-  SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) override;
-
-  SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) override;
-
   bool getBoolean(const camada::SMTExprRef &Exp) override;
 
   int64_t getBitvector(const camada::SMTExprRef &Exp) override;
 
-  float getFloat(const camada::SMTExprRef &Exp) override;
-
-  double getDouble(const camada::SMTExprRef &Exp) override;
-
   bool getInterpretation(const camada::SMTExprRef &Exp, int64_t &Int) override;
-
-  bool getInterpretation(const SMTExprRef &Exp, float &Float) override;
-
-  bool getInterpretation(const SMTExprRef &Exp, double &Double) override;
 
   camada::SMTExprRef mkBoolean(const bool b) override;
 
@@ -265,22 +194,6 @@ public:
 
   camada::SMTExprRef mkSymbol(const char *Name,
                               camada::SMTSortRef Sort) override;
-
-  SMTExprRef mkFloat(const float Float) override;
-
-  SMTExprRef mkDouble(const double Double) override;
-
-  SMTExprRef mkRoundingMode(const RoundingMode R) override;
-
-  SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override;
-
-  SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override;
-
-  SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp, const SMTSortRef &To) override;
-
-  SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override;
 
   camada::checkResult check() override;
 

@@ -95,14 +95,6 @@ SMTSortRef YicesSolver::getBitvectorSort(unsigned BitWidth) {
                                       yices_bv_type(BitWidth)));
 }
 
-SMTSortRef YicesSolver::getRoundingModeSort() {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTSortRef YicesSolver::getFloatSort(const unsigned, const unsigned) {
-  abortWithMessage("Yices does not support fp");
-}
-
 SMTSortRef YicesSolver::getBVRoundingModeSort() {
   return newSortRef<camada::SolverRMSort<YicesSort>>(
       camada::SolverRMSort<YicesSort>(Context, yices_bv_type(3)));
@@ -329,114 +321,6 @@ SMTExprRef YicesSolver::mkBVConcat(const SMTExprRef &LHS,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
-SMTExprRef YicesSolver::mkFPAbs(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPNeg(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPIsInfinite(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPIsNaN(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPIsDenormal(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPIsNormal(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPIsZero(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPMul(const SMTExprRef &, const SMTExprRef &,
-                                const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPDiv(const SMTExprRef &, const SMTExprRef &,
-                                const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPRem(const SMTExprRef &, const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPAdd(const SMTExprRef &, const SMTExprRef &,
-                                const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPSub(const SMTExprRef &, const SMTExprRef &,
-                                const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPSqrt(const SMTExprRef &, const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPFMA(const SMTExprRef &, const SMTExprRef &,
-                                const SMTExprRef &, const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPLt(const SMTExprRef &, const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPGt(const SMTExprRef &, const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPLe(const SMTExprRef &, const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPGe(const SMTExprRef &, const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPEqual(const SMTExprRef &, const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPtoFP(const SMTExprRef &, const SMTSortRef &,
-                                 const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkSBVtoFP(const SMTExprRef &, const SMTSortRef &,
-                                  const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkUBVtoFP(const SMTExprRef &, const SMTSortRef &,
-                                  const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPtoSBV(const SMTExprRef &, unsigned) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPtoUBV(const SMTExprRef &, unsigned) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkFPtoIntegral(const SMTExprRef &, RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
 bool YicesSolver::getBoolean(const SMTExprRef &Exp) {
   int32_t val;
   auto res = yices_get_bool_value(yices_get_model(Context->Context, 1),
@@ -461,26 +345,10 @@ int64_t YicesSolver::getBitvector(const SMTExprRef &Exp) {
   return val;
 }
 
-float YicesSolver::getFloat(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-double YicesSolver::getDouble(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
 bool YicesSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
   // TODO: Boolector never fails?
   Inter = getBitvector(Exp);
   return true;
-}
-
-bool YicesSolver::getInterpretation(const SMTExprRef &, float &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-bool YicesSolver::getInterpretation(const SMTExprRef &, double &) {
-  abortWithMessage("Yices does not support fp");
 }
 
 SMTExprRef YicesSolver::mkBoolean(const bool b) {
@@ -517,34 +385,6 @@ SMTExprRef YicesSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
   abortCondWithMessage(inserted.second, "Could not cache new Yices variable");
 
   return inserted.first->second;
-}
-
-SMTExprRef YicesSolver::mkFloat(const float) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkDouble(const double) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkRoundingMode(const RoundingMode) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkNaN(const bool, const unsigned, const unsigned) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkInf(const bool, const unsigned, const unsigned) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkBVToIEEEFP(const SMTExprRef &, const SMTSortRef &) {
-  abortWithMessage("Yices does not support fp");
-}
-
-SMTExprRef YicesSolver::mkIEEEFPToBV(const SMTExprRef &) {
-  abortWithMessage("Yices does not support fp");
 }
 
 checkResult YicesSolver::check() {

@@ -22,7 +22,7 @@
 #ifndef MATHSATSOLVER_H_
 #define MATHSATSOLVER_H_
 
-#include "camada.h"
+#include "camadafp.h"
 
 #include <mathsat.h>
 
@@ -50,7 +50,7 @@ public:
   void dump() const override;
 }; // end class MathSATExpr
 
-class MathSATSolver : public camada::SMTSolver {
+class MathSATSolver : public camada::SMTFPSolver {
 public:
   MathSATContextRef Context;
 
