@@ -254,9 +254,10 @@ SMTExprRef Z3Solver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 }
 
 SMTExprRef Z3Solver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(Context, getBoolSort(),
-                           toSolverExpr<Z3Expr>(*LHS).Expr ||
-                               toSolverExpr<Z3Expr>(*RHS).Expr));
+  return newExprRef(Z3Expr(
+      Context, LHS->Sort,
+      z3::to_expr(*Context, Z3_mk_xor(*Context, toSolverExpr<Z3Expr>(*LHS).Expr,
+                                      toSolverExpr<Z3Expr>(*RHS).Expr))));
 }
 
 SMTExprRef Z3Solver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
