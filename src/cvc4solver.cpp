@@ -644,24 +644,6 @@ double CVC4Solver::getDouble(const SMTExprRef &Exp) {
   return result;
 }
 
-bool CVC4Solver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
-  // TODO: CVC4 never fails?
-  Inter = getBitvector(Exp);
-  return true;
-}
-
-bool CVC4Solver::getInterpretation(const SMTExprRef &Exp, float &Float) {
-  // TODO: CVC4 never fails?
-  Float = getFloat(Exp);
-  return true;
-}
-
-bool CVC4Solver::getInterpretation(const SMTExprRef &Exp, double &Double) {
-  // TODO: CVC4 never fails?
-  Double = getDouble(Exp);
-  return true;
-}
-
 SMTExprRef CVC4Solver::mkBool(const bool b) {
   return newExprRef(CVC4Expr(Context, getBoolSort(), Context->mkConst(b)));
 }

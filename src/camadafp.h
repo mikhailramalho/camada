@@ -211,19 +211,6 @@ public:
     return getDoubleImpl(Exp);
   }
 
-  virtual bool getInterpretation(const SMTExprRef &Exp, float &Float) override {
-    if (useCamadaFP)
-      return SMTFPSolver::getInterpretationImpl(Exp, Float);
-    return getInterpretationImpl(Exp, Float);
-  }
-
-  virtual bool getInterpretation(const SMTExprRef &Exp,
-                                 double &Double) override {
-    if (useCamadaFP)
-      return SMTFPSolver::getInterpretationImpl(Exp, Double);
-    return getInterpretationImpl(Exp, Double);
-  }
-
   virtual SMTExprRef mkFloat(const float Float) override {
     if (useCamadaFP)
       return SMTFPSolver::mkFloatImpl(Float);
@@ -333,10 +320,6 @@ protected:
   virtual float getFloatImpl(const SMTExprRef &Exp);
 
   virtual double getDoubleImpl(const SMTExprRef &Exp);
-
-  virtual bool getInterpretationImpl(const SMTExprRef &Exp, float &Float);
-
-  virtual bool getInterpretationImpl(const SMTExprRef &Exp, double &Double);
 
   virtual SMTExprRef mkFloatImpl(const float Float);
 

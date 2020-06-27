@@ -1874,18 +1874,6 @@ double SMTFPSolver::getDoubleImpl(const SMTExprRef &Exp) {
   return getFP<double>(*this, Exp);
 }
 
-bool SMTFPSolver::getInterpretationImpl(const SMTExprRef &Exp, float &Float) {
-  // TODO: never fails?
-  Float = getFloat(Exp);
-  return true;
-}
-
-bool SMTFPSolver::getInterpretationImpl(const SMTExprRef &Exp, double &Double) {
-  // TODO: never fails?
-  Double = getDouble(Exp);
-  return true;
-}
-
 template <typename FPType, typename IntType>
 static inline IntType FPasInt(const FPType FP) {
   // Convert the integer to float/double

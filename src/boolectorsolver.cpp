@@ -370,12 +370,6 @@ int64_t BtorSolver::getBitvector(const SMTExprRef &Exp) {
   return finval;
 }
 
-bool BtorSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
-  // TODO: Boolector never fails?
-  Inter = getBitvector(Exp);
-  return true;
-}
-
 SMTExprRef BtorSolver::mkBool(const bool b) {
   return newExprRef(BtorExpr(Context, getBoolSort(),
                              b ? boolector_true(Context->Context)

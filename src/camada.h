@@ -321,15 +321,6 @@ public:
   /// symbol as double
   virtual double getDouble(const SMTExprRef &Exp) = 0;
 
-  /// Given an expression, extract the value of this operand in the model.
-  virtual bool getInterpretation(const SMTExprRef &Exp, int64_t &Int) = 0;
-
-  /// Given an expression extract the value of this operand in the model.
-  virtual bool getInterpretation(const SMTExprRef &Exp, float &Float) = 0;
-
-  /// Given an expression extract the value of this operand in the model.
-  virtual bool getInterpretation(const SMTExprRef &Exp, double &Double) = 0;
-
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
 

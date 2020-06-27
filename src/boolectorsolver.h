@@ -185,8 +185,6 @@ public:
 
   int64_t getBitvector(const camada::SMTExprRef &Exp) override;
 
-  bool getInterpretation(const camada::SMTExprRef &Exp, int64_t &Int) override;
-
   camada::SMTExprRef mkBool(const bool b) override;
 
   camada::SMTExprRef mkBitvector(const int64_t Int,

@@ -17,8 +17,7 @@ inline void equal_ten(const camada::SMTSolverRef &solver) {
   // And check for satisfiability
   REQUIRE(solver->check() == camada::checkResult::SAT);
 
-  int64_t f_res;
-  REQUIRE(solver->getInterpretation(f, f_res));
-  REQUIRE(f_res == solver->getBitvector(ten));
+  int64_t f_res = solver->getBitvector(f);
   REQUIRE(f_res == 10);
+  REQUIRE(f_res == solver->getBitvector(ten));
 }

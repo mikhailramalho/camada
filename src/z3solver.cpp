@@ -530,9 +530,21 @@ bool Z3Solver::getBool(const SMTExprRef &Exp) {
   return toSolverExpr<Z3Expr>(*Exp).Expr.bool_value();
 }
 
+static inline bool hasZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
+  return S.Solver.get_model().has_interp(
+      toSolverExpr<Z3Expr>(*Exp).Expr.decl());
+}
+
+static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
+  return S.newExprRef(Z3Expr(S.Context, Exp->Sort,
+                             S.Solver.get_model().get_const_interp(
+                                 toSolverExpr<Z3Expr>(*Exp).Expr.decl())));
+}
+
 int64_t Z3Solver::getBitvector(const SMTExprRef &Exp) {
+  SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   int64_t bv;
-  bool is_num = toSolverExpr<Z3Expr>(*Exp).Expr.is_numeral_i64(bv);
+  bool is_num = toSolverExpr<Z3Expr>(*value).Expr.is_numeral_i64(bv);
   camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
   return bv;
 }
@@ -571,48 +583,15 @@ static inline FPType getFP(const Z3ContextRef &C, const z3::model &Model,
 }
 
 float Z3Solver::getFloat(const SMTExprRef &Exp) {
+  SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   return getFP<float, int32_t, Z3_get_numeral_int>(Context, Solver.get_model(),
-                                                   Exp);
+                                                   value);
 }
 
 double Z3Solver::getDouble(const SMTExprRef &Exp) {
-  return getFP<double, int64_t, Z3_get_numeral_int64>(Context,
-                                                      Solver.get_model(), Exp);
-}
-
-static inline bool hasZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
-  return S.Solver.get_model().has_interp(
-      toSolverExpr<Z3Expr>(*Exp).Expr.decl());
-}
-
-static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
-  return S.newExprRef(Z3Expr(S.Context, Exp->Sort,
-                             S.Solver.get_model().get_const_interp(
-                                 toSolverExpr<Z3Expr>(*Exp).Expr.decl())));
-}
-
-bool Z3Solver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
-  if (!hasZ3Interp(*this, Exp))
-    return false;
-
-  Inter = getBitvector(getZ3Interp(*this, Exp));
-  return true;
-}
-
-bool Z3Solver::getInterpretation(const SMTExprRef &Exp, float &Float) {
-  if (!hasZ3Interp(*this, Exp))
-    return false;
-
-  Float = getFloat(getZ3Interp(*this, Exp));
-  return true;
-}
-
-bool Z3Solver::getInterpretation(const SMTExprRef &Exp, double &Double) {
-  if (!hasZ3Interp(*this, Exp))
-    return false;
-
-  Double = getDouble(getZ3Interp(*this, Exp));
-  return true;
+  SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
+  return getFP<double, int64_t, Z3_get_numeral_int64>(
+      Context, Solver.get_model(), value);
 }
 
 SMTExprRef Z3Solver::mkBool(const bool b) {

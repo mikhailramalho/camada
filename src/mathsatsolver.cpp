@@ -580,24 +580,6 @@ double MathSATSolver::getDouble(const SMTExprRef &Exp) {
   });
 }
 
-bool MathSATSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
-  // TODO: MathSAT never fails?
-  Inter = getBitvector(Exp);
-  return true;
-}
-
-bool MathSATSolver::getInterpretation(const SMTExprRef &Exp, float &Float) {
-  // TODO: MathSAT never fails?
-  Float = getFloat(Exp);
-  return true;
-}
-
-bool MathSATSolver::getInterpretation(const SMTExprRef &Exp, double &Double) {
-  // TODO: MathSAT never fails?
-  Double = getDouble(Exp);
-  return true;
-}
-
 SMTExprRef MathSATSolver::mkBool(const bool Bool) {
   return newExprRef(
       MathSATExpr(Context, getBoolSort(),

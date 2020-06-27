@@ -345,12 +345,6 @@ int64_t YicesSolver::getBitvector(const SMTExprRef &Exp) {
   return val;
 }
 
-bool YicesSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
-  // TODO: Boolector never fails?
-  Inter = getBitvector(Exp);
-  return true;
-}
-
 SMTExprRef YicesSolver::mkBool(const bool b) {
   return newExprRef(
       YicesExpr(Context, getBoolSort(), b ? yices_true() : yices_false()));
