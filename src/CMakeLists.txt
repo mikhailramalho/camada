@@ -25,7 +25,6 @@ set(libcamada_src_files camada.cpp camadafp.cpp)
 compile_solver(${CAMADA_AVAILABLE_SOLVERS})
 
 add_library(camada ${libcamada_src_files})
-target_compile_definitions(camada PRIVATE "-DFMT_HEADER_ONLY")
 target_link_libraries(camada PRIVATE ${CAMADA_SOLVER_LIBS})
 
 target_include_directories(camada INTERFACE

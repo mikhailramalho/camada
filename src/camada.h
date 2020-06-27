@@ -24,7 +24,6 @@
 
 #include <climits>
 #include <memory>
-#include <string>
 
 #include "camadaexpr.h"
 #include "camadasort.h"

@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build libfmt-dev
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup boolector
@@ -31,7 +31,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build libfmt-dev
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Z3
@@ -48,7 +48,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install libgmp-dev cmake linux-libc-dev ninja-build libfmt-dev
+      run: sudo apt-get update && sudo apt-get install libgmp-dev cmake linux-libc-dev ninja-build
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup MathSAT
@@ -65,7 +65,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build libfmt-dev
+      run: sudo apt-get update && sudo apt-get install gperf libgmp-dev cmake linux-libc-dev ninja-build
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Yices 2 (GMP)
@@ -84,7 +84,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build libfmt-dev && pip install toml
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build && pip install toml
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup CVC4

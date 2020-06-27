@@ -22,14 +22,15 @@
 #include "z3solver.h"
 #include "ac_config.h"
 
-#include <fmt/printf.h>
+#include <cmath>
+#include <cstring>
 
 using namespace camada;
 
 #ifdef SOLVER_Z3_ENABLED
 
 void Z3Sort::dump() const {
-  fmt::print(stderr, "{}\n", Z3_sort_to_string(*Context, Sort));
+  std::cerr << Z3_sort_to_string(*Context, Sort) << '\n';
 }
 
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
@@ -39,13 +40,13 @@ bool Z3Expr::equal_to(SMTExpr const &Other) const {
 }
 
 void Z3Expr::dump() const {
-  fmt::print(stderr, "{}\n", Z3_ast_to_string(*Context, Expr));
+  std::cerr << Z3_ast_to_string(*Context, Expr) << '\n';
 }
 
 // Function used to report errors
 void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
-  fmt::print(stderr, "Z3 error: {}\n",
-             std::string(Z3_get_error_msg(Context, Error)));
+  std::cerr << "Z3 error" << std::string(Z3_get_error_msg(Context, Error))
+            << '\n';
 }
 
 Z3Solver::Z3Solver()
@@ -713,11 +714,11 @@ checkResult Z3Solver::check() {
 void Z3Solver::reset() { Solver.reset(); }
 
 void Z3Solver::dump() {
-  fmt::print(stderr, "{}\n", Z3_solver_to_string(*Context, Solver));
+  std::cerr << Z3_solver_to_string(*Context, Solver) << '\n';
 }
 
 void Z3Solver::dumpModel() {
-  fmt::print(stderr, "{}\n", Z3_model_to_string(*Context, Solver.get_model()));
+  std::cerr << Z3_model_to_string(*Context, Solver.get_model()) << '\n';
 }
 
 #endif

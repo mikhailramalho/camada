@@ -22,8 +22,6 @@
 #include "boolectorsolver.h"
 #include "ac_config.h"
 
-#include <fmt/printf.h>
-
 using namespace camada;
 
 #ifdef SOLVER_BOOLECTOR_ENABLED

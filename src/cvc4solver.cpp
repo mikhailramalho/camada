@@ -22,13 +22,13 @@
 #include "cvc4solver.h"
 #include "ac_config.h"
 
-#include <fmt/printf.h>
+#include <cmath>
 
 using namespace camada;
 
 #ifdef SOLVER_CVC4_ENABLED
 
-void CVC4Sort::dump() const { fmt::print(stderr, "{}\n", Sort.toString()); }
+void CVC4Sort::dump() const { std::cerr << Sort.toString() << '\n'; }
 
 bool CVC4Expr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort)
@@ -36,7 +36,7 @@ bool CVC4Expr::equal_to(SMTExpr const &Other) const {
   return (Expr == dynamic_cast<const CVC4Expr &>(Other).Expr);
 }
 
-void CVC4Expr::dump() const { fmt::print(stderr, "{}\n", Expr.toString()); }
+void CVC4Expr::dump() const { std::cerr << Expr.toString() << '\n'; }
 
 CVC4Solver::CVC4Solver()
     : Context(std::make_shared<CVC4::ExprManager>()), Solver(Context.get()) {

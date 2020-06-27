@@ -22,7 +22,7 @@
 #include "yicessolver.h"
 #include "ac_config.h"
 
-#include <fmt/printf.h>
+#include <iostream>
 
 using namespace camada;
 
@@ -54,7 +54,7 @@ void YicesContext::reset() {
 
 void YicesSort::dump() const {
   char *ty_str = yices_type_to_string(Sort, 160, 80, 0);
-  fmt::print(stderr, "{}\n", ty_str);
+  std::cerr << ty_str << '\n';
   yices_free_string(ty_str);
 }
 
@@ -66,7 +66,7 @@ bool YicesExpr::equal_to(SMTExpr const &Other) const {
 
 void YicesExpr::dump() const {
   char *term_str = yices_term_to_string(Expr, 160, 80, 0);
-  fmt::print(stderr, "{}\n", term_str);
+  std::cerr << term_str << '\n';
   yices_free_string(term_str);
 }
 
@@ -403,7 +403,7 @@ void YicesSolver::reset() { Context->reset(); }
 void YicesSolver::dumpModel() {
   char *model_str =
       yices_model_to_string(yices_get_model(Context->Context, 1), 160, 80, 0);
-  fmt::print(stderr, "{}\n", model_str);
+  std::cerr << model_str << '\n';
   yices_free_string(model_str);
 }
 

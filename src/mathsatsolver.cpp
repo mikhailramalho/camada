@@ -22,8 +22,9 @@
 #include "mathsatsolver.h"
 #include "ac_config.h"
 
-#include <fmt/printf.h>
+#include <cstring>
 #include <gmp.h>
+#include <iostream>
 
 using namespace camada;
 
@@ -31,7 +32,7 @@ using namespace camada;
 
 void MathSATSort::dump() const {
   char *s = msat_type_repr(Sort);
-  fmt::print(stderr, "{}\n", s);
+  std::cerr << s << '\n';
   msat_free(s);
 }
 
@@ -44,7 +45,7 @@ bool MathSATExpr::equal_to(SMTExpr const &Other) const {
 
 void MathSATExpr::dump() const {
   char *ast = msat_to_smtlib2(*Context, Expr);
-  fmt::print(stderr, "{}\n", ast);
+  std::cerr << ast << '\n';
   msat_free(ast);
 }
 
@@ -720,7 +721,7 @@ void MathSATSolver::dump() {
       msat_get_asserted_formulas(*Context, &num_of_asserted);
 
   for (unsigned i = 0; i < num_of_asserted; i++)
-    fmt::print(stderr, "{}\n", msat_to_smtlib2(*Context, asserted_formulas[i]));
+    std::cerr << msat_to_smtlib2(*Context, asserted_formulas[i]) << '\n';
   msat_free(asserted_formulas);
 }
 
@@ -731,18 +732,17 @@ void MathSATSolver::dumpModel() {
   abortCondWithMessage(!MSAT_ERROR_MODEL_ITERATOR(iter),
                        "Error when getting model iterator");
 
-  fmt::print(stderr, "Model:\n");
   while (msat_model_iterator_has_next(iter)) {
     msat_term t, v;
     char *s;
     msat_model_iterator_next(iter, &t, &v);
     s = msat_term_repr(t);
     abortCondWithMessage(s, "Error when getting variable from model");
-    fmt::print(stderr, "{} = ", s);
+    std::cerr << s << " = ";
     msat_free(s);
     s = msat_term_repr(v);
     abortCondWithMessage(s, "Error when getting variable value from model");
-    fmt::print(stderr, "{}\n", s);
+    std::cerr << s << '\n';
     msat_free(s);
   }
   msat_destroy_model_iterator(iter);

@@ -107,9 +107,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Build only shared by default
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 
-# Check for required packages
-find_package(fmt REQUIRED)
-
 #-----------------------------------------------------------------------------#
 # Solvers
 
