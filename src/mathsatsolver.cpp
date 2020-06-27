@@ -296,7 +296,7 @@ SMTExprRef MathSATSolver::mkEqual(const SMTExprRef &LHS,
 
 SMTExprRef MathSATSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                                 const SMTExprRef &F) {
-  if (T->isBooleanSort())
+  if (T->isBoolSort())
     return mkOr(mkAnd(Cond, T), mkAnd(mkNot(Cond), F));
 
   return newExprRef(MathSATExpr(
@@ -520,14 +520,14 @@ SMTExprRef MathSATSolver::mkFPtoIntegral(const SMTExprRef &From,
                                 toSolverExpr<MathSATExpr>(*From).Expr)));
 }
 
-bool MathSATSolver::getBoolean(const SMTExprRef &Exp) {
+bool MathSATSolver::getBool(const SMTExprRef &Exp) {
   if (msat_term_is_true(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr))
     return true;
 
   if (msat_term_is_false(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr))
     return false;
 
-  abortWithMessage("Boolean is neither true nor false");
+  abortWithMessage("Bool is neither true nor false");
 }
 
 template <typename ResType, typename StrToFuncType>
@@ -598,7 +598,7 @@ bool MathSATSolver::getInterpretation(const SMTExprRef &Exp, double &Double) {
   return true;
 }
 
-SMTExprRef MathSATSolver::mkBoolean(const bool Bool) {
+SMTExprRef MathSATSolver::mkBool(const bool Bool) {
   return newExprRef(
       MathSATExpr(Context, getBoolSort(),
                   Bool ? msat_make_true(*Context) : msat_make_false(*Context)));

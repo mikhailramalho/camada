@@ -321,7 +321,7 @@ SMTExprRef YicesSolver::mkBVConcat(const SMTExprRef &LHS,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
-bool YicesSolver::getBoolean(const SMTExprRef &Exp) {
+bool YicesSolver::getBool(const SMTExprRef &Exp) {
   int32_t val;
   auto res = yices_get_bool_value(yices_get_model(Context->Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
@@ -351,7 +351,7 @@ bool YicesSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
   return true;
 }
 
-SMTExprRef YicesSolver::mkBoolean(const bool b) {
+SMTExprRef YicesSolver::mkBool(const bool b) {
   return newExprRef(
       YicesExpr(Context, getBoolSort(), b ? yices_true() : yices_false()));
 }

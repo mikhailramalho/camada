@@ -307,7 +307,7 @@ public:
   virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) = 0;
 
   /// If the a model is available, returns the value of a given boolean symbol
-  virtual bool getBoolean(const SMTExprRef &Exp) = 0;
+  virtual bool getBool(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given bitvector
   /// symbol as a 64-bits int
@@ -331,7 +331,7 @@ public:
   virtual bool getInterpretation(const SMTExprRef &Exp, double &Double) = 0;
 
   /// Constructs an SMTExprRef from a boolean.
-  virtual SMTExprRef mkBoolean(const bool b) = 0;
+  virtual SMTExprRef mkBool(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an integer and its bit width
   virtual SMTExprRef mkBitvector(const int64_t Int, const SMTSortRef &Sort) = 0;

@@ -334,7 +334,7 @@ SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                        toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-bool BtorSolver::getBoolean(const SMTExprRef &Exp) {
+bool BtorSolver::getBool(const SMTExprRef &Exp) {
   const char *boolean = boolector_bv_assignment(
       Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr);
 
@@ -376,7 +376,7 @@ bool BtorSolver::getInterpretation(const SMTExprRef &Exp, int64_t &Inter) {
   return true;
 }
 
-SMTExprRef BtorSolver::mkBoolean(const bool b) {
+SMTExprRef BtorSolver::mkBool(const bool b) {
   return newExprRef(BtorExpr(Context, getBoolSort(),
                              b ? boolector_true(Context->Context)
                                : boolector_false(Context->Context)));

@@ -1173,7 +1173,7 @@ SMTExprRef SMTFPSolver::mkFPLtImpl(const SMTExprRef &LHS,
   SMTExprRef y_eq_x_exp = mkEqual(y_exp, x_exp);
   SMTExprRef y_le_x_sig_exp = mkAnd(y_eq_x_exp, y_lt_x_sig);
   SMTExprRef t3_or = mkOr(y_lt_x_exp, y_le_x_sig_exp);
-  SMTExprRef t3 = mkIte(y_sgn_eq_0, mkBoolean(true), t3_or);
+  SMTExprRef t3 = mkIte(y_sgn_eq_0, mkBool(true), t3_or);
 
   SMTExprRef y_sgn_eq_1 = mkEqual(y_sgn, one_1);
   SMTExprRef x_lt_y_exp = mkBVUlt(x_exp, y_exp);
@@ -1181,11 +1181,11 @@ SMTExprRef SMTFPSolver::mkFPLtImpl(const SMTExprRef &LHS,
   SMTExprRef x_lt_y_sig = mkBVUlt(x_sig, y_sig);
   SMTExprRef x_le_y_sig_exp = mkAnd(x_eq_y_exp, x_lt_y_sig);
   SMTExprRef t4_or = mkOr(x_lt_y_exp, x_le_y_sig_exp);
-  SMTExprRef t4 = mkIte(y_sgn_eq_1, mkBoolean(false), t4_or);
+  SMTExprRef t4 = mkIte(y_sgn_eq_1, mkBool(false), t4_or);
 
   SMTExprRef c3t3t4 = mkIte(c3, t3, t4);
-  SMTExprRef c2else = mkIte(c2, mkBoolean(false), c3t3t4);
-  return mkIte(c1, mkBoolean(false), c2else);
+  SMTExprRef c2else = mkIte(c2, mkBool(false), c3t3t4);
+  return mkIte(c1, mkBool(false), c2else);
 }
 
 SMTExprRef SMTFPSolver::mkFPLeImpl(const SMTExprRef &LHS,
@@ -1283,7 +1283,7 @@ SMTExprRef SMTFPSolver::mkFPtoFPImpl(const SMTExprRef &From,
   res_sig = mkBVZeroExt(1, res_sig);
   assert(res_sig->getWidth() == to_sbits + 4);
 
-  SMTExprRef exponent_overflow = mkBoolean(false);
+  SMTExprRef exponent_overflow = mkBool(false);
 
   SMTExprRef res_exp;
   if (from_ebits < (to_ebits + 2)) {
@@ -1412,7 +1412,7 @@ SMTExprRef SMTFPSolver::mkSBVtoFPImpl(const SMTExprRef &From,
   SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
 
   // the remaining bits are 0 if ebits is large enough.
-  SMTExprRef exp_too_large = mkBoolean(false);
+  SMTExprRef exp_too_large = mkBool(false);
 
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
@@ -1511,7 +1511,7 @@ SMTExprRef SMTFPSolver::mkUBVtoFPImpl(const SMTExprRef &From,
   SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
 
   // the remaining bits are 0 if ebits is large enough.
-  SMTExprRef exp_too_large = mkBoolean(false); // This is always in range.
+  SMTExprRef exp_too_large = mkBool(false); // This is always in range.
 
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
@@ -1740,7 +1740,7 @@ SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
   // exponent >= sbits-1 -> x
   SMTExprRef exp_is_large = log2(sbits - 1) + 1 <= ebits - 1
                                 ? mkBVSle(mkBitvector(sbits - 1, ebits), a_exp)
-                                : mkBoolean(false);
+                                : mkBool(false);
   SMTExprRef c5 = exp_is_large;
   SMTExprRef v5 = From;
 
@@ -2062,7 +2062,7 @@ SMTExprRef SMTFPSolver::round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
   SMTExprRef biased_exp = mkBias(*this, mkBVExtract(EWidth - 1, 0, Exp));
 
   // AdjustExp
-  assert(OVF1->Sort->isBooleanSort());
+  assert(OVF1->Sort->isBoolSort());
 
   SMTExprRef exp_redand = mkBVRedAnd(biased_exp);
   SMTExprRef preOVF2 = mkEqual(exp_redand, one_1);
@@ -2071,8 +2071,8 @@ SMTExprRef SMTFPSolver::round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
   biased_exp = mkIte(OVF2, pem2m1, biased_exp);
   SMTExprRef OVF = mkOr(OVF1, OVF2);
 
-  assert(OVF2->Sort->isBooleanSort());
-  assert(OVF->Sort->isBooleanSort());
+  assert(OVF2->Sort->isBoolSort());
+  assert(OVF->Sort->isBoolSort());
 
   // ExpRnd
   SMTExprRef top_exp = mkTopExp(*this, EWidth);

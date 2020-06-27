@@ -184,13 +184,13 @@ public:
   camada::SMTExprRef mkBVConcat(const camada::SMTExprRef &LHS,
                                 const camada::SMTExprRef &RHS) override;
 
-  bool getBoolean(const camada::SMTExprRef &Exp) override;
+  bool getBool(const camada::SMTExprRef &Exp) override;
 
   int64_t getBitvector(const camada::SMTExprRef &Exp) override;
 
   bool getInterpretation(const camada::SMTExprRef &Exp, int64_t &Int) override;
 
-  camada::SMTExprRef mkBoolean(const bool b) override;
+  camada::SMTExprRef mkBool(const bool b) override;
 
   camada::SMTExprRef mkBitvector(const int64_t Int,
                                  const SMTSortRef &Sort) override;

@@ -60,7 +60,7 @@ void camada::abortCondWithMessage(bool Cond, const std::string &Msg) {
 
 void camada::SMTSort::dump() const {
   std::string k;
-  if (isBooleanSort())
+  if (isBoolSort())
     k = "Bool";
   else if (isBitvectorSort())
     k = "Bitvector";
@@ -104,7 +104,7 @@ unsigned SMTSort::getFloatExponentWidth() const {
 }
 
 bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
-  if (LHS.isBooleanSort() && RHS.isBooleanSort())
+  if (LHS.isBoolSort() && RHS.isBoolSort())
     return true;
 
   if (LHS.isRoundingModeSort() && RHS.isRoundingModeSort())
@@ -125,7 +125,7 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
 
 bool SMTSort::isBitvectorSort() const { return false; }
 
-bool SMTSort::isBooleanSort() const { return false; }
+bool SMTSort::isBoolSort() const { return false; }
 
 bool SMTSort::isFloatSort() const { return false; }
 

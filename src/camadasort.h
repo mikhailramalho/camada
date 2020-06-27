@@ -36,7 +36,7 @@ public:
   virtual bool isBitvectorSort() const;
 
   /// Returns true if the sort is a boolean.
-  virtual bool isBooleanSort() const;
+  virtual bool isBoolSort() const;
 
   /// Returns true if the sort is a floating-point.
   virtual bool isFloatSort() const;
@@ -108,7 +108,7 @@ public:
       : SolverSortBase(C, S) {}
   virtual ~SolverBoolSort() = default;
 
-  virtual bool isBooleanSort() const override { return true; }
+  virtual bool isBoolSort() const override { return true; }
 
   virtual unsigned getWidth() const override { return 1; }
 };

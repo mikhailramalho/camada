@@ -582,7 +582,7 @@ SMTExprRef CVC4Solver::mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) {
                                toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
-bool CVC4Solver::getBoolean(const SMTExprRef &Exp) {
+bool CVC4Solver::getBool(const SMTExprRef &Exp) {
   return Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr).getConst<bool>();
 }
 
@@ -662,7 +662,7 @@ bool CVC4Solver::getInterpretation(const SMTExprRef &Exp, double &Double) {
   return true;
 }
 
-SMTExprRef CVC4Solver::mkBoolean(const bool b) {
+SMTExprRef CVC4Solver::mkBool(const bool b) {
   return newExprRef(CVC4Expr(Context, getBoolSort(), Context->mkConst(b)));
 }
 

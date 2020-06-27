@@ -218,7 +218,7 @@ public:
 
   SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) override;
 
-  bool getBoolean(const camada::SMTExprRef &Exp) override;
+  bool getBool(const camada::SMTExprRef &Exp) override;
 
   int64_t getBitvector(const camada::SMTExprRef &Exp) override;
 
@@ -232,7 +232,7 @@ public:
 
   bool getInterpretation(const SMTExprRef &Exp, double &Double) override;
 
-  camada::SMTExprRef mkBoolean(const bool b) override;
+  camada::SMTExprRef mkBool(const bool b) override;
 
   camada::SMTExprRef mkBitvector(const int64_t Int,
                                  const SMTSortRef &Sort) override;

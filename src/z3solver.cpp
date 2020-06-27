@@ -526,7 +526,7 @@ SMTExprRef Z3Solver::mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) {
                              toSolverExpr<Z3Expr>(*From).Expr))));
 }
 
-bool Z3Solver::getBoolean(const SMTExprRef &Exp) {
+bool Z3Solver::getBool(const SMTExprRef &Exp) {
   return toSolverExpr<Z3Expr>(*Exp).Expr.bool_value();
 }
 
@@ -615,7 +615,7 @@ bool Z3Solver::getInterpretation(const SMTExprRef &Exp, double &Double) {
   return true;
 }
 
-SMTExprRef Z3Solver::mkBoolean(const bool b) {
+SMTExprRef Z3Solver::mkBool(const bool b) {
   return newExprRef(Z3Expr(Context, getBoolSort(), Context->bool_val(b)));
 }
 

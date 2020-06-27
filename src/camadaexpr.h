@@ -44,7 +44,7 @@ public:
   virtual bool isBitvectorSort() const = 0;
 
   /// Returns true if the expr sort is boolean
-  virtual bool isBooleanSort() const = 0;
+  virtual bool isBoolSort() const = 0;
 
   /// Returns true if the expr sort is floating-point
   virtual bool isFloatSort() const = 0;
@@ -81,7 +81,7 @@ public:
 
   virtual bool isBitvectorSort() const { return Sort->isBitvectorSort(); }
 
-  virtual bool isBooleanSort() const { return Sort->isBooleanSort(); }
+  virtual bool isBoolSort() const { return Sort->isBoolSort(); }
 
   virtual bool isFloatSort() const { return Sort->isFloatSort(); }
 
