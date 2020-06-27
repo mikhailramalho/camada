@@ -21,8 +21,7 @@
 
 #include "yicessolver.h"
 #include "ac_config.h"
-
-#include <iostream>
+#include "camadautils.h"
 
 using namespace camada;
 

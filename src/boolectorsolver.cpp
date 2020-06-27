@@ -21,6 +21,7 @@
 
 #include "boolectorsolver.h"
 #include "ac_config.h"
+#include "camadautils.h"
 
 using namespace camada;
 

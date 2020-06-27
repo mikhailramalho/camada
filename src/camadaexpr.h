@@ -22,9 +22,9 @@
 #ifndef CAMADAEXPR_H_
 #define CAMADAEXPR_H_
 
-#include <memory>
-
 #include "camadasort.h"
+
+#include <memory>
 
 namespace camada {
 

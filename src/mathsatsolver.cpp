@@ -21,10 +21,10 @@
 
 #include "mathsatsolver.h"
 #include "ac_config.h"
+#include "camadautils.h"
 
 #include <cstring>
 #include <gmp.h>
-#include <iostream>
 
 using namespace camada;
 

@@ -21,6 +21,7 @@
 
 #include "z3solver.h"
 #include "ac_config.h"
+#include "camadautils.h"
 
 #include <cmath>
 #include <cstring>

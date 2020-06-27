@@ -19,11 +19,12 @@
  *
  **************************************************************************/
 
+#include "camadafp.h"
+#include "camadautils.h"
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
-
-#include "camadafp.h"
 
 using namespace camada;
 

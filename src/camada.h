@@ -22,22 +22,15 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
+#include "camadaexpr.h"
+
 #include <climits>
 #include <memory>
-
-#include "camadaexpr.h"
-#include "camadasort.h"
 
 namespace camada {
 
 /// Return camada version
 std::string getCamadaVersion();
-
-/// Abort program if Cond is false and prints Msg to stderr
-void abortCondWithMessage(bool Cond, const std::string &Msg);
-
-/// Abort program and prints Msg to stderr
-[[noreturn]] void abortWithMessage(const std::string &Msg);
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 

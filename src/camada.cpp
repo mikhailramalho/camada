@@ -21,8 +21,7 @@
 
 #include "camada.h"
 #include "ac_config.h"
-
-#include <iostream>
+#include "camadautils.h"
 
 using namespace camada;
 
@@ -47,16 +46,6 @@ using namespace camada;
 #endif
 
 std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
-
-[[noreturn]] void camada::abortWithMessage(const std::string &Msg) {
-  std::cerr << Msg << '\n';
-  abort();
-}
-
-void camada::abortCondWithMessage(bool Cond, const std::string &Msg) {
-  if (!Cond)
-    abortWithMessage(Msg);
-}
 
 void camada::SMTSort::dump() const {
   std::string k;

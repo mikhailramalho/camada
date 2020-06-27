@@ -21,6 +21,7 @@
 
 #include "cvc4solver.h"
 #include "ac_config.h"
+#include "camadautils.h"
 
 #include <cmath>
 
