@@ -12,17 +12,17 @@ set (CAMADA_VERSION "${CAMADA_VERSION_MAJOR}.${CAMADA_VERSION_MINOR}.${CAMADA_VE
 #-----------------------------------------------------------------------------#
 # General macros
 
-# 3-valued option IGNORE/OFF/ON
+# 3-valued option IFAVAILABLE/OFF/ON
 macro(option3vl var description)
-  set(${var} IGNORE CACHE STRING "${description}")
+  set(${var} IFAVAILABLE CACHE STRING "${description}")
   # Provide drop down menu options in cmake-gui
-  set_property(CACHE ${var} PROPERTY STRINGS IGNORE ON OFF)
+  set_property(CACHE ${var} PROPERTY STRINGS IFAVAILABLE ON OFF)
 endmacro()
 
-# Set option only if it still has initial value IGNORE (do not overwrite user
+# Set option only if it still has initial value IFAVAILABLE (do not overwrite user
 # configurations)
 macro(set_option var value)
-  if(${var} STREQUAL "IGNORE")
+  if(${var} STREQUAL "IFAVAILABLE")
     set(${var} ${value} CACHE STRING "" FORCE)
   endif()
 endmacro()
