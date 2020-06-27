@@ -582,13 +582,13 @@ static inline FPType getFPValue(const Z3ContextRef &C, const z3::model &Model,
   return result;
 }
 
-float Z3Solver::getFP(const SMTExprRef &Exp) {
+float Z3Solver::getFP32(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   return getFPValue<float, int32_t, Z3_get_numeral_int>(
       Context, Solver.get_model(), value);
 }
 
-double Z3Solver::getDouble(const SMTExprRef &Exp) {
+double Z3Solver::getFP64(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   return getFPValue<double, int64_t, Z3_get_numeral_int64>(
       Context, Solver.get_model(), value);
@@ -609,11 +609,11 @@ SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
              Context->constant(Name, toSolverSort<Z3Sort>(*Sort).Sort)));
 }
 
-SMTExprRef Z3Solver::mkFP(const float Float) {
+SMTExprRef Z3Solver::mkFP32(const float Float) {
   return newExprRef(Z3Expr(Context, getFP32Sort(), Context->fpa_val(Float)));
 }
 
-SMTExprRef Z3Solver::mkDouble(const double Double) {
+SMTExprRef Z3Solver::mkFP64(const double Double) {
   return newExprRef(Z3Expr(Context, getFP64Sort(), Context->fpa_val(Double)));
 }
 

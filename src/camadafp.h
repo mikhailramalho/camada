@@ -199,28 +199,28 @@ public:
     return mkFPtoIntegralImpl(From, R);
   }
 
-  virtual float getFP(const SMTExprRef &Exp) override {
+  virtual float getFP32(const SMTExprRef &Exp) override {
     if (useCamadaFP)
-      return SMTFPSolver::getFPImpl(Exp);
-    return getFPImpl(Exp);
+      return SMTFPSolver::getFP32Impl(Exp);
+    return getFP32Impl(Exp);
   }
 
-  virtual double getDouble(const SMTExprRef &Exp) override {
+  virtual double getFP64(const SMTExprRef &Exp) override {
     if (useCamadaFP)
-      return SMTFPSolver::getDoubleImpl(Exp);
-    return getDoubleImpl(Exp);
+      return SMTFPSolver::getFP64Impl(Exp);
+    return getFP64Impl(Exp);
   }
 
-  virtual SMTExprRef mkFP(const float Float) override {
+  virtual SMTExprRef mkFP32(const float Float) override {
     if (useCamadaFP)
-      return SMTFPSolver::mkFPImpl(Float);
-    return mkFPImpl(Float);
+      return SMTFPSolver::mkFP32Impl(Float);
+    return mkFP32Impl(Float);
   }
 
-  virtual SMTExprRef mkDouble(const double Double) override {
+  virtual SMTExprRef mkFP64(const double Double) override {
     if (useCamadaFP)
-      return SMTFPSolver::mkDoubleImpl(Double);
-    return mkDoubleImpl(Double);
+      return SMTFPSolver::mkFP64Impl(Double);
+    return mkFP64Impl(Double);
   }
 
   virtual SMTExprRef mkRoundingMode(const RoundingMode R) override {
@@ -317,13 +317,13 @@ protected:
 
   virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, RoundingMode R);
 
-  virtual float getFPImpl(const SMTExprRef &Exp);
+  virtual float getFP32Impl(const SMTExprRef &Exp);
 
-  virtual double getDoubleImpl(const SMTExprRef &Exp);
+  virtual double getFP64Impl(const SMTExprRef &Exp);
 
-  virtual SMTExprRef mkFPImpl(const float Float);
+  virtual SMTExprRef mkFP32Impl(const float Float);
 
-  virtual SMTExprRef mkDoubleImpl(const double Double);
+  virtual SMTExprRef mkFP64Impl(const double Double);
 
   virtual SMTExprRef mkRoundingModeImpl(const RoundingMode R);
 

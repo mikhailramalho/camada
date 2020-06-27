@@ -315,11 +315,11 @@ public:
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as float
-  virtual float getFP(const SMTExprRef &Exp) = 0;
+  virtual float getFP32(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as double
-  virtual double getDouble(const SMTExprRef &Exp) = 0;
+  virtual double getFP64(const SMTExprRef &Exp) = 0;
 
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
@@ -336,10 +336,10 @@ public:
   virtual SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) = 0;
 
   /// Constructs an SMTExprRef from a float.
-  virtual SMTExprRef mkFP(const float Float) = 0;
+  virtual SMTExprRef mkFP32(const float Float) = 0;
 
   /// Constructs an SMTExprRef from a double.
-  virtual SMTExprRef mkDouble(const double Double) = 0;
+  virtual SMTExprRef mkFP64(const double Double) = 0;
 
   /// Returns an appropriate floating-point rounding mode.
   virtual SMTExprRef mkRoundingMode(const RoundingMode R) = 0;

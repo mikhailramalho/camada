@@ -1863,11 +1863,11 @@ static inline FPType getFPValue(SMTFPSolver &S, const SMTExprRef &Exp) {
   return result;
 }
 
-float SMTFPSolver::getFPImpl(const SMTExprRef &Exp) {
+float SMTFPSolver::getFP32Impl(const SMTExprRef &Exp) {
   return getFPValue<float>(*this, Exp);
 }
 
-double SMTFPSolver::getDoubleImpl(const SMTExprRef &Exp) {
+double SMTFPSolver::getFP64Impl(const SMTExprRef &Exp) {
   return getFPValue<double>(*this, Exp);
 }
 
@@ -1883,11 +1883,11 @@ static inline IntType FPasInt(const FPType FP) {
   return FPAsInt;
 }
 
-SMTExprRef SMTFPSolver::mkFPImpl(const float Float) {
+SMTExprRef SMTFPSolver::mkFP32Impl(const float Float) {
   return mkBitvector(FPasInt<float, int32_t>(Float), getFP32Sort());
 }
 
-SMTExprRef SMTFPSolver::mkDoubleImpl(const double Double) {
+SMTExprRef SMTFPSolver::mkFP64Impl(const double Double) {
   return mkBitvector(FPasInt<double, int64_t>(Double), getFP64Sort());
 }
 

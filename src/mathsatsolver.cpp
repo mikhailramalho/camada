@@ -566,14 +566,14 @@ int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
   });
 }
 
-float MathSATSolver::getFP(const SMTExprRef &Exp) {
+float MathSATSolver::getFP32(const SMTExprRef &Exp) {
   return GMPtoType<float>(*this, Exp, [](char *buffer) -> float {
     char *buffer_end = nullptr;
     return std::strtof(buffer, &buffer_end);
   });
 }
 
-double MathSATSolver::getDouble(const SMTExprRef &Exp) {
+double MathSATSolver::getFP64(const SMTExprRef &Exp) {
   return GMPtoType<double>(*this, Exp, [](char *buffer) -> double {
     char *buffer_end = nullptr;
     return std::strtod(buffer, &buffer_end);
@@ -615,14 +615,14 @@ static inline std::string FPasInt(const FPType FP) {
   return std::to_string(FPAsInt);
 }
 
-SMTExprRef MathSATSolver::mkFP(const float Float) {
+SMTExprRef MathSATSolver::mkFP32(const float Float) {
   return newExprRef(MathSATExpr(
       Context, getFP32Sort(),
       msat_make_fp_bits_number(*Context, FPasInt<float, int32_t>(Float).c_str(),
                                8, 24)));
 }
 
-SMTExprRef MathSATSolver::mkDouble(const double Double) {
+SMTExprRef MathSATSolver::mkFP64(const double Double) {
   return newExprRef(MathSATExpr(
       Context, getFP64Sort(),
       msat_make_fp_bits_number(

@@ -222,9 +222,9 @@ public:
 
   int64_t getBitvector(const camada::SMTExprRef &Exp) override;
 
-  float getFP(const camada::SMTExprRef &Exp) override;
+  float getFP32(const camada::SMTExprRef &Exp) override;
 
-  double getDouble(const camada::SMTExprRef &Exp) override;
+  double getFP64(const camada::SMTExprRef &Exp) override;
 
   camada::SMTExprRef mkBool(const bool b) override;
 
@@ -234,9 +234,9 @@ public:
   camada::SMTExprRef mkSymbol(const char *Name,
                               camada::SMTSortRef Sort) override;
 
-  SMTExprRef mkFP(const float Float) override;
+  SMTExprRef mkFP32(const float Float) override;
 
-  SMTExprRef mkDouble(const double Double) override;
+  SMTExprRef mkFP64(const double Double) override;
 
   SMTExprRef mkRoundingMode(const RoundingMode R) override;
 

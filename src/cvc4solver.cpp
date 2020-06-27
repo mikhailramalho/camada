@@ -610,7 +610,7 @@ static inline bool isNaNOrInf(const CVC4::FloatingPoint &FP, FPType &Res) {
   return false;
 }
 
-float CVC4Solver::getFP(const SMTExprRef &Exp) {
+float CVC4Solver::getFP32(const SMTExprRef &Exp) {
   CVC4::FloatingPoint fp = Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
                                .getConst<CVC4::FloatingPoint>();
 
@@ -627,7 +627,7 @@ float CVC4Solver::getFP(const SMTExprRef &Exp) {
   return result;
 }
 
-double CVC4Solver::getDouble(const SMTExprRef &Exp) {
+double CVC4Solver::getFP64(const SMTExprRef &Exp) {
   CVC4::FloatingPoint fp = Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
                                .getConst<CVC4::FloatingPoint>();
 
@@ -681,14 +681,14 @@ static inline IntType FPasInt(const FPType FP) {
   return FPAsInt;
 }
 
-SMTExprRef CVC4Solver::mkFP(const float Float) {
+SMTExprRef CVC4Solver::mkFP32(const float Float) {
   return newExprRef(CVC4Expr(
       Context, getFP32Sort(),
       Context->mkConst(CVC4::FloatingPoint(
           8, 24, CVC4::BitVector(63, FPasInt<float, uint32_t>(Float))))));
 }
 
-SMTExprRef CVC4Solver::mkDouble(const double Double) {
+SMTExprRef CVC4Solver::mkFP64(const double Double) {
   return newExprRef(CVC4Expr(
       Context, getFP64Sort(),
       Context->mkConst(CVC4::FloatingPoint(
