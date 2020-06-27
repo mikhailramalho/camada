@@ -69,10 +69,10 @@ public:
 
   SMTSortRef getBVSort(unsigned BitWidth) override;
 
-  SMTSortRef getRMSort() override;
+  SMTSortRef getRMSortImpl() override;
 
-  SMTSortRef getFPSort(const unsigned ExpWidth,
-                       const unsigned SigWidth) override;
+  SMTSortRef getFPSortImpl(const unsigned ExpWidth,
+                           const unsigned SigWidth) override;
 
   SMTSortRef getBVFPSort(const unsigned ExpWidth,
                          const unsigned SigWidth) override;
@@ -137,67 +137,68 @@ public:
 
   SMTExprRef mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPAbs(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPNeg(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) override;
+  SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const RM &R) override;
 
-  SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) override;
+  SMTExprRef mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const RM &R) override;
 
-  SMTExprRef mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) override;
+  SMTExprRef mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const RM &R) override;
 
-  SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) override;
+  SMTExprRef mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const RM &R) override;
 
-  SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RM &R) override;
+  SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const RM &R) override;
 
-  SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                     const SMTExprRef &Z, const RM &R) override;
+  SMTExprRef mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
+                         const SMTExprRef &Z, const RM &R) override;
 
-  SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                      const RM &R) override;
+  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                          const RM &R) override;
 
-  SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RM &R) override;
+  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const RM &R) override;
 
-  SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RM &R) override;
+  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const RM &R) override;
 
-  SMTExprRef mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
 
-  SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
 
-  SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) override;
+  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, RM R) override;
 
   bool getBool(const SMTExprRef &Exp) override;
 
   int64_t getBV(const SMTExprRef &Exp) override;
 
-  float getFP32(const SMTExprRef &Exp) override;
+  float getFP32Impl(const SMTExprRef &Exp) override;
 
-  double getFP64(const SMTExprRef &Exp) override;
+  double getFP64Impl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkBool(const bool b) override;
 
@@ -205,21 +206,22 @@ public:
 
   SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) override;
 
-  SMTExprRef mkFP32(const float Float) override;
+  SMTExprRef mkFP32Impl(const float Float) override;
 
-  SMTExprRef mkFP64(const double Double) override;
+  SMTExprRef mkFP64Impl(const double Double) override;
 
-  SMTExprRef mkRM(const RM &R) override;
+  SMTExprRef mkRMImpl(const RM &R) override;
 
-  SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override;
+  SMTExprRef mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
+                       const unsigned SigWidth) override;
 
-  SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override;
+  SMTExprRef mkInfImpl(const bool Sgn, const unsigned ExpWidth,
+                       const unsigned SigWidth) override;
 
-  SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp, const SMTSortRef &To) override;
+  SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
+                              const SMTSortRef &To) override;
 
-  SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override;
+  SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
   checkResult check() override;
 

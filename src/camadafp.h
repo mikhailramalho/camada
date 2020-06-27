@@ -31,223 +31,221 @@ public:
   SMTFPSolver() = default;
   ~SMTFPSolver() = default;
 
-  virtual SMTSortRef getRMSort() override {
+  virtual SMTSortRef getRMSort() final {
     if (useCamadaFP)
       return SMTFPSolver::getRMSortImpl();
     return getRMSortImpl();
   }
 
   virtual SMTSortRef getFPSort(const unsigned ExpWidth,
-                               const unsigned SigWidth) override {
+                               const unsigned SigWidth) final {
     if (useCamadaFP)
       return SMTFPSolver::getFPSortImpl(ExpWidth, SigWidth);
     return getFPSortImpl(ExpWidth, SigWidth);
   }
 
-  virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPAbsImpl(Exp);
     return mkFPAbsImpl(Exp);
   }
 
-  virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPNegImpl(Exp);
     return mkFPNegImpl(Exp);
   }
 
-  virtual SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPIsInfiniteImpl(Exp);
     return mkFPIsInfiniteImpl(Exp);
   }
 
-  virtual SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPIsNaNImpl(Exp);
     return mkFPIsNaNImpl(Exp);
   }
 
-  virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPIsDenormalImpl(Exp);
     return mkFPIsDenormalImpl(Exp);
   }
 
-  virtual SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPIsNormalImpl(Exp);
     return mkFPIsNormalImpl(Exp);
   }
 
-  virtual SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkFPIsZero(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPIsZeroImpl(Exp);
     return mkFPIsZeroImpl(Exp);
   }
 
   virtual SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) override {
+                             const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPMulImpl(LHS, RHS, R);
     return mkFPMulImpl(LHS, RHS, R);
   }
 
   virtual SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) override {
+                             const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPDivImpl(LHS, RHS, R);
     return mkFPDivImpl(LHS, RHS, R);
   }
 
   virtual SMTExprRef mkFPRem(const SMTExprRef &LHS,
-                             const SMTExprRef &RHS) override {
+                             const SMTExprRef &RHS) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPRemImpl(LHS, RHS);
     return mkFPRemImpl(LHS, RHS);
   }
 
   virtual SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) override {
+                             const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPAddImpl(LHS, RHS, R);
     return mkFPAddImpl(LHS, RHS, R);
   }
 
   virtual SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) override {
+                             const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPSubImpl(LHS, RHS, R);
     return mkFPSubImpl(LHS, RHS, R);
   }
 
-  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RM &R) override {
+  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPSqrtImpl(Exp, R);
     return mkFPSqrtImpl(Exp, R);
   }
 
   virtual SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                             const SMTExprRef &Z, const RM &R) override {
+                             const SMTExprRef &Z, const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPFMAImpl(X, Y, Z, R);
     return mkFPFMAImpl(X, Y, Z, R);
   };
 
   virtual SMTExprRef mkFPLt(const SMTExprRef &LHS,
-                            const SMTExprRef &RHS) override {
+                            const SMTExprRef &RHS) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPLtImpl(LHS, RHS);
     return mkFPLtImpl(LHS, RHS);
   }
 
   virtual SMTExprRef mkFPLe(const SMTExprRef &LHS,
-                            const SMTExprRef &RHS) override {
+                            const SMTExprRef &RHS) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPLeImpl(LHS, RHS);
     return mkFPLeImpl(LHS, RHS);
   }
 
   virtual SMTExprRef mkFPEqual(const SMTExprRef &LHS,
-                               const SMTExprRef &RHS) override {
+                               const SMTExprRef &RHS) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPEqualImpl(LHS, RHS);
     return mkFPEqualImpl(LHS, RHS);
   }
 
   virtual SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                              const RM &R) override {
+                              const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPtoFPImpl(From, To, R);
     return mkFPtoFPImpl(From, To, R);
   }
 
   virtual SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RM &R) override {
+                               const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkSBVtoFPImpl(From, To, R);
     return mkSBVtoFPImpl(From, To, R);
   }
 
   virtual SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RM &R) override {
+                               const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkUBVtoFPImpl(From, To, R);
     return mkUBVtoFPImpl(From, To, R);
   }
 
-  virtual SMTExprRef mkFPtoSBV(const SMTExprRef &From,
-                               unsigned ToWidth) override {
+  virtual SMTExprRef mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPtoSBVImpl(From, ToWidth);
     return mkFPtoSBVImpl(From, ToWidth);
   }
 
-  virtual SMTExprRef mkFPtoUBV(const SMTExprRef &From,
-                               unsigned ToWidth) override {
+  virtual SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPtoUBVImpl(From, ToWidth);
     return mkFPtoUBVImpl(From, ToWidth);
   }
 
-  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) override {
+  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPtoIntegralImpl(From, R);
     return mkFPtoIntegralImpl(From, R);
   }
 
-  virtual float getFP32(const SMTExprRef &Exp) override {
+  virtual float getFP32(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::getFP32Impl(Exp);
     return getFP32Impl(Exp);
   }
 
-  virtual double getFP64(const SMTExprRef &Exp) override {
+  virtual double getFP64(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::getFP64Impl(Exp);
     return getFP64Impl(Exp);
   }
 
-  virtual SMTExprRef mkFP32(const float Float) override {
+  virtual SMTExprRef mkFP32(const float Float) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFP32Impl(Float);
     return mkFP32Impl(Float);
   }
 
-  virtual SMTExprRef mkFP64(const double Double) override {
+  virtual SMTExprRef mkFP64(const double Double) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFP64Impl(Double);
     return mkFP64Impl(Double);
   }
 
-  virtual SMTExprRef mkRM(const RM &R) override {
+  virtual SMTExprRef mkRM(const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkRMImpl(R);
     return mkRMImpl(R);
   }
 
   virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) override {
+                           const unsigned SigWidth) final {
     if (useCamadaFP)
       return SMTFPSolver::mkNaNImpl(Sgn, ExpWidth, SigWidth);
     return mkNaNImpl(Sgn, ExpWidth, SigWidth);
   }
 
   virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) override {
+                           const unsigned SigWidth) final {
     if (useCamadaFP)
       return SMTFPSolver::mkInfImpl(Sgn, ExpWidth, SigWidth);
     return mkInfImpl(Sgn, ExpWidth, SigWidth);
   }
 
   virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
-                                  const SMTSortRef &To) override {
+                                  const SMTSortRef &To) final {
     if (useCamadaFP)
       return SMTFPSolver::mkBVToIEEEFPImpl(Exp, To);
     return mkBVToIEEEFPImpl(Exp, To);
   }
 
-  virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override {
+  virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) final {
     if (useCamadaFP)
       return SMTFPSolver::mkIEEEFPToBVImpl(Exp);
     return mkIEEEFPToBVImpl(Exp);
