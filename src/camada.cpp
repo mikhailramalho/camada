@@ -62,7 +62,7 @@ void camada::SMTSort::dump() const {
   std::string k;
   if (isBoolSort())
     k = "Bool";
-  else if (isBitvectorSort())
+  else if (isBVSort())
     k = "Bitvector";
   else if (isRoundingModeSort())
     k = "RoundingMode";
@@ -113,7 +113,7 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
   if (LHS.getWidth() != RHS.getWidth())
     return false;
 
-  if (LHS.isBitvectorSort() && RHS.isBitvectorSort())
+  if (LHS.isBVSort() && RHS.isBVSort())
     return true; // Width was already checked
 
   if (LHS.isFPSort() && RHS.isFPSort())
@@ -123,7 +123,7 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
   return false;
 }
 
-bool SMTSort::isBitvectorSort() const { return false; }
+bool SMTSort::isBVSort() const { return false; }
 
 bool SMTSort::isBoolSort() const { return false; }
 

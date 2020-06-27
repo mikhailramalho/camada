@@ -72,7 +72,7 @@ SMTSortRef Z3Solver::getBoolSort() {
       camada::SolverBoolSort<Z3Sort>(Context, Context->bool_sort()));
 }
 
-SMTSortRef Z3Solver::getBitvectorSort(unsigned BitWidth) {
+SMTSortRef Z3Solver::getBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<Z3Sort>>(camada::SolverBVSort<Z3Sort>(
       BitWidth, Context, Context->bv_sort(BitWidth)));
 }
@@ -276,24 +276,24 @@ SMTExprRef Z3Solver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 }
 
 SMTExprRef Z3Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, getBitvectorSort(i + Exp->getWidth()),
+  return newExprRef(Z3Expr(Context, getBVSort(i + Exp->getWidth()),
                            z3::sext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, getBitvectorSort(i + Exp->getWidth()),
+  return newExprRef(Z3Expr(Context, getBVSort(i + Exp->getWidth()),
                            z3::zext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
 SMTExprRef Z3Solver::mkBVExtract(unsigned High, unsigned Low,
                                  const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(Context, getBitvectorSort(High - Low + 1),
+  return newExprRef(Z3Expr(Context, getBVSort(High - Low + 1),
                            toSolverExpr<Z3Expr>(*Exp).Expr.extract(High, Low)));
 }
 
 SMTExprRef Z3Solver::mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context,
-                           getBitvectorSort(LHS->getWidth() + RHS->getWidth()),
+                           getBVSort(LHS->getWidth() + RHS->getWidth()),
                            z3::concat(toSolverExpr<Z3Expr>(*LHS).Expr,
                                       toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
@@ -497,7 +497,7 @@ SMTExprRef Z3Solver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
   // the round mode to be toward zero
   SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
   return newExprRef(
-      Z3Expr(Context, getBitvectorSort(ToWidth),
+      Z3Expr(Context, getBVSort(ToWidth),
              z3::to_expr(*Context,
                          Z3_mk_fpa_to_sbv(
                              *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
@@ -509,7 +509,7 @@ SMTExprRef Z3Solver::mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) {
   // the round mode to be toward zero
   SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
   return newExprRef(
-      Z3Expr(Context, getBitvectorSort(ToWidth),
+      Z3Expr(Context, getBVSort(ToWidth),
              z3::to_expr(*Context,
                          Z3_mk_fpa_to_ubv(
                              *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
@@ -541,7 +541,7 @@ static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
                                  toSolverExpr<Z3Expr>(*Exp).Expr.decl())));
 }
 
-int64_t Z3Solver::getBitvector(const SMTExprRef &Exp) {
+int64_t Z3Solver::getBV(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   int64_t bv;
   bool is_num = toSolverExpr<Z3Expr>(*value).Expr.is_numeral_i64(bv);
@@ -598,7 +598,7 @@ SMTExprRef Z3Solver::mkBool(const bool b) {
   return newExprRef(Z3Expr(Context, getBoolSort(), Context->bool_val(b)));
 }
 
-SMTExprRef Z3Solver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
+SMTExprRef Z3Solver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
   return newExprRef(
       Z3Expr(Context, Sort, Context->bv_val(Int, Sort->getWidth())));
 }
@@ -671,7 +671,7 @@ SMTExprRef Z3Solver::mkBVToIEEEFP(const SMTExprRef &Exp, const SMTSortRef &To) {
 }
 
 SMTExprRef Z3Solver::mkIEEEFPToBV(const SMTExprRef &Exp) {
-  SMTSortRef to = getBitvectorSort(Exp->getWidth());
+  SMTSortRef to = getBVSort(Exp->getWidth());
   return newExprRef(Z3Expr(
       Context, to,
       z3::to_expr(*Context, Z3_mk_fpa_to_ieee_bv(

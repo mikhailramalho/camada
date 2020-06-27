@@ -83,7 +83,7 @@ SMTSortRef BtorSolver::getBoolSort() {
                                        boolector_bool_sort(Context->Context)));
 }
 
-SMTSortRef BtorSolver::getBitvectorSort(unsigned BitWidth) {
+SMTSortRef BtorSolver::getBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<BtorSort>>(
       camada::SolverBVSort<BtorSort>(
           BitWidth, Context,
@@ -308,20 +308,20 @@ SMTExprRef BtorSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef BtorSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBitvectorSort(i + Exp->getWidth()),
+      Context, getBVSort(i + Exp->getWidth()),
       boolector_sext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBitvectorSort(i + Exp->getWidth()),
+      Context, getBVSort(i + Exp->getWidth()),
       boolector_uext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVExtract(unsigned High, unsigned Low,
                                    const SMTExprRef &Exp) {
   return newExprRef(
-      BtorExpr(Context, getBitvectorSort(High - Low + 1),
+      BtorExpr(Context, getBVSort(High - Low + 1),
                boolector_slice(Context->Context,
                                toSolverExpr<BtorExpr>(*Exp).Expr, High, Low)));
 }
@@ -329,7 +329,7 @@ SMTExprRef BtorSolver::mkBVExtract(unsigned High, unsigned Low,
 SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(BtorExpr(
-      Context, getBitvectorSort(LHS->getWidth() + RHS->getWidth()),
+      Context, getBVSort(LHS->getWidth() + RHS->getWidth()),
       boolector_concat(Context->Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                        toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -357,7 +357,7 @@ bool BtorSolver::getBool(const SMTExprRef &Exp) {
   return res;
 }
 
-int64_t BtorSolver::getBitvector(const SMTExprRef &Exp) {
+int64_t BtorSolver::getBV(const SMTExprRef &Exp) {
   const char *bv = boolector_bv_assignment(Context->Context,
                                            toSolverExpr<BtorExpr>(*Exp).Expr);
   char *foo;
@@ -376,7 +376,7 @@ SMTExprRef BtorSolver::mkBool(const bool b) {
                                : boolector_false(Context->Context)));
 }
 
-SMTExprRef BtorSolver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
+SMTExprRef BtorSolver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
   // Prevent creating a bitvector with size greater than the bitwidth
   int64_t newInt = Int & ((1 << Sort->getWidth()) - 1);
 

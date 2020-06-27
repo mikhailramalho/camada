@@ -72,7 +72,7 @@ public:
   virtual SMTSortRef getBoolSort() = 0;
 
   /// Returns an appropriate bitvector sort for the given bitwidth.
-  virtual SMTSortRef getBitvectorSort(const unsigned BitWidth) = 0;
+  virtual SMTSortRef getBVSort(const unsigned BitWidth) = 0;
 
   /// Returns an appropriate rounding mode sort.
   virtual SMTSortRef getRoundingModeSort() = 0;
@@ -202,14 +202,14 @@ public:
 
   SMTExprRef mkBVRedOr(SMTExprRef Exp) {
     // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBitvector(0, Exp->getWidth()));
-    return mkIte(mkNot(comp), mkBitvector(1, 1), mkBitvector(0, 1));
+    SMTExprRef comp = mkEqual(Exp, mkBV(0, Exp->getWidth()));
+    return mkIte(mkNot(comp), mkBV(1, 1), mkBV(0, 1));
   }
 
   SMTExprRef mkBVRedAnd(SMTExprRef Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBitvector(ULLONG_MAX, Exp->getWidth()));
-    return mkIte(comp, mkBitvector(1, 1), mkBitvector(0, 1));
+    SMTExprRef comp = mkEqual(Exp, mkBV(ULLONG_MAX, Exp->getWidth()));
+    return mkIte(comp, mkBV(1, 1), mkBV(0, 1));
   }
 
   /// Creates a floating-point absolute operation
@@ -311,7 +311,7 @@ public:
 
   /// If the a model is available, returns the value of a given bitvector
   /// symbol as a 64-bits int
-  virtual int64_t getBitvector(const SMTExprRef &Exp) = 0;
+  virtual int64_t getBV(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as float
@@ -325,11 +325,11 @@ public:
   virtual SMTExprRef mkBool(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an integer and its bit width
-  virtual SMTExprRef mkBitvector(const int64_t Int, const SMTSortRef &Sort) = 0;
+  virtual SMTExprRef mkBV(const int64_t Int, const SMTSortRef &Sort) = 0;
 
   /// Convinience method to create a bitvector using the value and the bitwidth
-  virtual SMTExprRef mkBitvector(const int64_t Int, unsigned BitWidth) {
-    return mkBitvector(Int, getBitvectorSort(BitWidth));
+  virtual SMTExprRef mkBV(const int64_t Int, unsigned BitWidth) {
+    return mkBV(Int, getBVSort(BitWidth));
   }
 
   /// Creates a new symbol, given a name and a sort

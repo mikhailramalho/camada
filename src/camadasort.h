@@ -33,7 +33,7 @@ public:
   virtual ~SMTSort() = default;
 
   /// Returns true if the sort is a bitvector.
-  virtual bool isBitvectorSort() const;
+  virtual bool isBVSort() const;
 
   /// Returns true if the sort is a boolean.
   virtual bool isBoolSort() const;
@@ -95,7 +95,7 @@ public:
       : SolverSortBase(C, S), Width(W) {}
   virtual ~SolverBVSort() = default;
 
-  virtual bool isBitvectorSort() const override { return true; }
+  virtual bool isBVSort() const override { return true; }
 
   virtual unsigned getWidth() const override { return Width; }
 };

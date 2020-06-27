@@ -57,7 +57,7 @@ SMTSortRef CVC4Solver::getBoolSort() {
       camada::SolverBoolSort<CVC4Sort>(Context, Context->booleanType()));
 }
 
-SMTSortRef CVC4Solver::getBitvectorSort(unsigned BitWidth) {
+SMTSortRef CVC4Solver::getBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<CVC4Sort>>(
       camada::SolverBVSort<CVC4Sort>(BitWidth, Context,
                                      Context->mkBitVectorType(BitWidth)));
@@ -316,7 +316,7 @@ SMTExprRef CVC4Solver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef CVC4Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, getBitvectorSort(i + Exp->getWidth()),
+      CVC4Expr(Context, getBVSort(i + Exp->getWidth()),
                Context->mkExpr(CVC4::kind::BITVECTOR_SIGN_EXTEND,
                                Context->mkConst(CVC4::BitVectorSignExtend(i)),
                                toSolverExpr<CVC4Expr>(*Exp).Expr)));
@@ -324,7 +324,7 @@ SMTExprRef CVC4Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
 
 SMTExprRef CVC4Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, getBitvectorSort(i + Exp->getWidth()),
+      CVC4Expr(Context, getBVSort(i + Exp->getWidth()),
                Context->mkExpr(CVC4::kind::BITVECTOR_ZERO_EXTEND,
                                Context->mkConst(CVC4::BitVectorZeroExtend(i)),
                                toSolverExpr<CVC4Expr>(*Exp).Expr)));
@@ -333,7 +333,7 @@ SMTExprRef CVC4Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
 SMTExprRef CVC4Solver::mkBVExtract(unsigned High, unsigned Low,
                                    const SMTExprRef &Exp) {
   return newExprRef(CVC4Expr(
-      Context, getBitvectorSort(Exp->getWidth()),
+      Context, getBVSort(Exp->getWidth()),
       Context->mkExpr(CVC4::Kind::BITVECTOR_EXTRACT,
                       Context->mkConst(CVC4::BitVectorExtract(High, Low)),
                       toSolverExpr<CVC4Expr>(*Exp).Expr)));
@@ -342,7 +342,7 @@ SMTExprRef CVC4Solver::mkBVExtract(unsigned High, unsigned Low,
 SMTExprRef CVC4Solver::mkBVConcat(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, getBitvectorSort(LHS->getWidth() + RHS->getWidth()),
+      CVC4Expr(Context, getBVSort(LHS->getWidth() + RHS->getWidth()),
                Context->mkExpr(CVC4::kind::BITVECTOR_CONCAT,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -554,7 +554,7 @@ SMTExprRef CVC4Solver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
   // the round mode to be toward zero
   SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
   return newExprRef(CVC4Expr(
-      Context, getBitvectorSort(ToWidth),
+      Context, getBVSort(ToWidth),
       Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_SBV,
                       Context->mkConst(CVC4::FloatingPointToSBV(ToWidth)),
                       toSolverExpr<CVC4Expr>(*roundingMode).Expr,
@@ -566,7 +566,7 @@ SMTExprRef CVC4Solver::mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) {
   // the round mode to be toward zero
   SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
   return newExprRef(CVC4Expr(
-      Context, getBitvectorSort(ToWidth),
+      Context, getBVSort(ToWidth),
       Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_UBV,
                       Context->mkConst(CVC4::FloatingPointToUBV(ToWidth)),
                       toSolverExpr<CVC4Expr>(*roundingMode).Expr,
@@ -586,7 +586,7 @@ bool CVC4Solver::getBool(const SMTExprRef &Exp) {
   return Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr).getConst<bool>();
 }
 
-int64_t CVC4Solver::getBitvector(const SMTExprRef &Exp) {
+int64_t CVC4Solver::getBV(const SMTExprRef &Exp) {
   return Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
       .getConst<CVC4::BitVector>()
       .toInteger()
@@ -648,7 +648,7 @@ SMTExprRef CVC4Solver::mkBool(const bool b) {
   return newExprRef(CVC4Expr(Context, getBoolSort(), Context->mkConst(b)));
 }
 
-SMTExprRef CVC4Solver::mkBitvector(const int64_t Int, const SMTSortRef &Sort) {
+SMTExprRef CVC4Solver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
   return newExprRef(
       CVC4Expr(Context, Sort,
                Context->mkConst(CVC4::BitVector(Sort->getWidth(),
@@ -756,8 +756,7 @@ SMTExprRef CVC4Solver::mkIEEEFPToBV(const SMTExprRef &Exp) {
   // to bv, so we create a new symbol
   const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
 
-  SMTExprRef newSymbol =
-      mkSymbol(name.c_str(), getBitvectorSort(Exp->getWidth()));
+  SMTExprRef newSymbol = mkSymbol(name.c_str(), getBVSort(Exp->getWidth()));
 
   // and constraint it to be the conversion of the fp, since
   // (fp_matches_bv f bv) <-> (= f ((_ to_fp E S) bv))

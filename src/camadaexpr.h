@@ -41,7 +41,7 @@ public:
   }
 
   /// Returns true if the expr sort is bitvector
-  virtual bool isBitvectorSort() const = 0;
+  virtual bool isBVSort() const = 0;
 
   /// Returns true if the expr sort is boolean
   virtual bool isBoolSort() const = 0;
@@ -79,7 +79,7 @@ public:
 
   virtual ~SolverExpr() = default;
 
-  virtual bool isBitvectorSort() const { return Sort->isBitvectorSort(); }
+  virtual bool isBVSort() const { return Sort->isBVSort(); }
 
   virtual bool isBoolSort() const { return Sort->isBoolSort(); }
 

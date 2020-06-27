@@ -80,7 +80,7 @@ public:
 
   camada::SMTSortRef getBoolSort() override;
 
-  camada::SMTSortRef getBitvectorSort(unsigned BitWidth) override;
+  camada::SMTSortRef getBVSort(unsigned BitWidth) override;
 
   SMTSortRef getBVFPSort(const unsigned ExpWidth,
                          const unsigned SigWidth) override;
@@ -186,12 +186,11 @@ public:
 
   bool getBool(const camada::SMTExprRef &Exp) override;
 
-  int64_t getBitvector(const camada::SMTExprRef &Exp) override;
+  int64_t getBV(const camada::SMTExprRef &Exp) override;
 
   camada::SMTExprRef mkBool(const bool b) override;
 
-  camada::SMTExprRef mkBitvector(const int64_t Int,
-                                 const SMTSortRef &Sort) override;
+  camada::SMTExprRef mkBV(const int64_t Int, const SMTSortRef &Sort) override;
 
   camada::SMTExprRef mkSymbol(const char *Name,
                               camada::SMTSortRef Sort) override;

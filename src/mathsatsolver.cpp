@@ -80,7 +80,7 @@ SMTSortRef MathSATSolver::getBoolSort() {
                                           msat_get_bool_type(*Context)));
 }
 
-SMTSortRef MathSATSolver::getBitvectorSort(unsigned BitWidth) {
+SMTSortRef MathSATSolver::getBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<MathSATSort>>(
       camada::SolverBVSort<MathSATSort>(BitWidth, Context,
                                         msat_get_bv_type(*Context, BitWidth)));
@@ -308,20 +308,20 @@ SMTExprRef MathSATSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef MathSATSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(i + Exp->getWidth()),
+      Context, getBVSort(i + Exp->getWidth()),
       msat_make_bv_sext(*Context, i, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(i + Exp->getWidth()),
+      Context, getBVSort(i + Exp->getWidth()),
       msat_make_bv_zext(*Context, i, toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkBVExtract(unsigned High, unsigned Low,
                                       const SMTExprRef &Exp) {
   return newExprRef(
-      MathSATExpr(Context, getBitvectorSort(High - Low + 1),
+      MathSATExpr(Context, getBVSort(High - Low + 1),
                   msat_make_bv_extract(*Context, High, Low,
                                        toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
@@ -329,7 +329,7 @@ SMTExprRef MathSATSolver::mkBVExtract(unsigned High, unsigned Low,
 SMTExprRef MathSATSolver::mkBVConcat(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(LHS->getWidth() + RHS->getWidth()),
+      Context, getBVSort(LHS->getWidth() + RHS->getWidth()),
       msat_make_bv_concat(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
                           toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
@@ -499,7 +499,7 @@ SMTExprRef MathSATSolver::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
   // the round mode to be toward zero
   SMTExprRef roundingMode = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
   return newExprRef(MathSATExpr(
-      Context, getBitvectorSort(ToWidth),
+      Context, getBVSort(ToWidth),
       msat_make_fp_to_bv(*Context, ToWidth,
                          toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                          toSolverExpr<MathSATExpr>(*From).Expr)));
@@ -556,7 +556,7 @@ static inline ResType GMPtoType(MathSATSolver &S, const SMTExprRef &Exp,
   return StrToFunc(buffer);
 }
 
-int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
+int64_t MathSATSolver::getBV(const SMTExprRef &Exp) {
   camada::abortCondWithMessage(sizeof(int64_t) == sizeof(long int),
                                "Cannot convert GMP value to int");
 
@@ -586,8 +586,7 @@ SMTExprRef MathSATSolver::mkBool(const bool Bool) {
                   Bool ? msat_make_true(*Context) : msat_make_false(*Context)));
 }
 
-SMTExprRef MathSATSolver::mkBitvector(const int64_t Int,
-                                      const SMTSortRef &Sort) {
+SMTExprRef MathSATSolver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
   return newExprRef(
       MathSATExpr(Context, Sort,
                   msat_make_bv_number(*Context, std::to_string(Int).c_str(),
@@ -678,7 +677,7 @@ SMTExprRef MathSATSolver::mkBVToIEEEFP(const SMTExprRef &Exp,
 }
 
 SMTExprRef MathSATSolver::mkIEEEFPToBV(const SMTExprRef &Exp) {
-  SMTSortRef to = getBitvectorSort(Exp->getWidth());
+  SMTSortRef to = getBVSort(Exp->getWidth());
   return newExprRef(MathSATExpr(
       Context, to,
       msat_make_fp_as_ieeebv(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));

@@ -5,10 +5,10 @@
 
 inline void equal_ten(const camada::SMTSolverRef &solver) {
   // A free variable
-  auto f = solver->mkSymbol("f", solver->getBitvectorSort(10));
+  auto f = solver->mkSymbol("f", solver->getBVSort(10));
 
   // And assert if there is a value for 'f' that is equal to 10
-  auto ten = solver->mkBitvector(10, 10);
+  auto ten = solver->mkBV(10, 10);
   auto eq = solver->mkEqual(f, ten);
 
   // Add the constraint to the solver
@@ -17,7 +17,7 @@ inline void equal_ten(const camada::SMTSolverRef &solver) {
   // And check for satisfiability
   REQUIRE(solver->check() == camada::checkResult::SAT);
 
-  int64_t f_res = solver->getBitvector(f);
+  int64_t f_res = solver->getBV(f);
   REQUIRE(f_res == 10);
-  REQUIRE(f_res == solver->getBitvector(ten));
+  REQUIRE(f_res == solver->getBV(ten));
 }
