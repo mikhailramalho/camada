@@ -191,7 +191,7 @@ static inline SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
 }
 
 static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
-                                const RM R) {
+                                const RM &R) {
   SMTExprRef RNum = S.mkBV(static_cast<int64_t>(R), 3);
   switch (R) {
   default:
@@ -388,7 +388,7 @@ SMTExprRef SMTFPSolver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef SMTFPSolver::mkFPMulImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS, const RM R) {
+                                    const SMTExprRef &RHS, const RM &R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -486,7 +486,7 @@ SMTExprRef SMTFPSolver::mkFPMulImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolver::mkFPDivImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS, const RM R) {
+                                    const SMTExprRef &RHS, const RM &R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -674,7 +674,7 @@ static inline void addCore(SMTSolver &S, unsigned int SWidth,
 }
 
 SMTExprRef SMTFPSolver::mkFPAddImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS, const RM R) {
+                                    const SMTExprRef &RHS, const RM &R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -762,11 +762,11 @@ SMTExprRef SMTFPSolver::mkFPAddImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolver::mkFPSubImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS, const RM R) {
+                                    const SMTExprRef &RHS, const RM &R) {
   return mkFPAdd(LHS, mkFPNeg(RHS), R);
 }
 
-SMTExprRef SMTFPSolver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM RM) {
+SMTExprRef SMTFPSolver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &RM) {
   unsigned ebits = Exp->Sort->getFPExponentWidth();
   unsigned sbits = Exp->Sort->getFPSignificandWidth();
 
@@ -866,7 +866,7 @@ SMTExprRef SMTFPSolver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM RM) {
 }
 
 SMTExprRef SMTFPSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                                    const SMTExprRef &Z, const RM R) {
+                                    const SMTExprRef &Z, const RM &R) {
   assert(X->getWidth() == Y->getWidth());
   assert(X->Sort->getFPExponentWidth() == Y->Sort->getFPExponentWidth());
   assert(X->getWidth() == Y->getWidth());
@@ -1200,7 +1200,7 @@ SMTExprRef SMTFPSolver::mkFPEqualImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolver::mkFPtoFPImpl(const SMTExprRef &From,
-                                     const SMTSortRef &To, const RM R) {
+                                     const SMTSortRef &To, const RM &R) {
   unsigned from_sbits = From->Sort->getFPSignificandWidth();
   unsigned from_ebits = From->Sort->getFPExponentWidth();
   unsigned to_sbits = To->getFPSignificandWidth();
@@ -1325,7 +1325,7 @@ SMTExprRef SMTFPSolver::mkFPtoFPImpl(const SMTExprRef &From,
 }
 
 SMTExprRef SMTFPSolver::mkSBVtoFPImpl(const SMTExprRef &From,
-                                      const SMTSortRef &To, const RM R) {
+                                      const SMTSortRef &To, const RM &R) {
   // This is a conversion from unsigned bitvector to float:
   // ((_ to_fp_unsigned eb sb) RM (_ BitVec m) (_ FloatingPoint eb
   // sb)) Semantics:
@@ -1427,7 +1427,7 @@ SMTExprRef SMTFPSolver::mkSBVtoFPImpl(const SMTExprRef &From,
 }
 
 SMTExprRef SMTFPSolver::mkUBVtoFPImpl(const SMTExprRef &From,
-                                      const SMTSortRef &To, const RM R) {
+                                      const SMTSortRef &To, const RM &R) {
   // This is a conversion from unsigned bitvector to float:
   // ((_ to_fp_unsigned eb sb) RM (_ BitVec m) (_ FloatingPoint eb
   // sb)) Semantics:
@@ -1870,7 +1870,7 @@ SMTExprRef SMTFPSolver::mkFP64Impl(const double Double) {
   return mkBV(FPasInt<double, int64_t>(Double), getFP64Sort());
 }
 
-SMTExprRef SMTFPSolver::mkRMImpl(const RM R) {
+SMTExprRef SMTFPSolver::mkRMImpl(const RM &R) {
   return mkBV(static_cast<int64_t>(R), getRMSort());
 }
 

@@ -378,7 +378,7 @@ SMTExprRef MathSATSolver::mkFPIsZero(const SMTExprRef &Exp) {
 }
 
 SMTExprRef MathSATSolver::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const RM R) {
+                                  const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
@@ -389,7 +389,7 @@ SMTExprRef MathSATSolver::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
 }
 
 SMTExprRef MathSATSolver::mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const RM R) {
+                                  const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
@@ -403,7 +403,7 @@ SMTExprRef MathSATSolver::mkFPRem(const SMTExprRef &, const SMTExprRef &) {
 }
 
 SMTExprRef MathSATSolver::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const RM R) {
+                                  const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
@@ -413,7 +413,7 @@ SMTExprRef MathSATSolver::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
 }
 
 SMTExprRef MathSATSolver::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const RM R) {
+                                  const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
@@ -423,7 +423,7 @@ SMTExprRef MathSATSolver::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
                          toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
-SMTExprRef MathSATSolver::mkFPSqrt(const SMTExprRef &Exp, const RM R) {
+SMTExprRef MathSATSolver::mkFPSqrt(const SMTExprRef &Exp, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, Exp->Sort,
@@ -432,7 +432,7 @@ SMTExprRef MathSATSolver::mkFPSqrt(const SMTExprRef &Exp, const RM R) {
 }
 
 SMTExprRef MathSATSolver::mkFPFMA(const SMTExprRef &, const SMTExprRef &,
-                                  const SMTExprRef &, const RM) {
+                                  const SMTExprRef &, const RM &) {
   abortWithMessage("MathSAT does not implement fp.fma");
 }
 
@@ -459,7 +459,7 @@ SMTExprRef MathSATSolver::mkFPEqual(const SMTExprRef &LHS,
 }
 
 SMTExprRef MathSATSolver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                                   const RM R) {
+                                   const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, To,
@@ -470,7 +470,7 @@ SMTExprRef MathSATSolver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
 }
 
 SMTExprRef MathSATSolver::mkSBVtoFP(const SMTExprRef &From,
-                                    const SMTSortRef &To, const RM R) {
+                                    const SMTSortRef &To, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, To,
@@ -481,7 +481,7 @@ SMTExprRef MathSATSolver::mkSBVtoFP(const SMTExprRef &From,
 }
 
 SMTExprRef MathSATSolver::mkUBVtoFP(const SMTExprRef &From,
-                                    const SMTSortRef &To, const RM R) {
+                                    const SMTSortRef &To, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, To,
@@ -624,7 +624,7 @@ SMTExprRef MathSATSolver::mkFP64(const double Double) {
           *Context, FPasInt<double, int64_t>(Double).c_str(), 11, 53)));
 }
 
-SMTExprRef MathSATSolver::mkRM(const RM R) {
+SMTExprRef MathSATSolver::mkRM(const RM &R) {
   msat_term e;
   switch (R) {
   default:

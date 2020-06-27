@@ -398,7 +398,7 @@ SMTExprRef CVC4Solver::mkFPIsZero(const SMTExprRef &Exp) {
 }
 
 SMTExprRef CVC4Solver::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RM R) {
+                               const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
@@ -409,7 +409,7 @@ SMTExprRef CVC4Solver::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
 }
 
 SMTExprRef CVC4Solver::mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RM R) {
+                               const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
@@ -428,7 +428,7 @@ SMTExprRef CVC4Solver::mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 }
 
 SMTExprRef CVC4Solver::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RM R) {
+                               const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
@@ -439,7 +439,7 @@ SMTExprRef CVC4Solver::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
 }
 
 SMTExprRef CVC4Solver::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                               const RM R) {
+                               const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
@@ -449,7 +449,7 @@ SMTExprRef CVC4Solver::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
-SMTExprRef CVC4Solver::mkFPSqrt(const SMTExprRef &Exp, const RM R) {
+SMTExprRef CVC4Solver::mkFPSqrt(const SMTExprRef &Exp, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, Exp->Sort,
@@ -459,7 +459,7 @@ SMTExprRef CVC4Solver::mkFPSqrt(const SMTExprRef &Exp, const RM R) {
 }
 
 SMTExprRef CVC4Solver::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                               const SMTExprRef &Z, const RM R) {
+                               const SMTExprRef &Z, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, X->Sort,
@@ -511,7 +511,7 @@ SMTExprRef CVC4Solver::mkFPEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 }
 
 SMTExprRef CVC4Solver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                                const RM R) {
+                                const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, To,
@@ -524,7 +524,7 @@ SMTExprRef CVC4Solver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
 }
 
 SMTExprRef CVC4Solver::mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                                 const RM R) {
+                                 const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, To,
@@ -537,7 +537,7 @@ SMTExprRef CVC4Solver::mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
 }
 
 SMTExprRef CVC4Solver::mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                                 const RM R) {
+                                 const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, To,
@@ -695,7 +695,7 @@ SMTExprRef CVC4Solver::mkFP64(const double Double) {
           11, 53, CVC4::BitVector(65, FPasInt<double, uint64_t>(Double))))));
 }
 
-SMTExprRef CVC4Solver::mkRM(const RM R) {
+SMTExprRef CVC4Solver::mkRM(const RM &R) {
   CVC4::Expr e;
   switch (R) {
   default:
