@@ -41,7 +41,7 @@ void abortCondWithMessage(bool Cond, const std::string &Msg);
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 
-enum class RoundingMode {
+enum class RM {
   ROUND_TO_EVEN = 0,
   ROUND_TO_AWAY = 1,
   ROUND_TO_PLUS_INF = 2,
@@ -75,7 +75,7 @@ public:
   virtual SMTSortRef getBVSort(const unsigned BitWidth) = 0;
 
   /// Returns an appropriate rounding mode sort.
-  virtual SMTSortRef getRoundingModeSort() = 0;
+  virtual SMTSortRef getRMSort() = 0;
 
   /// Returns an appropriate floating-point sort for the given bitwidth.
   virtual SMTSortRef getFPSort(const unsigned ExpWidth,
@@ -235,29 +235,29 @@ public:
 
   /// Creates a floating-point multiplication operation
   virtual SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) = 0;
+                             const RM R) = 0;
 
   /// Creates a floating-point division operation
   virtual SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) = 0;
+                             const RM R) = 0;
 
   /// Creates a floating-point remainder operation
   virtual SMTExprRef mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point addition operation
   virtual SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) = 0;
+                             const RM R) = 0;
 
   /// Creates a floating-point subtraction operation
   virtual SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RoundingMode R) = 0;
+                             const RM R) = 0;
 
   /// Creates a floating-point square root operation
-  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RoundingMode R) = 0;
+  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RM R) = 0;
 
   /// Creates a floating-point fused-multiply add operation: round((x * y) + z)
   virtual SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                             const SMTExprRef &Z, const RoundingMode R) = 0;
+                             const SMTExprRef &Z, const RM R) = 0;
 
   /// Creates a floating-point less-than operation
   virtual SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
@@ -282,17 +282,17 @@ public:
   /// Creates a floating-point conversion from floatint-point to floating-point
   /// operation
   virtual SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                              const RoundingMode R) = 0;
+                              const RM R) = 0;
 
   /// Creates a floating-point conversion from signed bitvector to
   /// floatint-point operation
   virtual SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RoundingMode R) = 0;
+                               const RM R) = 0;
 
   /// Creates a floating-point conversion from unsigned bitvector to
   /// floatint-point operation
   virtual SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RoundingMode R) = 0;
+                               const RM R) = 0;
 
   /// Creates a floating-point conversion from floatint-point to signed
   /// bitvector operation
@@ -304,7 +304,7 @@ public:
 
   /// Creates a floating-point conversion from floatint-point to the closest
   /// integer, considering the rounding mode.
-  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) = 0;
+  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) = 0;
 
   /// If the a model is available, returns the value of a given boolean symbol
   virtual bool getBool(const SMTExprRef &Exp) = 0;
@@ -342,7 +342,7 @@ public:
   virtual SMTExprRef mkFP64(const double Double) = 0;
 
   /// Returns an appropriate floating-point rounding mode.
-  virtual SMTExprRef mkRoundingMode(const RoundingMode R) = 0;
+  virtual SMTExprRef mkRM(const RM R) = 0;
 
   /// Convenience method to create 32 bits long NaN
   SMTExprRef mkNaN32(const bool Sgn) { return mkNaN(Sgn, 8, 24); }
@@ -395,7 +395,7 @@ protected:
                                  const unsigned SigWidth) = 0;
 
   /// Returns an appropriate rounding mode sort, encoded as a bitvector.
-  virtual SMTSortRef getBVRoundingModeSort() = 0;
+  virtual SMTSortRef getBVRMSort() = 0;
 };
 
 /// Shared pointer for SMTSolvers.

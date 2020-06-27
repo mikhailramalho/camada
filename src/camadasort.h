@@ -42,7 +42,7 @@ public:
   virtual bool isFPSort() const;
 
   /// Returns true if the sort is a rounding mode.
-  virtual bool isRoundingModeSort() const;
+  virtual bool isRMSort() const;
 
   /// Returns the sort width.
   virtual unsigned getWidth() const;
@@ -143,7 +143,7 @@ public:
 
   virtual unsigned getWidth() const override { return 3; }
 
-  virtual bool isRoundingModeSort() const override { return true; }
+  virtual bool isRMSort() const override { return true; }
 };
 
 /// Shared pointer for SMTSorts, used by SMTSolver API.

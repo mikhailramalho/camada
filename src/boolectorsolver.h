@@ -82,7 +82,7 @@ public:
   SMTSortRef getBVFPSort(const unsigned ExpWidth,
                          const unsigned SigWidth) override;
 
-  SMTSortRef getBVRoundingModeSort() override;
+  SMTSortRef getBVRMSort() override;
 
   camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
 

@@ -71,7 +71,7 @@ public:
 
   camada::SMTSortRef getBVSort(unsigned BitWidth) override;
 
-  camada::SMTSortRef getRoundingModeSort() override;
+  camada::SMTSortRef getRMSort() override;
 
   SMTSortRef getFPSort(const unsigned ExpWidth,
                        const unsigned SigWidth) override;
@@ -79,7 +79,7 @@ public:
   SMTSortRef getBVFPSort(const unsigned ExpWidth,
                          const unsigned SigWidth) override;
 
-  SMTSortRef getBVRoundingModeSort() override;
+  SMTSortRef getBVRMSort() override;
 
   camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
 
@@ -193,23 +193,23 @@ public:
   SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override;
 
   SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
+                     const RM R) override;
 
   SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
+                     const RM R) override;
 
   SMTExprRef mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
+                     const RM R) override;
 
   SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RoundingMode R) override;
+                     const RM R) override;
 
-  SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RoundingMode R) override;
+  SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RM R) override;
 
   SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                     const SMTExprRef &Z, const RoundingMode R) override;
+                     const SMTExprRef &Z, const RM R) override;
 
   SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
@@ -222,19 +222,19 @@ public:
   SMTExprRef mkFPEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                      const RoundingMode R) override;
+                      const RM R) override;
 
   SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RoundingMode R) override;
+                       const RM R) override;
 
   SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RoundingMode R) override;
+                       const RM R) override;
 
   SMTExprRef mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) override;
 
   SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) override;
 
-  SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RoundingMode R) override;
+  SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) override;
 
   bool getBool(const camada::SMTExprRef &Exp) override;
 
@@ -255,7 +255,7 @@ public:
 
   SMTExprRef mkFP64(const double Double) override;
 
-  SMTExprRef mkRoundingMode(const RoundingMode R) override;
+  SMTExprRef mkRM(const RM R) override;
 
   SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
                    const unsigned SigWidth) override;

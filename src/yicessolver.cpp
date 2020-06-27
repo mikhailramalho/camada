@@ -95,7 +95,7 @@ SMTSortRef YicesSolver::getBVSort(unsigned BitWidth) {
                                       yices_bv_type(BitWidth)));
 }
 
-SMTSortRef YicesSolver::getBVRoundingModeSort() {
+SMTSortRef YicesSolver::getBVRMSort() {
   return newSortRef<camada::SolverRMSort<YicesSort>>(
       camada::SolverRMSort<YicesSort>(Context, yices_bv_type(3)));
 }

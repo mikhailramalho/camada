@@ -64,7 +64,7 @@ void camada::SMTSort::dump() const {
     k = "Bool";
   else if (isBVSort())
     k = "Bitvector";
-  else if (isRoundingModeSort())
+  else if (isRMSort())
     k = "RoundingMode";
   else if (isFPSort())
     k = "Floating-point";
@@ -107,7 +107,7 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
   if (LHS.isBoolSort() && RHS.isBoolSort())
     return true;
 
-  if (LHS.isRoundingModeSort() && RHS.isRoundingModeSort())
+  if (LHS.isRMSort() && RHS.isRMSort())
     return true;
 
   if (LHS.getWidth() != RHS.getWidth())
@@ -129,7 +129,7 @@ bool SMTSort::isBoolSort() const { return false; }
 
 bool SMTSort::isFPSort() const { return false; }
 
-bool SMTSort::isRoundingModeSort() const { return false; }
+bool SMTSort::isRMSort() const { return false; }
 
 unsigned SMTSort::getFPSignificandWidthImpl() const {
   abortWithMessage("Unimplemented for current type");

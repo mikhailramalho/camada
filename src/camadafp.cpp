@@ -191,16 +191,16 @@ static inline SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
 }
 
 static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
-                                const RoundingMode R) {
+                                const RM R) {
   SMTExprRef RNum = S.mkBV(static_cast<int64_t>(R), 3);
   switch (R) {
   default:
     camada::abortWithMessage("Unsupported floating-point semantics.");
-  case RoundingMode::ROUND_TO_EVEN:
-  case RoundingMode::ROUND_TO_AWAY:
-  case RoundingMode::ROUND_TO_PLUS_INF:
-  case RoundingMode::ROUND_TO_MINUS_INF:
-  case RoundingMode::ROUND_TO_ZERO:
+  case RM::ROUND_TO_EVEN:
+  case RM::ROUND_TO_AWAY:
+  case RM::ROUND_TO_PLUS_INF:
+  case RM::ROUND_TO_MINUS_INF:
+  case RM::ROUND_TO_ZERO:
     return S.mkEqual(RME, RNum);
   }
 }
@@ -224,10 +224,10 @@ static inline SMTExprRef mkRoundingDecision(SMTSolver &S, SMTExprRef &R,
 
   SMTExprRef nil_1 = S.mkBV(0, 1);
 
-  SMTExprRef rm_is_to_neg = mkIsRM(S, R, RoundingMode::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_is_to_pos = mkIsRM(S, R, RoundingMode::ROUND_TO_PLUS_INF);
-  SMTExprRef rm_is_away = mkIsRM(S, R, RoundingMode::ROUND_TO_AWAY);
-  SMTExprRef rm_is_even = mkIsRM(S, R, RoundingMode::ROUND_TO_EVEN);
+  SMTExprRef rm_is_to_neg = mkIsRM(S, R, RM::ROUND_TO_MINUS_INF);
+  SMTExprRef rm_is_to_pos = mkIsRM(S, R, RM::ROUND_TO_PLUS_INF);
+  SMTExprRef rm_is_away = mkIsRM(S, R, RM::ROUND_TO_AWAY);
+  SMTExprRef rm_is_even = mkIsRM(S, R, RM::ROUND_TO_EVEN);
 
   SMTExprRef inc_c4 = S.mkIte(rm_is_to_neg, inc_neg, nil_1);
   SMTExprRef inc_c3 = S.mkIte(rm_is_to_pos, inc_pos, inc_c4);
@@ -297,9 +297,7 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
   assert(Sig->getWidth() == SWidth);
 }
 
-SMTSortRef SMTFPSolver::getRoundingModeSortImpl() {
-  return getBVRoundingModeSort();
-}
+SMTSortRef SMTFPSolver::getRMSortImpl() { return getBVRMSort(); }
 
 SMTSortRef SMTFPSolver::getFPSortImpl(const unsigned ExpWidth,
                                       const unsigned SigWidth) {
@@ -390,8 +388,7 @@ SMTExprRef SMTFPSolver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef SMTFPSolver::mkFPMulImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS,
-                                    const RoundingMode R) {
+                                    const SMTExprRef &RHS, const RM R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -476,7 +473,7 @@ SMTExprRef SMTFPSolver::mkFPMulImpl(const SMTExprRef &LHS,
   assert(rbits->getWidth() == 4);
   res_sig = mkBVConcat(h_p, rbits);
 
-  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef rm = mkRM(R);
   SMTExprRef v7 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
 
   // And finally, we tie them together.
@@ -489,8 +486,7 @@ SMTExprRef SMTFPSolver::mkFPMulImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolver::mkFPDivImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS,
-                                    const RoundingMode R) {
+                                    const SMTExprRef &RHS, const RM R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -588,7 +584,7 @@ SMTExprRef SMTFPSolver::mkFPDivImpl(const SMTExprRef &LHS,
   res_sig = mkIte(shift_cond, res_sig, res_sig_shifted);
   res_exp = mkIte(shift_cond, res_exp, res_exp_shifted);
 
-  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef rm = mkRM(R);
   SMTExprRef v8 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
 
   // And finally, we tie them together.
@@ -678,8 +674,7 @@ static inline void addCore(SMTSolver &S, unsigned int SWidth,
 }
 
 SMTExprRef SMTFPSolver::mkFPAddImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS,
-                                    const RoundingMode R) {
+                                    const SMTExprRef &RHS, const RM R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -717,8 +712,8 @@ SMTExprRef SMTFPSolver::mkFPAddImpl(const SMTExprRef &LHS,
   SMTExprRef c4 = mkAnd(x_is_zero, y_is_zero);
   SMTExprRef signs_and = mkAnd(x_is_neg, y_is_neg);
   SMTExprRef signs_xor = mkXor(x_is_neg, y_is_neg);
-  SMTExprRef rm = mkRoundingMode(R);
-  SMTExprRef rm_is_to_neg = mkIsRM(*this, rm, RoundingMode::ROUND_TO_MINUS_INF);
+  SMTExprRef rm = mkRM(R);
+  SMTExprRef rm_is_to_neg = mkIsRM(*this, rm, RM::ROUND_TO_MINUS_INF);
   SMTExprRef rm_and_xor = mkAnd(rm_is_to_neg, signs_xor);
   SMTExprRef neg_cond = mkOr(signs_and, rm_and_xor);
   SMTExprRef v4 = mkIte(neg_cond, nzero, pzero);
@@ -767,13 +762,11 @@ SMTExprRef SMTFPSolver::mkFPAddImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolver::mkFPSubImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS,
-                                    const RoundingMode R) {
+                                    const SMTExprRef &RHS, const RM R) {
   return mkFPAdd(LHS, mkFPNeg(RHS), R);
 }
 
-SMTExprRef SMTFPSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
-                                     const RoundingMode RM) {
+SMTExprRef SMTFPSolver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM RM) {
   unsigned ebits = Exp->Sort->getFPExponentWidth();
   unsigned sbits = Exp->Sort->getFPSignificandWidth();
 
@@ -862,7 +855,7 @@ SMTExprRef SMTFPSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
 
   assert(res_sig->getWidth() == sbits + 4);
 
-  SMTExprRef rm = mkRoundingMode(RM);
+  SMTExprRef rm = mkRM(RM);
   SMTExprRef v5 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
 
   // And finally, we tie them together.
@@ -873,7 +866,7 @@ SMTExprRef SMTFPSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTFPSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                                    const SMTExprRef &Z, const RoundingMode R) {
+                                    const SMTExprRef &Z, const RM R) {
   assert(X->getWidth() == Y->getWidth());
   assert(X->Sort->getFPExponentWidth() == Y->Sort->getFPExponentWidth());
   assert(X->getWidth() == Y->getWidth());
@@ -901,8 +894,8 @@ SMTExprRef SMTFPSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef z_is_neg = mkIsNeg(*this, Z);
   SMTExprRef z_is_inf = mkFPIsInfinite(Z);
 
-  SMTExprRef rm = mkRoundingMode(R);
-  SMTExprRef rm_is_to_neg = mkIsRM(*this, rm, RoundingMode::ROUND_TO_MINUS_INF);
+  SMTExprRef rm = mkRM(R);
+  SMTExprRef rm_is_to_neg = mkIsRM(*this, rm, RM::ROUND_TO_MINUS_INF);
 
   SMTExprRef inf_xor = mkXor(x_is_neg, y_is_neg);
   inf_xor = mkXor(inf_xor, z_is_neg);
@@ -1207,8 +1200,7 @@ SMTExprRef SMTFPSolver::mkFPEqualImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTFPSolver::mkFPtoFPImpl(const SMTExprRef &From,
-                                     const SMTSortRef &To,
-                                     const RoundingMode R) {
+                                     const SMTSortRef &To, const RM R) {
   unsigned from_sbits = From->Sort->getFPSignificandWidth();
   unsigned from_ebits = From->Sort->getFPExponentWidth();
   unsigned to_sbits = To->getFPSignificandWidth();
@@ -1316,7 +1308,7 @@ SMTExprRef SMTFPSolver::mkFPtoFPImpl(const SMTExprRef &From,
 
   assert(res_exp->getWidth() == to_ebits + 2);
 
-  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef rm = mkRM(R);
   SMTExprRef rounded = round(rm, res_sgn, res_sig, res_exp, to_ebits, to_sbits);
 
   SMTExprRef is_neg = mkEqual(sgn, one1);
@@ -1333,10 +1325,9 @@ SMTExprRef SMTFPSolver::mkFPtoFPImpl(const SMTExprRef &From,
 }
 
 SMTExprRef SMTFPSolver::mkSBVtoFPImpl(const SMTExprRef &From,
-                                      const SMTSortRef &To,
-                                      const RoundingMode R) {
+                                      const SMTSortRef &To, const RM R) {
   // This is a conversion from unsigned bitvector to float:
-  // ((_ to_fp_unsigned eb sb) RoundingMode (_ BitVec m) (_ FloatingPoint eb
+  // ((_ to_fp_unsigned eb sb) RM (_ BitVec m) (_ FloatingPoint eb
   // sb)) Semantics:
   //    Let b in[[(_ BitVec m)]] and let n be the unsigned integer represented
   //    by b.
@@ -1430,16 +1421,15 @@ SMTExprRef SMTFPSolver::mkSBVtoFPImpl(const SMTExprRef &From,
   assert(sig->getWidth() == sbits + 4);
   assert(exp->getWidth() == ebits + 2);
 
-  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef rm = mkRM(R);
   SMTExprRef v2 = round(rm, sgn, sig, exp, ebits, sbits);
   return mkIte(c1, v1, v2);
 }
 
 SMTExprRef SMTFPSolver::mkUBVtoFPImpl(const SMTExprRef &From,
-                                      const SMTSortRef &To,
-                                      const RoundingMode R) {
+                                      const SMTSortRef &To, const RM R) {
   // This is a conversion from unsigned bitvector to float:
-  // ((_ to_fp_unsigned eb sb) RoundingMode (_ BitVec m) (_ FloatingPoint eb
+  // ((_ to_fp_unsigned eb sb) RM (_ BitVec m) (_ FloatingPoint eb
   // sb)) Semantics:
   //    Let b in[[(_ BitVec m)]] and let n be the unsigned integer represented
   //    by b.
@@ -1528,14 +1518,14 @@ SMTExprRef SMTFPSolver::mkUBVtoFPImpl(const SMTExprRef &From,
   assert(sig->getWidth() == sbits + 4);
   assert(exp->getWidth() == ebits + 2);
 
-  SMTExprRef rm = mkRoundingMode(R);
+  SMTExprRef rm = mkRM(R);
   SMTExprRef v2 = round(rm, sgn, sig, exp, ebits, sbits);
   return mkIte(c1, v1, v2);
 }
 
 SMTExprRef SMTFPSolver::mkToBV(SMTExprRef Exp, bool isSigned,
                                unsigned int ToWidth) {
-  SMTExprRef rm = mkRoundingMode(RoundingMode::ROUND_TO_ZERO);
+  SMTExprRef rm = mkRM(RM::ROUND_TO_ZERO);
   SMTSortRef xs = Exp->Sort;
 
   unsigned ebits = xs->getFPExponentWidth();
@@ -1655,17 +1645,16 @@ SMTExprRef SMTFPSolver::mkFPtoUBVImpl(const SMTExprRef &From,
   return mkToBV(From, false, ToWidth);
 }
 
-SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
-                                           RoundingMode R) {
+SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From, RM R) {
   unsigned ebits = From->Sort->getFPExponentWidth();
   unsigned sbits = From->Sort->getFPSignificandWidth();
 
-  SMTExprRef rm = mkRoundingMode(R);
-  SMTExprRef rm_is_rta = mkIsRM(*this, rm, RoundingMode::ROUND_TO_AWAY);
-  SMTExprRef rm_is_rte = mkIsRM(*this, rm, RoundingMode::ROUND_TO_EVEN);
-  SMTExprRef rm_is_rtp = mkIsRM(*this, rm, RoundingMode::ROUND_TO_PLUS_INF);
-  SMTExprRef rm_is_rtn = mkIsRM(*this, rm, RoundingMode::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_is_rtz = mkIsRM(*this, rm, RoundingMode::ROUND_TO_ZERO);
+  SMTExprRef rm = mkRM(R);
+  SMTExprRef rm_is_rta = mkIsRM(*this, rm, RM::ROUND_TO_AWAY);
+  SMTExprRef rm_is_rte = mkIsRM(*this, rm, RM::ROUND_TO_EVEN);
+  SMTExprRef rm_is_rtp = mkIsRM(*this, rm, RM::ROUND_TO_PLUS_INF);
+  SMTExprRef rm_is_rtn = mkIsRM(*this, rm, RM::ROUND_TO_MINUS_INF);
+  SMTExprRef rm_is_rtz = mkIsRM(*this, rm, RM::ROUND_TO_ZERO);
 
   SMTExprRef nzero = mkNZero(*this, ebits, sbits);
   SMTExprRef pzero = mkPZero(*this, ebits, sbits);
@@ -1881,8 +1870,8 @@ SMTExprRef SMTFPSolver::mkFP64Impl(const double Double) {
   return mkBV(FPasInt<double, int64_t>(Double), getFP64Sort());
 }
 
-SMTExprRef SMTFPSolver::mkRoundingModeImpl(const RoundingMode R) {
-  return mkBV(static_cast<int64_t>(R), getRoundingModeSort());
+SMTExprRef SMTFPSolver::mkRMImpl(const RM R) {
+  return mkBV(static_cast<int64_t>(R), getRMSort());
 }
 
 SMTExprRef SMTFPSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
@@ -2052,9 +2041,9 @@ SMTExprRef SMTFPSolver::round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
 
   SMTExprRef nil_1 = mkBV(0, 1);
 
-  SMTExprRef rm_is_to_zero = mkIsRM(*this, R, RoundingMode::ROUND_TO_ZERO);
-  SMTExprRef rm_is_to_neg = mkIsRM(*this, R, RoundingMode::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_is_to_pos = mkIsRM(*this, R, RoundingMode::ROUND_TO_PLUS_INF);
+  SMTExprRef rm_is_to_zero = mkIsRM(*this, R, RM::ROUND_TO_ZERO);
+  SMTExprRef rm_is_to_neg = mkIsRM(*this, R, RM::ROUND_TO_MINUS_INF);
+  SMTExprRef rm_is_to_pos = mkIsRM(*this, R, RM::ROUND_TO_PLUS_INF);
   SMTExprRef rm_zero_or_neg = mkOr(rm_is_to_zero, rm_is_to_neg);
   SMTExprRef rm_zero_or_pos = mkOr(rm_is_to_zero, rm_is_to_pos);
 
