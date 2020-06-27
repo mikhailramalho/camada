@@ -50,7 +50,7 @@ public:
   void dump() const override;
 }; // end class MathSATExpr
 
-class MathSATSolver : public camada::SMTFPSolver {
+class MathSATSolver : public SMTFPSolver {
 public:
   MathSATContextRef Context;
 
@@ -61,15 +61,15 @@ public:
   explicit MathSATSolver(const msat_config &Config);
   virtual ~MathSATSolver();
 
-  void addConstraint(const camada::SMTExprRef &Exp) override;
+  void addConstraint(const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef newExprRef(const camada::SMTExpr &Exp) const override;
+  SMTExprRef newExprRef(const SMTExpr &Exp) const override;
 
-  camada::SMTSortRef getBoolSort() override;
+  SMTSortRef getBoolSort() override;
 
-  camada::SMTSortRef getBVSort(unsigned BitWidth) override;
+  SMTSortRef getBVSort(unsigned BitWidth) override;
 
-  camada::SMTSortRef getRMSort() override;
+  SMTSortRef getRMSort() override;
 
   SMTSortRef getFPSort(const unsigned ExpWidth,
                        const unsigned SigWidth) override;
@@ -79,87 +79,63 @@ public:
 
   SMTSortRef getBVRMSort() override;
 
-  camada::SMTExprRef mkBVNeg(const camada::SMTExprRef &Exp) override;
+  SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef mkBVNot(const camada::SMTExprRef &Exp) override;
+  SMTExprRef mkBVNot(const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef mkNot(const camada::SMTExprRef &Exp) override;
+  SMTExprRef mkNot(const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef mkBVAdd(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVSub(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVMul(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVSRem(const camada::SMTExprRef &LHS,
-                              const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVURem(const camada::SMTExprRef &LHS,
-                              const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVSDiv(const camada::SMTExprRef &LHS,
-                              const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVUDiv(const camada::SMTExprRef &LHS,
-                              const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVShl(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVAshr(const camada::SMTExprRef &LHS,
-                              const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVLshr(const camada::SMTExprRef &LHS,
-                              const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVXor(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVOr(const camada::SMTExprRef &LHS,
-                            const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVAnd(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVUlt(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVSlt(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVUle(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkBVSle(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkAnd(const camada::SMTExprRef &LHS,
-                           const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkOr(const camada::SMTExprRef &LHS,
-                          const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkEqual(const camada::SMTExprRef &LHS,
-                             const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkIte(const camada::SMTExprRef &Cond,
-                           const camada::SMTExprRef &T,
-                           const camada::SMTExprRef &F) override;
+  SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
+                   const SMTExprRef &F) override;
 
-  camada::SMTExprRef mkBVSignExt(unsigned i,
-                                 const camada::SMTExprRef &Exp) override;
+  SMTExprRef mkBVSignExt(unsigned i, const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef mkBVZeroExt(unsigned i,
-                                 const camada::SMTExprRef &Exp) override;
+  SMTExprRef mkBVZeroExt(unsigned i, const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef mkBVExtract(unsigned High, unsigned Low,
-                                 const camada::SMTExprRef &Exp) override;
+  SMTExprRef mkBVExtract(unsigned High, unsigned Low,
+                         const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef mkBVConcat(const camada::SMTExprRef &LHS,
-                                const camada::SMTExprRef &RHS) override;
+  SMTExprRef mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkFPAbs(const SMTExprRef &Exp) override;
 
@@ -215,20 +191,19 @@ public:
 
   SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) override;
 
-  bool getBool(const camada::SMTExprRef &Exp) override;
+  bool getBool(const SMTExprRef &Exp) override;
 
-  int64_t getBV(const camada::SMTExprRef &Exp) override;
+  int64_t getBV(const SMTExprRef &Exp) override;
 
-  float getFP32(const camada::SMTExprRef &Exp) override;
+  float getFP32(const SMTExprRef &Exp) override;
 
-  double getFP64(const camada::SMTExprRef &Exp) override;
+  double getFP64(const SMTExprRef &Exp) override;
 
-  camada::SMTExprRef mkBool(const bool b) override;
+  SMTExprRef mkBool(const bool b) override;
 
-  camada::SMTExprRef mkBV(const int64_t Int, const SMTSortRef &Sort) override;
+  SMTExprRef mkBV(const int64_t Int, const SMTSortRef &Sort) override;
 
-  camada::SMTExprRef mkSymbol(const char *Name,
-                              camada::SMTSortRef Sort) override;
+  SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) override;
 
   SMTExprRef mkFP32(const float Float) override;
 
@@ -246,7 +221,7 @@ public:
 
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override;
 
-  camada::checkResult check() override;
+  checkResult check() override;
 
   void reset() override;
 
