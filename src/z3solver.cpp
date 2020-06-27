@@ -82,8 +82,8 @@ SMTSortRef Z3Solver::getRoundingModeSort() {
       Context, z3::to_sort(*Context, Z3_mk_fpa_rounding_mode_sort(*Context))));
 }
 
-SMTSortRef Z3Solver::getFloatSort(const unsigned ExpWidth,
-                                  const unsigned SigWidth) {
+SMTSortRef Z3Solver::getFPSort(const unsigned ExpWidth,
+                               const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<Z3Sort>>(
       camada::SolverFPSort<Z3Sort>(ExpWidth, SigWidth + 1, Context,
                                    Context->fpa_sort(ExpWidth, SigWidth + 1)));
@@ -94,8 +94,8 @@ SMTSortRef Z3Solver::getBVRoundingModeSort() {
       camada::SolverRMSort<Z3Sort>(Context, Context->bv_sort(3)));
 }
 
-SMTSortRef Z3Solver::getBVFloatSort(const unsigned ExpWidth,
-                                    const unsigned SigWidth) {
+SMTSortRef Z3Solver::getBVFPSort(const unsigned ExpWidth,
+                                 const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<Z3Sort>>(
       camada::SolverFPSort<Z3Sort>(ExpWidth, SigWidth + 1, Context,
                                    Context->bv_sort(ExpWidth + SigWidth + 1)));
@@ -551,8 +551,8 @@ int64_t Z3Solver::getBitvector(const SMTExprRef &Exp) {
 
 template <typename FPType, typename IntType,
           bool (*Z3Func)(Z3_context c, Z3_ast v, IntType *i)>
-static inline FPType getFP(const Z3ContextRef &C, const z3::model &Model,
-                           const SMTExprRef &Exp) {
+static inline FPType getFPValue(const Z3ContextRef &C, const z3::model &Model,
+                                const SMTExprRef &Exp) {
   // TODO: what about negative NaN?
   if (Z3_fpa_is_numeral_nan(*C, toSolverExpr<Z3Expr>(*Exp).Expr))
     return NAN;
@@ -582,15 +582,15 @@ static inline FPType getFP(const Z3ContextRef &C, const z3::model &Model,
   return result;
 }
 
-float Z3Solver::getFloat(const SMTExprRef &Exp) {
+float Z3Solver::getFP(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
-  return getFP<float, int32_t, Z3_get_numeral_int>(Context, Solver.get_model(),
-                                                   value);
+  return getFPValue<float, int32_t, Z3_get_numeral_int>(
+      Context, Solver.get_model(), value);
 }
 
 double Z3Solver::getDouble(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
-  return getFP<double, int64_t, Z3_get_numeral_int64>(
+  return getFPValue<double, int64_t, Z3_get_numeral_int64>(
       Context, Solver.get_model(), value);
 }
 
@@ -609,13 +609,12 @@ SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
              Context->constant(Name, toSolverSort<Z3Sort>(*Sort).Sort)));
 }
 
-SMTExprRef Z3Solver::mkFloat(const float Float) {
-  return newExprRef(Z3Expr(Context, getFloat32Sort(), Context->fpa_val(Float)));
+SMTExprRef Z3Solver::mkFP(const float Float) {
+  return newExprRef(Z3Expr(Context, getFP32Sort(), Context->fpa_val(Float)));
 }
 
 SMTExprRef Z3Solver::mkDouble(const double Double) {
-  return newExprRef(
-      Z3Expr(Context, getFloat64Sort(), Context->fpa_val(Double)));
+  return newExprRef(Z3Expr(Context, getFP64Sort(), Context->fpa_val(Double)));
 }
 
 SMTExprRef Z3Solver::mkRoundingMode(const RoundingMode R) {
@@ -644,7 +643,7 @@ SMTExprRef Z3Solver::mkRoundingMode(const RoundingMode R) {
 
 SMTExprRef Z3Solver::mkNaN(const bool Sgn, const unsigned ExpWidth,
                            const unsigned SigWidth) {
-  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
+  SMTSortRef sort = getFPSort(ExpWidth, SigWidth);
   SMTExprRef theNaN = newExprRef(Z3Expr(
       Context, sort,
       z3::to_expr(*Context,
@@ -655,7 +654,7 @@ SMTExprRef Z3Solver::mkNaN(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef Z3Solver::mkInf(const bool Sgn, const unsigned ExpWidth,
                            const unsigned SigWidth) {
-  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
+  SMTSortRef sort = getFPSort(ExpWidth, SigWidth);
   return newExprRef(Z3Expr(
       Context, sort,
       z3::to_expr(

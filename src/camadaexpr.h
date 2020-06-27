@@ -47,7 +47,7 @@ public:
   virtual bool isBoolSort() const = 0;
 
   /// Returns true if the expr sort is floating-point
-  virtual bool isFloatSort() const = 0;
+  virtual bool isFPSort() const = 0;
 
   /// Returns true if the expr sort is rounding mode
   virtual bool isRoundingModeSort() = 0;
@@ -83,7 +83,7 @@ public:
 
   virtual bool isBoolSort() const { return Sort->isBoolSort(); }
 
-  virtual bool isFloatSort() const { return Sort->isFloatSort(); }
+  virtual bool isFPSort() const { return Sort->isFPSort(); }
 
   virtual bool isRoundingModeSort() { return Sort->isRoundingModeSort(); }
 

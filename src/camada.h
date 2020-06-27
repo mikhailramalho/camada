@@ -78,14 +78,14 @@ public:
   virtual SMTSortRef getRoundingModeSort() = 0;
 
   /// Returns an appropriate floating-point sort for the given bitwidth.
-  virtual SMTSortRef getFloatSort(const unsigned ExpWidth,
-                                  const unsigned SigWidth) = 0;
+  virtual SMTSortRef getFPSort(const unsigned ExpWidth,
+                               const unsigned SigWidth) = 0;
 
   /// Convenience method to create a 32 bits long a floating-point sort.
-  SMTSortRef getFloat32Sort() { return getFloatSort(8, 24); }
+  SMTSortRef getFP32Sort() { return getFPSort(8, 24); }
 
   /// Convenience method to create a 64 bits long a floating-point sort.
-  SMTSortRef getFloat64Sort() { return getFloatSort(11, 53); }
+  SMTSortRef getFP64Sort() { return getFPSort(11, 53); }
 
   /// Given a constraint, adds it to the solver
   virtual void addConstraint(const SMTExprRef &Exp) = 0;
@@ -315,7 +315,7 @@ public:
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as float
-  virtual float getFloat(const SMTExprRef &Exp) = 0;
+  virtual float getFP(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as double
@@ -336,7 +336,7 @@ public:
   virtual SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) = 0;
 
   /// Constructs an SMTExprRef from a float.
-  virtual SMTExprRef mkFloat(const float Float) = 0;
+  virtual SMTExprRef mkFP(const float Float) = 0;
 
   /// Constructs an SMTExprRef from a double.
   virtual SMTExprRef mkDouble(const double Double) = 0;
@@ -344,19 +344,11 @@ public:
   /// Returns an appropriate floating-point rounding mode.
   virtual SMTExprRef mkRoundingMode(const RoundingMode R) = 0;
 
-  /// Returns a NaN floating-point
-  virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) = 0;
-
   /// Convenience method to create 32 bits long NaN
   SMTExprRef mkNaN32(const bool Sgn) { return mkNaN(Sgn, 8, 24); }
 
   /// Convenience method to create 64 bits long NaN
   SMTExprRef mkNaN64(const bool Sgn) { return mkNaN(Sgn, 11, 53); }
-
-  /// Returns a Inf floating-point
-  virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) = 0;
 
   /// Convenience method to create 32 bits long Inf
   SMTExprRef mkInf32(const bool Sgn) { return mkInf(Sgn, 8, 24); }
@@ -390,9 +382,17 @@ protected:
   /// false
   bool useCamadaFP = false;
 
+  /// Returns a NaN floating-point
+  virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
+                           const unsigned SigWidth) = 0;
+
+  /// Returns a Inf floating-point
+  virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
+                           const unsigned SigWidth) = 0;
+
   /// Returns an appropriate floating-point sort, encoded as a bitvector.
-  virtual SMTSortRef getBVFloatSort(const unsigned ExpWidth,
-                                    const unsigned SigWidth) = 0;
+  virtual SMTSortRef getBVFPSort(const unsigned ExpWidth,
+                                 const unsigned SigWidth) = 0;
 
   /// Returns an appropriate rounding mode sort, encoded as a bitvector.
   virtual SMTSortRef getBVRoundingModeSort() = 0;

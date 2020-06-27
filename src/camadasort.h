@@ -39,7 +39,7 @@ public:
   virtual bool isBoolSort() const;
 
   /// Returns true if the sort is a floating-point.
-  virtual bool isFloatSort() const;
+  virtual bool isFPSort() const;
 
   /// Returns true if the sort is a rounding mode.
   virtual bool isRoundingModeSort() const;
@@ -49,11 +49,11 @@ public:
 
   /// Returns the floating-point significand width, fails if the sort is not a
   /// floating-point.
-  virtual unsigned getFloatSignificandWidth() const;
+  virtual unsigned getFPSignificandWidth() const;
 
   /// Returns the floating-point exponent width, fails if the sort is not a
   /// floating-point.
-  virtual unsigned getFloatExponentWidth() const;
+  virtual unsigned getFPExponentWidth() const;
 
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
@@ -63,10 +63,10 @@ public:
 
 protected:
   /// Returns the floating-point sort significand bit width.
-  virtual unsigned getFloatSignificandWidthImpl() const;
+  virtual unsigned getFPSignificandWidthImpl() const;
 
   /// Returns the floating-point sort exponent bit width.
-  virtual unsigned getFloatExponentWidthImpl() const;
+  virtual unsigned getFPExponentWidthImpl() const;
 };
 
 /// Template to hold Solver specific Context and Sort
@@ -123,17 +123,15 @@ public:
       : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
   virtual ~SolverFPSort() = default;
 
-  virtual bool isFloatSort() const override { return true; }
+  virtual bool isFPSort() const override { return true; }
 
   virtual unsigned getWidth() const override { return ExpWidth + SigWidth; }
 
-  virtual unsigned getFloatSignificandWidthImpl() const override {
+  virtual unsigned getFPSignificandWidthImpl() const override {
     return SigWidth;
   }
 
-  virtual unsigned getFloatExponentWidthImpl() const override {
-    return ExpWidth;
-  }
+  virtual unsigned getFPExponentWidthImpl() const override { return ExpWidth; }
 };
 
 template <typename SolverSortBase> class SolverRMSort : public SolverSortBase {

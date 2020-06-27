@@ -66,14 +66,14 @@ void camada::SMTSort::dump() const {
     k = "Bitvector";
   else if (isRoundingModeSort())
     k = "RoundingMode";
-  else if (isFloatSort())
+  else if (isFPSort())
     k = "Floating-point";
 
   std::cerr << "kind: " << k << '\n';
   std::cerr << "width: " << getWidth();
-  if (isFloatSort())
-    std::cerr << " (exp: " << getFloatExponentWidth()
-              << ", sig: " << getFloatSignificandWidth() << ")";
+  if (isFPSort())
+    std::cerr << " (exp: " << getFPExponentWidth()
+              << ", sig: " << getFPSignificandWidth() << ")";
   std::cerr << '\n';
 }
 
@@ -93,14 +93,14 @@ unsigned SMTSort::getWidth() const {
   abortWithMessage("Unimplemented for current type");
 }
 
-unsigned SMTSort::getFloatSignificandWidth() const {
-  abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
-  return getFloatSignificandWidthImpl();
+unsigned SMTSort::getFPSignificandWidth() const {
+  abortCondWithMessage(isFPSort(), "Not a floating-point sort!");
+  return getFPSignificandWidthImpl();
 }
 
-unsigned SMTSort::getFloatExponentWidth() const {
-  abortCondWithMessage(isFloatSort(), "Not a floating-point sort!");
-  return getFloatExponentWidthImpl();
+unsigned SMTSort::getFPExponentWidth() const {
+  abortCondWithMessage(isFPSort(), "Not a floating-point sort!");
+  return getFPExponentWidthImpl();
 }
 
 bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
@@ -116,9 +116,9 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
   if (LHS.isBitvectorSort() && RHS.isBitvectorSort())
     return true; // Width was already checked
 
-  if (LHS.isFloatSort() && RHS.isFloatSort())
-    return (LHS.getFloatSignificandWidth() == RHS.getFloatSignificandWidth()) &&
-           (LHS.getFloatExponentWidth() == RHS.getFloatExponentWidth());
+  if (LHS.isFPSort() && RHS.isFPSort())
+    return (LHS.getFPSignificandWidth() == RHS.getFPSignificandWidth()) &&
+           (LHS.getFPExponentWidth() == RHS.getFPExponentWidth());
 
   return false;
 }
@@ -127,15 +127,15 @@ bool SMTSort::isBitvectorSort() const { return false; }
 
 bool SMTSort::isBoolSort() const { return false; }
 
-bool SMTSort::isFloatSort() const { return false; }
+bool SMTSort::isFPSort() const { return false; }
 
 bool SMTSort::isRoundingModeSort() const { return false; }
 
-unsigned SMTSort::getFloatSignificandWidthImpl() const {
+unsigned SMTSort::getFPSignificandWidthImpl() const {
   abortWithMessage("Unimplemented for current type");
 }
 
-unsigned SMTSort::getFloatExponentWidthImpl() const {
+unsigned SMTSort::getFPExponentWidthImpl() const {
   abortWithMessage("Unimplemented for current type");
 }
 

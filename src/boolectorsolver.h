@@ -79,8 +79,8 @@ public:
 
   camada::SMTSortRef getBitvectorSort(unsigned BitWidth) override;
 
-  SMTSortRef getBVFloatSort(const unsigned ExpWidth,
-                            const unsigned SigWidth) override;
+  SMTSortRef getBVFPSort(const unsigned ExpWidth,
+                         const unsigned SigWidth) override;
 
   SMTSortRef getBVRoundingModeSort() override;
 

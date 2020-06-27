@@ -90,8 +90,8 @@ SMTSortRef BtorSolver::getBitvectorSort(unsigned BitWidth) {
           boolector_bitvec_sort(Context->Context, BitWidth)));
 }
 
-SMTSortRef BtorSolver::getBVFloatSort(const unsigned ExpWidth,
-                                      const unsigned SigWidth) {
+SMTSortRef BtorSolver::getBVFPSort(const unsigned ExpWidth,
+                                   const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<BtorSort>>(
       camada::SolverFPSort<BtorSort>(
           ExpWidth, SigWidth + 1, Context,

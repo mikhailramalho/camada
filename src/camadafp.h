@@ -37,11 +37,11 @@ public:
     return getRoundingModeSortImpl();
   }
 
-  virtual SMTSortRef getFloatSort(const unsigned ExpWidth,
-                                  const unsigned SigWidth) override {
+  virtual SMTSortRef getFPSort(const unsigned ExpWidth,
+                               const unsigned SigWidth) override {
     if (useCamadaFP)
-      return SMTFPSolver::getFloatSortImpl(ExpWidth, SigWidth);
-    return getFloatSortImpl(ExpWidth, SigWidth);
+      return SMTFPSolver::getFPSortImpl(ExpWidth, SigWidth);
+    return getFPSortImpl(ExpWidth, SigWidth);
   }
 
   virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) override {
@@ -199,10 +199,10 @@ public:
     return mkFPtoIntegralImpl(From, R);
   }
 
-  virtual float getFloat(const SMTExprRef &Exp) override {
+  virtual float getFP(const SMTExprRef &Exp) override {
     if (useCamadaFP)
-      return SMTFPSolver::getFloatImpl(Exp);
-    return getFloatImpl(Exp);
+      return SMTFPSolver::getFPImpl(Exp);
+    return getFPImpl(Exp);
   }
 
   virtual double getDouble(const SMTExprRef &Exp) override {
@@ -211,10 +211,10 @@ public:
     return getDoubleImpl(Exp);
   }
 
-  virtual SMTExprRef mkFloat(const float Float) override {
+  virtual SMTExprRef mkFP(const float Float) override {
     if (useCamadaFP)
-      return SMTFPSolver::mkFloatImpl(Float);
-    return mkFloatImpl(Float);
+      return SMTFPSolver::mkFPImpl(Float);
+    return mkFPImpl(Float);
   }
 
   virtual SMTExprRef mkDouble(const double Double) override {
@@ -259,8 +259,8 @@ public:
 protected:
   virtual SMTSortRef getRoundingModeSortImpl();
 
-  virtual SMTSortRef getFloatSortImpl(const unsigned ExpWidth,
-                                      const unsigned SigWidth);
+  virtual SMTSortRef getFPSortImpl(const unsigned ExpWidth,
+                                   const unsigned SigWidth);
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
 
@@ -317,11 +317,11 @@ protected:
 
   virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, RoundingMode R);
 
-  virtual float getFloatImpl(const SMTExprRef &Exp);
+  virtual float getFPImpl(const SMTExprRef &Exp);
 
   virtual double getDoubleImpl(const SMTExprRef &Exp);
 
-  virtual SMTExprRef mkFloatImpl(const float Float);
+  virtual SMTExprRef mkFPImpl(const float Float);
 
   virtual SMTExprRef mkDoubleImpl(const double Double);
 

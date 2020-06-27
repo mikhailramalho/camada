@@ -92,8 +92,8 @@ SMTSortRef MathSATSolver::getRoundingModeSort() {
           Context, msat_get_fp_roundingmode_type(*Context)));
 }
 
-SMTSortRef MathSATSolver::getFloatSort(const unsigned ExpWidth,
-                                       const unsigned SigWidth) {
+SMTSortRef MathSATSolver::getFPSort(const unsigned ExpWidth,
+                                    const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<MathSATSort>>(
       camada::SolverFPSort<MathSATSort>(
           ExpWidth, SigWidth + 1, Context,
@@ -106,8 +106,8 @@ SMTSortRef MathSATSolver::getBVRoundingModeSort() {
                                         msat_get_bv_type(*Context, 3)));
 }
 
-SMTSortRef MathSATSolver::getBVFloatSort(const unsigned ExpWidth,
-                                         const unsigned SigWidth) {
+SMTSortRef MathSATSolver::getBVFPSort(const unsigned ExpWidth,
+                                      const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<MathSATSort>>(
       camada::SolverFPSort<MathSATSort>(
           ExpWidth, SigWidth + 1, Context,
@@ -464,8 +464,8 @@ SMTExprRef MathSATSolver::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_cast(*Context, To->getFloatExponentWidth(),
-                        To->getFloatSignificandWidth(),
+      msat_make_fp_cast(*Context, To->getFPExponentWidth(),
+                        To->getFPSignificandWidth(),
                         toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                         toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -476,8 +476,8 @@ SMTExprRef MathSATSolver::mkSBVtoFP(const SMTExprRef &From,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_sbv(*Context, To->getFloatExponentWidth(),
-                            To->getFloatSignificandWidth(),
+      msat_make_fp_from_sbv(*Context, To->getFPExponentWidth(),
+                            To->getFPSignificandWidth(),
                             toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -488,8 +488,8 @@ SMTExprRef MathSATSolver::mkUBVtoFP(const SMTExprRef &From,
   SMTExprRef roundingMode = mkRoundingMode(R);
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_ubv(*Context, To->getFloatExponentWidth(),
-                            To->getFloatSignificandWidth(),
+      msat_make_fp_from_ubv(*Context, To->getFPExponentWidth(),
+                            To->getFPSignificandWidth(),
                             toSolverExpr<MathSATExpr>(*roundingMode).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -566,7 +566,7 @@ int64_t MathSATSolver::getBitvector(const SMTExprRef &Exp) {
   });
 }
 
-float MathSATSolver::getFloat(const SMTExprRef &Exp) {
+float MathSATSolver::getFP(const SMTExprRef &Exp) {
   return GMPtoType<float>(*this, Exp, [](char *buffer) -> float {
     char *buffer_end = nullptr;
     return std::strtof(buffer, &buffer_end);
@@ -615,16 +615,16 @@ static inline std::string FPasInt(const FPType FP) {
   return std::to_string(FPAsInt);
 }
 
-SMTExprRef MathSATSolver::mkFloat(const float Float) {
+SMTExprRef MathSATSolver::mkFP(const float Float) {
   return newExprRef(MathSATExpr(
-      Context, getFloat32Sort(),
+      Context, getFP32Sort(),
       msat_make_fp_bits_number(*Context, FPasInt<float, int32_t>(Float).c_str(),
                                8, 24)));
 }
 
 SMTExprRef MathSATSolver::mkDouble(const double Double) {
   return newExprRef(MathSATExpr(
-      Context, getFloat64Sort(),
+      Context, getFP64Sort(),
       msat_make_fp_bits_number(
           *Context, FPasInt<double, int64_t>(Double).c_str(), 11, 53)));
 }
@@ -652,7 +652,7 @@ SMTExprRef MathSATSolver::mkRoundingMode(const RoundingMode R) {
 
 SMTExprRef MathSATSolver::mkNaN(const bool Sgn, const unsigned ExpWidth,
                                 const unsigned SigWidth) {
-  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
+  SMTSortRef sort = getFPSort(ExpWidth, SigWidth);
   SMTExprRef theNaN = newExprRef(MathSATExpr(
       Context, sort, msat_make_fp_nan(*Context, ExpWidth, SigWidth - 1)));
 
@@ -661,7 +661,7 @@ SMTExprRef MathSATSolver::mkNaN(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef MathSATSolver::mkInf(const bool Sgn, const unsigned ExpWidth,
                                 const unsigned SigWidth) {
-  SMTSortRef sort = getFloatSort(ExpWidth, SigWidth);
+  SMTSortRef sort = getFPSort(ExpWidth, SigWidth);
   return newExprRef(MathSATExpr(
       Context, sort,
       Sgn ? msat_make_fp_minus_inf(*Context, ExpWidth, SigWidth - 1)
@@ -672,8 +672,8 @@ SMTExprRef MathSATSolver::mkBVToIEEEFP(const SMTExprRef &Exp,
                                        const SMTSortRef &To) {
   return newExprRef(MathSATExpr(
       Context, To,
-      msat_make_fp_from_ieeebv(*Context, To->getFloatExponentWidth(),
-                               To->getFloatSignificandWidth() - 1,
+      msat_make_fp_from_ieeebv(*Context, To->getFPExponentWidth(),
+                               To->getFPSignificandWidth() - 1,
                                toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 

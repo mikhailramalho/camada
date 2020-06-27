@@ -71,11 +71,11 @@ public:
 
   camada::SMTSortRef getRoundingModeSort() override;
 
-  SMTSortRef getFloatSort(const unsigned ExpWidth,
-                          const unsigned SigWidth) override;
+  SMTSortRef getFPSort(const unsigned ExpWidth,
+                       const unsigned SigWidth) override;
 
-  SMTSortRef getBVFloatSort(const unsigned ExpWidth,
-                            const unsigned SigWidth) override;
+  SMTSortRef getBVFPSort(const unsigned ExpWidth,
+                         const unsigned SigWidth) override;
 
   SMTSortRef getBVRoundingModeSort() override;
 
@@ -222,7 +222,7 @@ public:
 
   int64_t getBitvector(const camada::SMTExprRef &Exp) override;
 
-  float getFloat(const camada::SMTExprRef &Exp) override;
+  float getFP(const camada::SMTExprRef &Exp) override;
 
   double getDouble(const camada::SMTExprRef &Exp) override;
 
@@ -234,7 +234,7 @@ public:
   camada::SMTExprRef mkSymbol(const char *Name,
                               camada::SMTSortRef Sort) override;
 
-  SMTExprRef mkFloat(const float Float) override;
+  SMTExprRef mkFP(const float Float) override;
 
   SMTExprRef mkDouble(const double Double) override;
 

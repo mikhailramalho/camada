@@ -100,8 +100,8 @@ SMTSortRef YicesSolver::getBVRoundingModeSort() {
       camada::SolverRMSort<YicesSort>(Context, yices_bv_type(3)));
 }
 
-SMTSortRef YicesSolver::getBVFloatSort(const unsigned ExpWidth,
-                                       const unsigned SigWidth) {
+SMTSortRef YicesSolver::getBVFPSort(const unsigned ExpWidth,
+                                    const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<YicesSort>>(
       camada::SolverFPSort<YicesSort>(ExpWidth, SigWidth + 1, Context,
                                       yices_bv_type(ExpWidth + SigWidth + 1)));
