@@ -180,7 +180,9 @@ public:
   virtual SMTExprRef mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a boolean xor operation
-  virtual SMTExprRef mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
+  }
 
   /// Creates a boolean ite operation
   virtual SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,

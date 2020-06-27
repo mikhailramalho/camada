@@ -142,9 +142,6 @@ public:
   camada::SMTExprRef mkOr(const camada::SMTExprRef &LHS,
                           const camada::SMTExprRef &RHS) override;
 
-  camada::SMTExprRef mkXor(const camada::SMTExprRef &LHS,
-                           const camada::SMTExprRef &RHS) override;
-
   camada::SMTExprRef mkEqual(const camada::SMTExprRef &LHS,
                              const camada::SMTExprRef &RHS) override;
 
