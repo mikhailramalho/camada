@@ -328,7 +328,7 @@ public:
   }
 
   /// Creates a new symbol, given a name and a sort
-  virtual SMTExprRef mkSymbol(const char *Name, SMTSortRef Sort) = 0;
+  virtual SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) = 0;
 
   /// Constructs an SMTExprRef from a float.
   virtual SMTExprRef mkFP32(const float Float) = 0;

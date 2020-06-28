@@ -660,7 +660,7 @@ SMTExprRef CVC4Solver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
                                                 static_cast<uint64_t>(Int)))));
 }
 
-SMTExprRef CVC4Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
+SMTExprRef CVC4Solver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
 
   // Standard arrangement: if we already have the name, return the expression
   // from the symbol table. If not, time for a new name.

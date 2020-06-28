@@ -354,7 +354,7 @@ SMTExprRef YicesSolver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
       YicesExpr(Context, Sort, yices_bvconst_int64(Sort->getWidth(), Int)));
 }
 
-SMTExprRef YicesSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
+SMTExprRef YicesSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   // We could use yices_get_term_by_name to check if the variable was already
   // created, but the we would need to create a new SMTExprRef, so use
   // this map instead
@@ -362,14 +362,14 @@ SMTExprRef YicesSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
   if (it != SymbolTable.end())
     return it->second;
 
-  abortCondWithMessage(yices_get_term_by_name(Name) == NULL_TERM,
+  abortCondWithMessage(yices_get_term_by_name(Name.c_str()) == NULL_TERM,
                        "Trying to create a symbol but it already exists");
 
   term_t t = yices_new_uninterpreted_term(toSolverSort<YicesSort>(*Sort).Sort);
   abortCondWithMessage(t != NULL_TERM,
                        "Error when trying to create new a symbol");
 
-  abortCondWithMessage(yices_set_term_name(t, Name) != -1,
+  abortCondWithMessage(yices_set_term_name(t, Name.c_str()) != -1,
                        "Error when trying to set symbol name");
 
   auto inserted = SymbolTable.insert(

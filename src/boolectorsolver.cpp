@@ -387,16 +387,17 @@ SMTExprRef BtorSolver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
                        std::to_string(newInt).c_str())));
 }
 
-SMTExprRef BtorSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
+SMTExprRef BtorSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   auto it = SymbolTable.find(Name);
   if (it != SymbolTable.end())
     return it->second;
 
   auto inserted = SymbolTable.insert(SymbolTablet::value_type(
-      Name, newExprRef(BtorExpr(
-                Context, Sort,
-                boolector_var(Context->Context,
-                              toSolverSort<BtorSort>(*Sort).Sort, Name)))));
+      Name,
+      newExprRef(BtorExpr(Context, Sort,
+                          boolector_var(Context->Context,
+                                        toSolverSort<BtorSort>(*Sort).Sort,
+                                        Name.c_str())))));
 
   abortCondWithMessage(inserted.second,
                        "Could not cache new Boolector variable");

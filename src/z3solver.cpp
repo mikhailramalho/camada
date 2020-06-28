@@ -591,10 +591,10 @@ SMTExprRef Z3Solver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
       Z3Expr(Context, Sort, Context->bv_val(Int, Sort->getWidth())));
 }
 
-SMTExprRef Z3Solver::mkSymbol(const char *Name, SMTSortRef Sort) {
-  return newExprRef(
-      Z3Expr(Context, Sort,
-             Context->constant(Name, toSolverSort<Z3Sort>(*Sort).Sort)));
+SMTExprRef Z3Solver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
+  return newExprRef(Z3Expr(
+      Context, Sort,
+      Context->constant(Name.c_str(), toSolverSort<Z3Sort>(*Sort).Sort)));
 }
 
 SMTExprRef Z3Solver::mkFP32Impl(const float Float) {

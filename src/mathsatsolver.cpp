@@ -588,8 +588,8 @@ SMTExprRef MathSATSolver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
                                       Sort->getWidth(), 10)));
 }
 
-SMTExprRef MathSATSolver::mkSymbol(const char *Name, SMTSortRef Sort) {
-  msat_decl d = msat_declare_function(*Context, Name,
+SMTExprRef MathSATSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
+  msat_decl d = msat_declare_function(*Context, Name.c_str(),
                                       toSolverSort<MathSATSort>(*Sort).Sort);
   abortCondWithMessage(!MSAT_ERROR_DECL(d),
                        "Invalid function symbol declaration sort");
