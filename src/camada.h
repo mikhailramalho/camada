@@ -75,10 +75,10 @@ public:
                                const unsigned SigWidth) = 0;
 
   /// Convenience method to create a 32 bits long a floating-point sort.
-  SMTSortRef getFP32Sort() { return getFPSort(8, 24); }
+  SMTSortRef getFP32Sort() { return getFPSort(8, 23); }
 
   /// Convenience method to create a 64 bits long a floating-point sort.
-  SMTSortRef getFP64Sort() { return getFPSort(11, 53); }
+  SMTSortRef getFP64Sort() { return getFPSort(11, 52); }
 
   /// Given a constraint, adds it to the solver
   virtual void addConstraint(const SMTExprRef &Exp) = 0;
@@ -339,17 +339,25 @@ public:
   /// Returns an appropriate floating-point rounding mode.
   virtual SMTExprRef mkRM(const RM &R) = 0;
 
+  /// Returns a NaN floating-point
+  virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
+                           const unsigned SigWidth) = 0;
+
   /// Convenience method to create 32 bits long NaN
-  SMTExprRef mkNaN32(const bool Sgn) { return mkNaN(Sgn, 8, 24); }
+  SMTExprRef mkNaN32(const bool Sgn) { return mkNaN(Sgn, 8, 23); }
 
   /// Convenience method to create 64 bits long NaN
-  SMTExprRef mkNaN64(const bool Sgn) { return mkNaN(Sgn, 11, 53); }
+  SMTExprRef mkNaN64(const bool Sgn) { return mkNaN(Sgn, 11, 52); }
+
+  /// Returns a Inf floating-point
+  virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
+                           const unsigned SigWidth) = 0;
 
   /// Convenience method to create 32 bits long Inf
-  SMTExprRef mkInf32(const bool Sgn) { return mkInf(Sgn, 8, 24); }
+  SMTExprRef mkInf32(const bool Sgn) { return mkInf(Sgn, 8, 23); }
 
   /// Convenience method to create 64 bits long Inf
-  SMTExprRef mkInf64(const bool Sgn) { return mkInf(Sgn, 11, 53); }
+  SMTExprRef mkInf64(const bool Sgn) { return mkInf(Sgn, 11, 52); }
 
   /// Reinterpret a bitvector as a floating-point, using the IEEE format
   virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
@@ -376,14 +384,6 @@ protected:
   /// floating-point arithmetic, bitvectors will be used even if this flag is
   /// false
   bool useCamadaFP = false;
-
-  /// Returns a NaN floating-point
-  virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) = 0;
-
-  /// Returns a Inf floating-point
-  virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) = 0;
 
   /// Returns an appropriate floating-point sort, encoded as a bitvector.
   virtual SMTSortRef getBVFPSort(const unsigned ExpWidth,
