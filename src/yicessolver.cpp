@@ -355,6 +355,11 @@ SMTExprRef YicesSolver::mkBVFromDec(const uint64_t Int,
       YicesExpr(Context, Sort, yices_bvconst_int64(Sort->getWidth(), Int)));
 }
 
+SMTExprRef YicesSolver::mkBVFromBin(const std::string &Int,
+                                    const SMTSortRef &Sort) {
+  return newExprRef(YicesExpr(Context, Sort, yices_parse_bvbin(Int.c_str())));
+}
+
 SMTExprRef YicesSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   // We could use yices_get_term_by_name to check if the variable was already
   // created, but the we would need to create a new SMTExprRef, so use

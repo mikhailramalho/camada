@@ -163,6 +163,9 @@ public:
 
   SMTExprRef mkBVFromDec(const uint64_t Int, const SMTSortRef &Sort) override;
 
+  SMTExprRef mkBVFromBin(const std::string &Int,
+                         const SMTSortRef &Sort) override;
+
   SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) override;
 
   checkResult check() override;

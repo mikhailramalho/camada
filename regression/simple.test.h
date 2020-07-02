@@ -1,6 +1,7 @@
 
 #include "camada.h"
 
+#include <bitset>
 #include <catch2/catch.hpp>
 
 inline void equal_ten(const camada::SMTSolverRef &solver) {
@@ -8,7 +9,7 @@ inline void equal_ten(const camada::SMTSolverRef &solver) {
   auto f = solver->mkSymbol("f", solver->getBVSort(10));
 
   // And assert if there is a value for 'f' that is equal to 10
-  auto ten = solver->mkBVFromDec(10, 10);
+  auto ten = solver->mkBVFromBin(std::bitset<10>(10).to_string(), 10);
   auto eq = solver->mkEqual(f, ten);
 
   // Add the constraint to the solver

@@ -589,6 +589,13 @@ SMTExprRef MathSATSolver::mkBVFromDec(const uint64_t Int,
                                       Sort->getWidth(), 10)));
 }
 
+SMTExprRef MathSATSolver::mkBVFromBin(const std::string &Int,
+                                      const SMTSortRef &Sort) {
+  return newExprRef(MathSATExpr(
+      Context, Sort,
+      msat_make_bv_number(*Context, Int.c_str(), Sort->getWidth(), 2)));
+}
+
 SMTExprRef MathSATSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   msat_decl d = msat_declare_function(*Context, Name.c_str(),
                                       toSolverSort<MathSATSort>(*Sort).Sort);

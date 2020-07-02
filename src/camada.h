@@ -319,14 +319,29 @@ public:
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
 
-  /// Constructs an SMTExprRef from an integer in base 10 and its bit width
+  /// Constructs an SMTExprRef from an integer in base 10 and its sort
   virtual SMTExprRef mkBVFromDec(const uint64_t Int,
                                  const SMTSortRef &Sort) = 0;
 
   /// Convinience method to create a bitvector from an integer in base 10 and
   /// its bitwidth
-  virtual SMTExprRef mkBVFromDec(const uint64_t Int, unsigned BitWidth) {
+  SMTExprRef mkBVFromDec(const uint64_t Int, unsigned BitWidth) {
     return mkBVFromDec(Int, getBVSort(BitWidth));
+  }
+
+  /// Constructs an SMTExprRef from an integer in base 2 and its sort
+  virtual SMTExprRef mkBVFromBin(const std::string &Int,
+                                 const SMTSortRef &Sort) = 0;
+
+  /// Convinience method to create a bitvector from an integer in base 2 and
+  /// its bitwidth
+  SMTExprRef mkBVFromBin(const std::string &Int, unsigned BitWidth) {
+    return mkBVFromBin(Int, getBVSort(BitWidth));
+  }
+
+  /// Convinience method to create a bitvector from an integer in base 2
+  SMTExprRef mkBVFromBin(const std::string &Int) {
+    return mkBVFromBin(Int, Int.length());
   }
 
   /// Creates a new symbol, given a name and a sort

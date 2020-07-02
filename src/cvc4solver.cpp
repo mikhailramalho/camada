@@ -660,6 +660,12 @@ SMTExprRef CVC4Solver::mkBVFromDec(const uint64_t Int, const SMTSortRef &Sort) {
                                                 static_cast<uint64_t>(Int)))));
 }
 
+SMTExprRef CVC4Solver::mkBVFromBin(const std::string &Int,
+                                   const SMTSortRef &Sort) {
+  return newExprRef(
+      CVC4Expr(Context, Sort, Context->mkConst(CVC4::BitVector(Int))));
+}
+
 SMTExprRef CVC4Solver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
 
   // Standard arrangement: if we already have the name, return the expression

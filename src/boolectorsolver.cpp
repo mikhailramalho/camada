@@ -387,6 +387,12 @@ SMTExprRef BtorSolver::mkBVFromDec(const uint64_t Int, const SMTSortRef &Sort) {
                        std::to_string(newInt).c_str())));
 }
 
+SMTExprRef BtorSolver::mkBVFromBin(const std::string &Int,
+                                   const SMTSortRef &Sort) {
+  return newExprRef(
+      BtorExpr(Context, Sort, boolector_const(Context->Context, Int.c_str())));
+}
+
 SMTExprRef BtorSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   auto it = SymbolTable.find(Name);
   if (it != SymbolTable.end())
