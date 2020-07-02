@@ -197,14 +197,14 @@ public:
 
   SMTExprRef mkBVRedOr(SMTExprRef Exp) {
     // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBV(0, Exp->getWidth()));
-    return mkIte(mkNot(comp), mkBV(1, 1), mkBV(0, 1));
+    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
+    return mkIte(mkNot(comp), mkBVFromDec(1, 1), mkBVFromDec(0, 1));
   }
 
   SMTExprRef mkBVRedAnd(SMTExprRef Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBV(ULLONG_MAX, Exp->getWidth()));
-    return mkIte(comp, mkBV(1, 1), mkBV(0, 1));
+    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(ULLONG_MAX, Exp->getWidth()));
+    return mkIte(comp, mkBVFromDec(1, 1), mkBVFromDec(0, 1));
   }
 
   /// Creates a floating-point absolute operation
@@ -306,7 +306,7 @@ public:
 
   /// If the a model is available, returns the value of a given bitvector
   /// symbol as a 64-bits int
-  virtual int64_t getBV(const SMTExprRef &Exp) = 0;
+  virtual uint64_t getBV(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as float
@@ -319,12 +319,14 @@ public:
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
 
-  /// Constructs an SMTExprRef from an integer and its bit width
-  virtual SMTExprRef mkBV(const int64_t Int, const SMTSortRef &Sort) = 0;
+  /// Constructs an SMTExprRef from an integer in base 10 and its bit width
+  virtual SMTExprRef mkBVFromDec(const uint64_t Int,
+                                 const SMTSortRef &Sort) = 0;
 
-  /// Convinience method to create a bitvector using the value and the bitwidth
-  virtual SMTExprRef mkBV(const int64_t Int, unsigned BitWidth) {
-    return mkBV(Int, getBVSort(BitWidth));
+  /// Convinience method to create a bitvector from an integer in base 10 and
+  /// its bitwidth
+  virtual SMTExprRef mkBVFromDec(const uint64_t Int, unsigned BitWidth) {
+    return mkBVFromDec(Int, getBVSort(BitWidth));
   }
 
   /// Creates a new symbol, given a name and a sort

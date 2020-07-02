@@ -551,11 +551,11 @@ static inline ResType GMPtoType(MathSATSolver &S, const SMTExprRef &Exp,
   return StrToFunc(buffer);
 }
 
-int64_t MathSATSolver::getBV(const SMTExprRef &Exp) {
-  camada::abortCondWithMessage(sizeof(int64_t) == sizeof(long int),
+uint64_t MathSATSolver::getBV(const SMTExprRef &Exp) {
+  camada::abortCondWithMessage(sizeof(uint64_t) == sizeof(long int),
                                "Cannot convert GMP value to int");
 
-  return GMPtoType<int64_t>(*this, Exp, [](char *buffer) -> int64_t {
+  return GMPtoType<uint64_t>(*this, Exp, [](char *buffer) -> uint64_t {
     char *buffer_end = nullptr;
     return std::strtol(buffer, &buffer_end, 10);
   });
@@ -581,7 +581,8 @@ SMTExprRef MathSATSolver::mkBool(const bool Bool) {
                   Bool ? msat_make_true(*Context) : msat_make_false(*Context)));
 }
 
-SMTExprRef MathSATSolver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
+SMTExprRef MathSATSolver::mkBVFromDec(const uint64_t Int,
+                                      const SMTSortRef &Sort) {
   return newExprRef(
       MathSATExpr(Context, Sort,
                   msat_make_bv_number(*Context, std::to_string(Int).c_str(),

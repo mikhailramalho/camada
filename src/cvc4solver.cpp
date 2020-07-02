@@ -591,7 +591,7 @@ bool CVC4Solver::getBool(const SMTExprRef &Exp) {
   return Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr).getConst<bool>();
 }
 
-int64_t CVC4Solver::getBV(const SMTExprRef &Exp) {
+uint64_t CVC4Solver::getBV(const SMTExprRef &Exp) {
   return Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
       .getConst<CVC4::BitVector>()
       .toInteger()
@@ -653,7 +653,7 @@ SMTExprRef CVC4Solver::mkBool(const bool b) {
   return newExprRef(CVC4Expr(Context, getBoolSort(), Context->mkConst(b)));
 }
 
-SMTExprRef CVC4Solver::mkBV(const int64_t Int, const SMTSortRef &Sort) {
+SMTExprRef CVC4Solver::mkBVFromDec(const uint64_t Int, const SMTSortRef &Sort) {
   return newExprRef(
       CVC4Expr(Context, Sort,
                Context->mkConst(CVC4::BitVector(Sort->getWidth(),
