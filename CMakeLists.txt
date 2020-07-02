@@ -112,7 +112,7 @@ option(BUILD_SHARED_LIBS "Build shared library" ON)
 
 config_solver(Z3 4.8.8)
 config_solver(MATHSAT 5.6.3)
-config_solver(CVC4 "")
+config_solver(CVC4 1.8)
 config_solver(BOOLECTOR 3.2.1)
 config_solver(YICES 2.6.1)
 
