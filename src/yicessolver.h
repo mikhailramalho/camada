@@ -25,6 +25,7 @@
 #include "camadafp.h"
 
 #include <unordered_map>
+#include <vector>
 #include <yices.h>
 
 namespace camada {
@@ -66,9 +67,6 @@ public:
 class YicesSolver : public SMTFPSolver {
 public:
   YicesContextRef Context;
-
-  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
-  SymbolTablet SymbolTable;
 
   explicit YicesSolver();
   explicit YicesSolver(YicesContextRef C);
@@ -172,7 +170,17 @@ public:
 
   void reset() override;
 
+  void dump() override;
+
   void dumpModel() override;
+
+protected:
+  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
+  SymbolTablet SymbolTable;
+
+  using TermVectort = std::vector<SMTExprRef>;
+  TermVectort Assertions;
+
 }; // end class YicesSolver
 
 } // namespace camada

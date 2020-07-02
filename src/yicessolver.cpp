@@ -74,6 +74,7 @@ YicesSolver::YicesSolver() : Context(std::make_shared<YicesContext>()) {}
 YicesSolver::YicesSolver(YicesContextRef C) : Context(std::move(C)) {}
 
 void YicesSolver::addConstraint(const SMTExprRef &Exp) {
+  Assertions.push_back(Exp);
   yices_assert_formula(Context->Context, toSolverExpr<YicesExpr>(*Exp).Expr);
 }
 
@@ -397,7 +398,16 @@ checkResult YicesSolver::check() {
   return checkResult::UNKNOWN;
 }
 
-void YicesSolver::reset() { Context->reset(); }
+void YicesSolver::reset() {
+  SymbolTable.clear();
+  Assertions.clear();
+  Context->reset();
+}
+
+void YicesSolver::dump() {
+  for (auto const &a : Assertions)
+    a->dump();
+}
 
 void YicesSolver::dumpModel() {
   char *model_str =
