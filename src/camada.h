@@ -26,6 +26,7 @@
 
 #include <climits>
 #include <memory>
+#include <string>
 
 namespace camada {
 
