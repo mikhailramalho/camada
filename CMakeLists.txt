@@ -46,7 +46,7 @@ macro(config_solver name version)
   # Set the variable to enable the solver to 0, if the solver is enabled, it will be set to 1
   set(SOLVER_${name}_ENABLED 0)
 
-  if(CAMADA_ENABLE_SOLVER_${name})
+  if(CAMADA_ENABLE_SOLVER_${name} STREQUAL "ON")
 
     # If the solver was enabled but we could not find it, throw an error
     if(NOT ${name}_FOUND)
