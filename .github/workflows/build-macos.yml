@@ -89,7 +89,7 @@ jobs:
       with:
         java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install cmake ninja python3 && pip3 install PySMT toml
+      run: brew install gmp cmake ninja python3 && pip3 install PySMT toml
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup CVC4
