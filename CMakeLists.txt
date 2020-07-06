@@ -35,35 +35,37 @@ macro(config_solver name version)
   # Define the options
   option3vl(CAMADA_ENABLE_SOLVER_${name} "Build Camada with ${name}")
 
-  # Try to find the solver and version
-  find_package(${name} ${version})
-
-  # If the solver was found, enable it _IF_ the user did not explicitly disable it
-  if(${name}_FOUND)
-    set_option(CAMADA_ENABLE_SOLVER_${name} ON)
-  endif()
-
   # Set the variable to enable the solver to 0, if the solver is enabled, it will be set to 1
   set(SOLVER_${name}_ENABLED 0)
 
-  if(CAMADA_ENABLE_SOLVER_${name} STREQUAL "ON")
+  if(NOT CAMADA_ENABLE_SOLVER_${name} STREQUAL "OFF")
+    # Try to find the solver and version
+    find_package(${name} ${version})
 
-    # If the solver was enabled but we could not find it, throw an error
-    if(NOT ${name}_FOUND)
-      message(FATAL_ERROR "CAMADA_ENABLE_SOLVER_${name} cannot be enabled when ${name} is not available")
+    # If the solver was found, enable it _IF_ the user did not explicitly disable it
+    if(${name}_FOUND)
+      set_option(CAMADA_ENABLE_SOLVER_${name} ON)
     endif()
 
-    # otherwise, add it to the list of available solvers
-    list(APPEND CAMADA_AVAILABLE_SOLVERS "${name}")
+    if(CAMADA_ENABLE_SOLVER_${name} STREQUAL "ON")
 
-    # Set the variable to enable the solver to 1
-    set(SOLVER_${name}_ENABLED 1)
+      # If the solver was enabled but we could not find it, throw an error
+      if(NOT ${name}_FOUND)
+        message(FATAL_ERROR "CAMADA_ENABLE_SOLVER_${name} cannot be enabled when ${name} is not available")
+      endif()
 
-    # Add include dirs
-    include_directories(${SOLVER_${name}_INCLUDE_DIR})
+      # otherwise, add it to the list of available solvers
+      list(APPEND CAMADA_AVAILABLE_SOLVERS "${name}")
 
-    # and the libs to the list of solver libs
-    list(APPEND CAMADA_SOLVER_LIBS "${SOLVER_${name}_LIB}")
+      # Set the variable to enable the solver to 1
+      set(SOLVER_${name}_ENABLED 1)
+
+      # Add include dirs
+      include_directories(${SOLVER_${name}_INCLUDE_DIR})
+
+      # and the libs to the list of solver libs
+      list(APPEND CAMADA_SOLVER_LIBS "${SOLVER_${name}_LIB}")
+    endif()
   endif()
 endmacro()
 
