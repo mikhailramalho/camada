@@ -25,6 +25,7 @@
 
 #include <cstring>
 #include <gmp.h>
+#include <gmpxx.h>
 
 using namespace camada;
 
@@ -525,10 +526,8 @@ bool MathSATSolver::getBool(const SMTExprRef &Exp) {
   abortWithMessage("Bool is neither true nor false");
 }
 
-template <typename ResType, typename StrToFuncType>
-static inline ResType GMPtoType(MathSATSolver &S, const SMTExprRef &Exp,
-                                StrToFuncType StrToFunc) {
-
+static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp,
+                                    unsigned base) {
   SMTExprRef t = S.newExprRef(MathSATExpr(
       S.Context, Exp->Sort,
       msat_get_model_value(*S.Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
@@ -539,40 +538,36 @@ static inline ResType GMPtoType(MathSATSolver &S, const SMTExprRef &Exp,
   msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context,
                       toSolverExpr<MathSATExpr>(*t).Expr, val);
 
-  mpz_t num;
-  mpz_init(num);
-  mpz_set(num, mpq_numref(val));
+  mpq_class num(val);
   mpq_clear(val);
-
-  char *buffer = new char[mpz_sizeinbase(num, 10) + 2];
-  mpz_get_str(buffer, 10, num);
-  mpz_clear(num);
-
-  return StrToFunc(buffer);
+  return num.get_str(base);
 }
 
 uint64_t MathSATSolver::getBV(const SMTExprRef &Exp) {
   camada::abortCondWithMessage(sizeof(uint64_t) == sizeof(long int),
                                "Cannot convert GMP value to int");
+  std::string val = getGMPVal(*this, Exp, 10);
+  char *buffer_end = nullptr;
+  return std::strtol(val.c_str(), &buffer_end, 10);
+}
 
-  return GMPtoType<uint64_t>(*this, Exp, [](char *buffer) -> uint64_t {
-    char *buffer_end = nullptr;
-    return std::strtol(buffer, &buffer_end, 10);
-  });
+std::string MathSATSolver::getBVInBin(const SMTExprRef &Exp) {
+  std::string val = getGMPVal(*this, Exp, 2);
+  if (val.length() < Exp->getWidth())
+    val = std::string(Exp->getWidth() - val.length(), '0') + val;
+  return val;
 }
 
 float MathSATSolver::getFP32Impl(const SMTExprRef &Exp) {
-  return GMPtoType<float>(*this, Exp, [](char *buffer) -> float {
-    char *buffer_end = nullptr;
-    return std::strtof(buffer, &buffer_end);
-  });
+  std::string val = getGMPVal(*this, Exp, 10);
+  char *buffer_end = nullptr;
+  return std::strtof(val.c_str(), &buffer_end);
 }
 
 double MathSATSolver::getFP64Impl(const SMTExprRef &Exp) {
-  return GMPtoType<double>(*this, Exp, [](char *buffer) -> double {
-    char *buffer_end = nullptr;
-    return std::strtod(buffer, &buffer_end);
-  });
+  std::string val = getGMPVal(*this, Exp, 10);
+  char *buffer_end = nullptr;
+  return std::strtod(val.c_str(), &buffer_end);
 }
 
 SMTExprRef MathSATSolver::mkBool(const bool Bool) {

@@ -205,6 +205,8 @@ public:
 
   uint64_t getBV(const SMTExprRef &Exp) override;
 
+  std::string getBVInBin(const SMTExprRef &Exp) override;
+
   float getFP32Impl(const SMTExprRef &Exp) override;
 
   double getFP64Impl(const SMTExprRef &Exp) override;

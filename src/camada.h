@@ -309,6 +309,10 @@ public:
   /// symbol as a 64-bits int
   virtual uint64_t getBV(const SMTExprRef &Exp) = 0;
 
+  /// If the a model is available, returns the value of a given bitvector
+  /// symbol as a binary string
+  virtual std::string getBVInBin(const SMTExprRef &Exp) = 0;
+
   /// If the a model is available, returns the value of a given floating-point
   /// symbol as float
   virtual float getFP32(const SMTExprRef &Exp) = 0;

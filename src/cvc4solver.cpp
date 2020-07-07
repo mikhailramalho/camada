@@ -598,6 +598,12 @@ uint64_t CVC4Solver::getBV(const SMTExprRef &Exp) {
       .getUnsignedLong();
 }
 
+std::string CVC4Solver::getBVInBin(const SMTExprRef &Exp) {
+  return Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
+      .getConst<CVC4::BitVector>()
+      .toString(2);
+}
+
 template <class FPType>
 static inline bool isNaNOrInf(const CVC4::FloatingPoint &FP, FPType &Res) {
   // TODO: what about negative NaN?

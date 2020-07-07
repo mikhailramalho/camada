@@ -537,6 +537,14 @@ uint64_t Z3Solver::getBV(const SMTExprRef &Exp) {
   return bv;
 }
 
+std::string Z3Solver::getBVInBin(const SMTExprRef &Exp) {
+  SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
+  std::string bv;
+  bool is_num = toSolverExpr<Z3Expr>(*value).Expr.is_numeral(bv, 1000);
+  camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
+  return bv;
+}
+
 template <typename FPType, typename IntType,
           bool (*Z3Func)(Z3_context c, Z3_ast v, IntType *i)>
 static inline FPType getFPValue(const Z3ContextRef &C, const z3::model &Model,

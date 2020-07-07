@@ -345,6 +345,20 @@ uint64_t YicesSolver::getBV(const SMTExprRef &Exp) {
   return val;
 }
 
+std::string YicesSolver::getBVInBin(const SMTExprRef &Exp) {
+  unsigned width = Exp->getWidth();
+
+  int32_t data[width];
+  yices_get_bv_value(yices_get_model(Context->Context, 1),
+                     toSolverExpr<YicesExpr>(*Exp).Expr, data);
+
+  std::string val;
+  for (int i = width - 1; i >= 0; i--)
+    val += data[i] ? "1" : "0";
+
+  return val;
+}
+
 SMTExprRef YicesSolver::mkBool(const bool b) {
   return newExprRef(
       YicesExpr(Context, getBoolSort(), b ? yices_true() : yices_false()));

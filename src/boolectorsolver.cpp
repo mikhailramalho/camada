@@ -371,6 +371,11 @@ uint64_t BtorSolver::getBV(const SMTExprRef &Exp) {
   return finval;
 }
 
+std::string BtorSolver::getBVInBin(const SMTExprRef &Exp) {
+  return boolector_bv_assignment(Context->Context,
+                                 toSolverExpr<BtorExpr>(*Exp).Expr);
+}
+
 SMTExprRef BtorSolver::mkBool(const bool b) {
   return newExprRef(BtorExpr(Context, getBoolSort(),
                              b ? boolector_true(Context->Context)
