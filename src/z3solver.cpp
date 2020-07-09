@@ -529,18 +529,10 @@ static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
                                  toSolverExpr<Z3Expr>(*Exp).Expr.decl())));
 }
 
-uint64_t Z3Solver::getBV(const SMTExprRef &Exp) {
-  SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
-  uint64_t bv;
-  bool is_num = toSolverExpr<Z3Expr>(*value).Expr.is_numeral_u64(bv);
-  camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
-  return bv;
-}
-
 std::string Z3Solver::getBVInBin(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   std::string bv;
-  bool is_num = toSolverExpr<Z3Expr>(*value).Expr.is_numeral(bv, 1000);
+  bool is_num = toSolverExpr<Z3Expr>(*value).Expr.as_binary(bv);
   camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
   return bv;
 }
@@ -594,7 +586,7 @@ SMTExprRef Z3Solver::mkBool(const bool b) {
   return newExprRef(Z3Expr(Context, getBoolSort(), Context->bool_val(b)));
 }
 
-SMTExprRef Z3Solver::mkBVFromDec(const uint64_t Int, const SMTSortRef &Sort) {
+SMTExprRef Z3Solver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
   return newExprRef(
       Z3Expr(Context, Sort, Context->bv_val(Int, Sort->getWidth())));
 }

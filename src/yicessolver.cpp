@@ -329,22 +329,6 @@ bool YicesSolver::getBool(const SMTExprRef &Exp) {
   return val ? true : false;
 }
 
-uint64_t YicesSolver::getBV(const SMTExprRef &Exp) {
-  unsigned width = Exp->getWidth();
-
-  int32_t data[width];
-  yices_get_bv_value(yices_get_model(Context->Context, 1),
-                     toSolverExpr<YicesExpr>(*Exp).Expr, data);
-
-  uint64_t val = 0;
-  for (int i = width - 1; i >= 0; i--) {
-    val <<= 1;
-    val |= data[i];
-  }
-
-  return val;
-}
-
 std::string YicesSolver::getBVInBin(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
@@ -364,8 +348,7 @@ SMTExprRef YicesSolver::mkBool(const bool b) {
       YicesExpr(Context, getBoolSort(), b ? yices_true() : yices_false()));
 }
 
-SMTExprRef YicesSolver::mkBVFromDec(const uint64_t Int,
-                                    const SMTSortRef &Sort) {
+SMTExprRef YicesSolver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
   return newExprRef(
       YicesExpr(Context, Sort, yices_bvconst_int64(Sort->getWidth(), Int)));
 }

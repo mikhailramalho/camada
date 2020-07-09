@@ -358,19 +358,6 @@ bool BtorSolver::getBool(const SMTExprRef &Exp) {
   return res;
 }
 
-uint64_t BtorSolver::getBV(const SMTExprRef &Exp) {
-  const char *bv = boolector_bv_assignment(Context->Context,
-                                           toSolverExpr<BtorExpr>(*Exp).Expr);
-  char *foo;
-  uint64_t finval = strtol(bv, &foo, 2);
-
-  if (bv[0] != '\0' && (foo == bv || *foo != '\0'))
-    camada::abortWithMessage(
-        "Couldn't parse string representation of Bitvector");
-
-  return finval;
-}
-
 std::string BtorSolver::getBVInBin(const SMTExprRef &Exp) {
   return boolector_bv_assignment(Context->Context,
                                  toSolverExpr<BtorExpr>(*Exp).Expr);
@@ -382,7 +369,7 @@ SMTExprRef BtorSolver::mkBool(const bool b) {
                                : boolector_false(Context->Context)));
 }
 
-SMTExprRef BtorSolver::mkBVFromDec(const uint64_t Int, const SMTSortRef &Sort) {
+SMTExprRef BtorSolver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
   // Prevent creating a bitvector with size greater than the bitwidth
   int64_t newInt = Int & ((1 << Sort->getWidth()) - 1);
 

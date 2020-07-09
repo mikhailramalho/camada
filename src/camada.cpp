@@ -128,6 +128,19 @@ unsigned SMTSort::getFPExponentWidthImpl() const {
   abortWithMessage("Unimplemented for current type");
 }
 
+int64_t SMTSolver::getBV(const SMTExprRef &Exp) {
+  const std::string bv = getBVInBin(Exp);
+
+  int64_t power = 1 << (Exp->getWidth() - 1);
+  int64_t sum = bv[0] != '0' ? power * -1 : 0;
+
+  for (int64_t i = 1; i < Exp->getWidth(); ++i) {
+    power /= 2;
+    sum += (bv[i] - '0') * power;
+  }
+  return sum;
+}
+
 camada::SMTSolverRef camada::createZ3Solver() {
 #if SOLVER_Z3_ENABLED
   return std::make_shared<Z3Solver>();

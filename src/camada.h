@@ -307,10 +307,10 @@ public:
 
   /// If the a model is available, returns the value of a given bitvector
   /// symbol as a 64-bits int
-  virtual uint64_t getBV(const SMTExprRef &Exp) = 0;
+  int64_t getBV(const SMTExprRef &Exp);
 
   /// If the a model is available, returns the value of a given bitvector
-  /// symbol as a binary string
+  /// symbol as a 2-complement form binary string
   virtual std::string getBVInBin(const SMTExprRef &Exp) = 0;
 
   /// If the a model is available, returns the value of a given floating-point
@@ -325,12 +325,11 @@ public:
   virtual SMTExprRef mkBool(const bool b) = 0;
 
   /// Constructs an SMTExprRef from an integer in base 10 and its sort
-  virtual SMTExprRef mkBVFromDec(const uint64_t Int,
-                                 const SMTSortRef &Sort) = 0;
+  virtual SMTExprRef mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) = 0;
 
   /// Convinience method to create a bitvector from an integer in base 10 and
   /// its bitwidth
-  SMTExprRef mkBVFromDec(const uint64_t Int, unsigned BitWidth) {
+  SMTExprRef mkBVFromDec(const int64_t Int, unsigned BitWidth) {
     return mkBVFromDec(Int, getBVSort(BitWidth));
   }
 

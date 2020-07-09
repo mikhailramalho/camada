@@ -210,8 +210,6 @@ public:
 
   bool getBool(const SMTExprRef &Exp) override;
 
-  uint64_t getBV(const SMTExprRef &Exp) override;
-
   std::string getBVInBin(const SMTExprRef &Exp) override;
 
   float getFP32Impl(const SMTExprRef &Exp) override;
@@ -220,7 +218,7 @@ public:
 
   SMTExprRef mkBool(const bool b) override;
 
-  SMTExprRef mkBVFromDec(const uint64_t Int, const SMTSortRef &Sort) override;
+  SMTExprRef mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) override;
 
   SMTExprRef mkBVFromBin(const std::string &Int,
                          const SMTSortRef &Sort) override;

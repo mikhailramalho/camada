@@ -69,8 +69,18 @@ void MathSATSolver::addConstraint(const SMTExprRef &Exp) {
   msat_assert_formula(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr);
 }
 
+static inline bool checkExprError(const SMTExpr &Exp) {
+  auto const &exp = toSolverExpr<MathSATExpr>(Exp);
+  if (MSAT_ERROR_TERM(exp.Expr)) {
+    std::cerr << "MathSAT Error " << msat_last_error_message(*exp.Context)
+              << '\n';
+    return true;
+  }
+  return false;
+}
+
 SMTExprRef MathSATSolver::newExprRef(const SMTExpr &Exp) const {
-  abortCondWithMessage(!MSAT_ERROR_TERM(toSolverExpr<MathSATExpr>(Exp).Expr),
+  abortCondWithMessage(!checkExprError(Exp),
                        "Error when creating MathSAT expr.");
   return std::make_shared<MathSATExpr>(toSolverExpr<MathSATExpr>(Exp));
 }
@@ -543,14 +553,6 @@ static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp,
   return num.get_str(base);
 }
 
-uint64_t MathSATSolver::getBV(const SMTExprRef &Exp) {
-  camada::abortCondWithMessage(sizeof(uint64_t) == sizeof(long int),
-                               "Cannot convert GMP value to int");
-  std::string val = getGMPVal(*this, Exp, 10);
-  char *buffer_end = nullptr;
-  return std::strtol(val.c_str(), &buffer_end, 10);
-}
-
 std::string MathSATSolver::getBVInBin(const SMTExprRef &Exp) {
   std::string val = getGMPVal(*this, Exp, 2);
   if (val.length() < Exp->getWidth())
@@ -576,12 +578,16 @@ SMTExprRef MathSATSolver::mkBool(const bool Bool) {
                   Bool ? msat_make_true(*Context) : msat_make_false(*Context)));
 }
 
-SMTExprRef MathSATSolver::mkBVFromDec(const uint64_t Int,
+SMTExprRef MathSATSolver::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
-  return newExprRef(
-      MathSATExpr(Context, Sort,
-                  msat_make_bv_number(*Context, std::to_string(Int).c_str(),
-                                      Sort->getWidth(), 10)));
+  // Set upper bits to zero because MathSAT refuses to parse negative numbers
+  int64_t newInt = Int & ((1 << Sort->getWidth()) - 1);
+
+  return newExprRef(MathSATExpr(
+      Context, Sort,
+      msat_make_bv_number(*Context,
+                          std::to_string(static_cast<uint64_t>(newInt)).c_str(),
+                          Sort->getWidth(), 10)));
 }
 
 SMTExprRef MathSATSolver::mkBVFromBin(const std::string &Int,
