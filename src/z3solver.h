@@ -205,9 +205,7 @@ public:
 
   std::string getBVInBin(const SMTExprRef &Exp) override;
 
-  float getFP32Impl(const SMTExprRef &Exp) override;
-
-  double getFP64Impl(const SMTExprRef &Exp) override;
+  std::string getFPInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkBool(const bool b) override;
 
@@ -218,9 +216,7 @@ public:
 
   SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) override;
 
-  SMTExprRef mkFP32Impl(const float Float) override;
-
-  SMTExprRef mkFP64Impl(const double Double) override;
+  SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
 
   SMTExprRef mkRMImpl(const RM &R) override;
 

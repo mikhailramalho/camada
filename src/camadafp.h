@@ -194,28 +194,16 @@ public:
     return mkFPtoIntegralImpl(From, R);
   }
 
-  virtual float getFP32(const SMTExprRef &Exp) final {
+  virtual std::string getFPInBin(const SMTExprRef &Exp) final {
     if (useCamadaFP)
-      return SMTFPSolver::getFP32Impl(Exp);
-    return getFP32Impl(Exp);
+      return SMTFPSolver::getFPInBinImpl(Exp);
+    return getFPInBinImpl(Exp);
   }
 
-  virtual double getFP64(const SMTExprRef &Exp) final {
+  virtual SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth) {
     if (useCamadaFP)
-      return SMTFPSolver::getFP64Impl(Exp);
-    return getFP64Impl(Exp);
-  }
-
-  virtual SMTExprRef mkFP32(const float Float) final {
-    if (useCamadaFP)
-      return SMTFPSolver::mkFP32Impl(Float);
-    return mkFP32Impl(Float);
-  }
-
-  virtual SMTExprRef mkFP64(const double Double) final {
-    if (useCamadaFP)
-      return SMTFPSolver::mkFP64Impl(Double);
-    return mkFP64Impl(Double);
+      return SMTFPSolver::mkFPFromBinImpl(FP, EWidth);
+    return mkFPFromBinImpl(FP, EWidth);
   }
 
   virtual SMTExprRef mkRM(const RM &R) final {
@@ -312,13 +300,9 @@ protected:
 
   virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, RM R);
 
-  virtual float getFP32Impl(const SMTExprRef &Exp);
+  virtual std::string getFPInBinImpl(const SMTExprRef &Exp);
 
-  virtual double getFP64Impl(const SMTExprRef &Exp);
-
-  virtual SMTExprRef mkFP32Impl(const float Float);
-
-  virtual SMTExprRef mkFP64Impl(const double Double);
+  virtual SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth);
 
   virtual SMTExprRef mkRMImpl(const RM &R);
 

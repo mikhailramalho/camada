@@ -23,6 +23,9 @@
 #include "ac_config.h"
 #include "camadautils.h"
 
+#include <bitset>
+#include <cstring>
+
 using namespace camada;
 
 #if SOLVER_Z3_ENABLED
@@ -139,6 +142,50 @@ int64_t SMTSolver::getBV(const SMTExprRef &Exp) {
     sum += (bv[i] - '0') * power;
   }
   return sum;
+}
+
+template <typename FPType, typename IntType>
+static inline IntType FPAsInt(const FPType FP) {
+  // Convert the integer to float/double
+  // We assume that floats are 32 bits long and doubles are 64 bits long
+  camada::abortCondWithMessage(sizeof(FPType) == sizeof(IntType),
+                               "Cannot convert int to floating-point");
+  IntType FPAsInt;
+  memcpy(&FPAsInt, &FP, sizeof(FPType));
+  return FPAsInt;
+}
+
+camada::SMTExprRef SMTSolver::mkFP32(const float Float) {
+  uint32_t fp = FPAsInt<float, uint32_t>(Float);
+  return mkFPFromBin(std::bitset<32>(fp).to_string(), 8);
+}
+
+camada::SMTExprRef SMTSolver::mkFP64(const double Double) {
+  uint64_t fp = FPAsInt<double, uint64_t>(Double);
+  return mkFPFromBin(std::bitset<64>(fp).to_string(), 11);
+}
+
+template <typename FPType, typename IntType>
+static inline FPType IntAsFP(const IntType Int) {
+  // Convert the integer to float/double
+  // We assume that floats are 32 bits long and doubles are 64 bits long
+  camada::abortCondWithMessage(sizeof(FPType) == sizeof(IntType),
+                               "Cannot convert int to floating-point");
+  FPType IntAsFP;
+  memcpy(&IntAsFP, &Int, sizeof(IntType));
+  return IntAsFP;
+}
+
+float SMTSolver::getFP32(const SMTExprRef &Exp) {
+  char *buffer_end = nullptr;
+  return IntAsFP<float, uint32_t>(
+      std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));
+}
+
+double SMTSolver::getFP64(const SMTExprRef &Exp) {
+  char *buffer_end = nullptr;
+  return IntAsFP<double, uint64_t>(
+      std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));
 }
 
 camada::SMTSolverRef camada::createZ3Solver() {

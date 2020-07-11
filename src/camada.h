@@ -302,24 +302,33 @@ public:
   /// integer, considering the rounding mode.
   virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) = 0;
 
-  /// If the a model is available, returns the value of a given boolean symbol
+  /// If a model is available, returns the value of a given boolean symbol
   virtual bool getBool(const SMTExprRef &Exp) = 0;
 
-  /// If the a model is available, returns the value of a given bitvector
+  /// If a model is available, returns the value of a given bitvector
   /// symbol as a 64-bits int
   int64_t getBV(const SMTExprRef &Exp);
 
-  /// If the a model is available, returns the value of a given bitvector
+  /// If a model is available, returns the value of a given bitvector
   /// symbol as a 2-complement form binary string
   virtual std::string getBVInBin(const SMTExprRef &Exp) = 0;
 
-  /// If the a model is available, returns the value of a given floating-point
-  /// symbol as float
-  virtual float getFP32(const SMTExprRef &Exp) = 0;
+  /// If a model is available, returns the value of a given floating-point
+  /// symbol as a binary string in the IEEE-754 format: 1 bit for the sign + N
+  /// bits for the exponent + M bits for the significand
+  virtual std::string getFPInBin(const SMTExprRef &Exp) = 0;
+
+  /// If  a model is available, returns the value of a given floating-point
+  /// symbol as float. We assume the floating-point is using the IEEE-754
+  /// format: 1 bit for the sign + 8 bits for the exponent + 23 bits for the
+  /// significand and 1 hidden bit in the significand
+  float getFP32(const SMTExprRef &Exp);
 
   /// If the a model is available, returns the value of a given floating-point
-  /// symbol as double
-  virtual double getFP64(const SMTExprRef &Exp) = 0;
+  /// symbol as double. We assume the floating-point is using the IEEE-754
+  /// format: 1 bit for the sign + 11 bits for the exponent + 52 bits for the
+  /// significand and 1 hidden bit in the significand
+  double getFP64(const SMTExprRef &Exp);
 
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
@@ -351,11 +360,19 @@ public:
   /// Creates a new symbol, given a name and a sort
   virtual SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) = 0;
 
-  /// Constructs an SMTExprRef from a float.
-  virtual SMTExprRef mkFP32(const float Float) = 0;
+  /// Constructs a floating-point from a binary string, in the IEEE-754 format:
+  /// 1 bit for the sign + N bits for the exponent + M bits for the significand
+  virtual SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth) = 0;
 
-  /// Constructs an SMTExprRef from a double.
-  virtual SMTExprRef mkFP64(const double Double) = 0;
+  /// Constructs an SMTExprRef from a float. We assume the floating-point is
+  /// using the IEEE-754 format: 1 bit for the sign + 8 bits for the exponent +
+  /// 23 bits for the significand and 1 hidden bit in the significand
+  SMTExprRef mkFP32(const float Float);
+
+  /// Constructs an SMTExprRef from a double.  We assume the floating-point is
+  /// using the IEEE-754 format: 1 bit for the sign + 11 bits for the exponent +
+  /// 52 bits for the significand and 1 hidden bit in the significand
+  SMTExprRef mkFP64(const double Double);
 
   /// Returns an appropriate floating-point rounding mode.
   virtual SMTExprRef mkRM(const RM &R) = 0;

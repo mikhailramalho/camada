@@ -1853,12 +1853,8 @@ static inline FPType getFPValue(SMTFPSolver &S, const SMTExprRef &Exp) {
   return result;
 }
 
-float SMTFPSolver::getFP32Impl(const SMTExprRef &Exp) {
-  return getFPValue<float>(*this, Exp);
-}
-
-double SMTFPSolver::getFP64Impl(const SMTExprRef &Exp) {
-  return getFPValue<double>(*this, Exp);
+std::string SMTFPSolver::getFPInBinImpl(const SMTExprRef &Exp) {
+  return getBVInBin(Exp);
 }
 
 template <typename FPType, typename IntType>
@@ -1873,12 +1869,9 @@ static inline IntType FPasInt(const FPType FP) {
   return FPAsInt;
 }
 
-SMTExprRef SMTFPSolver::mkFP32Impl(const float Float) {
-  return mkBVFromDec(FPasInt<float, int32_t>(Float), getFP32Sort());
-}
-
-SMTExprRef SMTFPSolver::mkFP64Impl(const double Double) {
-  return mkBVFromDec(FPasInt<double, int64_t>(Double), getFP64Sort());
+SMTExprRef SMTFPSolver::mkFPFromBinImpl(const std::string &FP,
+                                        unsigned EWidth) {
+  return mkBVFromBin(FP, getFPSort(EWidth, FP.length() - EWidth - 1));
 }
 
 SMTExprRef SMTFPSolver::mkRMImpl(const RM &R) {
@@ -1889,19 +1882,17 @@ SMTExprRef SMTFPSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                   const unsigned SigWidth) {
   // we always create the same NaN: sgn = Sgn, exp = all 1, sig = 0...01
   SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
-  return mkBVToIEEEFP(
-      mkBVConcat(mkBVFromDec(Sgn, 1),
-                 mkBVConcat(top_exp, mkBVFromDec(1, SigWidth - 1))),
-      getFPSort(ExpWidth, SigWidth));
+  return mkBVToIEEEFP(mkBVConcat(mkBVFromDec(Sgn, 1),
+                                 mkBVConcat(top_exp, mkBVFromDec(1, SigWidth))),
+                      getFPSort(ExpWidth, SigWidth));
 }
 
 SMTExprRef SMTFPSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                   const unsigned SigWidth) {
   SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
-  return mkBVToIEEEFP(
-      mkBVConcat(mkBVFromDec(Sgn, 1),
-                 mkBVConcat(top_exp, mkBVFromDec(0, SigWidth - 1))),
-      getFPSort(ExpWidth, SigWidth));
+  return mkBVToIEEEFP(mkBVConcat(mkBVFromDec(Sgn, 1),
+                                 mkBVConcat(top_exp, mkBVFromDec(0, SigWidth))),
+                      getFPSort(ExpWidth, SigWidth));
 }
 
 SMTExprRef SMTFPSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
