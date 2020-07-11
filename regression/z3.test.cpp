@@ -1,10 +1,8 @@
 
 
-#include "camada.h"
 #include "simple.test.h"
 
 #include <catch2/catch.hpp>
-#include <z3++.h>
 #include <z3solver.h>
 
 TEST_CASE("Simple Z3 test", "[Z3]") {

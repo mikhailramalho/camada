@@ -23,7 +23,6 @@
 #define CAMADAUTILS_H_
 
 #include <iostream>
-#include <string>
 
 namespace camada {
 

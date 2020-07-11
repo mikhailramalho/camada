@@ -23,8 +23,6 @@
 #include "ac_config.h"
 #include "camadautils.h"
 
-#include <cstring>
-#include <gmp.h>
 #include <gmpxx.h>
 
 using namespace camada;

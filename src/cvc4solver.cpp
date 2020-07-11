@@ -23,8 +23,6 @@
 #include "ac_config.h"
 #include "camadautils.h"
 
-#include <cmath>
-
 using namespace camada;
 
 #ifdef SOLVER_CVC4_ENABLED

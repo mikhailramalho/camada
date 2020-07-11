@@ -1,10 +1,8 @@
 
 
-#include "camada.h"
 #include "simple.test.h"
 
 #include <catch2/catch.hpp>
-#include <mathsat.h>
 #include <mathsatsolver.h>
 
 TEST_CASE("Simple MathSAT test", "[MathSAT]") {

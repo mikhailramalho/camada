@@ -1,6 +1,4 @@
 
-
-#include "camada.h"
 #include "simple.test.h"
 
 #include <boolectorsolver.h>

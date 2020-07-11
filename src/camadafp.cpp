@@ -24,7 +24,6 @@
 
 #include <cassert>
 #include <cmath>
-#include <cstring>
 
 using namespace camada;
 
@@ -1950,7 +1949,7 @@ SMTExprRef SMTFPSolver::round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
   SMTExprRef t = mkBVAdd(Exp, mkBVFromDec(1, EWidth + 2));
   t = mkBVSub(t, lz);
   t = mkBVSub(t, mkBVSignExt(2, e_min));
-  SMTExprRef TINY = mkBVSle(t, mkBVFromDec(ULLONG_MAX, EWidth + 2));
+  SMTExprRef TINY = mkBVSle(t, mkBVFromDec(-1, EWidth + 2));
 
   SMTExprRef beta = mkBVAdd(mkBVSub(Exp, lz), mkBVFromDec(1, EWidth + 2));
 
@@ -1968,8 +1967,7 @@ SMTExprRef SMTFPSolver::round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
   SMTExprRef sigma_cap = mkBVFromDec(SWidth + 2, sigma_size);
   SMTExprRef sigma_le_cap = mkBVUle(sigma_neg, sigma_cap);
   SMTExprRef sigma_neg_capped = mkIte(sigma_le_cap, sigma_neg, sigma_cap);
-  SMTExprRef sigma_lt_zero =
-      mkBVSle(sigma, mkBVFromDec(ULLONG_MAX, sigma_size));
+  SMTExprRef sigma_lt_zero = mkBVSle(sigma, mkBVFromDec(-1, sigma_size));
 
   SMTExprRef sig_ext = mkBVConcat(Sig, mkBVFromDec(0, sig_size));
   SMTExprRef rs_sig = mkBVLshr(

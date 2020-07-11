@@ -23,9 +23,6 @@
 #include "ac_config.h"
 #include "camadautils.h"
 
-#include <cmath>
-#include <cstring>
-
 using namespace camada;
 
 #ifdef SOLVER_Z3_ENABLED

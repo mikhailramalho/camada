@@ -24,10 +24,6 @@
 
 #include "camadaexpr.h"
 
-#include <climits>
-#include <memory>
-#include <string>
-
 namespace camada {
 
 /// Return camada version
@@ -204,7 +200,7 @@ public:
 
   SMTExprRef mkBVRedAnd(SMTExprRef Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(ULLONG_MAX, Exp->getWidth()));
+    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
     return mkIte(comp, mkBVFromDec(1, 1), mkBVFromDec(0, 1));
   }
 

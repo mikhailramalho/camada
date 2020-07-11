@@ -24,8 +24,6 @@
 
 #include "camadasort.h"
 
-#include <memory>
-
 namespace camada {
 
 /// Generic base class for SMT exprs
