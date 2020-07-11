@@ -132,15 +132,11 @@ unsigned SMTSort::getFPExponentWidthImpl() const {
 
 int64_t SMTSolver::getBV(const SMTExprRef &Exp) {
   const std::string bv = getBVInBin(Exp);
-
-  int64_t power = 1 << (Exp->getWidth() - 1);
-  int64_t sum = bv[0] != '0' ? power * -1 : 0;
-
-  for (int64_t i = 1; i < Exp->getWidth(); ++i) {
-    power /= 2;
-    sum += (bv[i] - '0') * power;
-  }
-  return sum;
+  char *buffer_end;
+  int64_t res = std::strtoll(bv.c_str(), &buffer_end, 2);
+  if (res & (1 << (Exp->getWidth() - 1)))
+    res |= ~((1 << Exp->getWidth()) - 1);
+  return res;
 }
 
 template <typename FPType, typename IntType>
