@@ -63,6 +63,8 @@ public:
   explicit CVC4Solver();
   virtual ~CVC4Solver() = default;
 
+  virtual void setConfig();
+
   void addConstraint(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRef(const SMTExpr &Exp) const override;

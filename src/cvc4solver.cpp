@@ -38,7 +38,9 @@ bool CVC4Expr::equal_to(SMTExpr const &Other) const {
 void CVC4Expr::dump() const { std::cerr << Expr.toString() << '\n'; }
 
 CVC4Solver::CVC4Solver()
-    : Context(std::make_shared<CVC4::ExprManager>()), Solver(Context.get()) {
+    : Context(std::make_shared<CVC4::ExprManager>()), Solver(Context.get()) {}
+
+void CVC4Solver::setConfig() {
   Solver.setOption("produce-models", true);
   Solver.setOption("produce-assertions", true);
 }
@@ -767,7 +769,10 @@ checkResult CVC4Solver::check() {
   return checkResult::UNSAT;
 }
 
-void CVC4Solver::reset() { Solver.reset(); }
+void CVC4Solver::reset() {
+  Solver.reset();
+  setConfig();
+}
 
 void CVC4Solver::dump() {
   auto const &assertions = Solver.getAssertions();
