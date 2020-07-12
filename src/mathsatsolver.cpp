@@ -23,7 +23,7 @@
 #include "ac_config.h"
 #include "camadautils.h"
 
-#include <gmpxx.h>
+#include <gmp.h>
 
 using namespace camada;
 
@@ -546,9 +546,9 @@ static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp,
   msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context,
                       toSolverExpr<MathSATExpr>(*t).Expr, val);
 
-  mpq_class num(val);
+  std::string bv = mpq_get_str(NULL, 2, val);
   mpq_clear(val);
-  return num.get_str(base);
+  return bv;
 }
 
 std::string MathSATSolver::getBVInBin(const SMTExprRef &Exp) {
