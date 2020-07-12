@@ -1,6 +1,5 @@
 
-
-#include "simple.test.h"
+#include "tests.h"
 
 #include <catch2/catch.hpp>
 #include <yicessolver.h>
@@ -8,7 +7,7 @@
 TEST_CASE("Simple yices test", "[YICES]") {
   // Create Yices Solver
   auto yices = camada::createYicesSolver();
-  equal_ten(yices);
+  tests(yices);
 }
 
 TEST_CASE("Override Yices Solver", "[YICES]") {
@@ -39,5 +38,5 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
   camada::SMTSolverRef yices =
       std::make_shared<camada::YicesSolver>(std::make_shared<myYicesContext>());
 
-  equal_ten(yices);
+  tests(yices);
 }

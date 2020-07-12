@@ -1,5 +1,5 @@
 
-#include "simple.test.h"
+#include "tests.h"
 
 #include <boolectorsolver.h>
 #include <catch2/catch.hpp>
@@ -7,7 +7,7 @@
 TEST_CASE("Simple Boolector test", "[Boolector]") {
   // Create Boolector Solver
   auto btor = camada::createBoolectorSolver();
-  equal_ten(btor);
+  tests(btor);
 }
 
 TEST_CASE("Override Boolector Solver", "[Boolector]") {
@@ -28,5 +28,5 @@ TEST_CASE("Override Boolector Solver", "[Boolector]") {
   camada::SMTSolverRef btor =
       std::make_shared<camada::BtorSolver>(std::make_shared<myBtorContext>());
 
-  equal_ten(btor);
+  tests(btor);
 }

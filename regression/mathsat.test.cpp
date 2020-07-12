@@ -1,6 +1,6 @@
 
 
-#include "simple.test.h"
+#include "tests.h"
 
 #include <catch2/catch.hpp>
 #include <mathsatsolver.h>
@@ -8,7 +8,7 @@
 TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   // Create Mathsat Solver
   auto mathsat = camada::createMathSATSolver();
-  equal_ten(mathsat);
+  tests(mathsat);
 }
 
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
@@ -45,5 +45,5 @@ TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
   camada::SMTSolverRef mathsat = std::make_shared<mySolver>(Config);
   msat_destroy_config(Config);
 
-  equal_ten(mathsat);
+  tests(mathsat);
 }
