@@ -18,7 +18,7 @@ jobs:
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Z3
-      run: brew install z3
+      run: git clone https://github.com/Z3Prover/z3.git && cd z3 && git reset --hard 377658837 && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=../z3 && ninja install
     - name: Configure CMake
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
     - name: Build Camada
