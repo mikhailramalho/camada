@@ -84,12 +84,12 @@ SMTExprRef YicesSolver::newExprRef(const SMTExpr &Exp) const {
   return std::make_shared<YicesExpr>(toSolverExpr<YicesExpr>(Exp));
 }
 
-SMTSortRef YicesSolver::getBoolSort() {
+SMTSortRef YicesSolver::mkBoolSort() {
   return newSortRef<camada::SolverBoolSort<YicesSort>>(
       camada::SolverBoolSort<YicesSort>(Context, yices_bool_type()));
 }
 
-SMTSortRef YicesSolver::getBVSort(unsigned BitWidth) {
+SMTSortRef YicesSolver::mkBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<YicesSort>>(
       camada::SolverBVSort<YicesSort>(BitWidth, Context,
                                       yices_bv_type(BitWidth)));
@@ -107,8 +107,8 @@ SMTSortRef YicesSolver::getBVRMSort() {
       camada::SolverRMSort<YicesSort>(Context, yices_bv_type(3)));
 }
 
-SMTSortRef YicesSolver::getArraySort(const SMTSortRef &IndexSort,
-                                     const SMTSortRef &ElemSort) {
+SMTSortRef YicesSolver::mkArraySort(const SMTSortRef &IndexSort,
+                                    const SMTSortRef &ElemSort) {
   return newSortRef<camada::SolverArraySort<YicesSort>>(
       camada::SolverArraySort<YicesSort>(
           IndexSort, ElemSort, Context,
@@ -272,25 +272,25 @@ SMTExprRef YicesSolver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 }
 
 SMTExprRef YicesSolver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(Context, getBoolSort(),
+  return newExprRef(YicesExpr(Context, mkBoolSort(),
                               yices_and2(toSolverExpr<YicesExpr>(*LHS).Expr,
                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(Context, getBoolSort(),
+  return newExprRef(YicesExpr(Context, mkBoolSort(),
                               yices_or2(toSolverExpr<YicesExpr>(*LHS).Expr,
                                         toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(Context, getBoolSort(),
+  return newExprRef(YicesExpr(Context, mkBoolSort(),
                               yices_xor2(toSolverExpr<YicesExpr>(*LHS).Expr,
                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(Context, getBoolSort(),
+  return newExprRef(YicesExpr(Context, mkBoolSort(),
                               yices_eq(toSolverExpr<YicesExpr>(*LHS).Expr,
                                        toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -305,27 +305,27 @@ SMTExprRef YicesSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef YicesSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      YicesExpr(Context, getBVSort(i + Exp->getWidth()),
+      YicesExpr(Context, mkBVSort(i + Exp->getWidth()),
                 yices_sign_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
-      YicesExpr(Context, getBVSort(i + Exp->getWidth()),
+      YicesExpr(Context, mkBVSort(i + Exp->getWidth()),
                 yices_zero_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef YicesSolver::mkBVExtract(unsigned High, unsigned Low,
                                     const SMTExprRef &Exp) {
   return newExprRef(YicesExpr(
-      Context, getBVSort(High - Low + 1),
+      Context, mkBVSort(High - Low + 1),
       yices_bvextract(toSolverExpr<YicesExpr>(*Exp).Expr, Low, High)));
 }
 
 SMTExprRef YicesSolver::mkBVConcat(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, getBVSort(LHS->getWidth() + RHS->getWidth()),
+      YicesExpr(Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
                 yices_bvconcat2(toSolverExpr<YicesExpr>(*LHS).Expr,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -390,7 +390,7 @@ SMTExprRef YicesSolver::getArrayElement(const SMTExprRef &Array,
 
 SMTExprRef YicesSolver::mkBool(const bool b) {
   return newExprRef(
-      YicesExpr(Context, getBoolSort(), b ? yices_true() : yices_false()));
+      YicesExpr(Context, mkBoolSort(), b ? yices_true() : yices_false()));
 }
 
 SMTExprRef YicesSolver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
@@ -432,7 +432,7 @@ SMTExprRef YicesSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
 SMTExprRef YicesSolver::mkArrayConst(const SMTSortRef &IndexSort,
                                      const SMTExprRef &InitValue) {
   const std::string name = "__CAMADA_arr" + std::to_string(ConstArrayCounter++);
-  SMTExprRef arr = mkSymbol(name, getArraySort(IndexSort, InitValue->Sort));
+  SMTExprRef arr = mkSymbol(name, mkArraySort(IndexSort, InitValue->Sort));
 
   uint64_t size = 1ULL << IndexSort->getWidth();
   for (uint64_t i = 0; i < size; i++)

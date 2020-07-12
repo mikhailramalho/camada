@@ -6,7 +6,7 @@
 
 inline void equal_ten(const camada::SMTSolverRef &solver) {
   // A free variable
-  auto f = solver->mkSymbol("f", solver->getBVSort(10));
+  auto f = solver->mkSymbol("f", solver->mkBVSort(10));
 
   // And assert if there is a value for 'f' that is equal to 10
   auto ten = solver->mkBVFromBin(std::bitset<10>(-10).to_string(), 10);

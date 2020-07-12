@@ -64,22 +64,22 @@ public:
 
   SMTExprRef newExprRef(const SMTExpr &Exp) const override;
 
-  SMTSortRef getBoolSort() override;
+  SMTSortRef mkBoolSort() override;
 
-  SMTSortRef getBVSort(unsigned BitWidth) override;
+  SMTSortRef mkBVSort(unsigned BitWidth) override;
 
-  SMTSortRef getRMSortImpl() override;
+  SMTSortRef mkRMSortImpl() override;
 
-  SMTSortRef getFPSortImpl(const unsigned ExpWidth,
-                           const unsigned SigWidth) override;
+  SMTSortRef mkFPSortImpl(const unsigned ExpWidth,
+                          const unsigned SigWidth) override;
 
   SMTSortRef getBVFPSort(const unsigned ExpWidth,
                          const unsigned SigWidth) override;
 
   SMTSortRef getBVRMSort() override;
 
-  SMTSortRef getArraySort(const SMTSortRef &IndexType,
-                          const SMTSortRef &ElemType) override;
+  SMTSortRef mkArraySort(const SMTSortRef &IndexType,
+                         const SMTSortRef &ElemType) override;
 
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 

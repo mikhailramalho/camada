@@ -78,13 +78,13 @@ SMTExprRef BtorSolver::newExprRef(const SMTExpr &Exp) const {
   return std::make_shared<BtorExpr>(toSolverExpr<BtorExpr>(Exp));
 }
 
-SMTSortRef BtorSolver::getBoolSort() {
+SMTSortRef BtorSolver::mkBoolSort() {
   return newSortRef<camada::SolverBoolSort<BtorSort>>(
       camada::SolverBoolSort<BtorSort>(Context,
                                        boolector_bool_sort(Context->Context)));
 }
 
-SMTSortRef BtorSolver::getBVSort(unsigned BitWidth) {
+SMTSortRef BtorSolver::mkBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<BtorSort>>(
       camada::SolverBVSort<BtorSort>(
           BitWidth, Context,
@@ -105,8 +105,8 @@ SMTSortRef BtorSolver::getBVRMSort() {
           Context, boolector_bitvec_sort(Context->Context, 3)));
 }
 
-SMTSortRef BtorSolver::getArraySort(const SMTSortRef &IndexSort,
-                                    const SMTSortRef &ElemSort) {
+SMTSortRef BtorSolver::mkArraySort(const SMTSortRef &IndexSort,
+                                   const SMTSortRef &ElemSort) {
   return newSortRef<camada::SolverArraySort<BtorSort>>(
       camada::SolverArraySort<BtorSort>(
           IndexSort, ElemSort, Context,
@@ -281,7 +281,7 @@ SMTExprRef BtorSolver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 }
 
 SMTExprRef BtorSolver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(BtorExpr(Context, getBoolSort(),
+  return newExprRef(BtorExpr(Context, mkBoolSort(),
                              boolector_and(Context->Context,
                                            toSolverExpr<BtorExpr>(*LHS).Expr,
                                            toSolverExpr<BtorExpr>(*RHS).Expr)));
@@ -289,13 +289,13 @@ SMTExprRef BtorSolver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef BtorSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, getBoolSort(),
+      BtorExpr(Context, mkBoolSort(),
                boolector_or(Context->Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                             toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
 SMTExprRef BtorSolver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(BtorExpr(Context, getBoolSort(),
+  return newExprRef(BtorExpr(Context, mkBoolSort(),
                              boolector_xor(Context->Context,
                                            toSolverExpr<BtorExpr>(*LHS).Expr,
                                            toSolverExpr<BtorExpr>(*RHS).Expr)));
@@ -303,7 +303,7 @@ SMTExprRef BtorSolver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef BtorSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, getBoolSort(),
+      BtorExpr(Context, mkBoolSort(),
                boolector_eq(Context->Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                             toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -319,20 +319,20 @@ SMTExprRef BtorSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
 
 SMTExprRef BtorSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBVSort(i + Exp->getWidth()),
+      Context, mkBVSort(i + Exp->getWidth()),
       boolector_sext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
-      Context, getBVSort(i + Exp->getWidth()),
+      Context, mkBVSort(i + Exp->getWidth()),
       boolector_uext(Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
 SMTExprRef BtorSolver::mkBVExtract(unsigned High, unsigned Low,
                                    const SMTExprRef &Exp) {
   return newExprRef(
-      BtorExpr(Context, getBVSort(High - Low + 1),
+      BtorExpr(Context, mkBVSort(High - Low + 1),
                boolector_slice(Context->Context,
                                toSolverExpr<BtorExpr>(*Exp).Expr, High, Low)));
 }
@@ -340,7 +340,7 @@ SMTExprRef BtorSolver::mkBVExtract(unsigned High, unsigned Low,
 SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(BtorExpr(
-      Context, getBVSort(LHS->getWidth() + RHS->getWidth()),
+      Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
       boolector_concat(Context->Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                        toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -437,7 +437,7 @@ SMTExprRef BtorSolver::getArrayElement(const SMTExprRef &Array,
 }
 
 SMTExprRef BtorSolver::mkBool(const bool b) {
-  return newExprRef(BtorExpr(Context, getBoolSort(),
+  return newExprRef(BtorExpr(Context, mkBoolSort(),
                              b ? boolector_true(Context->Context)
                                : boolector_false(Context->Context)));
 }
@@ -485,7 +485,7 @@ SMTExprRef BtorSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
 
 SMTExprRef BtorSolver::mkArrayConst(const SMTSortRef &IndexSort,
                                     const SMTExprRef &InitValue) {
-  SMTSortRef sort = getArraySort(IndexSort, InitValue->Sort);
+  SMTSortRef sort = mkArraySort(IndexSort, InitValue->Sort);
   return newExprRef(
       BtorExpr(Context, sort,
                boolector_const_array(Context->Context,

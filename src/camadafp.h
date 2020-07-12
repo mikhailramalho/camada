@@ -31,17 +31,17 @@ public:
   SMTFPSolver() = default;
   ~SMTFPSolver() = default;
 
-  virtual SMTSortRef getRMSort() final {
+  virtual SMTSortRef mkRMSort() final {
     if (useCamadaFP)
-      return SMTFPSolver::getRMSortImpl();
-    return getRMSortImpl();
+      return SMTFPSolver::mkRMSortImpl();
+    return mkRMSortImpl();
   }
 
-  virtual SMTSortRef getFPSort(const unsigned ExpWidth,
-                               const unsigned SigWidth) final {
+  virtual SMTSortRef mkFPSort(const unsigned ExpWidth,
+                              const unsigned SigWidth) final {
     if (useCamadaFP)
-      return SMTFPSolver::getFPSortImpl(ExpWidth, SigWidth);
-    return getFPSortImpl(ExpWidth, SigWidth);
+      return SMTFPSolver::mkFPSortImpl(ExpWidth, SigWidth);
+    return mkFPSortImpl(ExpWidth, SigWidth);
   }
 
   virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) final {
@@ -240,10 +240,10 @@ public:
   }
 
 protected:
-  virtual SMTSortRef getRMSortImpl();
+  virtual SMTSortRef mkRMSortImpl();
 
-  virtual SMTSortRef getFPSortImpl(const unsigned ExpWidth,
-                                   const unsigned SigWidth);
+  virtual SMTSortRef mkFPSortImpl(const unsigned ExpWidth,
+                                  const unsigned SigWidth);
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
 

@@ -90,7 +90,7 @@ static inline SMTExprRef mkPZero(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(S.mkBVFromDec(0, 1),
                    S.mkBVConcat(bot_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.getFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1));
 }
 
 static inline SMTExprRef mkNZero(SMTSolver &S, unsigned int EWidth,
@@ -99,7 +99,7 @@ static inline SMTExprRef mkNZero(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(S.mkBVFromDec(1, 1),
                    S.mkBVConcat(bot_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.getFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1));
 }
 
 static inline SMTExprRef mkPInf(SMTSolver &S, unsigned int EWidth,
@@ -108,7 +108,7 @@ static inline SMTExprRef mkPInf(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(S.mkBVFromDec(0, 1),
                    S.mkBVConcat(top_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.getFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1));
 }
 
 static inline SMTExprRef mkNInf(SMTSolver &S, unsigned int EWidth,
@@ -117,7 +117,7 @@ static inline SMTExprRef mkNInf(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(S.mkBVFromDec(1, 1),
                    S.mkBVConcat(top_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.getFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1));
 }
 
 static inline SMTExprRef mkIsPZero(SMTSolver &S, const SMTExprRef &Exp) {
@@ -142,7 +142,7 @@ SMTExprRef mkOne(SMTSolver &S, SMTExprRef Sgn, unsigned int EWidth,
       S.mkBVConcat(
           Sgn, S.mkBVConcat(S.mkBVFromDec(power2m1(EWidth - 1, false), EWidth),
                             S.mkBVFromDec(0, SWidth - 1))),
-      S.getFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1));
 }
 
 static inline SMTExprRef mkBias(SMTSolver &S, SMTExprRef e) {
@@ -301,10 +301,10 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
   assert(Sig->getWidth() == SWidth);
 }
 
-SMTSortRef SMTFPSolver::getRMSortImpl() { return getBVRMSort(); }
+SMTSortRef SMTFPSolver::mkRMSortImpl() { return getBVRMSort(); }
 
-SMTSortRef SMTFPSolver::getFPSortImpl(const unsigned ExpWidth,
-                                      const unsigned SigWidth) {
+SMTSortRef SMTFPSolver::mkFPSortImpl(const unsigned ExpWidth,
+                                     const unsigned SigWidth) {
 
   return getBVFPSort(ExpWidth, SigWidth);
 }
@@ -1551,7 +1551,7 @@ SMTExprRef SMTFPSolver::mkToBV(SMTExprRef Exp, bool isSigned,
 
   // NaN, Inf, or negative (except -0) -> unspecified
   SMTExprRef c1 = mkOr(x_is_nan, x_is_inf);
-  SMTExprRef unspec_v = mkSymbol("UNSPEC_FP", getBVSort(ToWidth));
+  SMTExprRef unspec_v = mkSymbol("UNSPEC_FP", mkBVSort(ToWidth));
   SMTExprRef v1 = unspec_v;
 
   // +-0 -> 0
@@ -1815,7 +1815,7 @@ SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From, RM R) {
   res_sig = mkBVExtract(sbits - 2, 0, res_sig);
   SMTExprRef v6 =
       mkBVToIEEEFP(mkBVConcat(res_sgn, mkBVConcat(res_exp, res_sig)),
-                   getFPSort(ebits, sbits - 1));
+                   mkFPSort(ebits, sbits - 1));
 
   // And finally, we tie them together.
   SMTExprRef result = mkIte(c5, v5, v6);
@@ -1870,11 +1870,11 @@ static inline IntType FPasInt(const FPType FP) {
 
 SMTExprRef SMTFPSolver::mkFPFromBinImpl(const std::string &FP,
                                         unsigned EWidth) {
-  return mkBVFromBin(FP, getFPSort(EWidth, FP.length() - EWidth - 1));
+  return mkBVFromBin(FP, mkFPSort(EWidth, FP.length() - EWidth - 1));
 }
 
 SMTExprRef SMTFPSolver::mkRMImpl(const RM &R) {
-  return mkBVFromDec(static_cast<int64_t>(R), getRMSort());
+  return mkBVFromDec(static_cast<int64_t>(R), mkRMSort());
 }
 
 SMTExprRef SMTFPSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
@@ -1883,7 +1883,7 @@ SMTExprRef SMTFPSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
   SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
   return mkBVToIEEEFP(mkBVConcat(mkBVFromDec(Sgn, 1),
                                  mkBVConcat(top_exp, mkBVFromDec(1, SigWidth))),
-                      getFPSort(ExpWidth, SigWidth));
+                      mkFPSort(ExpWidth, SigWidth));
 }
 
 SMTExprRef SMTFPSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
@@ -1891,7 +1891,7 @@ SMTExprRef SMTFPSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
   SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
   return mkBVToIEEEFP(mkBVConcat(mkBVFromDec(Sgn, 1),
                                  mkBVConcat(top_exp, mkBVFromDec(0, SigWidth))),
-                      getFPSort(ExpWidth, SigWidth));
+                      mkFPSort(ExpWidth, SigWidth));
 }
 
 SMTExprRef SMTFPSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
@@ -2078,5 +2078,5 @@ SMTExprRef SMTFPSolver::round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
   assert(Exp->getWidth() == EWidth);
 
   return mkBVToIEEEFP(mkBVConcat(Sgn, mkBVConcat(Exp, Sig)),
-                      getFPSort(EWidth, SWidth - 1));
+                      mkFPSort(EWidth, SWidth - 1));
 }

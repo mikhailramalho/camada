@@ -61,27 +61,27 @@ public:
   virtual SMTExprRef newExprRef(const SMTExpr &Exp) const = 0;
 
   /// Returns a boolean sort.
-  virtual SMTSortRef getBoolSort() = 0;
+  virtual SMTSortRef mkBoolSort() = 0;
 
   /// Returns an appropriate bitvector sort for the given bitwidth.
-  virtual SMTSortRef getBVSort(const unsigned BitWidth) = 0;
+  virtual SMTSortRef mkBVSort(const unsigned BitWidth) = 0;
 
   /// Returns an appropriate rounding mode sort.
-  virtual SMTSortRef getRMSort() = 0;
+  virtual SMTSortRef mkRMSort() = 0;
 
   /// Returns an appropriate floating-point sort for the given bitwidth.
-  virtual SMTSortRef getFPSort(const unsigned ExpWidth,
-                               const unsigned SigWidth) = 0;
+  virtual SMTSortRef mkFPSort(const unsigned ExpWidth,
+                              const unsigned SigWidth) = 0;
 
   /// Convenience method to create a 32 bits long a floating-point sort.
-  SMTSortRef getFP32Sort() { return getFPSort(8, 23); }
+  SMTSortRef mkFP32Sort() { return mkFPSort(8, 23); }
 
   /// Convenience method to create a 64 bits long a floating-point sort.
-  SMTSortRef getFP64Sort() { return getFPSort(11, 52); }
+  SMTSortRef mkFP64Sort() { return mkFPSort(11, 52); }
 
   /// Returns an appropriate array sort.
-  virtual SMTSortRef getArraySort(const SMTSortRef &IndexSort,
-                                  const SMTSortRef &ElemSort) = 0;
+  virtual SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
+                                 const SMTSortRef &ElemSort) = 0;
 
   /// Given a constraint, adds it to the solver
   virtual void addConstraint(const SMTExprRef &Exp) = 0;
@@ -331,18 +331,19 @@ public:
   /// bits for the exponent + M bits for the significand
   virtual std::string getFPInBin(const SMTExprRef &Exp) = 0;
 
-  /// If  a model is available, returns the value of a given floating-point
+  /// If a model is available, returns the value of a given floating-point
   /// symbol as float. We assume the floating-point is using the IEEE-754
   /// format: 1 bit for the sign + 8 bits for the exponent + 23 bits for the
   /// significand and 1 hidden bit in the significand
   float getFP32(const SMTExprRef &Exp);
 
-  /// If the a model is available, returns the value of a given floating-point
+  /// If a model is available, returns the value of a given floating-point
   /// symbol as double. We assume the floating-point is using the IEEE-754
   /// format: 1 bit for the sign + 11 bits for the exponent + 52 bits for the
   /// significand and 1 hidden bit in the significand
   double getFP64(const SMTExprRef &Exp);
 
+  /// If a model is available, returns the Expr in position Index of Array
   virtual SMTExprRef getArrayElement(const SMTExprRef &Array,
                                      const SMTExprRef &Index) = 0;
 
@@ -355,7 +356,7 @@ public:
   /// Convinience method to create a bitvector from an integer in base 10 and
   /// its bitwidth
   SMTExprRef mkBVFromDec(const int64_t Int, unsigned BitWidth) {
-    return mkBVFromDec(Int, getBVSort(BitWidth));
+    return mkBVFromDec(Int, mkBVSort(BitWidth));
   }
 
   /// Constructs an SMTExprRef from an integer in base 2 and its sort
@@ -365,7 +366,7 @@ public:
   /// Convinience method to create a bitvector from an integer in base 2 and
   /// its bitwidth
   SMTExprRef mkBVFromBin(const std::string &Int, unsigned BitWidth) {
-    return mkBVFromBin(Int, getBVSort(BitWidth));
+    return mkBVFromBin(Int, mkBVSort(BitWidth));
   }
 
   /// Convinience method to create a bitvector from an integer in base 2
