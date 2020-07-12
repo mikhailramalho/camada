@@ -24,6 +24,7 @@
 #include "camadautils.h"
 
 #include <bitset>
+#include <cstring>
 
 using namespace camada;
 
