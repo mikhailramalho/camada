@@ -26,6 +26,11 @@
 
 namespace camada {
 
+class SMTSort;
+
+/// Shared pointer for SMTSorts, used by SMTSolver API.
+using SMTSortRef = std::shared_ptr<SMTSort>;
+
 /// Generic base class for SMT sorts
 class SMTSort {
 public:
@@ -33,16 +38,19 @@ public:
   virtual ~SMTSort() = default;
 
   /// Returns true if the sort is a bitvector.
-  virtual bool isBVSort() const;
+  virtual bool isBVSort() const { return false; }
 
   /// Returns true if the sort is a boolean.
-  virtual bool isBoolSort() const;
+  virtual bool isBoolSort() const { return false; }
 
   /// Returns true if the sort is a floating-point.
-  virtual bool isFPSort() const;
+  virtual bool isFPSort() const { return false; }
 
   /// Returns true if the sort is a rounding mode.
-  virtual bool isRMSort() const;
+  virtual bool isRMSort() const { return false; }
+
+  /// Returns true if the sort is an array.
+  virtual bool isArraySort() const { return false; }
 
   /// Returns the sort width.
   virtual unsigned getWidth() const;
@@ -55,18 +63,17 @@ public:
   /// floating-point.
   virtual unsigned getFPExponentWidth() const;
 
+  /// Returns the array's index sort, fails if the sort is not an array.
+  virtual SMTSortRef getIndexSort() const;
+
+  /// Returns the array's element sort, fails if the sort is not an array.
+  virtual SMTSortRef getElementSort() const;
+
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
   friend bool operator==(SMTSort const &LHS, SMTSort const &RHS);
 
   virtual void dump() const;
-
-protected:
-  /// Returns the floating-point sort significand bit width.
-  virtual unsigned getFPSignificandWidthImpl() const;
-
-  /// Returns the floating-point sort exponent bit width.
-  virtual unsigned getFPExponentWidthImpl() const;
 };
 
 /// Template to hold Solver specific Context and Sort
@@ -125,13 +132,11 @@ public:
 
   virtual bool isFPSort() const override { return true; }
 
-  virtual unsigned getWidth() const override { return ExpWidth + SigWidth; }
+  virtual unsigned getWidth() const override { return 1 + ExpWidth + SigWidth; }
 
-  virtual unsigned getFPSignificandWidthImpl() const override {
-    return SigWidth;
-  }
+  virtual unsigned getFPSignificandWidth() const override { return SigWidth; }
 
-  virtual unsigned getFPExponentWidthImpl() const override { return ExpWidth; }
+  virtual unsigned getFPExponentWidth() const override { return ExpWidth; }
 };
 
 template <typename SolverSortBase> class SolverRMSort : public SolverSortBase {
@@ -146,8 +151,24 @@ public:
   virtual bool isRMSort() const override { return true; }
 };
 
-/// Shared pointer for SMTSorts, used by SMTSolver API.
-using SMTSortRef = std::shared_ptr<SMTSort>;
+template <typename SolverSortBase>
+class SolverArraySort : public SolverSortBase {
+public:
+  SMTSortRef IndexSort;
+  SMTSortRef ElementSort;
+
+  SolverArraySort(const SMTSortRef &I, const SMTSortRef &E,
+                  typename SolverSortBase::ContextType C,
+                  typename SolverSortBase::SortType S)
+      : IndexSort(I), ElementSort(E), SolverSortBase(C, S) {}
+  virtual ~SolverArraySort() = default;
+
+  virtual bool isArraySort() const override { return true; }
+
+  virtual SMTSortRef getIndexSort() const override { return IndexSort; }
+
+  virtual SMTSortRef getElementSort() const override { return ElementSort; }
+};
 
 /// Wrapper to downcast from SMTSort to Solver specific sort
 template <typename SolverSort>

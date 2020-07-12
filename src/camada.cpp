@@ -85,13 +85,19 @@ unsigned SMTSort::getWidth() const {
 }
 
 unsigned SMTSort::getFPSignificandWidth() const {
-  abortCondWithMessage(isFPSort(), "Not a floating-point sort!");
-  return getFPSignificandWidthImpl();
+  abortWithMessage("Unimplemented for current type");
 }
 
 unsigned SMTSort::getFPExponentWidth() const {
-  abortCondWithMessage(isFPSort(), "Not a floating-point sort!");
-  return getFPExponentWidthImpl();
+  abortWithMessage("Unimplemented for current type");
+}
+
+SMTSortRef SMTSort::getIndexSort() const {
+  abortWithMessage("Unimplemented for current type");
+}
+
+SMTSortRef SMTSort::getElementSort() const {
+  abortWithMessage("Unimplemented for current type");
 }
 
 bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
@@ -112,22 +118,6 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
            (LHS.getFPExponentWidth() == RHS.getFPExponentWidth());
 
   return false;
-}
-
-bool SMTSort::isBVSort() const { return false; }
-
-bool SMTSort::isBoolSort() const { return false; }
-
-bool SMTSort::isFPSort() const { return false; }
-
-bool SMTSort::isRMSort() const { return false; }
-
-unsigned SMTSort::getFPSignificandWidthImpl() const {
-  abortWithMessage("Unimplemented for current type");
-}
-
-unsigned SMTSort::getFPExponentWidthImpl() const {
-  abortWithMessage("Unimplemented for current type");
 }
 
 int64_t SMTSolver::getBV(const SMTExprRef &Exp) {

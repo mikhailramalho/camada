@@ -81,6 +81,9 @@ public:
 
   SMTSortRef getBVRMSort() override;
 
+  SMTSortRef getArraySort(const SMTSortRef &IndexType,
+                          const SMTSortRef &ElemType) override;
+
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 
   SMTExprRef mkBVNot(const SMTExprRef &Exp) override;
@@ -149,6 +152,12 @@ public:
 
   SMTExprRef mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkArraySelect(const SMTExprRef &Array,
+                           const SMTExprRef &Index) override;
+
+  SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
+                          const SMTExprRef &Element) override;
+
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkFPNegImpl(const SMTExprRef &Exp) override;
@@ -214,6 +223,9 @@ public:
 
   std::string getFPInBinImpl(const SMTExprRef &Exp) override;
 
+  SMTExprRef getArrayElement(const SMTExprRef &Array,
+                             const SMTExprRef &Index) override;
+
   SMTExprRef mkBool(const bool b) override;
 
   SMTExprRef mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) override;
@@ -237,6 +249,9 @@ public:
                               const SMTSortRef &To) override;
 
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
+                          const SMTExprRef &InitValue) override;
 
   checkResult check() override;
 

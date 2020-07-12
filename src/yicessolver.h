@@ -68,6 +68,8 @@ class YicesSolver : public SMTFPSolver {
 public:
   YicesContextRef Context;
 
+  unsigned int ConstArrayCounter = 0;
+
   explicit YicesSolver();
   explicit YicesSolver(YicesContextRef C);
   virtual ~YicesSolver() = default;
@@ -84,6 +86,9 @@ public:
                          const unsigned SigWidth) override;
 
   SMTSortRef getBVRMSort() override;
+
+  SMTSortRef getArraySort(const SMTSortRef &IndexType,
+                          const SMTSortRef &ElemType) override;
 
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 
@@ -153,9 +158,18 @@ public:
 
   SMTExprRef mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkArraySelect(const SMTExprRef &Array,
+                           const SMTExprRef &Index) override;
+
+  SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
+                          const SMTExprRef &Element) override;
+
   bool getBool(const SMTExprRef &Exp) override;
 
   std::string getBVInBin(const SMTExprRef &Exp) override;
+
+  SMTExprRef getArrayElement(const SMTExprRef &Array,
+                             const SMTExprRef &Index) override;
 
   SMTExprRef mkBool(const bool b) override;
 
@@ -165,6 +179,9 @@ public:
                          const SMTSortRef &Sort) override;
 
   SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) override;
+
+  SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
+                          const SMTExprRef &InitValue) override;
 
   checkResult check() override;
 

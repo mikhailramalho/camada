@@ -79,6 +79,10 @@ public:
   /// Convenience method to create a 64 bits long a floating-point sort.
   SMTSortRef getFP64Sort() { return getFPSort(11, 52); }
 
+  /// Returns an appropriate array sort.
+  virtual SMTSortRef getArraySort(const SMTSortRef &IndexSort,
+                                  const SMTSortRef &ElemSort) = 0;
+
   /// Given a constraint, adds it to the solver
   virtual void addConstraint(const SMTExprRef &Exp) = 0;
 
@@ -300,6 +304,17 @@ public:
   /// integer, considering the rounding mode.
   virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) = 0;
 
+  /// Creates an array select operation. It returns the element in position
+  /// Index of Array.
+  virtual SMTExprRef mkArraySelect(const SMTExprRef &Array,
+                                   const SMTExprRef &Index) = 0;
+
+  /// Creates an array store operation. It stores Element in position Index of
+  /// Array.
+  virtual SMTExprRef mkArrayStore(const SMTExprRef &Array,
+                                  const SMTExprRef &Index,
+                                  const SMTExprRef &Element) = 0;
+
   /// If a model is available, returns the value of a given boolean symbol
   virtual bool getBool(const SMTExprRef &Exp) = 0;
 
@@ -327,6 +342,9 @@ public:
   /// format: 1 bit for the sign + 11 bits for the exponent + 52 bits for the
   /// significand and 1 hidden bit in the significand
   double getFP64(const SMTExprRef &Exp);
+
+  virtual SMTExprRef getArrayElement(const SMTExprRef &Array,
+                                     const SMTExprRef &Index) = 0;
 
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
@@ -394,6 +412,10 @@ public:
 
   /// Convenience method to create 64 bits long Inf
   SMTExprRef mkInf64(const bool Sgn) { return mkInf(Sgn, 11, 52); }
+
+  /// Creates an array and initializes all elements to InitValue
+  virtual SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
+                                  const SMTExprRef &InitValue) = 0;
 
   /// Reinterpret a bitvector as a floating-point, using the IEEE format
   virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
