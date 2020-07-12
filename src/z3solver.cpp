@@ -562,6 +562,8 @@ std::string Z3Solver::getBVInBin(const SMTExprRef &Exp) {
   std::string bv;
   bool is_num = toSolverExpr<Z3Expr>(*value).Expr.as_binary(bv);
   camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
+  if (bv.length() < Exp->getWidth())
+    bv = std::string(Exp->getWidth() - bv.length(), '0') + bv;
   return bv;
 }
 
