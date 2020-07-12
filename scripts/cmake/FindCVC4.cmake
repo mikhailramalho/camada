@@ -16,6 +16,9 @@ if(CVC4_FOUND)
   find_path(SOLVER_CVC4_SYMFPU_DIR symfpu/core/unpackedFloat.h PATHS)
   set(SOLVER_CVC4_INCLUDE_DIR "${SOLVER_CVC4_SYMFPU_DIR}")
 
+  find_path(GMP_INCLUDE_DIR NAMES gmpxx.h)
+  list(APPEND SOLVER_CVC4_INCLUDE_DIR "${GMP_INCLUDE_DIR}")
+
   # handle the QUIETLY and REQUIRED arguments and set CVC4_FOUND to TRUE if
   # all listed variables are TRUE
   include(FindPackageHandleStandardArgs)
