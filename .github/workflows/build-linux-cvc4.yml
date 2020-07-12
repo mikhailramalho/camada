@@ -1,0 +1,28 @@
+name: Linux CVC4 Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+
+  build-cvc4:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build && pip install toml
+    - name: Setup Catch2
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+    - name: Setup CVC4
+      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
+    - name: Configure CMake
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_CVC4=ON -DSOLVER_CVC4_DIR=$PWD/../cvc4 -DSOLVER_CVC4_SYMFPU_DIR=$PWD/../CVC4/deps/install/include -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+    - name: Build Camada
+      run: cd build && cmake --build . && ninja install
+    - name: Run tests
+      run: cd build/regression && ctest -j4 --output-on-failure --progress .
+
