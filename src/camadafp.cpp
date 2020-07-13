@@ -1655,7 +1655,8 @@ SMTExprRef SMTFPSolver::mkFPtoUBVImpl(const SMTExprRef &From,
   return mkToBV(From, false, ToWidth);
 }
 
-SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From, RM R) {
+SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
+                                           const RM &R) {
   unsigned ebits = From->Sort->getFPExponentWidth();
   unsigned sbits = From->Sort->getFPSignificandWidth();
 

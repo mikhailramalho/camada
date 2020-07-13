@@ -601,7 +601,7 @@ SMTExprRef CVC4Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
                       toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
-SMTExprRef CVC4Solver::mkFPtoIntegralImpl(const SMTExprRef &From, RM R) {
+SMTExprRef CVC4Solver::mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       CVC4Expr(Context, From->Sort,

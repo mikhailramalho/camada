@@ -217,7 +217,7 @@ public:
 
   SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
 
-  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, RM R) override;
+  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) override;
 
   bool getBool(const SMTExprRef &Exp) override;
 

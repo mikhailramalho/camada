@@ -530,7 +530,7 @@ SMTExprRef Z3Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
                              toSolverExpr<Z3Expr>(*From).Expr, ToWidth))));
 }
 
-SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From, RM R) {
+SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(
       Z3Expr(Context, From->Sort,

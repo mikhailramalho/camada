@@ -302,7 +302,7 @@ public:
 
   /// Creates a floating-point conversion from floatint-point to the closest
   /// integer, considering the rounding mode.
-  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) = 0;
+  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, const RM &R) = 0;
 
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.

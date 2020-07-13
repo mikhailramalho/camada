@@ -535,7 +535,8 @@ SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
   return mkFPtoSBV(From, ToWidth);
 }
 
-SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From, RM R) {
+SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
+                                             const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
   return newExprRef(MathSATExpr(
       Context, From->Sort,

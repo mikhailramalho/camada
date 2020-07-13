@@ -188,7 +188,7 @@ public:
     return mkFPtoUBVImpl(From, ToWidth);
   }
 
-  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, RM R) final {
+  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, const RM &R) final {
     if (useCamadaFP)
       return SMTFPSolver::mkFPtoIntegralImpl(From, R);
     return mkFPtoIntegralImpl(From, R);
@@ -298,7 +298,7 @@ protected:
 
   virtual SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth);
 
-  virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, RM R);
+  virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R);
 
   virtual std::string getFPInBinImpl(const SMTExprRef &Exp);
 
