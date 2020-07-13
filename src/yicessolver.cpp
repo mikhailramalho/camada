@@ -46,7 +46,7 @@ void YicesContext::createAndConfig() {
 }
 
 void YicesContext::reset() {
-  yices_reset();
+  yices_exit();
   Context = nullptr;
   createAndConfig();
 }
