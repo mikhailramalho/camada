@@ -53,8 +53,8 @@ public:
 
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
-  SMTSortRef newSortRef(const SMTSort &Sort) const {
-    return std::make_shared<SolverSort>(toSolverSort<SolverSort>(Sort));
+  SMTSortRef newSortRef(const SolverSort &Sort) const {
+    return std::make_shared<SolverSort>(Sort);
   }
 
   /// Wrapper to create new SMTExpr

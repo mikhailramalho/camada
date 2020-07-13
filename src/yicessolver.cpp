@@ -86,34 +86,32 @@ SMTExprRef YicesSolver::newExprRef(const SMTExpr &Exp) const {
 
 SMTSortRef YicesSolver::mkBoolSort() {
   return newSortRef<camada::SolverBoolSort<YicesSort>>(
-      camada::SolverBoolSort<YicesSort>(Context, yices_bool_type()));
+      {Context, yices_bool_type()});
 }
 
 SMTSortRef YicesSolver::mkBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<YicesSort>>(
-      camada::SolverBVSort<YicesSort>(BitWidth, Context,
-                                      yices_bv_type(BitWidth)));
+      {BitWidth, Context, yices_bv_type(BitWidth)});
 }
 
 SMTSortRef YicesSolver::getBVFPSort(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<YicesSort>>(
-      camada::SolverFPSort<YicesSort>(ExpWidth, SigWidth + 1, Context,
-                                      yices_bv_type(ExpWidth + SigWidth + 1)));
+      {ExpWidth, SigWidth + 1, Context,
+       yices_bv_type(ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef YicesSolver::getBVRMSort() {
   return newSortRef<camada::SolverRMSort<YicesSort>>(
-      camada::SolverRMSort<YicesSort>(Context, yices_bv_type(3)));
+      {Context, yices_bv_type(3)});
 }
 
 SMTSortRef YicesSolver::mkArraySort(const SMTSortRef &IndexSort,
                                     const SMTSortRef &ElemSort) {
   return newSortRef<camada::SolverArraySort<YicesSort>>(
-      camada::SolverArraySort<YicesSort>(
-          IndexSort, ElemSort, Context,
-          yices_function_type1(toSolverSort<YicesSort>(*IndexSort).Sort,
-                               toSolverSort<YicesSort>(*ElemSort).Sort)));
+      {IndexSort, ElemSort, Context,
+       yices_function_type1(toSolverSort<YicesSort>(*IndexSort).Sort,
+                            toSolverSort<YicesSort>(*ElemSort).Sort)});
 }
 
 SMTExprRef YicesSolver::mkBVNeg(const SMTExprRef &Exp) {

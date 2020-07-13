@@ -55,48 +55,44 @@ SMTExprRef CVC4Solver::newExprRef(const SMTExpr &Exp) const {
 
 SMTSortRef CVC4Solver::mkBoolSort() {
   return newSortRef<camada::SolverBoolSort<CVC4Sort>>(
-      camada::SolverBoolSort<CVC4Sort>(Context, Context->booleanType()));
+      {Context, Context->booleanType()});
 }
 
 SMTSortRef CVC4Solver::mkBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<CVC4Sort>>(
-      camada::SolverBVSort<CVC4Sort>(BitWidth, Context,
-                                     Context->mkBitVectorType(BitWidth)));
+      {BitWidth, Context, Context->mkBitVectorType(BitWidth)});
 }
 
 SMTSortRef CVC4Solver::mkRMSortImpl() {
   return newSortRef<camada::SolverRMSort<CVC4Sort>>(
-      camada::SolverRMSort<CVC4Sort>(Context, Context->roundingModeType()));
+      {Context, Context->roundingModeType()});
 }
 
 SMTSortRef CVC4Solver::mkFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<CVC4Sort>>(
-      camada::SolverFPSort<CVC4Sort>(
-          ExpWidth, SigWidth + 1, Context,
-          Context->mkFloatingPointType(ExpWidth, SigWidth + 1)));
+      {ExpWidth, SigWidth + 1, Context,
+       Context->mkFloatingPointType(ExpWidth, SigWidth + 1)});
 }
 
 SMTSortRef CVC4Solver::getBVFPSort(const unsigned ExpWidth,
                                    const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<CVC4Sort>>(
-      camada::SolverFPSort<CVC4Sort>(
-          ExpWidth, SigWidth + 1, Context,
-          Context->mkBitVectorType(ExpWidth + SigWidth + 1)));
+      {ExpWidth, SigWidth + 1, Context,
+       Context->mkBitVectorType(ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef CVC4Solver::getBVRMSort() {
   return newSortRef<camada::SolverRMSort<CVC4Sort>>(
-      camada::SolverRMSort<CVC4Sort>(Context, Context->mkBitVectorType(3)));
+      {Context, Context->mkBitVectorType(3)});
 }
 
 SMTSortRef CVC4Solver::mkArraySort(const SMTSortRef &IndexSort,
                                    const SMTSortRef &ElemSort) {
   return newSortRef<camada::SolverArraySort<CVC4Sort>>(
-      camada::SolverArraySort<CVC4Sort>(
-          IndexSort, ElemSort, Context,
-          Context->mkArrayType(toSolverSort<CVC4Sort>(*IndexSort).Sort,
-                               toSolverSort<CVC4Sort>(*ElemSort).Sort)));
+      {IndexSort, ElemSort, Context,
+       Context->mkArrayType(toSolverSort<CVC4Sort>(*IndexSort).Sort,
+                            toSolverSort<CVC4Sort>(*ElemSort).Sort)});
 }
 
 SMTExprRef CVC4Solver::mkBVNeg(const SMTExprRef &Exp) {

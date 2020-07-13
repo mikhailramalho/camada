@@ -80,39 +80,33 @@ SMTExprRef BtorSolver::newExprRef(const SMTExpr &Exp) const {
 
 SMTSortRef BtorSolver::mkBoolSort() {
   return newSortRef<camada::SolverBoolSort<BtorSort>>(
-      camada::SolverBoolSort<BtorSort>(Context,
-                                       boolector_bool_sort(Context->Context)));
+      {Context, boolector_bool_sort(Context->Context)});
 }
 
 SMTSortRef BtorSolver::mkBVSort(unsigned BitWidth) {
   return newSortRef<camada::SolverBVSort<BtorSort>>(
-      camada::SolverBVSort<BtorSort>(
-          BitWidth, Context,
-          boolector_bitvec_sort(Context->Context, BitWidth)));
+      {BitWidth, Context, boolector_bitvec_sort(Context->Context, BitWidth)});
 }
 
 SMTSortRef BtorSolver::getBVFPSort(const unsigned ExpWidth,
                                    const unsigned SigWidth) {
   return newSortRef<camada::SolverFPSort<BtorSort>>(
-      camada::SolverFPSort<BtorSort>(
-          ExpWidth, SigWidth + 1, Context,
-          boolector_bitvec_sort(Context->Context, ExpWidth + SigWidth + 1)));
+      {ExpWidth, SigWidth + 1, Context,
+       boolector_bitvec_sort(Context->Context, ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef BtorSolver::getBVRMSort() {
   return newSortRef<camada::SolverRMSort<BtorSort>>(
-      camada::SolverRMSort<BtorSort>(
-          Context, boolector_bitvec_sort(Context->Context, 3)));
+      {Context, boolector_bitvec_sort(Context->Context, 3)});
 }
 
 SMTSortRef BtorSolver::mkArraySort(const SMTSortRef &IndexSort,
                                    const SMTSortRef &ElemSort) {
   return newSortRef<camada::SolverArraySort<BtorSort>>(
-      camada::SolverArraySort<BtorSort>(
-          IndexSort, ElemSort, Context,
-          boolector_array_sort(Context->Context,
-                               toSolverSort<BtorSort>(*IndexSort).Sort,
-                               toSolverSort<BtorSort>(*ElemSort).Sort)));
+      {IndexSort, ElemSort, Context,
+       boolector_array_sort(Context->Context,
+                            toSolverSort<BtorSort>(*IndexSort).Sort,
+                            toSolverSort<BtorSort>(*ElemSort).Sort)});
 }
 
 SMTExprRef BtorSolver::mkBVNeg(const SMTExprRef &Exp) {
