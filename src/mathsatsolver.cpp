@@ -558,8 +558,7 @@ bool MathSATSolver::getBool(const SMTExprRef &Exp) {
   __builtin_unreachable();
 }
 
-static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp,
-                                    unsigned base) {
+static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp) {
   SMTExprRef t = S.newExprRef(MathSATExpr(
       S.Context, Exp->Sort,
       msat_get_model_value(*S.Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));
@@ -576,7 +575,7 @@ static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp,
 }
 
 std::string MathSATSolver::getBVInBin(const SMTExprRef &Exp) {
-  std::string val = getGMPVal(*this, Exp, 2);
+  std::string val = getGMPVal(*this, Exp);
   if (val.length() < Exp->getWidth())
     val = std::string(Exp->getWidth() - val.length(), '0') + val;
   return val;
