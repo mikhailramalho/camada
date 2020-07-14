@@ -1826,47 +1826,8 @@ SMTExprRef SMTFPSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
   return mkIte(c1, v1, result);
 }
 
-template <typename FPType>
-static inline FPType getFPValue(SMTFPSolver &S, const SMTExprRef &Exp) {
-  unsigned int ebits = Exp->Sort->getFPExponentWidth();
-  unsigned int sbits = Exp->Sort->getFPSignificandWidth();
-
-  // Extract parts
-  int64_t sgn = S.getBV(extractSgn(S, Exp));
-  int64_t exp = S.getBV(extractExp(S, Exp));
-  int64_t sig = S.getBV(extractSig(S, Exp));
-
-  // In our circuits the hidden bit is visible, so remove it
-  sig &= power2m1(sbits, false);
-
-  if (power2m1(ebits, false) == exp) {
-    // This is either a NaN
-    if (sig)
-      return sgn ? -NAN : NAN;
-
-    // or an inf
-    return sgn ? -INFINITY : INFINITY;
-  }
-
-  FPType result;
-  memcpy(&result, &sig, sizeof(FPType));
-  return result;
-}
-
 std::string SMTFPSolver::getFPInBinImpl(const SMTExprRef &Exp) {
   return getBVInBin(Exp);
-}
-
-template <typename FPType, typename IntType>
-static inline IntType FPasInt(const FPType FP) {
-  // Convert the integer to float/double
-  // We assume that floats are 32 bits long and doubles are 64 bits long
-  camada::abortCondWithMessage(sizeof(FPType) == sizeof(IntType),
-                               "Cannot convert int to floating-point");
-
-  IntType FPAsInt;
-  memcpy(&FPAsInt, &FP, sizeof(FPType));
-  return FPAsInt;
 }
 
 SMTExprRef SMTFPSolver::mkFPFromBinImpl(const std::string &FP,
