@@ -160,7 +160,7 @@ public:
   SolverArraySort(const SMTSortRef &I, const SMTSortRef &E,
                   typename SolverSortBase::ContextType C,
                   typename SolverSortBase::SortType S)
-      : IndexSort(I), ElementSort(E), SolverSortBase(C, S) {}
+      : SolverSortBase(C, S), IndexSort(I), ElementSort(E) {}
   virtual ~SolverArraySort() = default;
 
   virtual bool isArraySort() const override { return true; }
