@@ -92,9 +92,9 @@ endif()
 
 option(ENABLE_WERROR "All warnings are treated as errors during compilation (default: OFF)" OFF)
 
-option(ENABLE_WALL "Enable -Wall during compilation (default: OFF)" OFF)
+option(ENABLE_WALL "Enable -Wall and -Wextra during compilation (default: OFF)" OFF)
 if(ENABLE_WALL)
-  add_definitions(-Wall)
+  add_definitions(-Wall -Wextra)
 endif()
 
 # Demand C++17
