@@ -24,6 +24,7 @@
 
 #include <bitset>
 #include <cstring>
+#include <iostream>
 
 using namespace camada;
 
