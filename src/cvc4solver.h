@@ -34,7 +34,7 @@ using CVC4ContextRef = std::shared_ptr<CVC4::ExprManager>;
 class CVC4Sort : public SolverSort<CVC4ContextRef, CVC4::Type> {
 public:
   using SolverSort<CVC4ContextRef, CVC4::Type>::SolverSort;
-  virtual ~CVC4Sort() = default;
+  ~CVC4Sort() override = default;
 
   void dump() const override;
 }; // end class CVC4Sort
@@ -42,7 +42,7 @@ public:
 class CVC4Expr : public SolverExpr<CVC4ContextRef, CVC4::Expr> {
 public:
   using SolverExpr<CVC4ContextRef, CVC4::Expr>::SolverExpr;
-  virtual ~CVC4Expr() = default;
+  ~CVC4Expr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -61,7 +61,7 @@ public:
   unsigned int ToBVCounter = 0;
 
   explicit CVC4Solver();
-  virtual ~CVC4Solver() = default;
+  ~CVC4Solver() override = default;
 
   virtual void setConfig();
 
@@ -83,8 +83,8 @@ public:
 
   SMTSortRef getBVRMSort() override;
 
-  SMTSortRef mkArraySort(const SMTSortRef &IndexType,
-                         const SMTSortRef &ElemType) override;
+  SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
+                         const SMTSortRef &ElemSort) override;
 
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 

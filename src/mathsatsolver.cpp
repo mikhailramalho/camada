@@ -569,7 +569,7 @@ static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp) {
   msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context,
                       toSolverExpr<MathSATExpr>(*t).Expr, val);
 
-  std::string bv = mpq_get_str(NULL, 2, val);
+  std::string bv = mpq_get_str(nullptr, 2, val);
   mpq_clear(val);
   return bv;
 }
@@ -602,13 +602,13 @@ SMTExprRef MathSATSolver::mkBool(const bool Bool) {
 SMTExprRef MathSATSolver::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
   // Set upper bits to zero because MathSAT refuses to parse negative numbers
-  int64_t newInt = Int & ((1 << Sort->getWidth()) - 1);
+  uint64_t newInt =
+      static_cast<uint64_t>(Int) & ((1ULL << Sort->getWidth()) - 1);
 
-  return newExprRef(MathSATExpr(
-      Context, Sort,
-      msat_make_bv_number(*Context,
-                          std::to_string(static_cast<uint64_t>(newInt)).c_str(),
-                          Sort->getWidth(), 10)));
+  return newExprRef(
+      MathSATExpr(Context, Sort,
+                  msat_make_bv_number(*Context, std::to_string(newInt).c_str(),
+                                      Sort->getWidth(), 10)));
 }
 
 SMTExprRef MathSATSolver::mkBVFromBin(const std::string &Int,

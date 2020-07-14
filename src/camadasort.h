@@ -80,8 +80,8 @@ public:
 template <typename SolverContextRef, typename TheSort>
 class SolverSort : public SMTSort {
 public:
-  typedef SolverContextRef ContextType;
-  typedef TheSort SortType;
+  using ContextType = SolverContextRef;
+  using SortType = TheSort;
 
   SolverContextRef Context;
 
@@ -90,7 +90,7 @@ public:
   SolverSort(SolverContextRef C, const TheSort &SS)
       : Context(std::move(C)), Sort(SS) {}
 
-  virtual ~SolverSort() = default;
+  ~SolverSort() override = default;
 };
 
 template <typename SolverSortBase> class SolverBVSort : public SolverSortBase {
@@ -100,11 +100,11 @@ public:
   SolverBVSort(unsigned W, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
       : SolverSortBase(C, S), Width(W) {}
-  virtual ~SolverBVSort() = default;
+  ~SolverBVSort() override = default;
 
-  virtual bool isBVSort() const override { return true; }
+  bool isBVSort() const override { return true; }
 
-  virtual unsigned getWidth() const override { return Width; }
+  unsigned getWidth() const override { return Width; }
 };
 
 template <typename SolverSortBase>
@@ -113,11 +113,11 @@ public:
   SolverBoolSort(typename SolverSortBase::ContextType C,
                  typename SolverSortBase::SortType S)
       : SolverSortBase(C, S) {}
-  virtual ~SolverBoolSort() = default;
+  ~SolverBoolSort() override = default;
 
-  virtual bool isBoolSort() const override { return true; }
+  bool isBoolSort() const override { return true; }
 
-  virtual unsigned getWidth() const override { return 1; }
+  unsigned getWidth() const override { return 1; }
 };
 
 template <typename SolverSortBase> class SolverFPSort : public SolverSortBase {
@@ -128,15 +128,15 @@ public:
   SolverFPSort(unsigned EW, unsigned SW, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
       : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
-  virtual ~SolverFPSort() = default;
+  ~SolverFPSort() override = default;
 
-  virtual bool isFPSort() const override { return true; }
+  bool isFPSort() const override { return true; }
 
-  virtual unsigned getWidth() const override { return 1 + ExpWidth + SigWidth; }
+  unsigned getWidth() const override { return 1 + ExpWidth + SigWidth; }
 
-  virtual unsigned getFPSignificandWidth() const override { return SigWidth; }
+  unsigned getFPSignificandWidth() const override { return SigWidth; }
 
-  virtual unsigned getFPExponentWidth() const override { return ExpWidth; }
+  unsigned getFPExponentWidth() const override { return ExpWidth; }
 };
 
 template <typename SolverSortBase> class SolverRMSort : public SolverSortBase {
@@ -144,11 +144,11 @@ public:
   SolverRMSort(typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
       : SolverSortBase(C, S) {}
-  virtual ~SolverRMSort() = default;
+  ~SolverRMSort() override = default;
 
-  virtual unsigned getWidth() const override { return 3; }
+  unsigned getWidth() const override { return 3; }
 
-  virtual bool isRMSort() const override { return true; }
+  bool isRMSort() const override { return true; }
 };
 
 template <typename SolverSortBase>
@@ -157,17 +157,18 @@ public:
   SMTSortRef IndexSort;
   SMTSortRef ElementSort;
 
-  SolverArraySort(const SMTSortRef &I, const SMTSortRef &E,
+  SolverArraySort(SMTSortRef I, SMTSortRef E,
                   typename SolverSortBase::ContextType C,
                   typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S), IndexSort(I), ElementSort(E) {}
-  virtual ~SolverArraySort() = default;
+      : SolverSortBase(C, S), IndexSort(std::move(I)),
+        ElementSort(std::move(E)) {}
+  ~SolverArraySort() override = default;
 
-  virtual bool isArraySort() const override { return true; }
+  bool isArraySort() const override { return true; }
 
-  virtual SMTSortRef getIndexSort() const override { return IndexSort; }
+  SMTSortRef getIndexSort() const override { return IndexSort; }
 
-  virtual SMTSortRef getElementSort() const override { return ElementSort; }
+  SMTSortRef getElementSort() const override { return ElementSort; }
 };
 
 /// Wrapper to downcast from SMTSort to Solver specific sort

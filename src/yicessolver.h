@@ -48,7 +48,7 @@ using YicesContextRef = std::shared_ptr<YicesContext>;
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
 public:
   using SolverSort<YicesContextRef, type_t>::SolverSort;
-  virtual ~YicesSort() = default;
+  ~YicesSort() override = default;
 
   void dump() const override;
 }; // end class YicesSort
@@ -56,7 +56,7 @@ public:
 class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
 public:
   using SolverExpr<YicesContextRef, term_t>::SolverExpr;
-  virtual ~YicesExpr() = default;
+  ~YicesExpr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -72,7 +72,7 @@ public:
 
   explicit YicesSolver();
   explicit YicesSolver(YicesContextRef C);
-  virtual ~YicesSolver() = default;
+  ~YicesSolver() override = default;
 
   void addConstraint(const SMTExprRef &Exp) override;
 
@@ -87,8 +87,8 @@ public:
 
   SMTSortRef getBVRMSort() override;
 
-  SMTSortRef mkArraySort(const SMTSortRef &IndexType,
-                         const SMTSortRef &ElemType) override;
+  SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
+                         const SMTSortRef &ElemSort) override;
 
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 

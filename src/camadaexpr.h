@@ -31,7 +31,7 @@ class SMTExpr {
 public:
   SMTSortRef Sort;
 
-  SMTExpr(SMTSortRef S) : Sort(std::move(S)) {}
+  explicit SMTExpr(SMTSortRef S) : Sort(std::move(S)) {}
   virtual ~SMTExpr() = default;
 
   friend bool operator==(SMTExpr const &LHS, SMTExpr const &RHS) {
@@ -65,8 +65,8 @@ protected:
 template <typename SolverContextRef, typename TheExpr>
 class SolverExpr : public SMTExpr {
 public:
-  typedef SolverContextRef ContextType;
-  typedef TheExpr ExprType;
+  using ContextType = SolverContextRef;
+  using ExprType = TheExpr;
 
   SolverContextRef Context;
 
@@ -75,17 +75,17 @@ public:
   SolverExpr(SolverContextRef C, const SMTSortRef &S, const TheExpr &SA)
       : SMTExpr(S), Context(std::move(C)), Expr(SA) {}
 
-  virtual ~SolverExpr() = default;
+  ~SolverExpr() override = default;
 
-  virtual bool isBVSort() const { return Sort->isBVSort(); }
+  bool isBVSort() const override { return Sort->isBVSort(); }
 
-  virtual bool isBoolSort() const { return Sort->isBoolSort(); }
+  bool isBoolSort() const override { return Sort->isBoolSort(); }
 
-  virtual bool isFPSort() const { return Sort->isFPSort(); }
+  bool isFPSort() const override { return Sort->isFPSort(); }
 
-  virtual bool isRMSort() { return Sort->isRMSort(); }
+  bool isRMSort() override { return Sort->isRMSort(); }
 
-  virtual bool equal_to(SMTExpr const &other) const = 0;
+  bool equal_to(SMTExpr const &other) const override = 0;
 };
 
 /// Shared pointer for SMTExprs, used by SMTSolver API.

@@ -52,7 +52,7 @@ using BtorSort = SolverSort<BtorContextRef, BoolectorSort>;
 class BtorExpr : public SolverExpr<BtorContextRef, BoolectorNode *> {
 public:
   using SolverExpr<BtorContextRef, BoolectorNode *>::SolverExpr;
-  virtual ~BtorExpr() = default;
+  ~BtorExpr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -69,7 +69,7 @@ public:
 
   explicit BtorSolver();
   explicit BtorSolver(BtorContextRef C);
-  virtual ~BtorSolver() = default;
+  ~BtorSolver() override = default;
 
   void addConstraint(const SMTExprRef &Exp) override;
 
@@ -84,8 +84,8 @@ public:
 
   SMTSortRef getBVRMSort() override;
 
-  SMTSortRef mkArraySort(const SMTSortRef &IndexType,
-                         const SMTSortRef &ElemType) override;
+  SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
+                         const SMTSortRef &ElemSort) override;
 
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 

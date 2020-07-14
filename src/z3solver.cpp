@@ -601,10 +601,13 @@ SMTExprRef Z3Solver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
 SMTExprRef Z3Solver::mkBVFromBin(const std::string &Int,
                                  const SMTSortRef &Sort) {
   std::size_t s = Sort->getWidth();
-  bool newInt[s];
+  bool *newInt = new bool[s];
   for (unsigned int i = 0; i < s; ++i)
     newInt[s - i - 1] = (Int[i] == '1');
-  return newExprRef(Z3Expr(Context, Sort, Context->bv_val(s, newInt)));
+
+  SMTExprRef bv = newExprRef(Z3Expr(Context, Sort, Context->bv_val(s, newInt)));
+  delete[] newInt;
+  return bv;
 }
 
 SMTExprRef Z3Solver::mkSymbol(const std::string &Name, SMTSortRef Sort) {

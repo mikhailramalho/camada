@@ -34,7 +34,7 @@ using Z3ContextRef = std::shared_ptr<z3::context>;
 class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
 public:
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
-  virtual ~Z3Sort() = default;
+  ~Z3Sort() override = default;
 
   void dump() const override;
 }; // end class Z3Sort
@@ -42,7 +42,7 @@ public:
 class Z3Expr : public SolverExpr<Z3ContextRef, z3::expr> {
 public:
   using SolverExpr<Z3ContextRef, z3::expr>::SolverExpr;
-  virtual ~Z3Expr() = default;
+  ~Z3Expr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -58,7 +58,7 @@ public:
 
   explicit Z3Solver();
   explicit Z3Solver(Z3ContextRef C, const z3::solver &S);
-  virtual ~Z3Solver() = default;
+  ~Z3Solver() override = default;
 
   void addConstraint(const SMTExprRef &Exp) override;
 
@@ -78,8 +78,8 @@ public:
 
   SMTSortRef getBVRMSort() override;
 
-  SMTSortRef mkArraySort(const SMTSortRef &IndexType,
-                         const SMTSortRef &ElemType) override;
+  SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
+                         const SMTSortRef &ElemSort) override;
 
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
 

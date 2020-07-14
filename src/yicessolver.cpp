@@ -359,14 +359,15 @@ bool YicesSolver::getBool(const SMTExprRef &Exp) {
 std::string YicesSolver::getBVInBin(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
-  int32_t data[width];
+  int32_t *data = new int32_t[width];
   yices_get_bv_value(yices_get_model(Context->Context, 1),
                      toSolverExpr<YicesExpr>(*Exp).Expr, data);
 
   std::string val;
-  for (int i = width - 1; i >= 0; i--)
-    val += data[i] ? "1" : "0";
+  for (unsigned i = 0; i < width; i++)
+    val.append(std::to_string(data[width - i - 1]));
 
+  delete[] data;
   return val;
 }
 

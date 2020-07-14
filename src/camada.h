@@ -198,13 +198,13 @@ public:
   virtual SMTExprRef mkBVConcat(const SMTExprRef &LHS,
                                 const SMTExprRef &RHS) = 0;
 
-  SMTExprRef mkBVRedOr(SMTExprRef Exp) {
+  SMTExprRef mkBVRedOr(const SMTExprRef &Exp) {
     // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
     return mkIte(mkNot(comp), mkBVFromDec(1, 1), mkBVFromDec(0, 1));
   }
 
-  SMTExprRef mkBVRedAnd(SMTExprRef Exp) {
+  SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
     return mkIte(comp, mkBVFromDec(1, 1), mkBVFromDec(0, 1));

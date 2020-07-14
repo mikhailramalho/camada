@@ -130,9 +130,9 @@ bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
 int64_t SMTSolver::getBV(const SMTExprRef &Exp) {
   const std::string bv = getBVInBin(Exp);
   char *buffer_end;
-  int64_t res = std::strtoll(bv.c_str(), &buffer_end, 2);
-  if (res & (1 << (Exp->getWidth() - 1)))
-    res |= ~((1 << Exp->getWidth()) - 1);
+  uint64_t res = std::strtoull(bv.c_str(), &buffer_end, 2);
+  if (res & (1ULL << (Exp->getWidth() - 1)))
+    res |= ~((1ULL << Exp->getWidth()) - 1);
   return res;
 }
 
