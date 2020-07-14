@@ -425,8 +425,6 @@ SMTExprRef BtorSolver::getArrayElement(const SMTExprRef &Array,
   }
 
   assert(elementSort->isFPSort() && "Unknown array element type");
-
-  auto const width = elementSort->getWidth();
   return SMTFPSolver::mkFPFromBin(bv, elementSort->getFPExponentWidth());
 }
 
