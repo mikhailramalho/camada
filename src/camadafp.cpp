@@ -1399,9 +1399,6 @@ SMTExprRef SMTFPSolver::mkSBVtoFPImpl(const SMTExprRef &From,
   unsigned exp_sz = ebits + 2; // (+2 for rounder)
   SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
 
-  // the remaining bits are 0 if ebits is large enough.
-  SMTExprRef exp_too_large = mkBool(false);
-
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
   unsigned exp_worst_case_sz =
@@ -1414,7 +1411,7 @@ SMTExprRef SMTFPSolver::mkSBVtoFPImpl(const SMTExprRef &From,
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
     SMTExprRef max_exp_bvsz = mkBVZeroExt(bv_sz - exp_sz, max_exp);
 
-    exp_too_large =
+    SMTExprRef exp_too_large =
         mkBVSle(mkBVAdd(max_exp_bvsz, mkBVFromDec(1, bv_sz)), s_exp);
     SMTExprRef zero_sig_sz = mkBVFromDec(0, sig_sz);
     sig_4 = mkIte(exp_too_large, zero_sig_sz, sig_4);
@@ -1497,9 +1494,6 @@ SMTExprRef SMTFPSolver::mkUBVtoFPImpl(const SMTExprRef &From,
   unsigned exp_sz = ebits + 2; // (+2 for rounder)
   SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
 
-  // the remaining bits are 0 if ebits is large enough.
-  SMTExprRef exp_too_large = mkBool(false); // This is always in range.
-
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
   unsigned exp_worst_case_sz =
@@ -1512,7 +1506,7 @@ SMTExprRef SMTFPSolver::mkUBVtoFPImpl(const SMTExprRef &From,
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
     SMTExprRef max_exp_bvsz = mkBVZeroExt(bv_sz - exp_sz, max_exp);
 
-    exp_too_large =
+    SMTExprRef exp_too_large =
         mkBVSle(mkBVAdd(max_exp_bvsz, mkBVFromDec(1, bv_sz)), s_exp);
     SMTExprRef zero_sig_sz = mkBVFromDec(0, sig_sz);
     sig_4 = mkIte(exp_too_large, zero_sig_sz, sig_4);
