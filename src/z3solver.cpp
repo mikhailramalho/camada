@@ -21,7 +21,6 @@
 
 #include "z3solver.h"
 #include "ac_config.h"
-#include "camadautils.h"
 
 using namespace camada;
 
@@ -559,7 +558,8 @@ std::string Z3Solver::getBVInBin(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   std::string bv;
   bool is_num = toSolverExpr<Z3Expr>(*value).Expr.as_binary(bv);
-  camada::abortCondWithMessage(is_num, "Failed to get bitvector from Z3");
+  assert(is_num && "Failed to get bitvector from Z3");
+
   if (bv.length() < Exp->getWidth())
     bv = std::string(Exp->getWidth() - bv.length(), '0') + bv;
   return bv;
@@ -574,7 +574,7 @@ std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
       *Context, Solver.get_model(),
       Z3_mk_fpa_to_ieee_bv(*Context, toSolverExpr<Z3Expr>(*value).Expr), true,
       &fp_value);
-  camada::abortCondWithMessage(eval, "Failed to convert FP to BV in Z3");
+  assert(eval && "Failed to convert FP to BV in Z3");
 
   return Z3_get_numeral_binary_string(*Context, fp_value);
 }
@@ -630,7 +630,8 @@ SMTExprRef Z3Solver::mkRMImpl(const RM &R) {
   z3::expr e(*Context);
   switch (R) {
   default:
-    camada::abortWithMessage("Unsupported floating-point semantics.");
+    assert(0 && "Unsupported floating-point semantics.");
+    __builtin_unreachable();
   case RM::ROUND_TO_EVEN:
     e = z3::to_expr(*Context, Z3_mk_fpa_rne(*Context));
     break;

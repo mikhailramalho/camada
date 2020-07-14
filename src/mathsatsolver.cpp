@@ -21,9 +21,10 @@
 
 #include "mathsatsolver.h"
 #include "ac_config.h"
-#include "camadautils.h"
 
+#include <cassert>
 #include <gmp.h>
+#include <iostream>
 
 using namespace camada;
 
@@ -78,8 +79,7 @@ static inline bool checkExprError(const SMTExpr &Exp) {
 }
 
 SMTExprRef MathSATSolver::newExprRef(const SMTExpr &Exp) const {
-  abortCondWithMessage(!checkExprError(Exp),
-                       "Error when creating MathSAT expr.");
+  assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
   return std::make_shared<MathSATExpr>(toSolverExpr<MathSATExpr>(Exp));
 }
 
@@ -423,7 +423,8 @@ SMTExprRef MathSATSolver::mkFPDivImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &, const SMTExprRef &) {
-  abortWithMessage("MathSAT does not implement fp.rem");
+  assert(0 && "MathSAT does not implement fp.rem");
+  __builtin_unreachable();
 }
 
 SMTExprRef MathSATSolver::mkFPAddImpl(const SMTExprRef &LHS,
@@ -457,7 +458,8 @@ SMTExprRef MathSATSolver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &R) {
 
 SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &, const SMTExprRef &,
                                       const SMTExprRef &, const RM &) {
-  abortWithMessage("MathSAT does not implement fp.fma");
+  assert(0 && "MathSAT does not implement fp.fma");
+  __builtin_unreachable();
 }
 
 SMTExprRef MathSATSolver::mkFPLtImpl(const SMTExprRef &LHS,
@@ -552,7 +554,8 @@ bool MathSATSolver::getBool(const SMTExprRef &Exp) {
   if (msat_term_is_false(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr))
     return false;
 
-  abortWithMessage("Bool is neither true nor false");
+  assert(0 && "Bool is neither true nor false");
+  __builtin_unreachable();
 }
 
 static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp,
@@ -619,8 +622,7 @@ SMTExprRef MathSATSolver::mkBVFromBin(const std::string &Int,
 SMTExprRef MathSATSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   msat_decl d = msat_declare_function(*Context, Name.c_str(),
                                       toSolverSort<MathSATSort>(*Sort).Sort);
-  abortCondWithMessage(!MSAT_ERROR_DECL(d),
-                       "Invalid function symbol declaration sort");
+  assert(!MSAT_ERROR_DECL(d) && "Invalid function symbol declaration sort");
   return newExprRef(
       MathSATExpr(Context, Sort, msat_make_constant(*Context, d)));
 }
@@ -645,7 +647,8 @@ SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
   msat_term e;
   switch (R) {
   default:
-    camada::abortWithMessage("Unsupported floating-point semantics.");
+    assert(0 && "Unsupported floating-point semantics.");
+    __builtin_unreachable();
   case RM::ROUND_TO_EVEN:
     e = msat_make_fp_roundingmode_nearest_even(*Context);
     break;
@@ -732,19 +735,19 @@ void MathSATSolver::dumpModel() {
   // we use a model iterator to retrieve the model values for all the
   // variables, and the necessary function instantiations
   msat_model_iterator iter = msat_create_model_iterator(*Context);
-  abortCondWithMessage(!MSAT_ERROR_MODEL_ITERATOR(iter),
-                       "Error when getting model iterator");
+  assert(!MSAT_ERROR_MODEL_ITERATOR(iter) &&
+         "Error when getting model iterator");
 
   while (msat_model_iterator_has_next(iter)) {
     msat_term t, v;
     char *s;
     msat_model_iterator_next(iter, &t, &v);
     s = msat_term_repr(t);
-    abortCondWithMessage(s, "Error when getting variable from model");
+    assert(s && "Error when getting variable from model");
     std::cerr << s << " = ";
     msat_free(s);
     s = msat_term_repr(v);
-    abortCondWithMessage(s, "Error when getting variable value from model");
+    assert(s && "Error when getting variable value from model");
     std::cerr << s << '\n';
     msat_free(s);
   }

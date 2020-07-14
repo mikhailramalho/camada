@@ -21,7 +21,6 @@
 
 #include "camada.h"
 #include "ac_config.h"
-#include "camadautils.h"
 
 #include <bitset>
 #include <cstring>
@@ -82,23 +81,28 @@ void camada::SMTSolver::dumpModel() {
 }
 
 unsigned SMTSort::getWidth() const {
-  abortWithMessage("Unimplemented for current type");
+  assert(0 && "Unimplemented for current type");
+  __builtin_unreachable();
 }
 
 unsigned SMTSort::getFPSignificandWidth() const {
-  abortWithMessage("Unimplemented for current type");
+  assert(0 && "Unimplemented for current type");
+  __builtin_unreachable();
 }
 
 unsigned SMTSort::getFPExponentWidth() const {
-  abortWithMessage("Unimplemented for current type");
+  assert(0 && "Unimplemented for current type");
+  __builtin_unreachable();
 }
 
 SMTSortRef SMTSort::getIndexSort() const {
-  abortWithMessage("Unimplemented for current type");
+  assert(0 && "Unimplemented for current type");
+  __builtin_unreachable();
 }
 
 SMTSortRef SMTSort::getElementSort() const {
-  abortWithMessage("Unimplemented for current type");
+  assert(0 && "Unimplemented for current type");
+  __builtin_unreachable();
 }
 
 bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
@@ -134,8 +138,9 @@ template <typename FPType, typename IntType>
 static inline IntType FPAsInt(const FPType FP) {
   // Convert the integer to float/double
   // We assume that floats are 32 bits long and doubles are 64 bits long
-  camada::abortCondWithMessage(sizeof(FPType) == sizeof(IntType),
-                               "Cannot convert int to floating-point");
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
   IntType FPAsInt;
   memcpy(&FPAsInt, &FP, sizeof(FPType));
   return FPAsInt;
@@ -155,8 +160,9 @@ template <typename FPType, typename IntType>
 static inline FPType IntAsFP(const IntType Int) {
   // Convert the integer to float/double
   // We assume that floats are 32 bits long and doubles are 64 bits long
-  camada::abortCondWithMessage(sizeof(FPType) == sizeof(IntType),
-                               "Cannot convert int to floating-point");
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
   FPType IntAsFP;
   memcpy(&IntAsFP, &Int, sizeof(IntType));
   return IntAsFP;

@@ -21,14 +21,15 @@
 
 #include "boolectorsolver.h"
 #include "ac_config.h"
-#include "camadautils.h"
+
+#include <cassert>
 
 using namespace camada;
 
 #ifdef SOLVER_BOOLECTOR_ENABLED
 
 // Function used to report errors
-void BtorErrorHandler(const char *msg) { abortWithMessage(msg); }
+void BtorErrorHandler(const char *msg) { assert(0 && msg); }
 
 BtorContext::BtorContext() : Context(nullptr) {
   boolector_set_abort(BtorErrorHandler);
@@ -361,8 +362,7 @@ bool BtorSolver::getBool(const SMTExprRef &Exp) {
   const char *boolean = boolector_bv_assignment(
       Context->Context, toSolverExpr<BtorExpr>(*Exp).Expr);
 
-  abortCondWithMessage(boolean != nullptr,
-                       "Boolector returned null bv assignment string");
+  assert(boolean != nullptr && "Boolector returned null bv assignment string");
   bool res;
   switch (*boolean) {
   case '1':
@@ -372,8 +372,8 @@ bool BtorSolver::getBool(const SMTExprRef &Exp) {
     res = false;
     break;
   default:
-    abortWithMessage(
-        "Boolector returned digit other than 0 or 1 for a boolean");
+    assert(0 && "Bool is neither true nor false");
+    __builtin_unreachable();
   }
 
   boolector_free_bv_assignment(Context->Context, boolean);
@@ -424,7 +424,7 @@ SMTExprRef BtorSolver::getArrayElement(const SMTExprRef &Array,
     return mkBool(strtol(bv.c_str(), &foo, 2));
   }
 
-  abortCondWithMessage(elementSort->isFPSort(), "Unknown array element type");
+  assert(elementSort->isFPSort() && "Unknown array element type");
 
   auto const width = elementSort->getWidth();
   return SMTFPSolver::mkFPFromBin(bv, elementSort->getFPExponentWidth());
@@ -471,8 +471,7 @@ SMTExprRef BtorSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
                                        Name.c_str())));
 
   auto inserted = SymbolTable.insert(SymbolTablet::value_type(Name, newSymbol));
-  abortCondWithMessage(inserted.second,
-                       "Could not cache new Boolector variable");
+  assert(inserted.second && "Could not cache new Boolector variable");
 
   return inserted.first->second;
 }

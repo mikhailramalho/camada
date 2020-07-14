@@ -20,7 +20,6 @@
  **************************************************************************/
 
 #include "camadafp.h"
-#include "camadautils.h"
 
 #include <cassert>
 #include <cmath>
@@ -199,7 +198,8 @@ static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
   SMTExprRef RNum = S.mkBVFromDec(static_cast<int64_t>(R), 3);
   switch (R) {
   default:
-    camada::abortWithMessage("Unsupported floating-point semantics.");
+    assert(0 && "Unsupported floating-point semantics.");
+    __builtin_unreachable();
   case RM::ROUND_TO_EVEN:
   case RM::ROUND_TO_AWAY:
   case RM::ROUND_TO_PLUS_INF:

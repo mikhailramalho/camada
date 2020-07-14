@@ -21,7 +21,9 @@
 
 #include "yicessolver.h"
 #include "ac_config.h"
-#include "camadautils.h"
+
+#include <cassert>
+#include <iostream>
 
 using namespace camada;
 
@@ -79,8 +81,8 @@ void YicesSolver::addConstraint(const SMTExprRef &Exp) {
 }
 
 SMTExprRef YicesSolver::newExprRef(const SMTExpr &Exp) const {
-  abortCondWithMessage(toSolverExpr<YicesExpr>(Exp).Expr != NULL_TERM,
-                       "Error when creating Yices expr.");
+  assert(toSolverExpr<YicesExpr>(Exp).Expr != NULL_TERM &&
+         "Error when creating Yices expr.");
   return std::make_shared<YicesExpr>(toSolverExpr<YicesExpr>(Exp));
 }
 
@@ -350,7 +352,7 @@ bool YicesSolver::getBool(const SMTExprRef &Exp) {
   int32_t val;
   auto res = yices_get_bool_value(yices_get_model(Context->Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
-  abortCondWithMessage(res, "Can't get boolean value from Yices");
+  assert(res && "Can't get boolean value from Yices");
   return val ? true : false;
 }
 
@@ -379,9 +381,7 @@ SMTExprRef YicesSolver::getArrayElement(const SMTExprRef &Array,
   if (elementSort->isBVSort())
     return SMTFPSolver::mkBVFromBin(getBVInBin(sel));
 
-  abortCondWithMessage(elementSort->isFPSort(), "Unknown array element type");
-
-  auto const width = elementSort->getWidth();
+  assert(elementSort->isFPSort() && "Unknown array element type");
   return SMTFPSolver::mkFPFromBin(getFPInBin(sel),
                                   elementSort->getFPExponentWidth());
 }
@@ -409,21 +409,19 @@ SMTExprRef YicesSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   if (it != SymbolTable.end())
     return it->second;
 
-  abortCondWithMessage(yices_get_term_by_name(Name.c_str()) == NULL_TERM,
-                       "Trying to create a symbol but it already exists");
+  assert(yices_get_term_by_name(Name.c_str()) == NULL_TERM &&
+         "Trying to create a symbol but it already exists");
 
   term_t t = yices_new_uninterpreted_term(toSolverSort<YicesSort>(*Sort).Sort);
-  abortCondWithMessage(t != NULL_TERM,
-                       "Error when trying to create new a symbol");
+  assert(t != NULL_TERM && "Error when trying to create new a symbol");
 
-  abortCondWithMessage(yices_set_term_name(t, Name.c_str()) != -1,
-                       "Error when trying to set symbol name");
+  assert(yices_set_term_name(t, Name.c_str()) != -1 &&
+         "Error when trying to set symbol name");
 
   auto inserted = SymbolTable.insert(
       SymbolTablet::value_type(Name, newExprRef(YicesExpr(Context, Sort, t))));
 
-  abortCondWithMessage(inserted.second, "Could not cache new Yices variable");
-
+  assert(inserted.second && "Could not cache new Yices variable");
   return inserted.first->second;
 }
 

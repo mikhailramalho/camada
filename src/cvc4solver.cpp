@@ -21,7 +21,6 @@
 
 #include "cvc4solver.h"
 #include "ac_config.h"
-#include "camadautils.h"
 
 using namespace camada;
 
@@ -678,7 +677,8 @@ SMTExprRef CVC4Solver::mkRMImpl(const RM &R) {
   CVC4::Expr e;
   switch (R) {
   default:
-    camada::abortWithMessage("Unsupported floating-point semantics.");
+    assert(0 && "Unsupported floating-point semantics.");
+    __builtin_unreachable();
   case RM::ROUND_TO_EVEN:
     e = Context->mkConst(CVC4::RoundingMode::roundNearestTiesToEven);
     break;
