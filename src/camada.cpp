@@ -23,6 +23,7 @@
 #include "ac_config.h"
 
 #include <bitset>
+#include <cassert>
 #include <cstring>
 #include <iostream>
 
