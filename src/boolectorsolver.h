@@ -32,19 +32,7 @@ extern "C" {
 
 namespace camada {
 
-/// Wrapper for Boolector context
-class BtorContext {
-public:
-  Btor *Context;
-
-  BtorContext();
-  virtual ~BtorContext();
-
-  virtual void createAndConfig();
-  void reset();
-}; // end class BtorContext
-
-using BtorContextRef = std::shared_ptr<BtorContext>;
+using BtorContextRef = std::shared_ptr<Btor *>;
 
 /// No need for a wrapper for Boolector Sort
 using BtorSort = SolverSort<BtorContextRef, BoolectorSort>;
@@ -69,7 +57,7 @@ public:
 
   explicit BtorSolver();
   explicit BtorSolver(BtorContextRef C);
-  ~BtorSolver() override = default;
+  ~BtorSolver() override;
 
   void addConstraint(const SMTExprRef &Exp) override;
 

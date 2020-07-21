@@ -12,21 +12,30 @@ TEST_CASE("Simple Boolector test", "[Boolector]") {
 
 TEST_CASE("Override Boolector Solver", "[Boolector]") {
 
-  class myBtorContext : public camada::BtorContext {
+  class myBtorSolver : public camada::BtorSolver {
   public:
-    explicit myBtorContext() : camada::BtorContext() {}
+    explicit myBtorSolver()
+        : BtorSolver(std::make_shared<Btor *>(boolector_new())) {
+      boolector_set_opt(*Context, BTOR_OPT_MODEL_GEN, 1);
+      boolector_set_opt(*Context, BTOR_OPT_AUTO_CLEANUP, 1);
+      boolector_set_opt(*Context, BTOR_OPT_INCREMENTAL, 1);
+    }
 
-    void createAndConfig() override {
-      Context = boolector_new();
-      boolector_set_opt(Context, BTOR_OPT_MODEL_GEN, 1);
-      boolector_set_opt(Context, BTOR_OPT_AUTO_CLEANUP, 1);
-      boolector_set_opt(Context, BTOR_OPT_INCREMENTAL, 1);
+    void reset() override {
+      // Delete
+      boolector_release_all(*Context);
+      boolector_delete(*Context);
+
+      // Create new
+      Context = std::make_shared<Btor *>(boolector_new());
+      boolector_set_opt(*Context, BTOR_OPT_MODEL_GEN, 1);
+      boolector_set_opt(*Context, BTOR_OPT_AUTO_CLEANUP, 1);
+      boolector_set_opt(*Context, BTOR_OPT_INCREMENTAL, 1);
     }
   };
 
   // Create Boolector Solver
-  camada::SMTSolverRef btor =
-      std::make_shared<camada::BtorSolver>(std::make_shared<myBtorContext>());
+  camada::SMTSolverRef btor = std::make_shared<myBtorSolver>();
 
   tests(btor);
 }
