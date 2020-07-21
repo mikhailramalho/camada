@@ -49,8 +49,6 @@ BtorSolver::BtorSolver() : Context(std::make_shared<Btor *>(boolector_new())) {
   boolector_set_opt(*Context, BTOR_OPT_AUTO_CLEANUP, 1);
 }
 
-BtorSolver::BtorSolver(BtorContextRef C) : Context(std::move(C)) {}
-
 BtorSolver::~BtorSolver() {
   boolector_release_all(*Context);
   boolector_delete(*Context);

@@ -58,8 +58,6 @@ YicesSolver::YicesSolver() {
   yices_free_config(config);
 }
 
-YicesSolver::YicesSolver(YicesContextRef C) : Context(std::move(C)) {}
-
 YicesSolver::~YicesSolver() {
   yices_exit();
   Context = nullptr;

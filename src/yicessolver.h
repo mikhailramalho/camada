@@ -59,7 +59,6 @@ public:
   unsigned int ConstArrayCounter = 0;
 
   explicit YicesSolver();
-  explicit YicesSolver(YicesContextRef C);
   ~YicesSolver() override;
 
   void addConstraint(const SMTExprRef &Exp) override;
