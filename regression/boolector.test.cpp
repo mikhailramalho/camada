@@ -14,8 +14,8 @@ TEST_CASE("Override Boolector Solver", "[Boolector]") {
 
   class myBtorSolver : public camada::BtorSolver {
   public:
-    explicit myBtorSolver()
-        : BtorSolver(std::make_shared<Btor *>(boolector_new())) {
+    explicit myBtorSolver() {
+      Context = std::make_shared<Btor *>(boolector_new());
       boolector_set_opt(*Context, BTOR_OPT_MODEL_GEN, 1);
       boolector_set_opt(*Context, BTOR_OPT_AUTO_CLEANUP, 1);
       boolector_set_opt(*Context, BTOR_OPT_INCREMENTAL, 1);
