@@ -30,19 +30,7 @@
 
 namespace camada {
 
-/// Wrapper for Boolector context
-class YicesContext {
-public:
-  context_t *Context;
-
-  YicesContext();
-  virtual ~YicesContext();
-
-  virtual void createAndConfig();
-  void reset();
-}; // end class YicesContext
-
-using YicesContextRef = std::shared_ptr<YicesContext>;
+using YicesContextRef = std::shared_ptr<context_t *>;
 
 /// Wrapper for Yices Sort
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
@@ -72,7 +60,7 @@ public:
 
   explicit YicesSolver();
   explicit YicesSolver(YicesContextRef C);
-  ~YicesSolver() override = default;
+  ~YicesSolver() override;
 
   void addConstraint(const SMTExprRef &Exp) override;
 
@@ -198,7 +186,7 @@ protected:
   using TermVectort = std::vector<SMTExprRef>;
   TermVectort Assertions;
 
-}; // end class YicesSolver
+}; // namespace camada
 
 } // namespace camada
 

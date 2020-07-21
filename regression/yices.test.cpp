@@ -12,11 +12,22 @@ TEST_CASE("Simple yices test", "[YICES]") {
 
 TEST_CASE("Override Yices Solver", "[YICES]") {
 
-  class myYicesContext : public camada::YicesContext {
+  class myYicesSolver : public camada::YicesSolver {
   public:
-    explicit myYicesContext() : camada::YicesContext() {}
+    explicit myYicesSolver() { create(); }
 
-    void createAndConfig() override {
+    void reset() override {
+      SymbolTable.clear();
+      Assertions.clear();
+
+      // Delete
+      yices_exit();
+
+      // and recreate
+      create();
+    }
+
+    void create() {
       yices_init();
       yices_clear_error();
 
@@ -29,14 +40,13 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
       yices_set_config(config, "array-solver", "none");
       yices_set_config(config, "arith-solver", "none");
 
-      Context = yices_new_context(config);
+      Context = std::make_shared<context_t *>(yices_new_context(config));
       yices_free_config(config);
     }
   };
 
   // Create Yices Solver
-  camada::SMTSolverRef yices =
-      std::make_shared<camada::YicesSolver>(std::make_shared<myYicesContext>());
+  camada::SMTSolverRef yices = std::make_shared<myYicesSolver>();
 
   tests(yices);
 }
