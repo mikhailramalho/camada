@@ -49,6 +49,10 @@ using namespace camada;
 #include "yicessolver.h"
 #endif
 
+#if SOLVER_STP_ENABLED
+#include "stpsolver.h"
+#endif
+
 std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
 
 void camada::SMTSort::dump() const {
@@ -228,6 +232,16 @@ camada::SMTSolverRef camada::createYicesSolver() {
 #else
   std::cerr << "Camada was not compiled with YICES support, rebuild with "
                "-DCAMADA_ENABLE_SOLVER_YICES=ON\n";
+  abort();
+#endif
+}
+
+camada::SMTSolverRef camada::createSTPSolver() {
+#if SOLVER_STP_ENABLED
+  return std::make_shared<STPSolver>();
+#else
+  std::cerr << "Camada was not compiled with STP support, rebuild with "
+               "-DCAMADA_ENABLE_SOLVER_STP=ON\n";
   abort();
 #endif
 }
