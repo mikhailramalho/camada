@@ -1,4 +1,4 @@
-name: MacOS Yices Build
+name: MacOS STP Build
 
 on:
   push:
