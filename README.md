@@ -10,6 +10,7 @@
 | Boolector  |  3.2.1          | ![Linux Boolector Build](https://github.com/mikhailramalho/camada/workflows/Linux%20Boolector%20Build/badge.svg)| ![MacOS Boolector Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20Boolector%20Build/badge.svg) |
 | CVC4       |  1.8            | ![Linux CVC4 Build](https://github.com/mikhailramalho/camada/workflows/Linux%20CVC4%20Build/badge.svg) | ![MacOS CVC4 Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20CVC4%20Build/badge.svg) |
 | MathSAT    |  5.6.3          | ![Linux MathSAT Build](https://github.com/mikhailramalho/camada/workflows/Linux%20MathSAT%20Build/badge.svg) | ![MacOS MathSAT Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20MathSAT%20Build/badge.svg) |
+| STP        |  > 2.3.3        | ![Linux STP Build](https://github.com/mikhailramalho/camada/workflows/Linux%20STP%20Build/badge.svg) | ![MacOS STP Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20STP%20Build/badge.svg) |
 | Yices      |  2.6.1          | ![Linux Yices Build](https://github.com/mikhailramalho/camada/workflows/Linux%20Yices%20Build/badge.svg) | ![MacOS Yices Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20Yices%20Build/badge.svg) |
 | Z3         |  > 4.8.8        | ![Linux Z3 Build](https://github.com/mikhailramalho/camada/workflows/Linux%20Z3%20Build/badge.svg) | ![MacOS Z3 Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20Z3%20Build/badge.svg) |
 
