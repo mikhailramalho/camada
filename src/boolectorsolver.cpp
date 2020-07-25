@@ -64,30 +64,30 @@ SMTExprRef BtorSolver::newExprRef(const SMTExpr &Exp) const {
 }
 
 SMTSortRef BtorSolver::mkBoolSort() {
-  return newSortRef<camada::SolverBoolSort<BtorSort>>(
+  return newSortRef<SolverBoolSort<BtorSort>>(
       {Context, boolector_bool_sort(*Context)});
 }
 
 SMTSortRef BtorSolver::mkBVSort(unsigned BitWidth) {
-  return newSortRef<camada::SolverBVSort<BtorSort>>(
+  return newSortRef<SolverBVSort<BtorSort>>(
       {BitWidth, Context, boolector_bitvec_sort(*Context, BitWidth)});
 }
 
 SMTSortRef BtorSolver::getBVFPSort(const unsigned ExpWidth,
                                    const unsigned SigWidth) {
-  return newSortRef<camada::SolverFPSort<BtorSort>>(
+  return newSortRef<SolverFPSort<BtorSort>>(
       {ExpWidth, SigWidth + 1, Context,
        boolector_bitvec_sort(*Context, ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef BtorSolver::getBVRMSort() {
-  return newSortRef<camada::SolverRMSort<BtorSort>>(
+  return newSortRef<SolverRMSort<BtorSort>>(
       {Context, boolector_bitvec_sort(*Context, 3)});
 }
 
 SMTSortRef BtorSolver::mkArraySort(const SMTSortRef &IndexSort,
                                    const SMTSortRef &ElemSort) {
-  return newSortRef<camada::SolverArraySort<BtorSort>>(
+  return newSortRef<SolverArraySort<BtorSort>>(
       {IndexSort, ElemSort, Context,
        boolector_array_sort(*Context, toSolverSort<BtorSort>(*IndexSort).Sort,
                             toSolverSort<BtorSort>(*ElemSort).Sort)});

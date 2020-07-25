@@ -70,30 +70,30 @@ SMTExprRef STPSolver::newExprRef(const SMTExpr &Exp) const {
 }
 
 SMTSortRef STPSolver::mkBoolSort() {
-  return newSortRef<camada::SolverBoolSort<STPSort>>(
+  return newSortRef<SolverBoolSort<STPSort>>(
       {Context, STP::vc_boolType(*Context)});
 }
 
 SMTSortRef STPSolver::mkBVSort(unsigned BitWidth) {
-  return newSortRef<camada::SolverBVSort<STPSort>>(
+  return newSortRef<SolverBVSort<STPSort>>(
       {BitWidth, Context, STP::vc_bvType(*Context, BitWidth)});
 }
 
 SMTSortRef STPSolver::getBVFPSort(const unsigned ExpWidth,
                                   const unsigned SigWidth) {
-  return newSortRef<camada::SolverFPSort<STPSort>>(
+  return newSortRef<SolverFPSort<STPSort>>(
       {ExpWidth, SigWidth + 1, Context,
        STP::vc_bvType(*Context, ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef STPSolver::getBVRMSort() {
-  return newSortRef<camada::SolverRMSort<STPSort>>(
+  return newSortRef<SolverRMSort<STPSort>>(
       {Context, STP::vc_bvType(*Context, 3)});
 }
 
 SMTSortRef STPSolver::mkArraySort(const SMTSortRef &IndexSort,
                                   const SMTSortRef &ElemSort) {
-  return newSortRef<camada::SolverArraySort<STPSort>>(
+  return newSortRef<SolverArraySort<STPSort>>(
       {IndexSort, ElemSort, Context,
        STP::vc_arrayType(*Context, toSolverSort<STPSort>(*IndexSort).Sort,
                          toSolverSort<STPSort>(*ElemSort).Sort)});
