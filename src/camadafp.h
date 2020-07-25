@@ -130,7 +130,7 @@ public:
     if (useCamadaFP)
       return SMTFPSolver::mkFPFMAImpl(X, Y, Z, R);
     return mkFPFMAImpl(X, Y, Z, R);
-  };
+  }
 
   SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) final {
     if (useCamadaFP)
