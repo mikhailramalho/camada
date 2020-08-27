@@ -75,10 +75,10 @@ public:
 
   SMTSortRef mkBVSort(unsigned BitWidth) override;
 
-  SMTSortRef getBVFPSort(const unsigned ExpWidth,
+  SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                          const unsigned SigWidth) override;
 
-  SMTSortRef getBVRMSort() override;
+  SMTSortRef mkBVRMSort() override;
 
   SMTSortRef mkArraySort(const SMTSortRef &IndexType,
                          const SMTSortRef &ElemType) override;

@@ -301,12 +301,12 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
   assert(Sig->getWidth() == SWidth);
 }
 
-SMTSortRef SMTFPSolver::mkRMSortImpl() { return getBVRMSort(); }
+SMTSortRef SMTFPSolver::mkRMSortImpl() { return mkBVRMSort(); }
 
 SMTSortRef SMTFPSolver::mkFPSortImpl(const unsigned ExpWidth,
                                      const unsigned SigWidth) {
 
-  return getBVFPSort(ExpWidth, SigWidth);
+  return mkBVFPSort(ExpWidth, SigWidth);
 }
 
 SMTExprRef SMTFPSolver::mkFPAbsImpl(const SMTExprRef &Exp) {

@@ -445,11 +445,11 @@ protected:
   bool useCamadaFP = false;
 
   /// Returns an appropriate floating-point sort, encoded as a bitvector.
-  virtual SMTSortRef getBVFPSort(const unsigned ExpWidth,
+  virtual SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                                  const unsigned SigWidth) = 0;
 
   /// Returns an appropriate rounding mode sort, encoded as a bitvector.
-  virtual SMTSortRef getBVRMSort() = 0;
+  virtual SMTSortRef mkBVRMSort() = 0;
 };
 
 /// Shared pointer for SMTSolvers.

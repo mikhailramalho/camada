@@ -72,14 +72,14 @@ SMTSortRef CVC4Solver::mkFPSortImpl(const unsigned ExpWidth,
        Context->mkFloatingPointType(ExpWidth, SigWidth + 1)});
 }
 
-SMTSortRef CVC4Solver::getBVFPSort(const unsigned ExpWidth,
+SMTSortRef CVC4Solver::mkBVFPSort(const unsigned ExpWidth,
                                    const unsigned SigWidth) {
   return newSortRef<SolverFPSort<CVC4Sort>>(
       {ExpWidth, SigWidth + 1, Context,
        Context->mkBitVectorType(ExpWidth + SigWidth + 1)});
 }
 
-SMTSortRef CVC4Solver::getBVRMSort() {
+SMTSortRef CVC4Solver::mkBVRMSort() {
   return newSortRef<SolverRMSort<CVC4Sort>>(
       {Context, Context->mkBitVectorType(3)});
 }

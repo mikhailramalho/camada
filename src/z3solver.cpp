@@ -91,14 +91,14 @@ SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
        Context->fpa_sort(ExpWidth, SigWidth + 1)});
 }
 
-SMTSortRef Z3Solver::getBVFPSort(const unsigned ExpWidth,
+SMTSortRef Z3Solver::mkBVFPSort(const unsigned ExpWidth,
                                  const unsigned SigWidth) {
   return newSortRef<SolverFPSort<Z3Sort>>(
       {ExpWidth, SigWidth + 1, Context,
        Context->bv_sort(ExpWidth + SigWidth + 1)});
 }
 
-SMTSortRef Z3Solver::getBVRMSort() {
+SMTSortRef Z3Solver::mkBVRMSort() {
   return newSortRef<SolverRMSort<Z3Sort>>({Context, Context->bv_sort(3)});
 }
 

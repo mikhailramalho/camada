@@ -73,10 +73,10 @@ public:
   SMTSortRef mkFPSortImpl(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
 
-  SMTSortRef getBVFPSort(const unsigned ExpWidth,
+  SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                          const unsigned SigWidth) override;
 
-  SMTSortRef getBVRMSort() override;
+  SMTSortRef mkBVRMSort() override;
 
   SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
                          const SMTSortRef &ElemSort) override;
