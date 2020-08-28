@@ -55,76 +55,12 @@ using namespace camada;
 
 std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
 
-void camada::SMTSort::dump() const {
-  std::string k;
-  if (isBoolSort())
-    k = "Bool";
-  else if (isBVSort())
-    k = "Bitvector";
-  else if (isRMSort())
-    k = "RoundingMode";
-  else if (isFPSort())
-    k = "Floating-point";
-
-  std::cerr << "kind: " << k << '\n';
-  std::cerr << "width: " << getWidth();
-  if (isFPSort())
-    std::cerr << " (exp: " << getFPExponentWidth()
-              << ", sig: " << getFPSignificandWidth() << ")";
-  std::cerr << '\n';
-}
-
 void camada::SMTSolver::dump() {
   std::cerr << "SMTSolver dump not implemented.\n";
 }
 
 void camada::SMTSolver::dumpModel() {
   std::cerr << "SMTSolver model dump not implemented.\n";
-}
-
-unsigned SMTSort::getWidth() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
-}
-
-unsigned SMTSort::getFPSignificandWidth() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
-}
-
-unsigned SMTSort::getFPExponentWidth() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
-}
-
-SMTSortRef SMTSort::getIndexSort() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
-}
-
-SMTSortRef SMTSort::getElementSort() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
-}
-
-bool operator==(SMTSort const &LHS, SMTSort const &RHS) {
-  if (LHS.isBoolSort() && RHS.isBoolSort())
-    return true;
-
-  if (LHS.isRMSort() && RHS.isRMSort())
-    return true;
-
-  if (LHS.getWidth() != RHS.getWidth())
-    return false;
-
-  if (LHS.isBVSort() && RHS.isBVSort())
-    return true; // Width was already checked
-
-  if (LHS.isFPSort() && RHS.isFPSort())
-    return (LHS.getFPSignificandWidth() == RHS.getFPSignificandWidth()) &&
-           (LHS.getFPExponentWidth() == RHS.getFPExponentWidth());
-
-  return false;
 }
 
 int64_t SMTSolver::getBV(const SMTExprRef &Exp) {
