@@ -19,7 +19,7 @@ function(compile_solver)
 endfunction()
 
 # Add base implementation
-set(libcamada_src_files camada.cpp camadaexpr.cpp camadafp.cpp)
+set(libcamada_src_files camada.cpp camadaexpr.cpp camadasort.cpp camadafp.cpp)
 
 # And compile each solver specific implementation, if it is enabled
 compile_solver(${CAMADA_AVAILABLE_SOLVERS})
