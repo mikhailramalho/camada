@@ -27,8 +27,6 @@
 #include <cstring>
 #include <iostream>
 
-using namespace camada;
-
 #if SOLVER_Z3_ENABLED
 #include "z3solver.h"
 #endif
@@ -63,7 +61,7 @@ void camada::SMTSolver::dumpModel() {
   std::cerr << "SMTSolver model dump not implemented.\n";
 }
 
-int64_t SMTSolver::getBV(const SMTExprRef &Exp) {
+int64_t camada::SMTSolver::getBV(const SMTExprRef &Exp) {
   const std::string bv = getBVInBin(Exp);
   char *buffer_end;
   uint64_t res = std::strtoull(bv.c_str(), &buffer_end, 2);
@@ -84,12 +82,12 @@ static inline IntType FPAsInt(const FPType FP) {
   return FPAsInt;
 }
 
-camada::SMTExprRef SMTSolver::mkFP32(const float Float) {
+camada::SMTExprRef camada::SMTSolver::mkFP32(const float Float) {
   uint32_t fp = FPAsInt<float, uint32_t>(Float);
   return mkFPFromBin(std::bitset<32>(fp).to_string(), 8);
 }
 
-camada::SMTExprRef SMTSolver::mkFP64(const double Double) {
+camada::SMTExprRef camada::SMTSolver::mkFP64(const double Double) {
   uint64_t fp = FPAsInt<double, uint64_t>(Double);
   return mkFPFromBin(std::bitset<64>(fp).to_string(), 11);
 }
@@ -106,13 +104,13 @@ static inline FPType IntAsFP(const IntType Int) {
   return IntAsFP;
 }
 
-float SMTSolver::getFP32(const SMTExprRef &Exp) {
+float camada::SMTSolver::getFP32(const SMTExprRef &Exp) {
   char *buffer_end = nullptr;
   return IntAsFP<float, uint32_t>(
       std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));
 }
 
-double SMTSolver::getFP64(const SMTExprRef &Exp) {
+double camada::SMTSolver::getFP64(const SMTExprRef &Exp) {
   char *buffer_end = nullptr;
   return IntAsFP<double, uint64_t>(
       std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));

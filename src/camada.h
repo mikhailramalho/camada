@@ -44,8 +44,7 @@ enum class RM {
 /// Generic base class for SMT Solvers
 ///
 /// This class is responsible for wrapping all sorts and expression generation,
-/// through the mk* methods. It also provides methods to create SMT expressions
-/// straight from clang's Expr, through the from* methods.
+/// through the mk* methods.
 class SMTSolver {
 public:
   SMTSolver() = default;
@@ -446,7 +445,7 @@ protected:
 
   /// Returns an appropriate floating-point sort, encoded as a bitvector.
   virtual SMTSortRef mkBVFPSort(const unsigned ExpWidth,
-                                 const unsigned SigWidth) = 0;
+                                const unsigned SigWidth) = 0;
 
   /// Returns an appropriate rounding mode sort, encoded as a bitvector.
   virtual SMTSortRef mkBVRMSort() = 0;
