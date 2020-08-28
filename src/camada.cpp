@@ -74,10 +74,6 @@ void camada::SMTSort::dump() const {
   std::cerr << '\n';
 }
 
-void camada::SMTExpr::dump() const {
-  std::cerr << "SMTExpr dump not implemented.\n";
-}
-
 void camada::SMTSolver::dump() {
   std::cerr << "SMTSolver dump not implemented.\n";
 }
