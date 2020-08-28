@@ -21,6 +21,7 @@
 
 #include "camada.h"
 #include "ac_config.h"
+#include "camadaimpl.h"
 
 #include <bitset>
 #include <cassert>
@@ -52,6 +53,10 @@
 #endif
 
 std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
+
+camada::SMTSolver::SMTSolver() : pImpl(new SMTSolverImpl) {}
+
+camada::SMTSolver::~SMTSolver() = default;
 
 void camada::SMTSolver::dump() {
   std::cerr << "SMTSolver dump not implemented.\n";
