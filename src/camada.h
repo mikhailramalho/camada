@@ -47,8 +47,8 @@ enum class RM {
 /// through the mk* methods.
 class SMTSolver {
 public:
-  SMTSolver() = default;
-  virtual ~SMTSolver() = default;
+  SMTSolver();
+  virtual ~SMTSolver();
 
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
@@ -449,6 +449,10 @@ protected:
 
   /// Returns an appropriate rounding mode sort, encoded as a bitvector.
   virtual SMTSortRef mkBVRMSort() = 0;
+
+  /// Hidden implementation of SMTSolver
+  class SMTSolverImpl;
+  std::unique_ptr<SMTSolverImpl> pImpl;
 };
 
 /// Shared pointer for SMTSolvers.
