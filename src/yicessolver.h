@@ -70,7 +70,7 @@ public:
   SMTSortRef mkBVSort(unsigned BitWidth) override;
 
   SMTSortRef mkBVFPSort(const unsigned ExpWidth,
-                         const unsigned SigWidth) override;
+                        const unsigned SigWidth) override;
 
   SMTSortRef mkBVRMSort() override;
 

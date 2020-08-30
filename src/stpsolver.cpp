@@ -83,7 +83,7 @@ SMTSortRef STPSolver::mkBVSort(unsigned BitWidth) {
 }
 
 SMTSortRef STPSolver::mkBVFPSort(const unsigned ExpWidth,
-                                  const unsigned SigWidth) {
+                                 const unsigned SigWidth) {
   return newSortRef<SolverFPSort<STPSort>>(
       {ExpWidth, SigWidth + 1, Context,
        STP::vc_bvType(*Context, ExpWidth + SigWidth + 1)});
