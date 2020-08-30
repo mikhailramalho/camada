@@ -91,6 +91,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 option(ENABLE_WERROR "All warnings are treated as errors during compilation (default: OFF)" OFF)
+if(ENABLE_WERROR)
+  add_definitions(-Werror)
+endif()
 
 option(ENABLE_WALL "Enable -Wall and -Wextra during compilation (default: OFF)" OFF)
 if(ENABLE_WALL)
