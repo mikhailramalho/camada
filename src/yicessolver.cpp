@@ -338,6 +338,7 @@ bool YicesSolver::getBool(const SMTExprRef &Exp) {
   int32_t val;
   auto res = yices_get_bool_value(yices_get_model(*Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
+  (void)res;
   assert(res && "Can't get boolean value from Yices");
   return val ? true : false;
 }

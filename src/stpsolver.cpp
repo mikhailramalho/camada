@@ -50,7 +50,10 @@ void STPExpr::dump() const {
 }
 
 // Function used to report errors
-void STPErrorHandler(const char *msg) { assert(0 && msg); }
+void STPErrorHandler(const char *msg) {
+  (void)msg;
+  assert(0 && msg);
+}
 
 STPSolver::STPSolver()
     : Context(std::make_shared<STP::VC>(STP::vc_createValidityChecker())) {

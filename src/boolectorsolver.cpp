@@ -41,7 +41,10 @@ void BtorExpr::dump() const {
 }
 
 // Function used to report errors
-void BtorErrorHandler(const char *msg) { assert(0 && msg); }
+void BtorErrorHandler(const char *msg) {
+  (void)msg;
+  assert(0 && msg);
+}
 
 BtorSolver::BtorSolver() : Context(std::make_shared<Btor *>(boolector_new())) {
   boolector_set_abort(BtorErrorHandler);
