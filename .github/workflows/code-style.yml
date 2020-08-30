@@ -11,7 +11,7 @@ jobs:
     - name: Install Dependencies
       run: sudo apt-get update && sudo apt-get install clang-tools-9
     - name: Run clang-format
-      run: find src -iname *.h -o -iname *.c -o -iname *.cpp -o -iname *.hpp -iname *.hh | grep -v src/ansi-c/cpp | xargs clang-format -style=file -i -fallback-style=none
+      run: find src -iname *.h -o -iname *.c -o -iname *.cpp -o -iname *.hpp -iname *.hh | xargs clang-format -style=llvm -i
     - name: Throws error if changes were made
       run: git diff --exit-code
 
