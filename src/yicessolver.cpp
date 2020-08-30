@@ -84,7 +84,7 @@ SMTSortRef YicesSolver::mkBVSort(unsigned BitWidth) {
 }
 
 SMTSortRef YicesSolver::mkBVFPSort(const unsigned ExpWidth,
-                                    const unsigned SigWidth) {
+                                   const unsigned SigWidth) {
   return newSortRef<SolverFPSort<YicesSort>>(
       {ExpWidth, SigWidth + 1, Context,
        yices_bv_type(ExpWidth + SigWidth + 1)});
