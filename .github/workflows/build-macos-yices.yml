@@ -16,7 +16,7 @@ jobs:
     - name: Install Dependencies
       run: brew install gmp ninja automake
     - name: Setup Catch2
-      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup Yices 2
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j4 && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
     - name: Install yices

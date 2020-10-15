@@ -16,7 +16,7 @@ jobs:
     - name: Install Dependencies
       run: brew install cmake ninja
     - name: Setup Catch2
-      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup boolector
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
     - name: Configure CMake

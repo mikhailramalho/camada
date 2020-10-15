@@ -16,7 +16,7 @@ jobs:
     - name: Install Dependencies
       run: brew install gmp ninja automake cmake boost zlib bison flex
     - name: Setup Catch2
-      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup CryptoMiniSAT
       run: wget -c https://github.com/msoos/cryptominisat/archive/5.8.0.zip && unzip 5.8.0.zip && cd cryptominisat-5.8.0 && mkdir build && cd build && cmake .. -GNinja && ninja && ninja install
     - name: Setup MiniSAT

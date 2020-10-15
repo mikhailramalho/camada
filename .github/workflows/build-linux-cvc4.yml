@@ -16,7 +16,7 @@ jobs:
     - name: Install Dependencies
       run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build && pip install toml
     - name: Setup Catch2
-      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
     - name: Setup CVC4
       run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
     - name: Configure CMake
