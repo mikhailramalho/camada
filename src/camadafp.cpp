@@ -209,10 +209,11 @@ static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
   }
 }
 
-static inline SMTExprRef mkRoundingDecision(SMTSolver &S, SMTExprRef &R,
-                                            SMTExprRef &Sgn, SMTExprRef &Last,
-                                            SMTExprRef &Round,
-                                            SMTExprRef &Sticky) {
+static inline SMTExprRef mkRoundingDecision(SMTSolver &S, const SMTExprRef &R,
+                                            const SMTExprRef &Sgn,
+                                            const SMTExprRef &Last,
+                                            const SMTExprRef &Round,
+                                            const SMTExprRef &Sticky) {
   SMTExprRef last_or_sticky = S.mkBVOr(Last, Sticky);
   SMTExprRef round_or_sticky = S.mkBVOr(Round, Sticky);
 
@@ -608,11 +609,11 @@ SMTExprRef SMTFPSolver::mkFPRemImpl(const SMTExprRef &LHS,
 }
 
 static inline void addCore(SMTSolver &S, unsigned int SWidth,
-                           unsigned int EWidth, SMTExprRef &CSgn,
-                           SMTExprRef &CSig, SMTExprRef &CExp, SMTExprRef &DSgn,
-                           SMTExprRef &DSig, SMTExprRef &DExp,
-                           SMTExprRef &ResSgn, SMTExprRef &ResSig,
-                           SMTExprRef &ResExp) {
+                           unsigned int EWidth, const SMTExprRef &CSgn,
+                           SMTExprRef &CSig, const SMTExprRef &CExp,
+                           const SMTExprRef &DSgn, SMTExprRef &DSig,
+                           const SMTExprRef &DExp, SMTExprRef &ResSgn,
+                           SMTExprRef &ResSig, SMTExprRef &ResExp) {
   // c/d are now such that c_exp >= d_exp.
   SMTExprRef exp_delta = S.mkBVSub(CExp, DExp);
 
@@ -1861,8 +1862,8 @@ SMTExprRef SMTFPSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   return Exp;
 }
 
-SMTExprRef SMTFPSolver::round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
-                              SMTExprRef &Exp, unsigned EWidth,
+SMTExprRef SMTFPSolver::round(const SMTExprRef &R, const SMTExprRef &Sgn,
+                              SMTExprRef &Sig, SMTExprRef &Exp, unsigned EWidth,
                               unsigned SWidth) {
   // Assumptions: sig is of the form f[-1:0] . f[1:SWidth-1]
   // [guard,round,sticky],
