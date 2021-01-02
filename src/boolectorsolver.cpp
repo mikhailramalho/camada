@@ -489,6 +489,8 @@ checkResult BtorSolver::check() {
 }
 
 void BtorSolver::reset() {
+  SymbolTable.clear();
+
   // Delete
   boolector_release_all(*Context);
   boolector_delete(*Context);
