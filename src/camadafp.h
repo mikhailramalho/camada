@@ -313,7 +313,7 @@ protected:
 
   SMTExprRef mkToBV(const SMTExprRef &Exp, bool isSigned, unsigned int width);
 
-  SMTExprRef round(SMTExprRef &R, SMTExprRef &Sgn, SMTExprRef &Sig,
+  SMTExprRef round(const SMTExprRef &R, const SMTExprRef &Sgn, SMTExprRef &Sig,
                    SMTExprRef &Exp, unsigned EWidth, unsigned SWidth);
 };
 
