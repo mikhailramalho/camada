@@ -325,6 +325,18 @@ SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
                                 toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
+SMTExprRef BtorSolver::mkBVRedOr(const SMTExprRef &Exp) {
+  return newExprRef(
+      BtorExpr(Context, mkBVSort(1),
+               boolector_redor(*Context, toSolverExpr<BtorExpr>(*Exp).Expr)));
+}
+
+SMTExprRef BtorSolver::mkBVRedAnd(const SMTExprRef &Exp) {
+  return newExprRef(
+      BtorExpr(Context, mkBVSort(1),
+               boolector_redand(*Context, toSolverExpr<BtorExpr>(*Exp).Expr)));
+}
+
 SMTExprRef BtorSolver::mkArraySelect(const SMTExprRef &Array,
                                      const SMTExprRef &Index) {
   return newExprRef(

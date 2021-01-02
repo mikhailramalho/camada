@@ -316,6 +316,16 @@ SMTExprRef YicesSolver::mkBVConcat(const SMTExprRef &LHS,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
+SMTExprRef YicesSolver::mkBVRedOr(const SMTExprRef &Exp) {
+  return newExprRef(YicesExpr(Context, mkBVSort(1),
+                              yices_redor(toSolverExpr<YicesExpr>(*Exp).Expr)));
+}
+
+SMTExprRef YicesSolver::mkBVRedAnd(const SMTExprRef &Exp) {
+  return newExprRef(YicesExpr(
+      Context, mkBVSort(1), yices_redand(toSolverExpr<YicesExpr>(*Exp).Expr)));
+}
+
 SMTExprRef YicesSolver::mkArraySelect(const SMTExprRef &Array,
                                       const SMTExprRef &Index) {
   return newExprRef(

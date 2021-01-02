@@ -306,6 +306,20 @@ SMTExprRef Z3Solver::mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                       toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
+SMTExprRef Z3Solver::mkBVRedOr(const SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context, mkBVSort(1),
+      z3::to_expr(*Context,
+                  Z3_mk_bvredor(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+}
+
+SMTExprRef Z3Solver::mkBVRedAnd(const SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(
+      Context, mkBVSort(1),
+      z3::to_expr(*Context,
+                  Z3_mk_bvredand(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+}
+
 SMTExprRef Z3Solver::mkArraySelect(const SMTExprRef &Array,
                                    const SMTExprRef &Index) {
   return newExprRef(Z3Expr(Context, Array->Sort->getElementSort(),
