@@ -306,7 +306,6 @@ SMTSortRef SMTFPSolver::mkRMSortImpl() { return mkBVRMSort(); }
 
 SMTSortRef SMTFPSolver::mkFPSortImpl(const unsigned ExpWidth,
                                      const unsigned SigWidth) {
-
   return mkBVFPSort(ExpWidth, SigWidth);
 }
 
