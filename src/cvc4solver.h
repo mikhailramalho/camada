@@ -152,6 +152,10 @@ public:
 
   SMTExprRef mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVRedOr(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) override;
+
   SMTExprRef mkArraySelect(const SMTExprRef &Array,
                            const SMTExprRef &Index) override;
 
