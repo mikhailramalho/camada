@@ -19,13 +19,7 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #include "camada.h"
-
-#include <bitset>
-#include <cassert>
-#include <cstring>
-#include <iostream>
 
 namespace camada {
 

@@ -24,8 +24,6 @@
 
 #include "camadafp.h"
 
-#include <unordered_map>
-
 namespace STP {
 #include <c_interface.h>
 }
@@ -59,9 +57,6 @@ public:
   STPContextRef Context;
 
   unsigned int ConstArrayCounter = 0;
-
-  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
-  SymbolTablet SymbolTable;
 
   explicit STPSolver();
   explicit STPSolver(STPContextRef C);
