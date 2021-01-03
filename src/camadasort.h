@@ -71,10 +71,14 @@ public:
 
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
-  friend bool operator==(SMTSort const &LHS, SMTSort const &RHS);
+  bool operator==(SMTSort const &Other);
 
   virtual void dump() const;
 };
+
+inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {
+  return (*LHS.get() == *RHS.get());
+}
 
 /// Template to hold Solver specific Context and Sort
 template <typename SolverContextRef, typename TheSort>
