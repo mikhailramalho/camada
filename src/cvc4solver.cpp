@@ -26,6 +26,17 @@ using namespace camada;
 
 #ifdef SOLVER_CVC4_ENABLED
 
+unsigned CVC4Sort::getWidthFromSolver() const {
+  if (Sort.isBitVector()) {
+    CVC4::BitVectorType bvType = static_cast<CVC4::BitVectorType>(Sort);
+    return bvType.getSize();
+  }
+
+  assert(Sort.isFloatingPoint());
+  CVC4::FloatingPointType fpType = static_cast<CVC4::FloatingPointType>(Sort);
+  return 1 + fpType.getExponentSize() + fpType.getSignificandSize();
+}
+
 void CVC4Sort::dump() const { std::cerr << Sort.toString() << '\n'; }
 
 bool CVC4Expr::equal_to(SMTExpr const &Other) const {

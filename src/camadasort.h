@@ -55,6 +55,9 @@ public:
   /// Returns the sort width.
   virtual unsigned getWidth() const;
 
+  /// Returns the sort width from the Solver.
+  virtual unsigned getWidthFromSolver() const;
+
   /// Returns the floating-point significand width, fails if the sort is not a
   /// floating-point.
   virtual unsigned getFPSignificandWidth() const;

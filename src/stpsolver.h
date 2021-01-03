@@ -38,6 +38,8 @@ public:
   using SolverSort<STPContextRef, STP::Type>::SolverSort;
   ~STPSort() override = default;
 
+  unsigned getWidthFromSolver() const override;
+
   void dump() const override;
 }; // end class STPSort
 

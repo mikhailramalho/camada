@@ -36,6 +36,8 @@ public:
   using SolverSort<MathSATContextRef, msat_type>::SolverSort;
   ~MathSATSort() override = default;
 
+  unsigned getWidthFromSolver() const override;
+
   void dump() const override;
 }; // end class MathSATSort
 

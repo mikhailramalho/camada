@@ -36,6 +36,8 @@ public:
   using SolverSort<CVC4ContextRef, CVC4::Type>::SolverSort;
   ~CVC4Sort() override = default;
 
+  unsigned getWidthFromSolver() const override;
+
   void dump() const override;
 }; // end class CVC4Sort
 

@@ -28,6 +28,10 @@ using namespace camada;
 
 #ifdef SOLVER_BOOLECTOR_ENABLED
 
+unsigned BtorSort::getWidthFromSolver() const {
+  return boolector_bitvec_sort_get_width(*Context, Sort);
+}
+
 bool BtorExpr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort)
     return false;

@@ -34,8 +34,14 @@ namespace camada {
 
 using BtorContextRef = std::shared_ptr<Btor *>;
 
-/// No need for a wrapper for Boolector Sort
-using BtorSort = SolverSort<BtorContextRef, BoolectorSort>;
+/// Wrapper for CVC4 Sort
+class BtorSort : public SolverSort<BtorContextRef, BoolectorSort> {
+public:
+  using SolverSort<BtorContextRef, BoolectorSort>::SolverSort;
+  ~BtorSort() override = default;
+
+  unsigned getWidthFromSolver() const override;
+}; // end class CVC4Sort
 
 class BtorExpr : public SolverExpr<BtorContextRef, BoolectorNode *> {
 public:
