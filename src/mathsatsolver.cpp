@@ -30,6 +30,18 @@ using namespace camada;
 
 #ifdef SOLVER_MATHSAT_ENABLED
 
+unsigned MathSATSort::getWidthFromSolver() const {
+  std::size_t w;
+  if (msat_is_bv_type(*Context, Sort, &w))
+    return w;
+
+  std::size_t exp, sig;
+  int isFP = msat_is_fp_type(*Context, Sort, &exp, &sig);
+  assert(isFP);
+  (void)isFP;
+  return 1 + exp + sig;
+}
+
 void MathSATSort::dump() const {
   char *s = msat_type_repr(Sort);
   std::cerr << s << '\n';

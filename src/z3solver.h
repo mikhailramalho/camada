@@ -36,6 +36,8 @@ public:
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
   ~Z3Sort() override = default;
 
+  unsigned getWidthFromSolver() const override;
+
   void dump() const override;
 }; // end class Z3Sort
 

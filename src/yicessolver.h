@@ -38,6 +38,8 @@ public:
   using SolverSort<YicesContextRef, type_t>::SolverSort;
   ~YicesSort() override = default;
 
+  unsigned getWidthFromSolver() const override;
+
   void dump() const override;
 }; // end class YicesSort
 

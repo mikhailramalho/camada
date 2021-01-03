@@ -29,6 +29,10 @@ using namespace camada;
 
 #ifdef SOLVER_YICES_ENABLED
 
+unsigned YicesSort::getWidthFromSolver() const {
+  return yices_bvtype_size(Sort);
+}
+
 void YicesSort::dump() const {
   char *ty_str = yices_type_to_string(Sort, 160, 80, 0);
   std::cerr << ty_str << '\n';

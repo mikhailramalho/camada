@@ -48,6 +48,11 @@ unsigned camada::SMTSort::getWidth() const {
   __builtin_unreachable();
 }
 
+unsigned camada::SMTSort::getWidthFromSolver() const {
+  assert(0 && "Unimplemented for current type");
+  __builtin_unreachable();
+}
+
 unsigned camada::SMTSort::getFPSignificandWidth() const {
   assert(0 && "Unimplemented for current type");
   __builtin_unreachable();

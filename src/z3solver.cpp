@@ -26,6 +26,14 @@ using namespace camada;
 
 #ifdef SOLVER_Z3_ENABLED
 
+unsigned Z3Sort::getWidthFromSolver() const {
+  if (Sort.is_bv())
+    return Sort.bv_size();
+
+  assert(Sort.is_fpa());
+  return 1 + Sort.fpa_ebits() + Sort.fpa_sbits();
+}
+
 void Z3Sort::dump() const {
   std::cerr << Z3_sort_to_string(*Context, Sort) << '\n';
 }

@@ -30,6 +30,11 @@ using namespace camada;
 
 #ifdef SOLVER_STP_ENABLED
 
+unsigned STPSort::getWidthFromSolver() const {
+  // TODO: ask developers for an API call
+  return getWidth();
+}
+
 void STPSort::dump() const {
   char *s = STP::typeString(Sort);
   std::cerr << s << '\n';
