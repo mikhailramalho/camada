@@ -63,104 +63,111 @@ public:
   explicit CVC4Solver();
   ~CVC4Solver() override = default;
 
-  void addConstraint(const SMTExprRef &Exp) override;
+  void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRef(const SMTExpr &Exp) const override;
+  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
 
-  SMTSortRef mkBoolSort() override;
+  SMTSortRef mkBoolSortImpl() override;
 
-  SMTSortRef mkBVSort(unsigned BitWidth) override;
+  SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
 
   SMTSortRef mkRMSortImpl() override;
 
   SMTSortRef mkFPSortImpl(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
 
-  SMTSortRef mkBVFPSort(const unsigned ExpWidth,
-                        const unsigned SigWidth) override;
+  SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
+                            const unsigned SigWidth) override;
 
-  SMTSortRef mkBVRMSort() override;
+  SMTSortRef mkBVRMSortImpl() override;
 
-  SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
-                         const SMTSortRef &ElemSort) override;
+  SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
+                             const SMTSortRef &ElemSort) override;
 
-  SMTExprRef mkBVNeg(const SMTExprRef &Exp) override;
+  SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkBVNot(const SMTExprRef &Exp) override;
+  SMTExprRef mkBVNotImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkNot(const SMTExprRef &Exp) override;
+  SMTExprRef mkNotImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVSRemImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVURemImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVSDivImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVUDivImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVShlImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVAshrImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVLshrImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVUltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVSltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVUleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVSleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
-                   const SMTExprRef &F) override;
+  SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
+                       const SMTExprRef &F) override;
 
-  SMTExprRef mkBVSignExt(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) override;
 
-  SMTExprRef mkBVZeroExt(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) override;
 
-  SMTExprRef mkBVExtract(unsigned High, unsigned Low,
-                         const SMTExprRef &Exp) override;
+  SMTExprRef mkBVExtractImpl(unsigned High, unsigned Low,
+                             const SMTExprRef &Exp) override;
 
-  SMTExprRef mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVRedOr(const SMTExprRef &Exp) override;
+  SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) override;
+  SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkArraySelect(const SMTExprRef &Array,
-                           const SMTExprRef &Index) override;
+  SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
+                               const SMTExprRef &Index) override;
 
-  SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
-                          const SMTExprRef &Element) override;
+  SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
+                              const SMTExprRef &Element) override;
 
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 
@@ -197,11 +204,11 @@ public:
 
   SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
@@ -221,23 +228,24 @@ public:
 
   SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) override;
 
-  bool getBool(const SMTExprRef &Exp) override;
+  bool getBoolImpl(const SMTExprRef &Exp) override;
 
-  std::string getBVInBin(const SMTExprRef &Exp) override;
+  std::string getBVInBinImpl(const SMTExprRef &Exp) override;
 
   std::string getFPInBinImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef getArrayElement(const SMTExprRef &Array,
-                             const SMTExprRef &Index) override;
+  SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
+                                 const SMTExprRef &Index) override;
 
-  SMTExprRef mkBool(const bool b) override;
+  SMTExprRef mkBoolImpl(const bool b) override;
 
-  SMTExprRef mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) override;
+  SMTExprRef mkBVFromDecImpl(const int64_t Int,
+                             const SMTSortRef &Sort) override;
 
-  SMTExprRef mkBVFromBin(const std::string &Int,
-                         const SMTSortRef &Sort) override;
+  SMTExprRef mkBVFromBinImpl(const std::string &Int,
+                             const SMTSortRef &Sort) override;
 
-  SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) override;
+  SMTExprRef mkSymbolImpl(const std::string &Name, SMTSortRef Sort) override;
 
   SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
 
@@ -254,16 +262,16 @@ public:
 
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
-                          const SMTExprRef &InitValue) override;
+  SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
+                              const SMTExprRef &InitValue) override;
 
-  checkResult check() override;
+  checkResult checkImpl() override;
 
-  void reset() override;
+  void resetImpl() override;
 
-  void dump() override;
+  void dumpImpl() override;
 
-  void dumpModel() override;
+  void dumpModelImpl() override;
 }; // end class CVC4Solver
 
 } // namespace camada

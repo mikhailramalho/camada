@@ -21,7 +21,7 @@ TEST_CASE("Override Boolector Solver", "[Boolector]") {
       boolector_set_opt(*Context, BTOR_OPT_INCREMENTAL, 1);
     }
 
-    void reset() override {
+    void resetImpl() override {
       // Delete
       boolector_release_all(*Context);
       boolector_delete(*Context);

@@ -16,7 +16,7 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
   public:
     explicit myYicesSolver() { create(); }
 
-    void reset() override {
+    void resetImpl() override {
       SymbolTable.clear();
       Assertions.clear();
 
