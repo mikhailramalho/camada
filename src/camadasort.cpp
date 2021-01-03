@@ -68,22 +68,26 @@ camada::SMTSortRef camada::SMTSort::getElementSort() const {
   __builtin_unreachable();
 }
 
-bool operator==(camada::SMTSort const &LHS, camada::SMTSort const &RHS) {
-  if (LHS.isBoolSort() && RHS.isBoolSort())
+bool camada::SMTSort::operator==(camada::SMTSort const &Other) {
+  if (isBoolSort() && Other.isBoolSort())
     return true;
 
-  if (LHS.isRMSort() && RHS.isRMSort())
+  if (isRMSort() && Other.isRMSort())
     return true;
 
-  if (LHS.getWidth() != RHS.getWidth())
+  if (isArraySort() && Other.isArraySort())
+    return (getIndexSort() == Other.getIndexSort()) &&
+           (getElementSort() == Other.getElementSort());
+
+  if (getWidth() != Other.getWidth())
     return false;
 
-  if (LHS.isBVSort() && RHS.isBVSort())
+  if (isBVSort() && Other.isBVSort())
     return true; // Width was already checked
 
-  if (LHS.isFPSort() && RHS.isFPSort())
-    return (LHS.getFPSignificandWidth() == RHS.getFPSignificandWidth()) &&
-           (LHS.getFPExponentWidth() == RHS.getFPExponentWidth());
+  if (isFPSort() && Other.isFPSort())
+    return (getFPSignificandWidth() == Other.getFPSignificandWidth()) &&
+           (getFPExponentWidth() == Other.getFPExponentWidth());
 
   return false;
 }
