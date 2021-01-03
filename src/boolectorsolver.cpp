@@ -58,239 +58,261 @@ BtorSolver::~BtorSolver() {
   Context = nullptr;
 }
 
-void BtorSolver::addConstraint(const SMTExprRef &Exp) {
+void BtorSolver::addConstraintImpl(const SMTExprRef &Exp) {
   boolector_assert(*Context, toSolverExpr<BtorExpr>(*Exp).Expr);
 }
 
-SMTExprRef BtorSolver::newExprRef(const SMTExpr &Exp) const {
+SMTExprRef BtorSolver::newExprRefImpl(const SMTExpr &Exp) const {
   return std::make_shared<BtorExpr>(toSolverExpr<BtorExpr>(Exp));
 }
 
-SMTSortRef BtorSolver::mkBoolSort() {
+SMTSortRef BtorSolver::mkBoolSortImpl() {
   return newSortRef<SolverBoolSort<BtorSort>>(
       {Context, boolector_bool_sort(*Context)});
 }
 
-SMTSortRef BtorSolver::mkBVSort(unsigned BitWidth) {
+SMTSortRef BtorSolver::mkBVSortImpl(unsigned BitWidth) {
   return newSortRef<SolverBVSort<BtorSort>>(
       {BitWidth, Context, boolector_bitvec_sort(*Context, BitWidth)});
 }
 
-SMTSortRef BtorSolver::mkBVFPSort(const unsigned ExpWidth,
-                                  const unsigned SigWidth) {
+SMTSortRef BtorSolver::mkBVFPSortImpl(const unsigned ExpWidth,
+                                      const unsigned SigWidth) {
   return newSortRef<SolverFPSort<BtorSort>>(
       {ExpWidth, SigWidth + 1, Context,
        boolector_bitvec_sort(*Context, ExpWidth + SigWidth + 1)});
 }
 
-SMTSortRef BtorSolver::mkBVRMSort() {
+SMTSortRef BtorSolver::mkBVRMSortImpl() {
   return newSortRef<SolverRMSort<BtorSort>>(
       {Context, boolector_bitvec_sort(*Context, 3)});
 }
 
-SMTSortRef BtorSolver::mkArraySort(const SMTSortRef &IndexSort,
-                                   const SMTSortRef &ElemSort) {
+SMTSortRef BtorSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
+                                       const SMTSortRef &ElemSort) {
   return newSortRef<SolverArraySort<BtorSort>>(
       {IndexSort, ElemSort, Context,
        boolector_array_sort(*Context, toSolverSort<BtorSort>(*IndexSort).Sort,
                             toSolverSort<BtorSort>(*ElemSort).Sort)});
 }
 
-SMTExprRef BtorSolver::mkBVNeg(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkBVNegImpl(const SMTExprRef &Exp) {
   return newExprRef(
       BtorExpr(Context, Exp->Sort,
                boolector_neg(*Context, toSolverExpr<BtorExpr>(*Exp).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVNot(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkBVNotImpl(const SMTExprRef &Exp) {
   return newExprRef(
       BtorExpr(Context, Exp->Sort,
                boolector_not(*Context, toSolverExpr<BtorExpr>(*Exp).Expr)));
 }
 
-SMTExprRef BtorSolver::mkNot(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkNotImpl(const SMTExprRef &Exp) {
   return newExprRef(
       BtorExpr(Context, Exp->Sort,
                boolector_not(*Context, toSolverExpr<BtorExpr>(*Exp).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVAddImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_add(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVSubImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_sub(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVMulImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_mul(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVSRemImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_srem(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVURemImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_urem(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVSDivImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_sdiv(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVUDivImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_udiv(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVShlImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_sll(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVAshrImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_sra(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVLshrImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_srl(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVXorImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_xor(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVOrImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_or(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                             toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVAndImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_and(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVUltImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_ult(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVSltImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_slt(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVUgtImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_ugt(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVSgtImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_sgt(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVUleImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_ulte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVSleImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_slte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVUgeImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_ugte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVSgeImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, LHS->Sort,
                boolector_sgte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, mkBoolSort(),
                boolector_and(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, mkBoolSort(),
                boolector_or(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                             toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, mkBoolSort(),
                boolector_xor(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkEqualImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, mkBoolSort(),
                boolector_eq(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                             toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
-                             const SMTExprRef &F) {
+SMTExprRef BtorSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
+                                 const SMTExprRef &F) {
   return newExprRef(
       BtorExpr(Context, T->Sort,
                boolector_cond(*Context, toSolverExpr<BtorExpr>(*Cond).Expr,
@@ -298,56 +320,56 @@ SMTExprRef BtorSolver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                               toSolverExpr<BtorExpr>(*F).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
       BtorExpr(Context, mkBVSort(i + Exp->getWidth()),
                boolector_sext(*Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
-SMTExprRef BtorSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(
       BtorExpr(Context, mkBVSort(i + Exp->getWidth()),
                boolector_uext(*Context, toSolverExpr<BtorExpr>(*Exp).Expr, i)));
 }
 
-SMTExprRef BtorSolver::mkBVExtract(unsigned High, unsigned Low,
-                                   const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkBVExtractImpl(unsigned High, unsigned Low,
+                                       const SMTExprRef &Exp) {
   return newExprRef(BtorExpr(
       Context, mkBVSort(High - Low + 1),
       boolector_slice(*Context, toSolverExpr<BtorExpr>(*Exp).Expr, High, Low)));
 }
 
-SMTExprRef BtorSolver::mkBVConcat(const SMTExprRef &LHS,
-                                  const SMTExprRef &RHS) {
+SMTExprRef BtorSolver::mkBVConcatImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
                boolector_concat(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                                 toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVRedOr(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkBVRedOrImpl(const SMTExprRef &Exp) {
   return newExprRef(
       BtorExpr(Context, mkBVSort(1),
                boolector_redor(*Context, toSolverExpr<BtorExpr>(*Exp).Expr)));
 }
 
-SMTExprRef BtorSolver::mkBVRedAnd(const SMTExprRef &Exp) {
+SMTExprRef BtorSolver::mkBVRedAndImpl(const SMTExprRef &Exp) {
   return newExprRef(
       BtorExpr(Context, mkBVSort(1),
                boolector_redand(*Context, toSolverExpr<BtorExpr>(*Exp).Expr)));
 }
 
-SMTExprRef BtorSolver::mkArraySelect(const SMTExprRef &Array,
-                                     const SMTExprRef &Index) {
+SMTExprRef BtorSolver::mkArraySelectImpl(const SMTExprRef &Array,
+                                         const SMTExprRef &Index) {
   return newExprRef(
       BtorExpr(Context, Array->Sort->getElementSort(),
                boolector_read(*Context, toSolverExpr<BtorExpr>(*Array).Expr,
                               toSolverExpr<BtorExpr>(*Index).Expr)));
 }
 
-SMTExprRef BtorSolver::mkArrayStore(const SMTExprRef &Array,
-                                    const SMTExprRef &Index,
-                                    const SMTExprRef &Element) {
+SMTExprRef BtorSolver::mkArrayStoreImpl(const SMTExprRef &Array,
+                                        const SMTExprRef &Index,
+                                        const SMTExprRef &Element) {
   return newExprRef(
       BtorExpr(Context, Array->Sort,
                boolector_write(*Context, toSolverExpr<BtorExpr>(*Array).Expr,
@@ -355,7 +377,7 @@ SMTExprRef BtorSolver::mkArrayStore(const SMTExprRef &Array,
                                toSolverExpr<BtorExpr>(*Element).Expr)));
 }
 
-bool BtorSolver::getBool(const SMTExprRef &Exp) {
+bool BtorSolver::getBoolImpl(const SMTExprRef &Exp) {
   const char *boolean =
       boolector_bv_assignment(*Context, toSolverExpr<BtorExpr>(*Exp).Expr);
 
@@ -377,12 +399,12 @@ bool BtorSolver::getBool(const SMTExprRef &Exp) {
   return res;
 }
 
-std::string BtorSolver::getBVInBin(const SMTExprRef &Exp) {
+std::string BtorSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   return boolector_bv_assignment(*Context, toSolverExpr<BtorExpr>(*Exp).Expr);
 }
 
-SMTExprRef BtorSolver::getArrayElement(const SMTExprRef &Array,
-                                       const SMTExprRef &Index) {
+SMTExprRef BtorSolver::getArrayElementImpl(const SMTExprRef &Array,
+                                           const SMTExprRef &Index) {
   // Boolector is weird here, it returns the elements and binary strings
   // so we need to parse the array and create the appropriate Expr
   uint32_t size;
@@ -423,13 +445,14 @@ SMTExprRef BtorSolver::getArrayElement(const SMTExprRef &Array,
   return SMTSolverImpl::mkFPFromBin(bv, elementSort->getFPExponentWidth());
 }
 
-SMTExprRef BtorSolver::mkBool(const bool b) {
+SMTExprRef BtorSolver::mkBoolImpl(const bool b) {
   return newExprRef(
       BtorExpr(Context, mkBoolSort(),
                b ? boolector_true(*Context) : boolector_false(*Context)));
 }
 
-SMTExprRef BtorSolver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
+SMTExprRef BtorSolver::mkBVFromDecImpl(const int64_t Int,
+                                       const SMTSortRef &Sort) {
   // Prevent creating a bitvector with size greater than the bitwidth
   uint64_t newInt =
       static_cast<uint64_t>(Int) & ((1ULL << Sort->getWidth()) - 1);
@@ -440,13 +463,13 @@ SMTExprRef BtorSolver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
                                 std::to_string(newInt).c_str())));
 }
 
-SMTExprRef BtorSolver::mkBVFromBin(const std::string &Int,
-                                   const SMTSortRef &Sort) {
+SMTExprRef BtorSolver::mkBVFromBinImpl(const std::string &Int,
+                                       const SMTSortRef &Sort) {
   return newExprRef(
       BtorExpr(Context, Sort, boolector_const(*Context, Int.c_str())));
 }
 
-SMTExprRef BtorSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
+SMTExprRef BtorSolver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
   auto it = SymbolTable.find(Name);
   if (it != SymbolTable.end())
     return it->second;
@@ -468,8 +491,8 @@ SMTExprRef BtorSolver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
   return inserted.first->second;
 }
 
-SMTExprRef BtorSolver::mkArrayConst(const SMTSortRef &IndexSort,
-                                    const SMTExprRef &InitValue) {
+SMTExprRef BtorSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
+                                        const SMTExprRef &InitValue) {
   SMTSortRef sort = mkArraySort(IndexSort, InitValue->Sort);
   return newExprRef(BtorExpr(
       Context, sort,
@@ -477,7 +500,7 @@ SMTExprRef BtorSolver::mkArrayConst(const SMTSortRef &IndexSort,
                             toSolverExpr<BtorExpr>(*InitValue).Expr)));
 }
 
-checkResult BtorSolver::check() {
+checkResult BtorSolver::checkImpl() {
   int res = boolector_sat(*Context);
   if (res == BOOLECTOR_SAT)
     return checkResult::SAT;
@@ -488,7 +511,7 @@ checkResult BtorSolver::check() {
   return checkResult::UNKNOWN;
 }
 
-void BtorSolver::reset() {
+void BtorSolver::resetImpl() {
   SymbolTable.clear();
 
   // Delete
@@ -502,9 +525,9 @@ void BtorSolver::reset() {
   boolector_set_opt(*Context, BTOR_OPT_AUTO_CLEANUP, 1);
 }
 
-void BtorSolver::dump() { boolector_dump_smt2(*Context, stderr); }
+void BtorSolver::dumpImpl() { boolector_dump_smt2(*Context, stderr); }
 
-void BtorSolver::dumpModel() {
+void BtorSolver::dumpModelImpl() {
   boolector_print_model(*Context, const_cast<char *>("smt2"), stderr);
 }
 

@@ -62,19 +62,19 @@ Z3Solver::Z3Solver(Z3ContextRef C, const z3::solver &S)
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }
 
-void Z3Solver::addConstraint(const SMTExprRef &Exp) {
+void Z3Solver::addConstraintImpl(const SMTExprRef &Exp) {
   Solver.add(toSolverExpr<Z3Expr>(*Exp).Expr);
 }
 
-SMTExprRef Z3Solver::newExprRef(const SMTExpr &Exp) const {
+SMTExprRef Z3Solver::newExprRefImpl(const SMTExpr &Exp) const {
   return std::make_shared<Z3Expr>(toSolverExpr<Z3Expr>(Exp));
 }
 
-SMTSortRef Z3Solver::mkBoolSort() {
+SMTSortRef Z3Solver::mkBoolSortImpl() {
   return newSortRef<SolverBoolSort<Z3Sort>>({Context, Context->bool_sort()});
 }
 
-SMTSortRef Z3Solver::mkBVSort(unsigned BitWidth) {
+SMTSortRef Z3Solver::mkBVSortImpl(unsigned BitWidth) {
   return newSortRef<SolverBVSort<Z3Sort>>(
       {BitWidth, Context, Context->bv_sort(BitWidth)});
 }
@@ -91,245 +91,252 @@ SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
        Context->fpa_sort(ExpWidth, SigWidth + 1)});
 }
 
-SMTSortRef Z3Solver::mkBVFPSort(const unsigned ExpWidth,
-                                const unsigned SigWidth) {
+SMTSortRef Z3Solver::mkBVFPSortImpl(const unsigned ExpWidth,
+                                    const unsigned SigWidth) {
   return newSortRef<SolverFPSort<Z3Sort>>(
       {ExpWidth, SigWidth + 1, Context,
        Context->bv_sort(ExpWidth + SigWidth + 1)});
 }
 
-SMTSortRef Z3Solver::mkBVRMSort() {
+SMTSortRef Z3Solver::mkBVRMSortImpl() {
   return newSortRef<SolverRMSort<Z3Sort>>({Context, Context->bv_sort(3)});
 }
 
-SMTSortRef Z3Solver::mkArraySort(const SMTSortRef &IndexSort,
-                                 const SMTSortRef &ElemSort) {
+SMTSortRef Z3Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
+                                     const SMTSortRef &ElemSort) {
   return newSortRef<SolverArraySort<Z3Sort>>(
       {IndexSort, ElemSort, Context,
        Context->array_sort(toSolverSort<Z3Sort>(*IndexSort).Sort,
                            toSolverSort<Z3Sort>(*ElemSort).Sort)});
 }
 
-SMTExprRef Z3Solver::mkBVNeg(const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVNegImpl(const SMTExprRef &Exp) {
   return newExprRef(
       Z3Expr(Context, Exp->Sort, -toSolverExpr<Z3Expr>(*Exp).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVNot(const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVNotImpl(const SMTExprRef &Exp) {
   return newExprRef(
       Z3Expr(Context, Exp->Sort, ~toSolverExpr<Z3Expr>(*Exp).Expr));
 }
 
-SMTExprRef Z3Solver::mkNot(const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkNotImpl(const SMTExprRef &Exp) {
   return newExprRef(
       Z3Expr(Context, Exp->Sort, !toSolverExpr<Z3Expr>(*Exp).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr +
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVSub(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr -
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVMul(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr *
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVSRem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVSRemImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::srem(toSolverExpr<Z3Expr>(*LHS).Expr,
                                     toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVURem(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVURemImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::urem(toSolverExpr<Z3Expr>(*LHS).Expr,
                                     toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVSDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVSDivImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr /
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVUDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVUDivImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::udiv(toSolverExpr<Z3Expr>(*LHS).Expr,
                                     toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVShl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVShlImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::shl(toSolverExpr<Z3Expr>(*LHS).Expr,
                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVAshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVAshrImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::ashr(toSolverExpr<Z3Expr>(*LHS).Expr,
                                     toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVLshr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVLshrImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::lshr(toSolverExpr<Z3Expr>(*LHS).Expr,
                                     toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr ^
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr |
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr &
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVUltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::ult(toSolverExpr<Z3Expr>(*LHS).Expr,
                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVSltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::slt(toSolverExpr<Z3Expr>(*LHS).Expr,
                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::ugt(toSolverExpr<Z3Expr>(*LHS).Expr,
                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr >
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVUleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::ule(toSolverExpr<Z3Expr>(*LHS).Expr,
                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVSleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::sle(toSolverExpr<Z3Expr>(*LHS).Expr,
                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            z3::uge(toSolverExpr<Z3Expr>(*LHS).Expr,
                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort,
                            toSolverExpr<Z3Expr>(*LHS).Expr >=
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, mkBoolSort(),
                            toSolverExpr<Z3Expr>(*LHS).Expr &&
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, mkBoolSort(),
                            toSolverExpr<Z3Expr>(*LHS).Expr ||
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(
       Context, LHS->Sort,
       z3::to_expr(*Context, Z3_mk_xor(*Context, toSolverExpr<Z3Expr>(*LHS).Expr,
                                       toSolverExpr<Z3Expr>(*RHS).Expr))));
 }
 
-SMTExprRef Z3Solver::mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, mkBoolSort(),
                            toSolverExpr<Z3Expr>(*LHS).Expr ==
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
-SMTExprRef Z3Solver::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
-                           const SMTExprRef &F) {
+SMTExprRef Z3Solver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
+                               const SMTExprRef &F) {
   return newExprRef(Z3Expr(Context, T->Sort,
                            z3::ite(toSolverExpr<Z3Expr>(*Cond).Expr,
                                    toSolverExpr<Z3Expr>(*T).Expr,
                                    toSolverExpr<Z3Expr>(*F).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(Context, mkBVSort(i + Exp->getWidth()),
                            z3::sext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
-SMTExprRef Z3Solver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(Context, mkBVSort(i + Exp->getWidth()),
                            z3::zext(toSolverExpr<Z3Expr>(*Exp).Expr, i)));
 }
 
-SMTExprRef Z3Solver::mkBVExtract(unsigned High, unsigned Low,
-                                 const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVExtractImpl(unsigned High, unsigned Low,
+                                     const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(Context, mkBVSort(High - Low + 1),
                            toSolverExpr<Z3Expr>(*Exp).Expr.extract(High, Low)));
 }
 
-SMTExprRef Z3Solver::mkBVConcat(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+SMTExprRef Z3Solver::mkBVConcatImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
                            z3::concat(toSolverExpr<Z3Expr>(*LHS).Expr,
                                       toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBVRedOr(const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVRedOrImpl(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
       Context, mkBVSort(1),
       z3::to_expr(*Context,
                   Z3_mk_bvredor(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
 }
 
-SMTExprRef Z3Solver::mkBVRedAnd(const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVRedAndImpl(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
       Context, mkBVSort(1),
       z3::to_expr(*Context,
                   Z3_mk_bvredand(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
 }
 
-SMTExprRef Z3Solver::mkArraySelect(const SMTExprRef &Array,
-                                   const SMTExprRef &Index) {
+SMTExprRef Z3Solver::mkArraySelectImpl(const SMTExprRef &Array,
+                                       const SMTExprRef &Index) {
   return newExprRef(Z3Expr(Context, Array->Sort->getElementSort(),
                            z3::select(toSolverExpr<Z3Expr>(*Array).Expr,
                                       toSolverExpr<Z3Expr>(*Index).Expr)));
 }
 
-SMTExprRef Z3Solver::mkArrayStore(const SMTExprRef &Array,
-                                  const SMTExprRef &Index,
-                                  const SMTExprRef &Element) {
+SMTExprRef Z3Solver::mkArrayStoreImpl(const SMTExprRef &Array,
+                                      const SMTExprRef &Index,
+                                      const SMTExprRef &Element) {
   return newExprRef(Z3Expr(Context, Array->Sort,
                            z3::store(toSolverExpr<Z3Expr>(*Array).Expr,
                                      toSolverExpr<Z3Expr>(*Index).Expr,
@@ -466,9 +473,21 @@ SMTExprRef Z3Solver::mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
+SMTExprRef Z3Solver::mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*LHS).Expr >
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
+}
+
 SMTExprRef Z3Solver::mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, mkBoolSort(),
                            toSolverExpr<Z3Expr>(*LHS).Expr <=
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
+}
+
+SMTExprRef Z3Solver::mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*LHS).Expr >=
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
@@ -551,7 +570,7 @@ SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) {
                              toSolverExpr<Z3Expr>(*From).Expr))));
 }
 
-bool Z3Solver::getBool(const SMTExprRef &Exp) {
+bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
   return toSolverExpr<Z3Expr>(*Exp).Expr.bool_value();
 }
 
@@ -566,7 +585,7 @@ static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
                                  toSolverExpr<Z3Expr>(*Exp).Expr.decl())));
 }
 
-std::string Z3Solver::getBVInBin(const SMTExprRef &Exp) {
+std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   SMTExprRef value = hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
   std::string bv;
   bool is_num = toSolverExpr<Z3Expr>(*value).Expr.as_binary(bv);
@@ -593,8 +612,8 @@ std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   return Z3_get_numeral_binary_string(*Context, fp_value);
 }
 
-SMTExprRef Z3Solver::getArrayElement(const SMTExprRef &Array,
-                                     const SMTExprRef &Index) {
+SMTExprRef Z3Solver::getArrayElementImpl(const SMTExprRef &Array,
+                                         const SMTExprRef &Index) {
   SMTExprRef sel = mkArraySelect(Array, Index);
   SMTExprRef value = hasZ3Interp(*this, sel) ? getZ3Interp(*this, sel) : sel;
 
@@ -603,17 +622,18 @@ SMTExprRef Z3Solver::getArrayElement(const SMTExprRef &Array,
              Solver.get_model().eval(toSolverExpr<Z3Expr>(*value).Expr)));
 }
 
-SMTExprRef Z3Solver::mkBool(const bool b) {
+SMTExprRef Z3Solver::mkBoolImpl(const bool b) {
   return newExprRef(Z3Expr(Context, mkBoolSort(), Context->bool_val(b)));
 }
 
-SMTExprRef Z3Solver::mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) {
+SMTExprRef Z3Solver::mkBVFromDecImpl(const int64_t Int,
+                                     const SMTSortRef &Sort) {
   return newExprRef(
       Z3Expr(Context, Sort, Context->bv_val(Int, Sort->getWidth())));
 }
 
-SMTExprRef Z3Solver::mkBVFromBin(const std::string &Int,
-                                 const SMTSortRef &Sort) {
+SMTExprRef Z3Solver::mkBVFromBinImpl(const std::string &Int,
+                                     const SMTSortRef &Sort) {
   std::size_t s = Sort->getWidth();
   bool *newInt = new bool[s];
   for (unsigned int i = 0; i < s; ++i)
@@ -624,7 +644,7 @@ SMTExprRef Z3Solver::mkBVFromBin(const std::string &Int,
   return bv;
 }
 
-SMTExprRef Z3Solver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
+SMTExprRef Z3Solver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
   return newExprRef(Z3Expr(
       Context, Sort,
       Context->constant(Name.c_str(), toSolverSort<Z3Sort>(*Sort).Sort)));
@@ -706,8 +726,8 @@ SMTExprRef Z3Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
                                 *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
 }
 
-SMTExprRef Z3Solver::mkArrayConst(const SMTSortRef &IndexSort,
-                                  const SMTExprRef &InitValue) {
+SMTExprRef Z3Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
+                                      const SMTExprRef &InitValue) {
   SMTSortRef sort = mkArraySort(IndexSort, InitValue->Sort);
   return newExprRef(
       Z3Expr(Context, sort,
@@ -715,7 +735,7 @@ SMTExprRef Z3Solver::mkArrayConst(const SMTSortRef &IndexSort,
                              toSolverExpr<Z3Expr>(*InitValue).Expr)));
 }
 
-checkResult Z3Solver::check() {
+checkResult Z3Solver::checkImpl() {
   z3::check_result res = Solver.check();
   if (res == z3::check_result::sat)
     return checkResult::SAT;
@@ -726,13 +746,13 @@ checkResult Z3Solver::check() {
   return checkResult::UNKNOWN;
 }
 
-void Z3Solver::reset() { Solver.reset(); }
+void Z3Solver::resetImpl() { Solver.reset(); }
 
-void Z3Solver::dump() {
+void Z3Solver::dumpImpl() {
   std::cerr << Z3_solver_to_string(*Context, Solver) << '\n';
 }
 
-void Z3Solver::dumpModel() {
+void Z3Solver::dumpModelImpl() {
   std::cerr << Z3_model_to_string(*Context, Solver.get_model()) << '\n';
 }
 
