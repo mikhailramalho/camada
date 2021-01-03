@@ -48,13 +48,13 @@ public:
   virtual bool isFPSort() const = 0;
 
   /// Returns true if the expr sort is rounding mode
-  virtual bool isRMSort() = 0;
+  virtual bool isRMSort() const = 0;
 
   /// Returns true if the expr sort is array
-  virtual bool isArraySort() = 0;
+  virtual bool isArraySort() const = 0;
 
   /// Returns this expr's sort width
-  unsigned getWidth() { return Sort->getWidth(); }
+  unsigned getWidth() const { return Sort->getWidth(); }
 
   virtual void dump() const;
 
@@ -86,9 +86,9 @@ public:
 
   bool isFPSort() const override { return Sort->isFPSort(); }
 
-  bool isRMSort() override { return Sort->isRMSort(); }
+  bool isRMSort() const override { return Sort->isRMSort(); }
 
-  bool isArraySort() override { return Sort->isArraySort(); }
+  bool isArraySort() const override { return Sort->isArraySort(); }
 
   bool equal_to(SMTExpr const &other) const override = 0;
 };
