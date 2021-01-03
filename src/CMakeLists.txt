@@ -19,7 +19,7 @@ function(compile_solver)
 endfunction()
 
 # Add base implementation
-set(libcamada_src_files camada.cpp camadaexpr.cpp camadasort.cpp camadafp.cpp)
+set(libcamada_src_files camada.cpp camadaexpr.cpp camadasort.cpp camadaimpl.cpp)
 
 # And compile each solver specific implementation, if it is enabled
 compile_solver(${CAMADA_AVAILABLE_SOLVERS})
@@ -56,7 +56,7 @@ function(install_solver_header)
 endfunction()
 
 # Install camada header
-install(FILES camada.h camadasort.h camadaexpr.h camadafp.h DESTINATION include)
+install(FILES camada.h camadasort.h camadaexpr.h camadaimpl.h DESTINATION include)
 
 # And header for each enabled solver
 install_solver_header(${CAMADA_AVAILABLE_SOLVERS})

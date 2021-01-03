@@ -377,11 +377,11 @@ SMTExprRef YicesSolver::getArrayElement(const SMTExprRef &Array,
     return mkBool(getBool(sel));
 
   if (elementSort->isBVSort())
-    return SMTFPSolver::mkBVFromBin(getBVInBin(sel));
+    return SMTSolverImpl::mkBVFromBin(getBVInBin(sel));
 
   assert(elementSort->isFPSort() && "Unknown array element type");
-  return SMTFPSolver::mkFPFromBin(getFPInBin(sel),
-                                  elementSort->getFPExponentWidth());
+  return SMTSolverImpl::mkFPFromBin(getFPInBin(sel),
+                                    elementSort->getFPExponentWidth());
 }
 
 SMTExprRef YicesSolver::mkBool(const bool b) {

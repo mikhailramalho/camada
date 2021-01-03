@@ -22,7 +22,7 @@
 #ifndef Z3SOLVER_H_
 #define Z3SOLVER_H_
 
-#include "camadafp.h"
+#include "camadaimpl.h"
 
 #include <z3++.h>
 
@@ -50,7 +50,7 @@ public:
   void dump() const override;
 }; // end class Z3Expr
 
-class Z3Solver : public SMTFPSolver {
+class Z3Solver : public SMTSolverImpl {
 public:
   Z3ContextRef Context;
 

@@ -412,7 +412,7 @@ SMTExprRef BtorSolver::getArrayElement(const SMTExprRef &Array,
 
   SMTSortRef elementSort = Array->Sort->getElementSort();
   if (elementSort->isBVSort())
-    return SMTFPSolver::mkBVFromBin(bv);
+    return SMTSolverImpl::mkBVFromBin(bv);
 
   if (elementSort->isBoolSort()) {
     char *foo;
@@ -420,7 +420,7 @@ SMTExprRef BtorSolver::getArrayElement(const SMTExprRef &Array,
   }
 
   assert(elementSort->isFPSort() && "Unknown array element type");
-  return SMTFPSolver::mkFPFromBin(bv, elementSort->getFPExponentWidth());
+  return SMTSolverImpl::mkFPFromBin(bv, elementSort->getFPExponentWidth());
 }
 
 SMTExprRef BtorSolver::mkBool(const bool b) {

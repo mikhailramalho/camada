@@ -22,7 +22,7 @@
 #ifndef CVC4SOLVER_H_
 #define CVC4SOLVER_H_
 
-#include "camadafp.h"
+#include "camadaimpl.h"
 
 #include <cvc4/cvc4.h>
 
@@ -50,7 +50,7 @@ public:
   void dump() const override;
 }; // end class CVC4Expr
 
-class CVC4Solver : public SMTFPSolver {
+class CVC4Solver : public SMTSolverImpl {
 public:
   CVC4ContextRef Context;
 
