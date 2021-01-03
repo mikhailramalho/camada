@@ -45,8 +45,8 @@ enum class RM {
 /// through the mk* methods.
 class SMTSolver {
 public:
-  SMTSolver();
-  virtual ~SMTSolver();
+  SMTSolver() = default;
+  virtual ~SMTSolver() = default;
 
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
@@ -71,10 +71,10 @@ public:
                               const unsigned SigWidth) = 0;
 
   /// Convenience method to create a 32 bits long a floating-point sort.
-  SMTSortRef mkFP32Sort() { return mkFPSort(8, 23); }
+  virtual SMTSortRef mkFP32Sort() = 0;
 
   /// Convenience method to create a 64 bits long a floating-point sort.
-  SMTSortRef mkFP64Sort() { return mkFPSort(11, 52); }
+  virtual SMTSortRef mkFP64Sort() = 0;
 
   /// Returns an appropriate array sort.
   virtual SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
@@ -135,14 +135,10 @@ public:
   virtual SMTExprRef mkBVSlt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector unsigned greater-than operation
-  virtual SMTExprRef mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVUle(LHS, RHS));
-  }
+  virtual SMTExprRef mkBVUgt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector signed greater-than operation
-  virtual SMTExprRef mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVSle(LHS, RHS));
-  }
+  virtual SMTExprRef mkBVSgt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector unsigned less-equal-than operation
   virtual SMTExprRef mkBVUle(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
@@ -151,14 +147,10 @@ public:
   virtual SMTExprRef mkBVSle(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector unsigned greater-equal-than operation
-  virtual SMTExprRef mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVUlt(LHS, RHS));
-  }
+  virtual SMTExprRef mkBVUge(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector signed greater-equal-than operation
-  virtual SMTExprRef mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVSlt(LHS, RHS));
-  }
+  virtual SMTExprRef mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a boolean not operation
   virtual SMTExprRef mkNot(const SMTExprRef &Exp) = 0;
@@ -173,9 +165,7 @@ public:
   virtual SMTExprRef mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a boolean xor operation
-  virtual SMTExprRef mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
-  }
+  virtual SMTExprRef mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a boolean ite operation
   virtual SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -196,18 +186,10 @@ public:
                                 const SMTExprRef &RHS) = 0;
 
   /// Creates a bitvector reduction-or operation
-  virtual SMTExprRef mkBVRedOr(const SMTExprRef &Exp) {
-    // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
-    return mkIte(mkNot(comp), mkBVFromDec(1, 1), mkBVFromDec(0, 1));
-  }
+  virtual SMTExprRef mkBVRedOr(const SMTExprRef &Exp) = 0;
 
   /// Creates a bitvector reduction-and operation
-  virtual SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) {
-    // bvredand = bvcomp(x,-1) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
-    return mkIte(comp, mkBVFromDec(1, 1), mkBVFromDec(0, 1));
-  }
+  virtual SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) = 0;
 
   /// Creates a floating-point absolute operation
   virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) = 0;
@@ -260,17 +242,13 @@ public:
   virtual SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point greater-than operation
-  virtual SMTExprRef mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkFPLt(RHS, LHS);
-  }
+  virtual SMTExprRef mkFPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point less-than-or-equal operation
   virtual SMTExprRef mkFPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point greater-than-or-equal operation
-  virtual SMTExprRef mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkFPLt(RHS, LHS));
-  }
+  virtual SMTExprRef mkFPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point equality operation
   virtual SMTExprRef mkFPEqual(const SMTExprRef &LHS,
@@ -319,7 +297,7 @@ public:
 
   /// If a model is available, returns the value of a given bitvector
   /// symbol as a 64-bits int
-  int64_t getBV(const SMTExprRef &Exp);
+  virtual int64_t getBV(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given bitvector
   /// symbol as a 2-complement form binary string
@@ -334,13 +312,13 @@ public:
   /// symbol as float. We assume the floating-point is using the IEEE-754
   /// format: 1 bit for the sign + 8 bits for the exponent + 23 bits for the
   /// significand and 1 hidden bit in the significand
-  float getFP32(const SMTExprRef &Exp);
+  virtual float getFP32(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given floating-point
   /// symbol as double. We assume the floating-point is using the IEEE-754
   /// format: 1 bit for the sign + 11 bits for the exponent + 52 bits for the
   /// significand and 1 hidden bit in the significand
-  double getFP64(const SMTExprRef &Exp);
+  virtual double getFP64(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the Expr in position Index of Array
   virtual SMTExprRef getArrayElement(const SMTExprRef &Array,
@@ -354,9 +332,7 @@ public:
 
   /// Convinience method to create a bitvector from an integer in base 10 and
   /// its bitwidth
-  SMTExprRef mkBVFromDec(const int64_t Int, unsigned BitWidth) {
-    return mkBVFromDec(Int, mkBVSort(BitWidth));
-  }
+  virtual SMTExprRef mkBVFromDec(const int64_t Int, unsigned BitWidth) = 0;
 
   /// Constructs an SMTExprRef from an integer in base 2 and its sort
   virtual SMTExprRef mkBVFromBin(const std::string &Int,
@@ -364,14 +340,10 @@ public:
 
   /// Convinience method to create a bitvector from an integer in base 2 and
   /// its bitwidth
-  SMTExprRef mkBVFromBin(const std::string &Int, unsigned BitWidth) {
-    return mkBVFromBin(Int, mkBVSort(BitWidth));
-  }
+  virtual SMTExprRef mkBVFromBin(const std::string &Int, unsigned BitWidth) = 0;
 
   /// Convinience method to create a bitvector from an integer in base 2
-  SMTExprRef mkBVFromBin(const std::string &Int) {
-    return mkBVFromBin(Int, Int.length());
-  }
+  virtual SMTExprRef mkBVFromBin(const std::string &Int) = 0;
 
   /// Creates a new symbol, given a name and a sort
   virtual SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) = 0;
@@ -383,12 +355,12 @@ public:
   /// Constructs an SMTExprRef from a float. We assume the floating-point is
   /// using the IEEE-754 format: 1 bit for the sign + 8 bits for the exponent +
   /// 23 bits for the significand and 1 hidden bit in the significand
-  SMTExprRef mkFP32(const float Float);
+  virtual SMTExprRef mkFP32(const float Float) = 0;
 
   /// Constructs an SMTExprRef from a double.  We assume the floating-point is
   /// using the IEEE-754 format: 1 bit for the sign + 11 bits for the exponent +
   /// 52 bits for the significand and 1 hidden bit in the significand
-  SMTExprRef mkFP64(const double Double);
+  virtual SMTExprRef mkFP64(const double Double) = 0;
 
   /// Returns an appropriate floating-point rounding mode.
   virtual SMTExprRef mkRM(const RM &R) = 0;
@@ -398,20 +370,20 @@ public:
                            const unsigned SigWidth) = 0;
 
   /// Convenience method to create 32 bits long NaN
-  SMTExprRef mkNaN32(const bool Sgn) { return mkNaN(Sgn, 8, 23); }
+  virtual SMTExprRef mkNaN32(const bool Sgn) = 0;
 
   /// Convenience method to create 64 bits long NaN
-  SMTExprRef mkNaN64(const bool Sgn) { return mkNaN(Sgn, 11, 52); }
+  virtual SMTExprRef mkNaN64(const bool Sgn) = 0;
 
   /// Returns a Inf floating-point
   virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
                            const unsigned SigWidth) = 0;
 
   /// Convenience method to create 32 bits long Inf
-  SMTExprRef mkInf32(const bool Sgn) { return mkInf(Sgn, 8, 23); }
+  virtual SMTExprRef mkInf32(const bool Sgn) = 0;
 
   /// Convenience method to create 64 bits long Inf
-  SMTExprRef mkInf64(const bool Sgn) { return mkInf(Sgn, 11, 52); }
+  virtual SMTExprRef mkInf64(const bool Sgn) = 0;
 
   /// Creates an array and initializes all elements to InitValue
   virtual SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
@@ -431,10 +403,10 @@ public:
   virtual void reset() = 0;
 
   /// Dump formula
-  virtual void dump();
+  virtual void dump() = 0;
 
   /// Dump Model
-  virtual void dumpModel();
+  virtual void dumpModel() = 0;
 
 protected:
   /// Flag to enable encoding floating-points using bitvectors even if the
