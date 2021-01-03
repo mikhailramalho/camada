@@ -338,7 +338,7 @@ SMTExprRef STPSolver::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
 }
 
 SMTExprRef STPSolver::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
-  SMTExprRef z = SMTFPSolver::mkBVFromDec(0, i);
+  SMTExprRef z = SMTSolverImpl::mkBVFromDec(0, i);
   return mkBVConcat(z, Exp);
 }
 
@@ -401,11 +401,11 @@ SMTExprRef STPSolver::getArrayElement(const SMTExprRef &Array,
     return mkBool(getBool(sel));
 
   if (elementSort->isBVSort())
-    return SMTFPSolver::mkBVFromBin(getBVInBin(sel));
+    return SMTSolverImpl::mkBVFromBin(getBVInBin(sel));
 
   assert(elementSort->isFPSort() && "Unknown array element type");
-  return SMTFPSolver::mkFPFromBin(getFPInBin(sel),
-                                  elementSort->getFPExponentWidth());
+  return SMTSolverImpl::mkFPFromBin(getFPInBin(sel),
+                                    elementSort->getFPExponentWidth());
 }
 
 SMTExprRef STPSolver::mkBool(const bool b) {

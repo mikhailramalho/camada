@@ -22,7 +22,7 @@
 #ifndef STPSOLVER_H_
 #define STPSOLVER_H_
 
-#include "camadafp.h"
+#include "camadaimpl.h"
 
 namespace STP {
 #include <c_interface.h>
@@ -52,7 +52,7 @@ public:
   void dump() const override;
 }; // end class STPExpr
 
-class STPSolver : public SMTFPSolver {
+class STPSolver : public SMTSolverImpl {
 public:
   STPContextRef Context;
 

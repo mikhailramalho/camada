@@ -449,10 +449,6 @@ protected:
 
   /// Returns an appropriate rounding mode sort, encoded as a bitvector.
   virtual SMTSortRef mkBVRMSort() = 0;
-
-  /// Hidden implementation of SMTSolver
-  class SMTSolverImpl;
-  std::unique_ptr<SMTSolverImpl> pImpl;
 };
 
 /// Shared pointer for SMTSolvers.

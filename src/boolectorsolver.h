@@ -22,7 +22,7 @@
 #ifndef BOOLECTORSOLVER_H_
 #define BOOLECTORSOLVER_H_
 
-#include "camadafp.h"
+#include "camadaimpl.h"
 
 #include <unordered_map>
 
@@ -48,7 +48,7 @@ public:
   void dump() const override;
 }; // end class BtorExpr
 
-class BtorSolver : public SMTFPSolver {
+class BtorSolver : public SMTSolverImpl {
 public:
   BtorContextRef Context;
 

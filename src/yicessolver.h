@@ -22,7 +22,7 @@
 #ifndef YICESSOLVER_H_
 #define YICESSOLVER_H_
 
-#include "camadafp.h"
+#include "camadaimpl.h"
 
 #include <unordered_map>
 #include <vector>
@@ -52,7 +52,7 @@ public:
   void dump() const override;
 }; // end class YicesExpr
 
-class YicesSolver : public SMTFPSolver {
+class YicesSolver : public SMTSolverImpl {
 public:
   YicesContextRef Context;
 

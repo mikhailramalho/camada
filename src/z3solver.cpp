@@ -631,9 +631,9 @@ SMTExprRef Z3Solver::mkSymbol(const std::string &Name, SMTSortRef Sort) {
 }
 
 SMTExprRef Z3Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
-  SMTExprRef sgn = SMTFPSolver::mkBVFromBin({FP[0]});
-  SMTExprRef exp = SMTFPSolver::mkBVFromBin(FP.substr(1, EWidth));
-  SMTExprRef sig = SMTFPSolver::mkBVFromBin(FP.substr(1 + EWidth));
+  SMTExprRef sgn = SMTSolverImpl::mkBVFromBin({FP[0]});
+  SMTExprRef exp = SMTSolverImpl::mkBVFromBin(FP.substr(1, EWidth));
+  SMTExprRef sig = SMTSolverImpl::mkBVFromBin(FP.substr(1 + EWidth));
 
   return newExprRef(
       Z3Expr(Context, mkFPSort(EWidth, FP.length() - EWidth - 1),
