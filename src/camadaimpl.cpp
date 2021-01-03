@@ -21,8 +21,11 @@
 
 #include "camadaimpl.h"
 
+#include <bitset>
 #include <cassert>
 #include <cmath>
+#include <cstring>
+#include <iostream>
 
 using namespace camada;
 
@@ -2035,4 +2038,67 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
 
   return mkBVToIEEEFP(mkBVConcat(Sgn, mkBVConcat(Exp, Sig)),
                       mkFPSort(EWidth, SWidth - 1));
+}
+
+int64_t SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
+  const std::string bv = getBVInBin(Exp);
+  char *buffer_end;
+  uint64_t res = std::strtoull(bv.c_str(), &buffer_end, 2);
+  if (res & (1ULL << (Exp->getWidth() - 1)))
+    res |= ~((1ULL << Exp->getWidth()) - 1);
+  return res;
+}
+
+template <typename FPType, typename IntType>
+static inline FPType IntAsFP(const IntType Int) {
+  // Convert the integer to float/double
+  // We assume that floats are 32 bits long and doubles are 64 bits long
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
+  FPType IntAsFP;
+  memcpy(&IntAsFP, &Int, sizeof(IntType));
+  return IntAsFP;
+}
+
+float SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
+  char *buffer_end = nullptr;
+  return IntAsFP<float, uint32_t>(
+      std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));
+}
+
+double SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
+  char *buffer_end = nullptr;
+  return IntAsFP<double, uint64_t>(
+      std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));
+}
+
+template <typename FPType, typename IntType>
+static inline IntType FPAsInt(const FPType FP) {
+  // Convert the integer to float/double
+  // We assume that floats are 32 bits long and doubles are 64 bits long
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
+  IntType FPAsInt;
+  memcpy(&FPAsInt, &FP, sizeof(FPType));
+  return FPAsInt;
+}
+
+camada::SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float) {
+  uint32_t fp = FPAsInt<float, uint32_t>(Float);
+  return mkFPFromBin(std::bitset<32>(fp).to_string(), 8);
+}
+
+camada::SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double) {
+  uint64_t fp = FPAsInt<double, uint64_t>(Double);
+  return mkFPFromBin(std::bitset<64>(fp).to_string(), 11);
+}
+
+void SMTSolverImpl::dumpImpl() {
+  std::cerr << "SMTSolver dump not implemented.\n";
+}
+
+void SMTSolverImpl::dumpModelImpl() {
+  std::cerr << "SMTSolver model dump not implemented.\n";
 }
