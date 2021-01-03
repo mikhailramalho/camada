@@ -22,7 +22,6 @@
 #include "camadaimpl.h"
 
 #include <bitset>
-#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <iostream>
