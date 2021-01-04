@@ -20,7 +20,7 @@ jobs:
     - name: Setup MathSAT
       run: wget https://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-linux-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-linux-x86_64 mathsat
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests

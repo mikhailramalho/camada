@@ -25,7 +25,7 @@ jobs:
       continue-on-error: true
       run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 85c32d2763e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release && ninja install
     - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
     - name: Build Camada
       run: cd build && cmake --build . && cmake --install .
     - name: Run tests
