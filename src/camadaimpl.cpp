@@ -2041,8 +2041,7 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
 
 int64_t SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
   const std::string bv = getBVInBin(Exp);
-  char *buffer_end;
-  uint64_t res = std::strtoull(bv.c_str(), &buffer_end, 2);
+  uint64_t res = std::strtoull(bv.c_str(), nullptr, 2);
   if (res & (1ULL << (Exp->getWidth() - 1)))
     res |= ~((1ULL << Exp->getWidth()) - 1);
   return res;
@@ -2061,15 +2060,13 @@ static inline FPType IntAsFP(const IntType Int) {
 }
 
 float SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
-  char *buffer_end = nullptr;
   return IntAsFP<float, uint32_t>(
-      std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));
+      std::strtol(getFPInBin(Exp).c_str(), nullptr, 2));
 }
 
 double SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
-  char *buffer_end = nullptr;
   return IntAsFP<double, uint64_t>(
-      std::strtol(getFPInBin(Exp).c_str(), &buffer_end, 2));
+      std::strtol(getFPInBin(Exp).c_str(), nullptr, 2));
 }
 
 template <typename FPType, typename IntType>
