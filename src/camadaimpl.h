@@ -25,6 +25,7 @@
 #include "camada.h"
 
 #include <cassert>
+#include <string>
 
 namespace camada {
 
