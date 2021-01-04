@@ -808,7 +808,7 @@ SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &RM) {
   assert(a_sig->getWidth() == sbits);
   assert(a_exp->getWidth() == ebits);
 
-  SMTExprRef res_sgn = zero1;
+  const SMTExprRef res_sgn = zero1;
 
   SMTExprRef real_exp = mkBVSub(mkBVSignExt(1, a_exp), mkBVZeroExt(1, a_lz));
   SMTExprRef res_exp = mkBVSignExt(2, mkBVExtract(ebits, 1, real_exp));
