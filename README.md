@@ -14,4 +14,4 @@
 | [Yices](https://yices.csl.sri.com/)      |  2.6.1          | ![Linux Yices Build](https://github.com/mikhailramalho/camada/workflows/Linux%20Yices%20Build/badge.svg) | ![MacOS Yices Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20Yices%20Build/badge.svg) |
 | [Z3](https://github.com/Z3Prover/z3)         |  4.8.9          | ![Linux Z3 Build](https://github.com/mikhailramalho/camada/workflows/Linux%20Z3%20Build/badge.svg) | ![MacOS Z3 Build](https://github.com/mikhailramalho/camada/workflows/MacOS%20Z3%20Build/badge.svg) |
 
-\* At least commit [1d0353a](https://github.com/stp/stp/commit/1d0353aa5a745d2cee81c51a6450136e40514d21)
+\* At least commit [9a59a72e](https://github.com/stp/stp/commit/9a59a72e82d67cefeb88d8baa34965f70acb5d1c)
