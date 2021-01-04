@@ -73,7 +73,7 @@ camada::SMTSortRef camada::SMTSort::getElementSort() const {
   __builtin_unreachable();
 }
 
-bool camada::SMTSort::operator==(camada::SMTSort const &Other) {
+bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
   if (isBoolSort() && Other.isBoolSort())
     return true;
 

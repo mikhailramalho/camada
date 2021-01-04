@@ -74,7 +74,7 @@ public:
 
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
-  bool operator==(SMTSort const &Other);
+  bool operator==(SMTSort const &Other) const;
 
   virtual void dump() const;
 };
