@@ -19,16 +19,16 @@
  *
  **************************************************************************/
 
-#include "stpsolver.h"
 #include "ac_config.h"
+#ifdef SOLVER_STP_ENABLED
+
+#include "stpsolver.h"
 
 #include <algorithm>
 #include <cassert>
 #include <iostream>
 
-using namespace camada;
-
-#ifdef SOLVER_STP_ENABLED
+namespace camada {
 
 unsigned STPSort::getWidthFromSolver() const {
   return STP::vc_getValueSize(*Context, Sort);
@@ -511,5 +511,7 @@ void STPSolver::dumpModelImpl() {
   std::cerr << buf << '\n';
   free(buf);
 }
+
+} // namespace camada
 
 #endif

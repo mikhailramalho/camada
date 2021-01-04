@@ -19,15 +19,15 @@
  *
  **************************************************************************/
 
-#include "yicessolver.h"
 #include "ac_config.h"
+#ifdef SOLVER_YICES_ENABLED
+
+#include "yicessolver.h"
 
 #include <cassert>
 #include <iostream>
 
-using namespace camada;
-
-#ifdef SOLVER_YICES_ENABLED
+namespace camada {
 
 unsigned YicesSort::getWidthFromSolver() const {
   return yices_bvtype_size(Sort);
@@ -504,5 +504,7 @@ void YicesSolver::dumpModelImpl() {
   std::cerr << model_str << '\n';
   yices_free_string(model_str);
 }
+
+} // namespace camada
 
 #endif

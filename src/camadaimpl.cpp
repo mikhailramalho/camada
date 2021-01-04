@@ -26,7 +26,7 @@
 #include <cstring>
 #include <iostream>
 
-using namespace camada;
+namespace camada {
 
 static inline SMTExprRef extractSgn(SMTSolver &S, const SMTExprRef &Exp) {
   return S.mkBVExtract(Exp->getWidth() - 1, Exp->getWidth() - 1, Exp);
@@ -2101,3 +2101,5 @@ void SMTSolverImpl::dumpImpl() {
 void SMTSolverImpl::dumpModelImpl() {
   std::cerr << "SMTSolver model dump not implemented.\n";
 }
+
+} // namespace camada

@@ -19,12 +19,12 @@
  *
  **************************************************************************/
 
-#include "z3solver.h"
 #include "ac_config.h"
-
-using namespace camada;
-
 #ifdef SOLVER_Z3_ENABLED
+
+#include "z3solver.h"
+
+namespace camada {
 
 unsigned Z3Sort::getWidthFromSolver() const {
   if (Sort.is_bv())
@@ -763,5 +763,7 @@ void Z3Solver::dumpImpl() {
 void Z3Solver::dumpModelImpl() {
   std::cerr << Z3_model_to_string(*Context, Solver.get_model()) << '\n';
 }
+
+} // namespace camada
 
 #endif

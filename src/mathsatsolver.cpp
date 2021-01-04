@@ -19,16 +19,16 @@
  *
  **************************************************************************/
 
-#include "mathsatsolver.h"
 #include "ac_config.h"
+#ifdef SOLVER_MATHSAT_ENABLED
+
+#include "mathsatsolver.h"
 
 #include <cassert>
 #include <gmp.h>
 #include <iostream>
 
-using namespace camada;
-
-#ifdef SOLVER_MATHSAT_ENABLED
+namespace camada {
 
 unsigned MathSATSort::getWidthFromSolver() const {
   std::size_t w;
@@ -768,5 +768,7 @@ void MathSATSolver::dumpModelImpl() {
   }
   msat_destroy_model_iterator(iter);
 }
+
+} // namespace camada
 
 #endif

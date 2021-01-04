@@ -19,12 +19,12 @@
  *
  **************************************************************************/
 
-#include "cvc4solver.h"
 #include "ac_config.h"
-
-using namespace camada;
-
 #ifdef SOLVER_CVC4_ENABLED
+
+#include "cvc4solver.h"
+
+namespace camada {
 
 unsigned CVC4Sort::getWidthFromSolver() const {
   if (Sort.isBitVector()) {
@@ -826,5 +826,7 @@ void CVC4Solver::dumpImpl() {
 }
 
 void CVC4Solver::dumpModelImpl() { Solver.printSynthSolution(std::cerr); }
+
+} // namespace camada
 
 #endif

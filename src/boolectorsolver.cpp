@@ -19,14 +19,14 @@
  *
  **************************************************************************/
 
-#include "boolectorsolver.h"
 #include "ac_config.h"
+#ifdef SOLVER_BOOLECTOR_ENABLED
+
+#include "boolectorsolver.h"
 
 #include <cassert>
 
-using namespace camada;
-
-#ifdef SOLVER_BOOLECTOR_ENABLED
+namespace camada {
 
 unsigned BtorSort::getWidthFromSolver() const {
   return boolector_bitvec_sort_get_width(*Context, Sort);
@@ -534,5 +534,7 @@ void BtorSolver::dumpImpl() { boolector_dump_smt2(*Context, stderr); }
 void BtorSolver::dumpModelImpl() {
   boolector_print_model(*Context, const_cast<char *>("smt2"), stderr);
 }
+
+} // namespace camada
 
 #endif
