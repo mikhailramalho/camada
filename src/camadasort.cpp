@@ -36,7 +36,7 @@ void camada::SMTSort::dump() const {
     k = "Floating-point";
 
   std::cerr << "kind: " << k << '\n';
-  std::cerr << "width: " << getWidth();
+  std::cerr << "width: " << getWidth() << ", solver: " << getWidthFromSolver();
   if (isFPSort())
     std::cerr << " (exp: " << getFPExponentWidth()
               << ", sig: " << getFPSignificandWidth() << ")";
