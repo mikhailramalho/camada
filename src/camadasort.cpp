@@ -28,6 +28,8 @@ void camada::SMTSort::dump() const {
   std::string k;
   if (isBoolSort())
     k = "Bool";
+  else if (isBVSort() && isFPSort())
+    k = "BV Floating-point";
   else if (isBVSort())
     k = "Bitvector";
   else if (isRMSort())

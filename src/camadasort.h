@@ -159,6 +159,44 @@ public:
 };
 
 template <typename SolverSortBase>
+class SolverBVFPSort : public SolverSortBase {
+public:
+  unsigned ExpWidth;
+  unsigned SigWidth;
+
+  SolverBVFPSort(unsigned EW, unsigned SW,
+                 typename SolverSortBase::ContextType C,
+                 typename SolverSortBase::SortType S)
+      : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
+  ~SolverBVFPSort() override = default;
+
+  bool isFPSort() const override { return true; }
+
+  bool isBVSort() const override { return true; }
+
+  unsigned getWidth() const override { return 1 + ExpWidth + SigWidth; }
+
+  unsigned getFPSignificandWidth() const override { return SigWidth; }
+
+  unsigned getFPExponentWidth() const override { return ExpWidth; }
+};
+
+template <typename SolverSortBase>
+class SolverBVRMSort : public SolverSortBase {
+public:
+  SolverBVRMSort(typename SolverSortBase::ContextType C,
+                 typename SolverSortBase::SortType S)
+      : SolverSortBase(C, S) {}
+  ~SolverBVRMSort() override = default;
+
+  unsigned getWidth() const override { return 3; }
+
+  bool isBVSort() const override { return true; }
+
+  bool isRMSort() const override { return true; }
+};
+
+template <typename SolverSortBase>
 class SolverArraySort : public SolverSortBase {
 public:
   SMTSortRef IndexSort;
