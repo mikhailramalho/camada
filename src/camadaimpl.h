@@ -729,7 +729,7 @@ public:
                             ? SMTSolverImpl::mkNaNImpl(Sgn, ExpWidth, SigWidth)
                             : mkNaNImpl(Sgn, ExpWidth, SigWidth);
     assert(theExp->isFPSort());
-    assert(theExp->getWidth() == (Sgn + ExpWidth + SigWidth));
+    assert(theExp->getWidth() == (1 + ExpWidth + SigWidth));
     return theExp;
   }
 
@@ -743,7 +743,7 @@ public:
                             ? SMTSolverImpl::mkInfImpl(Sgn, ExpWidth, SigWidth)
                             : mkInfImpl(Sgn, ExpWidth, SigWidth);
     assert(theExp->isFPSort());
-    assert(theExp->getWidth() == (Sgn + ExpWidth + SigWidth));
+    assert(theExp->getWidth() == (1 + ExpWidth + SigWidth));
     return theExp;
   }
 
