@@ -232,7 +232,7 @@ SMTExprRef STPSolver::mkBVOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 SMTExprRef STPSolver::mkBVAndImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_bvAndExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                 toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -240,7 +240,7 @@ SMTExprRef STPSolver::mkBVAndImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVUltImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_bvLtExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -248,7 +248,7 @@ SMTExprRef STPSolver::mkBVUltImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVSltImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_sbvLtExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                 toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -256,7 +256,7 @@ SMTExprRef STPSolver::mkBVSltImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVUgtImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_bvGtExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -264,7 +264,7 @@ SMTExprRef STPSolver::mkBVUgtImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVSgtImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_sbvGtExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                 toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -272,7 +272,7 @@ SMTExprRef STPSolver::mkBVSgtImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVUleImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_bvLeExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -280,7 +280,7 @@ SMTExprRef STPSolver::mkBVUleImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVSleImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_sbvLeExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                 toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -288,7 +288,7 @@ SMTExprRef STPSolver::mkBVSleImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVUgeImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_bvGeExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                toSolverExpr<STPExpr>(*RHS).Expr)));
 }
@@ -296,7 +296,7 @@ SMTExprRef STPSolver::mkBVUgeImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkBVSgeImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, LHS->Sort,
+      STPExpr(Context, mkBoolSort(),
               STP::vc_sbvGeExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                 toSolverExpr<STPExpr>(*RHS).Expr)));
 }

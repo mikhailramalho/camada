@@ -220,7 +220,7 @@ SMTExprRef YicesSolver::mkBVAndImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVUltImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvlt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -228,7 +228,7 @@ SMTExprRef YicesSolver::mkBVUltImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVSltImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvslt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                  toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -236,7 +236,7 @@ SMTExprRef YicesSolver::mkBVSltImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVUgtImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvgt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -244,7 +244,7 @@ SMTExprRef YicesSolver::mkBVUgtImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVSgtImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvsgt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                  toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -252,7 +252,7 @@ SMTExprRef YicesSolver::mkBVSgtImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVUleImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvle_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -260,7 +260,7 @@ SMTExprRef YicesSolver::mkBVUleImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVSleImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvsle_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                  toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -268,7 +268,7 @@ SMTExprRef YicesSolver::mkBVSleImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVUgeImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvge_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                 toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
@@ -276,7 +276,7 @@ SMTExprRef YicesSolver::mkBVUgeImpl(const SMTExprRef &LHS,
 SMTExprRef YicesSolver::mkBVSgeImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      YicesExpr(Context, LHS->Sort,
+      YicesExpr(Context, mkBoolSort(),
                 yices_bvsge_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                  toSolverExpr<YicesExpr>(*RHS).Expr)));
 }

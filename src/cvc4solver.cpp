@@ -243,7 +243,7 @@ SMTExprRef CVC4Solver::mkBVAndImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVUltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_ULT,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -252,7 +252,7 @@ SMTExprRef CVC4Solver::mkBVUltImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVSltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_SLT,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -261,7 +261,7 @@ SMTExprRef CVC4Solver::mkBVSltImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVUgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_UGT,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -270,7 +270,7 @@ SMTExprRef CVC4Solver::mkBVUgtImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVSgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_SGT,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -279,7 +279,7 @@ SMTExprRef CVC4Solver::mkBVSgtImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVUleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_ULE,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -288,7 +288,7 @@ SMTExprRef CVC4Solver::mkBVUleImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVSleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_SLE,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -297,7 +297,7 @@ SMTExprRef CVC4Solver::mkBVSleImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVUgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_UGE,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -306,7 +306,7 @@ SMTExprRef CVC4Solver::mkBVUgeImpl(const SMTExprRef &LHS,
 SMTExprRef CVC4Solver::mkBVSgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
+      CVC4Expr(Context, mkBoolSort(),
                Context->mkExpr(CVC4::kind::BITVECTOR_SGE,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
