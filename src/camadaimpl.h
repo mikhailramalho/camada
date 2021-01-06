@@ -335,11 +335,12 @@ public:
 
   SMTExprRef mkBVExtract(unsigned High, unsigned Low,
                          const SMTExprRef &Exp) final {
-    assert(Exp->isBVSort());
     assert(High >= Low);
     assert(High <= Exp->getWidth());
     assert(Low <= Exp->getWidth());
-    SMTExprRef theExp = mkBVExtractImpl(High, Low, Exp);
+    SMTExprRef theExp = Exp->isBVSort()
+                            ? mkBVExtractImpl(High, Low, Exp)
+                            : mkBVExtractImpl(High, Low, mkIEEEFPToBV(Exp));
     assert(theExp->getWidth() == (High - Low + 1));
     return theExp;
   }
