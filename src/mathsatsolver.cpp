@@ -262,7 +262,7 @@ SMTExprRef MathSATSolver::mkBVAndImpl(const SMTExprRef &LHS,
 SMTExprRef MathSATSolver::mkBVUltImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
+      Context, mkBoolSort(),
       msat_make_bv_ult(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
                        toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
@@ -270,7 +270,7 @@ SMTExprRef MathSATSolver::mkBVUltImpl(const SMTExprRef &LHS,
 SMTExprRef MathSATSolver::mkBVSltImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
+      Context, mkBoolSort(),
       msat_make_bv_slt(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
                        toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
@@ -278,7 +278,7 @@ SMTExprRef MathSATSolver::mkBVSltImpl(const SMTExprRef &LHS,
 SMTExprRef MathSATSolver::mkBVUleImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
+      Context, mkBoolSort(),
       msat_make_bv_uleq(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
                         toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
@@ -286,7 +286,7 @@ SMTExprRef MathSATSolver::mkBVUleImpl(const SMTExprRef &LHS,
 SMTExprRef MathSATSolver::mkBVSleImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
+      Context, mkBoolSort(),
       msat_make_bv_sleq(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
                         toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }

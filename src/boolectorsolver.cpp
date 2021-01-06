@@ -225,7 +225,7 @@ SMTExprRef BtorSolver::mkBVAndImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVUltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_ult(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -233,7 +233,7 @@ SMTExprRef BtorSolver::mkBVUltImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVSltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_slt(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -241,7 +241,7 @@ SMTExprRef BtorSolver::mkBVSltImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVUgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_ugt(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -249,7 +249,7 @@ SMTExprRef BtorSolver::mkBVUgtImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVSgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_sgt(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                              toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -257,7 +257,7 @@ SMTExprRef BtorSolver::mkBVSgtImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVUleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_ulte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -265,7 +265,7 @@ SMTExprRef BtorSolver::mkBVUleImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVSleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_slte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -273,7 +273,7 @@ SMTExprRef BtorSolver::mkBVSleImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVUgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_ugte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
@@ -281,7 +281,7 @@ SMTExprRef BtorSolver::mkBVUgeImpl(const SMTExprRef &LHS,
 SMTExprRef BtorSolver::mkBVSgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      BtorExpr(Context, LHS->Sort,
+      BtorExpr(Context, mkBoolSort(),
                boolector_sgte(*Context, toSolverExpr<BtorExpr>(*LHS).Expr,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }

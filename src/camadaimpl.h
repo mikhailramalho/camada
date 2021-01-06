@@ -211,7 +211,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUltImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
@@ -219,7 +219,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSltImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
@@ -227,7 +227,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUgtImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
@@ -235,7 +235,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSgtImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
@@ -243,7 +243,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUleImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
@@ -251,7 +251,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSleImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
@@ -259,7 +259,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUgeImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
@@ -267,7 +267,7 @@ public:
     assert(LHS->isBVSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSgeImpl(LHS, RHS);
-    assert(theExp->Sort == LHS->Sort);
+    assert(theExp->Sort->isBoolSort());
     return theExp;
   }
 
