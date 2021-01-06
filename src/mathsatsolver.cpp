@@ -120,7 +120,7 @@ SMTSortRef MathSATSolver::mkFPSortImpl(const unsigned ExpWidth,
 SMTSortRef MathSATSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                          const unsigned SigWidth) {
   return newSortRef<SolverBVFPSort<MathSATSort>>(
-      {ExpWidth, SigWidth + 1, Context,
+      {ExpWidth, SigWidth, Context,
        msat_get_bv_type(*Context, ExpWidth + SigWidth + 1)});
 }
 

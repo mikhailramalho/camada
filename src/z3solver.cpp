@@ -102,8 +102,7 @@ SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
 SMTSortRef Z3Solver::mkBVFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   return newSortRef<SolverBVFPSort<Z3Sort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       Context->bv_sort(ExpWidth + SigWidth + 1)});
+      {ExpWidth, SigWidth, Context, Context->bv_sort(ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef Z3Solver::mkBVRMSortImpl() {

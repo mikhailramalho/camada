@@ -86,7 +86,7 @@ SMTSortRef CVC4Solver::mkFPSortImpl(const unsigned ExpWidth,
 SMTSortRef CVC4Solver::mkBVFPSortImpl(const unsigned ExpWidth,
                                       const unsigned SigWidth) {
   return newSortRef<SolverBVFPSort<CVC4Sort>>(
-      {ExpWidth, SigWidth + 1, Context,
+      {ExpWidth, SigWidth, Context,
        Context->mkBitVectorType(ExpWidth + SigWidth + 1)});
 }
 
