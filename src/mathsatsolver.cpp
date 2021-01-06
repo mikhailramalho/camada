@@ -113,7 +113,7 @@ SMTSortRef MathSATSolver::mkRMSortImpl() {
 SMTSortRef MathSATSolver::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
   return newSortRef<SolverFPSort<MathSATSort>>(
-      {ExpWidth, SigWidth + 1, Context,
+      {ExpWidth, SigWidth, Context,
        msat_get_fp_type(*Context, ExpWidth, SigWidth)});
 }
 
