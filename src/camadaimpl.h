@@ -279,7 +279,6 @@ public:
   }
 
   SMTExprRef mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) final {
-    assert(LHS->isBoolSort() || LHS->isBVSort() || LHS->isArraySort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkEqualImpl(LHS, RHS);
     assert(theExp->isBoolSort());
