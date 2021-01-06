@@ -369,7 +369,7 @@ SMTExprRef CVC4Solver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
 SMTExprRef CVC4Solver::mkBVExtractImpl(unsigned High, unsigned Low,
                                        const SMTExprRef &Exp) {
   return newExprRef(CVC4Expr(
-      Context, mkBVSort(Exp->getWidth()),
+      Context, mkBVSort(High - Low + 1),
       Context->mkExpr(CVC4::Kind::BITVECTOR_EXTRACT,
                       Context->mkConst(CVC4::BitVectorExtract(High, Low)),
                       toSolverExpr<CVC4Expr>(*Exp).Expr)));
