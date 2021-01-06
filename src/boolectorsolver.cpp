@@ -82,13 +82,13 @@ SMTSortRef BtorSolver::mkBVSortImpl(unsigned BitWidth) {
 
 SMTSortRef BtorSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                       const unsigned SigWidth) {
-  return newSortRef<SolverFPSort<BtorSort>>(
+  return newSortRef<SolverBVFPSort<BtorSort>>(
       {ExpWidth, SigWidth + 1, Context,
        boolector_bitvec_sort(*Context, ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef BtorSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverRMSort<BtorSort>>(
+  return newSortRef<SolverBVRMSort<BtorSort>>(
       {Context, boolector_bitvec_sort(*Context, 3)});
 }
 

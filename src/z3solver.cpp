@@ -101,13 +101,13 @@ SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
 
 SMTSortRef Z3Solver::mkBVFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  return newSortRef<SolverFPSort<Z3Sort>>(
+  return newSortRef<SolverBVFPSort<Z3Sort>>(
       {ExpWidth, SigWidth + 1, Context,
        Context->bv_sort(ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef Z3Solver::mkBVRMSortImpl() {
-  return newSortRef<SolverRMSort<Z3Sort>>({Context, Context->bv_sort(3)});
+  return newSortRef<SolverBVRMSort<Z3Sort>>({Context, Context->bv_sort(3)});
 }
 
 SMTSortRef Z3Solver::mkArraySortImpl(const SMTSortRef &IndexSort,

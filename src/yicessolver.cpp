@@ -89,13 +89,13 @@ SMTSortRef YicesSolver::mkBVSortImpl(unsigned BitWidth) {
 
 SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return newSortRef<SolverFPSort<YicesSort>>(
+  return newSortRef<SolverBVFPSort<YicesSort>>(
       {ExpWidth, SigWidth + 1, Context,
        yices_bv_type(ExpWidth + SigWidth + 1)});
 }
 
 SMTSortRef YicesSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverRMSort<YicesSort>>({Context, yices_bv_type(3)});
+  return newSortRef<SolverBVRMSort<YicesSort>>({Context, yices_bv_type(3)});
 }
 
 SMTSortRef YicesSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
