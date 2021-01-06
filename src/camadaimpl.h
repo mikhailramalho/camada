@@ -312,7 +312,6 @@ public:
   SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                    const SMTExprRef &F) final {
     assert(Cond->isBoolSort());
-    assert(T->isBVSort() || T->isArraySort());
     assert(T->Sort == F->Sort);
     SMTExprRef theExp = mkIteImpl(Cond, T, F);
     assert(theExp->Sort == F->Sort);
