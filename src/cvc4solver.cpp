@@ -34,7 +34,7 @@ unsigned CVC4Sort::getWidthFromSolver() const {
 
   assert(Sort.isFloatingPoint());
   CVC4::FloatingPointType fpType = static_cast<CVC4::FloatingPointType>(Sort);
-  return 1 + fpType.getExponentSize() + fpType.getSignificandSize();
+  return fpType.getExponentSize() + fpType.getSignificandSize();
 }
 
 void CVC4Sort::dump() const { std::cerr << Sort.toString() << '\n'; }
@@ -79,7 +79,7 @@ SMTSortRef CVC4Solver::mkRMSortImpl() {
 SMTSortRef CVC4Solver::mkFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   return newSortRef<SolverFPSort<CVC4Sort>>(
-      {ExpWidth, SigWidth + 1, Context,
+      {ExpWidth, SigWidth, Context,
        Context->mkFloatingPointType(ExpWidth, SigWidth + 1)});
 }
 
@@ -715,10 +715,10 @@ SMTExprRef CVC4Solver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
 }
 
 SMTExprRef CVC4Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
-  unsigned SWidth = FP.length() - EWidth;
+  unsigned SWidth = FP.length() - EWidth - 1;
   return newExprRef(
       CVC4Expr(Context, mkFPSort(EWidth, SWidth),
-               Context->mkConst(CVC4::FloatingPoint(EWidth, SWidth, FP))));
+               Context->mkConst(CVC4::FloatingPoint(EWidth, SWidth + 1, FP))));
 }
 
 SMTExprRef CVC4Solver::mkRMImpl(const RM &R) {
