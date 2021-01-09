@@ -590,14 +590,11 @@ static inline std::string getGMPVal(MathSATSolver &S, const SMTExprRef &Exp) {
 }
 
 std::string MathSATSolver::getBVInBinImpl(const SMTExprRef &Exp) {
-  std::string val = getGMPVal(*this, Exp);
-  if (val.length() < Exp->getWidth())
-    val = std::string(Exp->getWidth() - val.length(), '0') + val;
-  return val;
+  return getGMPVal(*this, Exp);
 }
 
 std::string MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {
-  return getBVInBin(Exp);
+  return getGMPVal(*this, Exp);
 }
 
 SMTExprRef MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
