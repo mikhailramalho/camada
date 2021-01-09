@@ -2061,12 +2061,12 @@ static inline FPType IntAsFP(const IntType Int) {
 
 float SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
   return IntAsFP<float, uint32_t>(
-      std::strtol(getFPInBin(Exp).c_str(), nullptr, 2));
+      std::strtoul(getFPInBin(Exp).c_str(), nullptr, 2));
 }
 
 double SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
   return IntAsFP<double, uint64_t>(
-      std::strtol(getFPInBin(Exp).c_str(), nullptr, 2));
+      std::strtoull(getFPInBin(Exp).c_str(), nullptr, 2));
 }
 
 template <typename FPType, typename IntType>
