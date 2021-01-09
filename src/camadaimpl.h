@@ -50,7 +50,7 @@ public:
     SMTSortRef theSort = mkBVSortImpl(BitWidth);
     assert(theSort->isBVSort());
     assert(theSort->getWidth() == BitWidth);
-    assert(theSort->getWidthFromSolver() == BitWidth);
+    assert(theSort->getWidth() == theSort->getWidthFromSolver());
     return theSort;
   }
 
@@ -68,7 +68,7 @@ public:
                              : mkFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
     assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
-    assert(theSort->getWidthFromSolver() == (1 + ExpWidth + SigWidth));
+    assert(theSort->getWidth() == theSort->getWidthFromSolver());
     return theSort;
   }
 
@@ -729,6 +729,7 @@ public:
                             : mkNaNImpl(Sgn, ExpWidth, SigWidth);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == (1 + ExpWidth + SigWidth));
+    assert(theExp->getWidth() == theExp->Sort->getWidthFromSolver());
     return theExp;
   }
 
@@ -743,6 +744,7 @@ public:
                             : mkInfImpl(Sgn, ExpWidth, SigWidth);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == (1 + ExpWidth + SigWidth));
+    assert(theExp->getWidth() == theExp->Sort->getWidthFromSolver());
     return theExp;
   }
 
@@ -790,7 +792,7 @@ public:
     SMTSortRef theSort = mkBVFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
     assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
-    assert(theSort->getWidthFromSolver() == (1 + ExpWidth + SigWidth));
+    assert(theSort->getWidth() == theSort->getWidthFromSolver());
     return theSort;
   }
 
