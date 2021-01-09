@@ -31,7 +31,7 @@ unsigned Z3Sort::getWidthFromSolver() const {
     return Sort.bv_size();
 
   assert(Sort.is_fpa());
-  return 1 + Sort.fpa_ebits() + Sort.fpa_sbits();
+  return Sort.fpa_ebits() + Sort.fpa_sbits();
 }
 
 void Z3Sort::dump() const {
@@ -95,8 +95,7 @@ SMTSortRef Z3Solver::mkRMSortImpl() {
 SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
                                   const unsigned SigWidth) {
   return newSortRef<SolverFPSort<Z3Sort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       Context->fpa_sort(ExpWidth, SigWidth + 1)});
+      {ExpWidth, SigWidth, Context, Context->fpa_sort(ExpWidth, SigWidth + 1)});
 }
 
 SMTSortRef Z3Solver::mkBVFPSortImpl(const unsigned ExpWidth,
