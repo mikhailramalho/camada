@@ -10,5 +10,6 @@
 
 inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(equal_ten);
+  RESETANDTEST(fp_equal);
   RESETANDTEST(array);
 }
