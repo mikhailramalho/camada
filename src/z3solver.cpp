@@ -597,9 +597,6 @@ std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   bool is_num = toSolverExpr<Z3Expr>(*value).Expr.as_binary(bv);
   (void)is_num;
   assert(is_num && "Failed to get bitvector from Z3");
-
-  if (bv.length() < Exp->getWidth())
-    bv = std::string(Exp->getWidth() - bv.length(), '0') + bv;
   return bv;
 }
 
@@ -614,7 +611,6 @@ std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
       &fp_value);
   (void)eval;
   assert(eval && "Failed to convert FP to BV in Z3");
-
   return Z3_get_numeral_binary_string(*Context, fp_value);
 }
 

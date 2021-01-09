@@ -620,19 +620,23 @@ public:
     return getBVImpl(Exp);
   }
 
+  static inline const std::string addLeadingZeroes(const std::string &Str,
+                                                   const unsigned Width) {
+    if (Str.length() == Width)
+      return Str;
+    return std::string(Width - Str.length(), '0') + Str;
+  }
+
   std::string getBVInBin(const SMTExprRef &Exp) final {
     assert(Exp->isBVSort());
-    std::string theBV = getBVInBinImpl(Exp);
-    assert(theBV.length() == Exp->getWidth());
-    return theBV;
+    return addLeadingZeroes(getBVInBinImpl(Exp), Exp->getWidth());
   }
 
   std::string getFPInBin(const SMTExprRef &Exp) final {
     assert(Exp->isFPSort());
-    std::string theFP =
-        useCamadaFP ? SMTSolverImpl::getFPInBinImpl(Exp) : getFPInBinImpl(Exp);
-    assert(theFP.length() == Exp->getWidth());
-    return theFP;
+    return addLeadingZeroes(useCamadaFP ? SMTSolverImpl::getFPInBinImpl(Exp)
+                                        : getFPInBinImpl(Exp),
+                            Exp->getWidth());
   }
 
   float getFP32(const SMTExprRef &Exp) final {

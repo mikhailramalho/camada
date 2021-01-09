@@ -669,10 +669,7 @@ std::string CVC4Solver::getBVInBinImpl(const SMTExprRef &Exp) {
 std::string CVC4Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   CVC4::FloatingPoint fp = Solver.getValue(toSolverExpr<CVC4Expr>(*Exp).Expr)
                                .getConst<CVC4::FloatingPoint>();
-  std::string val = fp.pack().toString(2);
-  if (val.length() < Exp->getWidth())
-    val = std::string(Exp->getWidth() - val.length(), '0') + val;
-  return val;
+  return fp.pack().toString(2);
 }
 
 SMTExprRef CVC4Solver::getArrayElementImpl(const SMTExprRef &Array,
