@@ -384,20 +384,6 @@ SMTExprRef CVC4Solver::mkBVConcatImpl(const SMTExprRef &LHS,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
-SMTExprRef CVC4Solver::mkBVRedOrImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC4Expr(Context, mkBVSort(1),
-               Context->mkExpr(CVC4::kind::BITVECTOR_REDOR,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
-}
-
-SMTExprRef CVC4Solver::mkBVRedAndImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC4Expr(Context, mkBVSort(1),
-               Context->mkExpr(CVC4::kind::BITVECTOR_REDAND,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
-}
-
 SMTExprRef CVC4Solver::mkArraySelectImpl(const SMTExprRef &Array,
                                          const SMTExprRef &Index) {
   return newExprRef(CVC4Expr(

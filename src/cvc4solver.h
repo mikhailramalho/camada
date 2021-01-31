@@ -161,10 +161,6 @@ public:
   SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
-
   SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
                                const SMTExprRef &Index) override;
 
