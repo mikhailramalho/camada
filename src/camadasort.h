@@ -174,7 +174,7 @@ public:
 
   bool isBVSort() const override { return true; }
 
-  unsigned getWidth() const override { return 1 + ExpWidth + SigWidth; }
+  unsigned getWidth() const override { return ExpWidth + SigWidth; }
 
   unsigned getFPSignificandWidth() const override { return SigWidth; }
 
