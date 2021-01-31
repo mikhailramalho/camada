@@ -632,7 +632,7 @@ static inline void addCore(SMTSolver &S, unsigned int SWidth,
   SMTExprRef new_DSig = S.mkBVConcat(DSig, S.mkBVFromDec(0, 3));
 
   // Alignment shift with sticky bit computation.
-  SMTExprRef big_d_sig = S.mkBVConcat(S.mkBVFromDec(0, SWidth + 3), new_DSig);
+  SMTExprRef big_d_sig = S.mkBVConcat(new_DSig, S.mkBVFromDec(0, SWidth + 3));
 
   SMTExprRef shifted_big = S.mkBVLshr(
       big_d_sig,
