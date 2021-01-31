@@ -48,24 +48,14 @@ void Z3Expr::dump() const {
   std::cerr << Z3_ast_to_string(*Context, Expr) << '\n';
 }
 
-// Function used to report errors
-void Z3ErrorHandler(Z3_context Context, Z3_error_code Error) {
-  std::cerr << "Z3 error" << std::string(Z3_get_error_msg(Context, Error))
-            << '\n';
-}
-
 Z3Solver::Z3Solver()
     : Context(std::make_shared<z3::context>()), Solver(*Context) {
-  Z3_set_error_handler(*Context, Z3ErrorHandler);
-
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }
 
 Z3Solver::Z3Solver(Z3ContextRef C, const z3::solver &S)
     : Context(std::move(C)), Solver(S) {
-  Z3_set_error_handler(*Context, Z3ErrorHandler);
-
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }
