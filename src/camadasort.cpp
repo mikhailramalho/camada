@@ -89,12 +89,13 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
   if (getWidth() != Other.getWidth())
     return false;
 
+  if (isFPSort() && Other.isFPSort())
+    return !(isBVSort() ^ Other.isBVSort()) &&
+           (getFPSignificandWidth() == Other.getFPSignificandWidth()) &&
+           (getFPExponentWidth() == Other.getFPExponentWidth());
+
   if (isBVSort() && Other.isBVSort())
     return true; // Width was already checked
-
-  if (isFPSort() && Other.isFPSort())
-    return (getFPSignificandWidth() == Other.getFPSignificandWidth()) &&
-           (getFPExponentWidth() == Other.getFPExponentWidth());
 
   return false;
 }
