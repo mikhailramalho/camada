@@ -437,9 +437,26 @@ SMTExprRef MathSATSolver::mkFPDivImpl(const SMTExprRef &LHS,
                        toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
-SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &, const SMTExprRef &) {
-  assert(0 && "MathSAT does not implement fp.rem");
-  __builtin_unreachable();
+SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  // MathSAT does not support rem, so convert to BVFP and call the fp_api
+
+  // Save camada flag
+  bool oldUseCamadaFP = useCamadaFP;
+
+  // Enable fp conversion API
+  useCamadaFP = true;
+
+  // We can call the conversion API directly here because the arguments were
+  // already checked
+  SMTExprRef rem =
+      SMTSolverImpl::mkFPRemImpl(mkIEEEFPToBVImpl(LHS), mkIEEEFPToBVImpl(RHS));
+
+  // Restore camada flag
+  useCamadaFP = oldUseCamadaFP;
+
+  // And convert it back the right type
+  return mkBVToIEEEFP(rem, LHS->Sort);
 }
 
 SMTExprRef MathSATSolver::mkFPAddImpl(const SMTExprRef &LHS,
@@ -471,10 +488,26 @@ SMTExprRef MathSATSolver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &R) {
                         toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
-SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &, const SMTExprRef &,
-                                      const SMTExprRef &, const RM &) {
-  assert(0 && "MathSAT does not implement fp.fma");
-  __builtin_unreachable();
+SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
+                                      const SMTExprRef &Z, const RM &R) {
+  // MathSAT does not support FMA, so convert to BVFP and call the fp_api
+
+  // Save camada flag
+  bool oldUseCamadaFP = useCamadaFP;
+
+  // Enable fp conversion API
+  useCamadaFP = true;
+
+  // We can call the conversion API directly here because the arguments were
+  // already checked
+  SMTExprRef fma = SMTSolverImpl::mkFPFMAImpl(
+      mkIEEEFPToBVImpl(X), mkIEEEFPToBVImpl(Y), mkIEEEFPToBVImpl(Z), R);
+
+  // Restore camada flag
+  useCamadaFP = oldUseCamadaFP;
+
+  // And convert it back the right type
+  return mkBVToIEEEFP(fma, X->Sort);
 }
 
 SMTExprRef MathSATSolver::mkFPLtImpl(const SMTExprRef &LHS,
