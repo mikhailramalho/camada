@@ -739,7 +739,8 @@ SMTExprRef MathSATSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef MathSATSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  SMTSortRef to = mkBVSort(Exp->getWidth());
+  SMTSortRef to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
+                             Exp->Sort->getFPSignificandWidth());
   return newExprRef(MathSATExpr(
       Context, to,
       msat_make_fp_as_ieeebv(*Context, toSolverExpr<MathSATExpr>(*Exp).Expr)));

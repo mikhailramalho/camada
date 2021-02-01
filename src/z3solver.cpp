@@ -712,7 +712,8 @@ SMTExprRef Z3Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef Z3Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  SMTSortRef to = mkBVSort(Exp->getWidth());
+  SMTSortRef to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
+                             Exp->Sort->getFPSignificandWidth());
   return newExprRef(Z3Expr(
       Context, to,
       z3::to_expr(*Context, Z3_mk_fpa_to_ieee_bv(
