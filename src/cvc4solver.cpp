@@ -751,17 +751,16 @@ SMTExprRef CVC4Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef CVC4Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                         const SMTSortRef &To) {
-  return newExprRef(
-      CVC4Expr(Context, To,
-               Context->mkExpr(
-                   CVC4::kind::FLOATINGPOINT_TO_FP_IEEE_BITVECTOR,
-                   Context->mkConst(CVC4::FloatingPointToFPIEEEBitVector(
-                       To->getFPExponentWidth(), To->getFPSignificandWidth())),
-                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
+  return newExprRef(CVC4Expr(
+      Context, To,
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_IEEE_BITVECTOR,
+          Context->mkConst(CVC4::FloatingPointToFPIEEEBitVector(
+              To->getFPExponentWidth(), To->getFPSignificandWidth() + 1)),
+          toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-
   // CVC4 does not provide a direct way to convert from fp
   // to bv, so we create a new symbol
   const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
