@@ -766,7 +766,9 @@ SMTExprRef CVC4Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   // to bv, so we create a new symbol
   const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
 
-  SMTExprRef newSymbol = mkSymbol(name, mkBVSort(Exp->getWidth()));
+  SMTSortRef to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
+                             Exp->Sort->getFPSignificandWidth());
+  SMTExprRef newSymbol = mkSymbol(name, to);
 
   // and constraint it to be the conversion of the fp, since
   // (fp_matches_bv f bv) <-> (= f ((_ to_fp E S) bv))
