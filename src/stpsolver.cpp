@@ -232,7 +232,7 @@ SMTExprRef STPSolver::mkBVOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 SMTExprRef STPSolver::mkBVAndImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      STPExpr(Context, mkBoolSort(),
+      STPExpr(Context, LHS->Sort,
               STP::vc_bvAndExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
                                 toSolverExpr<STPExpr>(*RHS).Expr)));
 }
