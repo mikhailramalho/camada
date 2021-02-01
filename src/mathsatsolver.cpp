@@ -175,8 +175,8 @@ SMTExprRef MathSATSolver::mkBVMulImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
-      msat_make_times(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
-                      toSolverExpr<MathSATExpr>(*RHS).Expr)));
+      msat_make_bv_times(*Context, toSolverExpr<MathSATExpr>(*LHS).Expr,
+                         toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkBVSRemImpl(const SMTExprRef &LHS,
