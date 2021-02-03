@@ -738,9 +738,9 @@ public:
     return theExp;
   }
 
-  SMTExprRef mkNaN32(const bool Sgn) final { return mkNaN(Sgn, 8, 23); }
+  SMTExprRef mkNaN32(const bool Sgn) final { return mkNaN(Sgn, 8, 24); }
 
-  SMTExprRef mkNaN64(const bool Sgn) final { return mkNaN(Sgn, 11, 52); }
+  SMTExprRef mkNaN64(const bool Sgn) final { return mkNaN(Sgn, 11, 53); }
 
   SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
                    const unsigned SigWidth) final {
@@ -748,14 +748,14 @@ public:
                             ? SMTSolverImpl::mkInfImpl(Sgn, ExpWidth, SigWidth)
                             : mkInfImpl(Sgn, ExpWidth, SigWidth);
     assert(theExp->isFPSort());
-    assert(theExp->getWidth() == (1 + ExpWidth + SigWidth));
+    assert(theExp->getWidth() == (ExpWidth + SigWidth));
     assert(theExp->getWidth() == theExp->Sort->getWidthFromSolver());
     return theExp;
   }
 
-  SMTExprRef mkInf32(const bool Sgn) final { return mkInf(Sgn, 8, 23); }
+  SMTExprRef mkInf32(const bool Sgn) final { return mkInf(Sgn, 8, 24); }
 
-  SMTExprRef mkInf64(const bool Sgn) final { return mkInf(Sgn, 11, 52); }
+  SMTExprRef mkInf64(const bool Sgn) final { return mkInf(Sgn, 11, 53); }
 
   SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
                           const SMTExprRef &InitValue) final {

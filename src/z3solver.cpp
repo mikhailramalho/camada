@@ -689,7 +689,7 @@ SMTExprRef Z3Solver::mkRMImpl(const RM &R) {
 
 SMTExprRef Z3Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
+  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth - 1);
   SMTExprRef theNaN = newExprRef(Z3Expr(
       Context, sort,
       z3::to_expr(*Context,
@@ -700,7 +700,7 @@ SMTExprRef Z3Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef Z3Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
+  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth - 1);
   return newExprRef(Z3Expr(
       Context, sort,
       z3::to_expr(

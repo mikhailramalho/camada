@@ -719,20 +719,20 @@ SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
 
 SMTExprRef MathSATSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
+  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth - 1);
   SMTExprRef theNaN = newExprRef(MathSATExpr(
-      Context, sort, msat_make_fp_nan(*Context, ExpWidth, SigWidth)));
+      Context, sort, msat_make_fp_nan(*Context, ExpWidth, SigWidth - 1)));
 
   return Sgn ? mkFPNeg(theNaN) : theNaN;
 }
 
 SMTExprRef MathSATSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
-  return newExprRef(
-      MathSATExpr(Context, sort,
-                  Sgn ? msat_make_fp_minus_inf(*Context, ExpWidth, SigWidth)
-                      : msat_make_fp_plus_inf(*Context, ExpWidth, SigWidth)));
+  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth - 1);
+  return newExprRef(MathSATExpr(
+      Context, sort,
+      Sgn ? msat_make_fp_minus_inf(*Context, ExpWidth, SigWidth - 1)
+          : msat_make_fp_plus_inf(*Context, ExpWidth, SigWidth - 1)));
 }
 
 SMTExprRef MathSATSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,

@@ -737,22 +737,22 @@ SMTExprRef CVC4Solver::mkRMImpl(const RM &R) {
 
 SMTExprRef CVC4Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth + 1);
-  SMTExprRef theNaN = newExprRef(
-      CVC4Expr(Context, sort,
-               Context->mkConst(CVC4::FloatingPoint::makeNaN(
-                   CVC4::FloatingPointSize(ExpWidth, SigWidth + 1)))));
+  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
+  SMTExprRef theNaN =
+      newExprRef(CVC4Expr(Context, sort,
+                          Context->mkConst(CVC4::FloatingPoint::makeNaN(
+                              CVC4::FloatingPointSize(ExpWidth, SigWidth)))));
 
   return Sgn ? mkFPNeg(theNaN) : theNaN;
 }
 
 SMTExprRef CVC4Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth + 1);
+  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
   return newExprRef(
       CVC4Expr(Context, sort,
                Context->mkConst(CVC4::FloatingPoint::makeInf(
-                   CVC4::FloatingPointSize(ExpWidth, SigWidth + 1), Sgn))));
+                   CVC4::FloatingPointSize(ExpWidth, SigWidth), Sgn))));
 }
 
 SMTExprRef CVC4Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
