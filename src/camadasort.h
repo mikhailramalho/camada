@@ -76,6 +76,9 @@ public:
   /// not check if the two sorts are the same objects.
   bool operator==(SMTSort const &Other) const;
 
+  /// Validate if the width from solve matches our internal representation
+  void validateSortWidth() const;
+
   virtual void dump() const;
 };
 
