@@ -402,6 +402,9 @@ public:
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
 
+  /// Returns the solver name and version
+  virtual std::string getSolverNameAndVersion() const = 0;
+
   /// Dump formula
   virtual void dump() = 0;
 

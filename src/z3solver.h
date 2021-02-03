@@ -268,6 +268,8 @@ public:
 
   void resetImpl() override;
 
+  std::string getSolverNameAndVersion() const override;
+
   void dumpImpl() override;
 
   void dumpModelImpl() override;

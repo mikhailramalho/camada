@@ -497,6 +497,10 @@ void YicesSolver::resetImpl() {
   yices_free_config(config);
 }
 
+std::string YicesSolver::getSolverNameAndVersion() const {
+  return std::string("Yices v").append(yices_version);
+}
+
 void YicesSolver::dumpImpl() {
   for (auto const &a : Assertions)
     a->dump();
