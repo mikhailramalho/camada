@@ -502,7 +502,7 @@ void STPSolver::resetImpl() {
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 
-void STPSolver::dumpImpl() { STP::vc_printQuery(*Context); }
+void STPSolver::dumpImpl() { STP::vc_printAsserts(*Context); }
 
 void STPSolver::dumpModelImpl() {
   char *buf;
