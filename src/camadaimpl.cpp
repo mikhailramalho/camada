@@ -1848,9 +1848,10 @@ SMTExprRef SMTSolverImpl::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 SMTExprRef SMTSolverImpl::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   SMTExprRef top_exp = mkTopExp(*this, ExpWidth);
-  return mkBVToIEEEFP(mkBVConcat(mkBVFromDec(Sgn, 1),
-                                 mkBVConcat(top_exp, mkBVFromDec(0, SigWidth))),
-                      mkFPSort(ExpWidth, SigWidth));
+  return mkBVToIEEEFP(
+      mkBVConcat(mkBVFromDec(Sgn, 1),
+                 mkBVConcat(top_exp, mkBVFromDec(0, SigWidth - 1))),
+      mkFPSort(ExpWidth, SigWidth - 1));
 }
 
 SMTExprRef SMTSolverImpl::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
