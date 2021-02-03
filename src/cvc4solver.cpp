@@ -809,6 +809,10 @@ void CVC4Solver::resetImpl() {
   Solver.setOption("produce-assertions", true);
 }
 
+std::string CVC4Solver::getSolverNameAndVersion() const {
+  return std::string("CVC4 v").append(CVC4::Configuration::getVersionString());
+}
+
 void CVC4Solver::dumpImpl() {
   auto const &assertions = Solver.getAssertions();
   for (auto const &a : assertions)

@@ -774,6 +774,13 @@ checkResult MathSATSolver::checkImpl() {
 
 void MathSATSolver::resetImpl() { msat_reset_env(*Context); }
 
+std::string MathSATSolver::getSolverNameAndVersion() const {
+  char *tmp = msat_get_version();
+  std::string ver = tmp;
+  msat_free(tmp);
+  return ver;
+}
+
 void MathSATSolver::dumpImpl() {
   size_t num_of_asserted;
   msat_term *asserted_formulas =

@@ -748,6 +748,17 @@ checkResult Z3Solver::checkImpl() {
 
 void Z3Solver::resetImpl() { Solver.reset(); }
 
+std::string Z3Solver::getSolverNameAndVersion() const {
+  unsigned int major, minor, build, revision;
+  Z3_get_version(&major, &minor, &build, &revision);
+  return std::string("Z3 v")
+      .append(std::to_string(major))
+      .append(".")
+      .append(std::to_string(minor))
+      .append(".")
+      .append(std::to_string(revision));
+}
+
 void Z3Solver::dumpImpl() {
   std::cerr << Z3_solver_to_string(*Context, Solver) << '\n';
 }

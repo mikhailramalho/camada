@@ -502,6 +502,10 @@ void STPSolver::resetImpl() {
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 
+std::string STPSolver::getSolverNameAndVersion() const {
+  return std::string("STP v").append(STP::get_git_version_tag());
+}
+
 void STPSolver::dumpImpl() { STP::vc_printAsserts(*Context); }
 
 void STPSolver::dumpModelImpl() {

@@ -529,6 +529,10 @@ void BtorSolver::resetImpl() {
   boolector_set_opt(*Context, BTOR_OPT_AUTO_CLEANUP, 1);
 }
 
+std::string BtorSolver::getSolverNameAndVersion() const {
+  return std::string("Boolector v").append(boolector_version(*Context));
+}
+
 void BtorSolver::dumpImpl() { boolector_dump_smt2(*Context, stderr); }
 
 void BtorSolver::dumpModelImpl() {
