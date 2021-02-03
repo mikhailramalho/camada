@@ -31,6 +31,8 @@
 namespace camada {
 
 unsigned STPSort::getWidthFromSolver() const {
+  if (isBoolSort())
+    return 1;
   return STP::vc_getValueSize(*Context, Sort);
 }
 
