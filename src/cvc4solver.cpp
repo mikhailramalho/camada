@@ -35,6 +35,9 @@ unsigned CVC4Sort::getWidthFromSolver() const {
   if (Sort.isBoolean())
     return 1;
 
+  if (Sort.isRoundingMode())
+    return 3;
+
   assert(Sort.isFloatingPoint());
   CVC4::FloatingPointType fpType = static_cast<CVC4::FloatingPointType>(Sort);
   return fpType.getExponentSize() + fpType.getSignificandSize();

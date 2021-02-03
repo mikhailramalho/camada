@@ -33,8 +33,11 @@ unsigned Z3Sort::getWidthFromSolver() const {
   if (Sort.is_bool())
     return 1;
 
-  assert(Sort.is_fpa());
-  return Sort.fpa_ebits() + Sort.fpa_sbits();
+  if (Sort.is_fpa())
+    return Sort.fpa_ebits() + Sort.fpa_sbits();
+
+  assert(Sort.sort_kind() == Z3_ROUNDING_MODE_SORT);
+  return 3;
 }
 
 void Z3Sort::dump() const {
