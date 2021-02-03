@@ -30,6 +30,9 @@ unsigned Z3Sort::getWidthFromSolver() const {
   if (Sort.is_bv())
     return Sort.bv_size();
 
+  if (Sort.is_bool())
+    return 1;
+
   assert(Sort.is_fpa());
   return Sort.fpa_ebits() + Sort.fpa_sbits();
 }

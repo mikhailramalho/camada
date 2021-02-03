@@ -35,6 +35,9 @@ unsigned MathSATSort::getWidthFromSolver() const {
   if (msat_is_bv_type(*Context, Sort, &w))
     return w;
 
+  if (msat_is_bool_type(*Context, Sort))
+    return 1;
+
   std::size_t exp, sig;
   int isFP = msat_is_fp_type(*Context, Sort, &exp, &sig);
   assert(isFP);
