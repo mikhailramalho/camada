@@ -38,6 +38,9 @@ unsigned MathSATSort::getWidthFromSolver() const {
   if (msat_is_bool_type(*Context, Sort))
     return 1;
 
+  if (msat_is_fp_roundingmode_type(*Context, Sort))
+    return 3;
+
   std::size_t exp, sig;
   int isFP = msat_is_fp_type(*Context, Sort, &exp, &sig);
   assert(isFP);
