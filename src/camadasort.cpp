@@ -75,6 +75,14 @@ camada::SMTSortRef camada::SMTSort::getElementSort() const {
   __builtin_unreachable();
 }
 
+void camada::SMTSort::validateSortWidth() const {
+  // Don't check array sort for now
+  if (isArraySort())
+    return;
+
+  assert(getWidthFromSolver() == getWidth());
+}
+
 bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
   if (isBoolSort() && Other.isBoolSort())
     return true;

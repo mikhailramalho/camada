@@ -36,6 +36,7 @@ public:
 
   SMTExprRef newExprRef(const SMTExpr &Exp) const final {
     SMTExprRef theExp = newExprRefImpl(Exp);
+    theExp->Sort->validateSortWidth();
     return theExp;
   }
 
