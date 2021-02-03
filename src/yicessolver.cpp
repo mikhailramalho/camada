@@ -30,6 +30,10 @@
 namespace camada {
 
 unsigned YicesSort::getWidthFromSolver() const {
+  if (yices_type_is_bool(Sort))
+    return 1;
+
+  assert(yices_type_is_bitvector(Sort));
   return yices_bvtype_size(Sort);
 }
 
