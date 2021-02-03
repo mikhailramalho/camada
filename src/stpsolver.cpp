@@ -357,9 +357,10 @@ SMTExprRef STPSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
 }
 
 SMTExprRef STPSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(STPExpr(
-      Context, mkBVSort(i + Exp->getWidth()),
-      STP::vc_bvSignExtend(*Context, toSolverExpr<STPExpr>(*Exp).Expr, i)));
+  return newExprRef(
+      STPExpr(Context, mkBVSort(i + Exp->getWidth()),
+              STP::vc_bvSignExtend(*Context, toSolverExpr<STPExpr>(*Exp).Expr,
+                                   i + Exp->getWidth())));
 }
 
 SMTExprRef STPSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
