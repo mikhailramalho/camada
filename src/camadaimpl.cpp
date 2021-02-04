@@ -657,8 +657,8 @@ static inline void addCore(SMTSolver &S, unsigned int SWidth,
   assert(new_CSig->getWidth() == SWidth + 5);
   assert(shifted_d_sig->getWidth() == SWidth + 5);
 
-  SMTExprRef c_plus_d = S.mkBVAdd(shifted_d_sig, new_CSig);
-  SMTExprRef c_minus_d = S.mkBVSub(shifted_d_sig, new_CSig);
+  SMTExprRef c_plus_d = S.mkBVAdd(new_CSig, shifted_d_sig);
+  SMTExprRef c_minus_d = S.mkBVSub(new_CSig, shifted_d_sig);
   SMTExprRef sum = S.mkIte(eq_sgn, c_plus_d, c_minus_d);
 
   SMTExprRef sign_bv = S.mkBVExtract(SWidth + 4, SWidth + 4, sum);
