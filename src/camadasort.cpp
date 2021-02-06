@@ -97,6 +97,9 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
   if (getWidth() != Other.getWidth())
     return false;
 
+  if (getWidthFromSolver() != Other.getWidthFromSolver())
+    return false;
+
   if (isFPSort() && Other.isFPSort())
     return !(isBVSort() ^ Other.isBVSort()) &&
            (getFPSignificandWidth() == Other.getFPSignificandWidth()) &&
