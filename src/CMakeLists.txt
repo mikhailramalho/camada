@@ -53,13 +53,13 @@ function(install_solver_header)
     string(TOLOWER ${name} lower_name)
 
     if(CAMADA_ENABLE_SOLVER_${name})
-      install(FILES "${lower_name}solver.h" DESTINATION include)
+      install(FILES "${lower_name}/${lower_name}solver.h" DESTINATION include/camada)
     endif()
   endforeach()
 endfunction()
 
 # Install camada header
-install(FILES camada.h camadasort.h camadaexpr.h camadaimpl.h DESTINATION include)
+install(FILES camada.h camadasort.h camadaexpr.h camadaimpl.h DESTINATION include/camada)
 
 # And header for each enabled solver
 install_solver_header(${CAMADA_AVAILABLE_SOLVERS})
