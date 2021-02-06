@@ -1,7 +1,7 @@
 
 #include "tests.h"
 
-#include <boolectorsolver.h>
+#include <boolector/boolectorsolver.h>
 #include <catch2/catch.hpp>
 
 TEST_CASE("Simple Boolector test", "[Boolector]") {

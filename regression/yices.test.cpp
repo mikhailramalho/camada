@@ -2,7 +2,7 @@
 #include "tests.h"
 
 #include <catch2/catch.hpp>
-#include <yicessolver.h>
+#include <yices/yicessolver.h>
 
 TEST_CASE("Simple yices test", "[YICES]") {
   // Create Yices Solver

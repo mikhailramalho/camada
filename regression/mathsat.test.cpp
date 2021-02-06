@@ -3,7 +3,7 @@
 #include "tests.h"
 
 #include <catch2/catch.hpp>
-#include <mathsatsolver.h>
+#include <mathsat/mathsatsolver.h>
 
 TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   // Create Mathsat Solver

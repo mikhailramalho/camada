@@ -2,7 +2,7 @@
 #include "tests.h"
 
 #include <catch2/catch.hpp>
-#include <cvc4solver.h>
+#include <cvc4/cvc4solver.h>
 
 TEST_CASE("Simple CVC4 test", "[CVC4]") {
   // Create CVC4 Solver
