@@ -6,8 +6,7 @@ project (Camada LANGUAGES CXX)
 
 set (CAMADA_VERSION_MAJOR 0)
 set (CAMADA_VERSION_MINOR 0)
-set (CAMADA_VERSION_PATCH 0)
-set (CAMADA_VERSION "${CAMADA_VERSION_MAJOR}.${CAMADA_VERSION_MINOR}.${CAMADA_VERSION_PATCH}")
+set (CAMADA_VERSION "${CAMADA_VERSION_MAJOR}.${CAMADA_VERSION_MINOR}")
 
 #-----------------------------------------------------------------------------#
 # General macros
