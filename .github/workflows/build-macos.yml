@@ -79,7 +79,7 @@ jobs:
 
     - name: Setup MiniSAT
       if: steps.cache-minisat.outputs.cache-hit != 'true'
-      run: git clone https://github.com/mikhailramalho/minisat-os-x.git && cd minisat-os-x && make config prefix=/usr/local && make install
+      run: git clone https://github.com/mikhailramalho/minisat-os-x.git && cd minisat-os-x && make config prefix=/usr/local && make -j4 install
 
       # Setup/cache STP
     - name: Cache STP
