@@ -34,10 +34,10 @@ jobs:
         path: |
           boolector-release
           boolector
-        key: ${{ runner.os }}-boolector
+        key: ${{ runner.os }}-bool
 
     - name: Setup boolector
-      if: steps.cache-boolector.outputs.cache-hit != 'true'
+      if: steps.cache-bool.outputs.cache-hit != 'true'
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j && make install
 
       # Setup SymFPU
