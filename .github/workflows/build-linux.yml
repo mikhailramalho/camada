@@ -19,28 +19,88 @@ jobs:
       id: cache-gmp
       uses: actions/cache@v2
       with:
-        path: $PWD/../gmp
+        path: gmp
         key: ${{ runner.os }}-gmp
 
     - name: Setup GMP
       if: steps.cache-gmp.outputs.cache-hit != 'true'
       run: wget https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz && tar xf gmp-6.1.2.tar.xz && rm gmp-6.1.2.tar.xz && cd gmp-6.1.2 && ./configure --prefix $PWD/../gmp --disable-shared ABI=64 CFLAGS=-fPIC CPPFLAGS=-DPIC && make -j4 && make install
 
+      # Setup/cache Boolector
+    - name: Cache Boolector
+      id: cache-boolector
+      uses: actions/cache@v2
+      with:
+        path: boolector-release
+        key: ${{ runner.os }}-btor
+
     - name: Setup boolector
+      if: steps.cache-btor.outputs.cache-hit != 'true'
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
+
+      # Setup/cache CVC4
+    - name: Cache CVC4
+      id: cache-cvc4
+      uses: actions/cache@v2
+      with:
+        path: cvc4
+        key: ${{ runner.os }}-cvc4
+
     - name: Setup CVC4
-      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --optimized --prefix=../cvc4 --static --no-static-binary && cd build && make -j4 && make install
+      if: steps.cache-cvc4.outputs.cache-hit != 'true'
+      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --optimized --prefix=$PWD/../cvc4 --static --no-static-binary && cd build && make -j4 && make install
+
+      # Setup/cache MathSAT
+    - name: Cache MathSAT
+      id: cache-mathsat
+      uses: actions/cache@v2
+      with:
+        path: mathsat
+        key: ${{ runner.os }}-mathsat
+
     - name: Setup MathSAT
+      if: steps.cache-mathsat.outputs.cache-hit != 'true'
       run: wget https://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-linux-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-linux-x86_64 mathsat
+
+      # Setup/cache STP
+    - name: Cache STP
+      id: cache-stp
+      uses: actions/cache@v2
+      with:
+        path: stp-release
+        key: ${{ runner.os }}-stp
+
     - name: Setup STP
       continue-on-error: true
+      if: steps.cache-stp.outputs.cache-hit != 'true'
       run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release && ninja install
+
+      # Setup/cache Yices
+    - name: Cache Yices
+      id: cache-yices
+      uses: actions/cache@v2
+      with:
+        path: yices
+        key: ${{ runner.os }}-yices
+
     - name: Setup Yices 2
+      if: steps.cache-yices.outputs.cache-hit != 'true'
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices --with-static-gmp=$PWD/../gmp/lib/libgmp.a && make -j4 && make static-lib && make install && cp ./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a ../yices/lib
+
+      # Setup/cache Z3
+    - name: Cache Z3
+      id: cache-z3
+      uses: actions/cache@v2
+      with:
+        path: z3
+        key: ${{ runner.os }}-z3
+
     - name: Setup Z3
+      if: steps.cache-z3.outputs.cache-hit != 'true'
       run: wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.9/z3-4.8.9-x64-ubuntu-16.04.zip && unzip z3-4.8.9-x64-ubuntu-16.04.zip && mv z3-4.8.9-x64-ubuntu-16.04 z3
-    - name: Configure CMake
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCAMADA_ENABLE_SOLVER_CVC4=ON -DSOLVER_CVC4_DIR=$PWD/../cvc4 -DSOLVER_CVC4_SYMFPU_DIR=$PWD/../CVC4/deps/install/include -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
+
+    - name: Configure Camada
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCAMADA_ENABLE_SOLVER_CVC4=ON -DSOLVER_CVC4_DIR=$PWD/../cvc4 -DSOLVER_CVC4_SYMFPU_DIR=$PWD/../CVC4/deps/install/include -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
     - name: Build Camada
       run: cd build && cmake --build . && ninja install
     - name: Run tests
