@@ -1,5 +1,5 @@
 # Looking for Boolector in SOLVER_BOOLECTOR_INCLUDE_DIR
-find_package(Boolector PATHS ${SOLVER_BOOLECTOR_DIR}/lib/cmake $ENV{HOME}/boolector)
+find_package(Boolector HINTS ${SOLVER_BOOLECTOR_DIR}/lib/cmake $ENV{HOME}/boolector)
 
 if(Boolector_FOUND)
   set(SOLVER_BOOLECTOR_LIB "Boolector::boolector")

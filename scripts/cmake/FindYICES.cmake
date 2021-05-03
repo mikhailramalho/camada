@@ -24,9 +24,9 @@ function(check_yices_version yices_include yices_lib)
 endfunction(check_yices_version)
 
 # Looking for YICES in SOLVER_YICES_INCLUDE_DIR
-find_path(SOLVER_YICES_INCLUDE_DIR yices.h PATHS ${SOLVER_YICES_DIR} $ENV{HOME}/yices PATH_SUFFIXES include)
+find_path(SOLVER_YICES_INCLUDE_DIR yices.h HINTS ${SOLVER_YICES_DIR} $ENV{HOME}/yices PATH_SUFFIXES include)
 
-find_library(SOLVER_YICES_LIB yices PATHS ${SOLVER_YICES_DIR} $ENV{HOME}/yices PATH_SUFFIXES lib bin)
+find_library(SOLVER_YICES_LIB yices HINTS ${SOLVER_YICES_DIR} $ENV{HOME}/yices PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that
 # prints YICES's version

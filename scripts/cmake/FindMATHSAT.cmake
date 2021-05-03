@@ -24,9 +24,9 @@ function(check_mathsat_version mathsat_include mathsat_lib)
 endfunction(check_mathsat_version)
 
 # Looking for MATHSAT in SOLVER_MATHSAT_INCLUDE_DIR
-find_path(SOLVER_MATHSAT_INCLUDE_DIR mathsat.h PATHS ${SOLVER_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES include)
+find_path(SOLVER_MATHSAT_INCLUDE_DIR mathsat.h HINTS ${SOLVER_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES include)
 
-find_library(SOLVER_MATHSAT_LIB mathsat PATHS ${SOLVER_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES lib bin)
+find_library(SOLVER_MATHSAT_LIB mathsat HINTS ${SOLVER_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that
 # prints MATHSAT's version

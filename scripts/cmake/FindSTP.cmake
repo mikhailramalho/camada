@@ -24,9 +24,9 @@ function(check_stp_version stp_include stp_lib)
 endfunction(check_stp_version)
 
 # Looking for STP in SOLVER_STP_INCLUDE_DIR
-find_path(SOLVER_STP_INCLUDE_DIR c_interface.h PATHS ${SOLVER_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES include/stp)
+find_path(SOLVER_STP_INCLUDE_DIR c_interface.h HINTS ${SOLVER_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES include/stp)
 
-find_library(SOLVER_STP_LIB stp PATHS ${SOLVER_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES lib bin)
+find_library(SOLVER_STP_LIB stp HINTS ${SOLVER_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES lib bin)
 
 
 # Try to check it dynamically, by compiling a small program that
