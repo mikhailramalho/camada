@@ -31,11 +31,11 @@ jobs:
       id: cache-boolector
       uses: actions/cache@v2
       with:
-        path: btor
-        key: ${{ runner.os }}-btor
+        path: boolector
+        key: ${{ runner.os }}-boolector
 
     - name: Setup boolector
-      if: steps.cache-btor.outputs.cache-hit != 'true'
+      if: steps.cache-boolector.outputs.cache-hit != 'true'
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
 
       # Setup SymFPU
