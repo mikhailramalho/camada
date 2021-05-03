@@ -54,7 +54,7 @@ jobs:
       # Setup/cache STP
     - name: Setup STP
       continue-on-error: true
-      run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release && ninja install
+      run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release -DMINISAT_INCLUDE_DIR=$PWD/../../minisat/include -DMINISAT_LIBRARY=$PWD/../../minisat/lib/libminisat.a && ninja install
 
     - name: Setup Yices
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
