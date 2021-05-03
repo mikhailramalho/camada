@@ -24,7 +24,7 @@ jobs:
 
     - name: Setup GMP
       if: steps.cache-gmp.outputs.cache-hit != 'true'
-      run: wget https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz && tar xf gmp-6.1.2.tar.xz && rm gmp-6.1.2.tar.xz && cd gmp-6.1.2 && ./configure --prefix $PWD/../gmp --disable-shared ABI=64 CFLAGS=-fPIC CPPFLAGS=-DPIC && make -j4 && make install
+      run: wget https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz && tar xf gmp-6.1.2.tar.xz && rm gmp-6.1.2.tar.xz && cd gmp-6.1.2 && ./configure --prefix $PWD/../gmp --disable-shared ABI=64 CFLAGS=-fPIC CPPFLAGS=-DPIC && make -j && make install
 
       # Setup/cache Boolector
     - name: Cache Boolector
@@ -36,7 +36,7 @@ jobs:
 
     - name: Setup boolector
       if: steps.cache-boolector.outputs.cache-hit != 'true'
-      run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
+      run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j && make install
 
       # Setup SymFPU
     - name: Setup SymFPU
@@ -89,7 +89,7 @@ jobs:
 
     - name: Setup Yices 2
       if: steps.cache-yices.outputs.cache-hit != 'true'
-      run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices --with-static-gmp=$PWD/../gmp/lib/libgmp.a && make -j4 && make static-lib && make install && cp ./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a ../yices/lib
+      run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices --with-static-gmp=$PWD/../gmp/lib/libgmp.a && make -j && make static-lib && make install && cp ./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a ../yices/lib
 
       # Setup/cache Z3
     - name: Cache Z3
@@ -108,5 +108,5 @@ jobs:
     - name: Build Camada
       run: cd build && ninja && ninja install
     - name: Run tests
-      run: cd build/regression && ctest -j4 --output-on-failure --progress .
+      run: cd build/regression && ctest -j --output-on-failure --progress .
 
