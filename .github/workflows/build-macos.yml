@@ -45,7 +45,7 @@ jobs:
 
     - name: Setup CVC4
       if: steps.cache-cvc4.outputs.cache-hit != 'true'
-      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./configure.sh production --symfpu --optimized --prefix=$PWD/../cvc4 --static --no-static-binary --ninja --symfpu-dir=$PWD/../ && cd build && ninja && ninja install
+      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./configure.sh production --symfpu --python3 --optimized --prefix=$PWD/../cvc4 --static --no-static-binary --ninja --symfpu-dir=$PWD/../ && cd build && ninja && ninja install
 
       # Setup/cache MathSAT
     - name: Cache MathSAT
