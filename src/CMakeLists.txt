@@ -50,7 +50,7 @@ function(install_solver_header)
     string(TOLOWER ${name} lower_name)
 
     if(CAMADA_ENABLE_SOLVER_${name})
-      install(FILES "${lower_name}/${lower_name}solver.h" DESTINATION include/camada)
+      install(FILES "${lower_name}solver.h" DESTINATION include/camada)
     endif()
   endforeach()
 endfunction()
