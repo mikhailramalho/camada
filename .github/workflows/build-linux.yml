@@ -12,7 +12,7 @@ jobs:
 
       # Setup Catch2. TODO: replace it with https://github.com/marketplace/actions/continuous-benchmark
     - name: Setup Catch2
-      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF -GNinja && cd build && sudo ninja && sudo ninja install
 
       # Setup/cache GMP
     - name: Cache GMP
@@ -48,7 +48,7 @@ jobs:
 
     - name: Setup CVC4
       if: steps.cache-cvc4.outputs.cache-hit != 'true'
-      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh --symfpu --optimized --prefix=$PWD/../cvc4 --static --no-static-binary && cd build && make -j4 && make install
+      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./contrib/get-symfpu && ./configure.sh production --symfpu --optimized --prefix=$PWD/../cvc4 --static --no-static-binary --ninja && cd build && ninja && ninja install
 
       # Setup/cache MathSAT
     - name: Cache MathSAT
@@ -102,7 +102,7 @@ jobs:
     - name: Configure Camada
       run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCAMADA_ENABLE_SOLVER_CVC4=ON -DSOLVER_CVC4_DIR=$PWD/../cvc4 -DSOLVER_CVC4_SYMFPU_DIR=$PWD/../CVC4/deps/install/include -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
     - name: Build Camada
-      run: cd build && cmake --build . && ninja install
+      run: cd build && ninja && ninja install
     - name: Run tests
       run: cd build/regression && ctest -j4 --output-on-failure --progress .
 
