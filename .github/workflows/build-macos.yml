@@ -70,16 +70,8 @@ jobs:
       run: git clone https://github.com/mikhailramalho/minisat-os-x.git && cd minisat-os-x && make config prefix=/usr/local && make -j install
 
       # Setup/cache STP
-    - name: Cache STP
-      id: cache-stp
-      uses: actions/cache@v2
-      with:
-        path: stp-release
-        key: ${{ runner.os }}-stp
-
     - name: Setup STP
       continue-on-error: true
-      if: steps.cache-stp.outputs.cache-hit != 'true'
       run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release && ninja install
 
     - name: Setup Yices
