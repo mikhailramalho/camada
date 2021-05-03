@@ -75,7 +75,7 @@ jobs:
       run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release && ninja install
 
     - name: Setup Yices
-      run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j4 && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
+      run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
     - name: Install yices
       run: cp yices/lib/libyices.dylib /usr/local/lib && cp yices/lib/libyices.a /usr/local/lib
 
