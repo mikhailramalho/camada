@@ -45,8 +45,69 @@ jobs:
     - name: Setup SymFPU
       run: git clone https://github.com/martin-cs/symfpu && cd symfpu && git reset --hard 8fbe139bf0071cbe0758d2f6690a546c69ff0053
 
+      # Setup/cache MathSAT
+    - name: Cache MathSAT
+      id: cache-mathsat
+      uses: actions/cache@v2
+      with:
+        path: mathsat
+        key: ${{ runner.os }}-mathsat
+
+    - name: Setup MathSAT
+      if: steps.cache-mathsat.outputs.cache-hit != 'true'
+      run: wget https://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-linux-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-linux-x86_64 mathsat && ln -s /usr/local/include/gmp.h mathsat/include/gmp.h && cp mathsat/lib/libmathsat.dylib /usr/local/lib && cp mathsat/lib/libmathsat.a /usr/local/lib
+
+      # Setup/cache CryptoMiniSAT
+    - name: Cache CryptoMiniSAT
+      id: cache-cryptominisat
+      uses: actions/cache@v2
+      with:
+        path: cryptominisat
+        key: ${{ runner.os }}-cryptominisat
+
+    - name: Setup CryptoMiniSAT
+      if: steps.cache-cryptominisat.outputs.cache-hit != 'true'
+      run: wget -c https://github.com/msoos/cryptominisat/archive/5.8.0.zip && unzip 5.8.0.zip && cd cryptominisat-5.8.0 && mkdir build && cd build && cmake .. -GNinja && ninja && ninja install
+
+      # Setup/cache MiniSAT
+    - name: Cache MiniSAT
+      id: cache-minisat
+      uses: actions/cache@v2
+      with:
+        path: minisat
+        key: ${{ runner.os }}-minisat
+
+    - name: Setup MiniSAT
+      if: steps.cache-minisat.outputs.cache-hit != 'true'
+      run: git clone https://github.com/mikhailramalho/minisat-os-x.git && cd minisat-os-x && make config prefix=/usr/local && make install
+
+      # Setup/cache STP
+    - name: Cache STP
+      id: cache-stp
+      uses: actions/cache@v2
+      with:
+        path: stp-release
+        key: ${{ runner.os }}-stp
+
+    - name: Setup STP
+      continue-on-error: true
+      if: steps.cache-stp.outputs.cache-hit != 'true'
+      run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release && ninja install
+
+      # Setup/cache Yices
+    - name: Cache Yices
+      id: cache-yices
+      uses: actions/cache@v2
+      with:
+        path: yices
+        key: ${{ runner.os }}-yices
+
+    - name: Setup Yices 2
+      if: steps.cache-yices.outputs.cache-hit != 'true'
+      run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j4 && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib && cp yices/lib/libyices.dylib /usr/local/lib && cp yices/lib/libyices.a /usr/local/lib
+
     - name: Configure Camada
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
     - name: Build Camada
       run: cd build && ninja && ninja install
     - name: Run tests
