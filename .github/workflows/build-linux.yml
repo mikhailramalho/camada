@@ -11,8 +11,19 @@ jobs:
       run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF && sudo cmake --build build/ --target install
+
+      # Setup/cache GMP
+    - name: Cache GMP
+      id: cache-gmp
+      uses: actions/cache@v2
+      with:
+        path: $PWD/../gmp
+        key: ${{ runner.os }}-gmp
+
     - name: Setup GMP
+      if: steps.cache-gmp.outputs.cache-hit != 'true'
       run: wget https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz && tar xf gmp-6.1.2.tar.xz && rm gmp-6.1.2.tar.xz && cd gmp-6.1.2 && ./configure --prefix $PWD/../gmp --disable-shared ABI=64 CFLAGS=-fPIC CPPFLAGS=-DPIC && make -j4 && make install
+
     - name: Setup boolector
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j4 && make install
     - name: Setup CVC4
