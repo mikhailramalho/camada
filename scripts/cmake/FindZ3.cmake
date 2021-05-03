@@ -31,9 +31,9 @@ function(check_z3_version z3_include z3_lib)
 endfunction(check_z3_version)
 
 # Looking for Z3 in SOLVER_Z3_INCLUDE_DIR
-find_path(SOLVER_Z3_INCLUDE_DIR z3.h PATHS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES include)
+find_path(SOLVER_Z3_INCLUDE_DIR z3.h HINTS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES include)
 
-find_library(SOLVER_Z3_LIB z3 PATHS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES lib bin)
+find_library(SOLVER_Z3_LIB z3 HINTS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that
 # prints Z3's version
