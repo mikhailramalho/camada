@@ -55,7 +55,7 @@ jobs:
 
     - name: Setup MathSAT
       if: steps.cache-mathsat.outputs.cache-hit != 'true'
-      run: wget https://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-linux-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-linux-x86_64 mathsat && ln -s /usr/local/include/gmp.h mathsat/include/gmp.h && cp mathsat/lib/libmathsat.dylib /usr/local/lib && cp mathsat/lib/libmathsat.a /usr/local/lib
+      run: wget http://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-darwin-libcxx-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-darwin-libcxx-x86_64 mathsat && ln -s /usr/local/include/gmp.h mathsat/include/gmp.h && cp mathsat/lib/libmathsat.dylib /usr/local/lib && cp mathsat/lib/libmathsat.a /usr/local/lib
 
       # Setup/cache CryptoMiniSAT
     - name: Cache CryptoMiniSAT
