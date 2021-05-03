@@ -45,29 +45,11 @@ jobs:
       if: steps.cache-mathsat.outputs.cache-hit != 'true'
       run: wget http://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-darwin-libcxx-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-darwin-libcxx-x86_64 mathsat && ln -s /usr/local/include/gmp.h mathsat/include/gmp.h && cp mathsat/lib/libmathsat.dylib /usr/local/lib && cp mathsat/lib/libmathsat.a /usr/local/lib
 
-      # Setup/cache CryptoMiniSAT
-    - name: Cache CryptoMiniSAT
-      id: cache-cryptominisat
-      uses: actions/cache@v2
-      with:
-        path: cryptominisat
-        key: ${{ runner.os }}-cryptominisat
-
     - name: Setup CryptoMiniSAT
-      if: steps.cache-cryptominisat.outputs.cache-hit != 'true'
-      run: wget -c https://github.com/msoos/cryptominisat/archive/5.8.0.zip && unzip 5.8.0.zip && cd cryptominisat-5.8.0 && mkdir build && cd build && cmake .. -GNinja && ninja && ninja install
-
-      # Setup/cache MiniSAT
-    - name: Cache MiniSAT
-      id: cache-minisat
-      uses: actions/cache@v2
-      with:
-        path: minisat
-        key: ${{ runner.os }}-minisat
+      run: wget -c https://github.com/msoos/cryptominisat/archive/5.8.0.zip && unzip 5.8.0.zip && cd cryptominisat-5.8.0 && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../cryptominisat && ninja && ninja install
 
     - name: Setup MiniSAT
-      if: steps.cache-minisat.outputs.cache-hit != 'true'
-      run: git clone https://github.com/mikhailramalho/minisat-os-x.git && cd minisat-os-x && make config prefix=/usr/local && make -j install
+      run: git clone https://github.com/mikhailramalho/minisat-os-x.git && cd minisat-os-x && make config prefix=$PWD/../minisat && make -j install
 
       # Setup/cache STP
     - name: Setup STP
