@@ -17,18 +17,6 @@ jobs:
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF -GNinja && cd build && sudo ninja && sudo ninja install
 
-      # Setup/cache GMP
-    - name: Cache GMP
-      id: cache-gmp
-      uses: actions/cache@v2
-      with:
-        path: gmp
-        key: ${{ runner.os }}-gmp
-
-    - name: Setup GMP
-      if: steps.cache-gmp.outputs.cache-hit != 'true'
-      run: wget https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz && tar xf gmp-6.1.2.tar.xz && rm gmp-6.1.2.tar.xz && cd gmp-6.1.2 && ./configure --prefix $PWD/../gmp --disable-shared ABI=64 CFLAGS=-fPIC CPPFLAGS=-DPIC && make -j4 && make install
-
       # Setup/cache Boolector
     - name: Cache Boolector
       id: cache-boolector
@@ -109,7 +97,7 @@ jobs:
       run: cp yices/lib/libyices.dylib /usr/local/lib && cp yices/lib/libyices.a /usr/local/lib
 
     - name: Configure Camada
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DGMP_DIR=$PWD/../gmp -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON -DSOLVER_BOOLECTOR_DIR=$PWD/../boolector-release -DCAMADA_ENABLE_SOLVER_MATHSAT=ON -DSOLVER_MATHSAT_DIR=$PWD/../mathsat -DCAMADA_ENABLE_SOLVER_STP=ON -DSOLVER_STP_DIR=$PWD/../stp-release -DCAMADA_ENABLE_SOLVER_YICES=ON -DSOLVER_YICES_DIR=$PWD/../yices -DCAMADA_ENABLE_SOLVER_Z3=ON -DSOLVER_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
     - name: Build Camada
       run: cd build && ninja && ninja install
     - name: Run tests
