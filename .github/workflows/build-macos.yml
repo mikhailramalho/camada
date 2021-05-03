@@ -34,7 +34,7 @@ jobs:
       id: cache-boolector
       uses: actions/cache@v2
       with:
-        path: boolector
+        path: boolector-release
         key: ${{ runner.os }}-boolector
 
     - name: Setup boolector
