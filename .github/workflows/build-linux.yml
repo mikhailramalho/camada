@@ -16,28 +16,28 @@ jobs:
 
       # Setup/cache GMP
     - name: Cache GMP
-      id: cache-gmp
+      id: cache-gmp-v1
       uses: actions/cache@v2
       with:
         path: gmp
-        key: ${{ runner.os }}-gmp
+        key: ${{ runner.os }}-gmp-v1
 
     - name: Setup GMP
-      if: steps.cache-gmp.outputs.cache-hit != 'true'
+      if: steps.cache-gmp-v1.outputs.cache-hit != 'true'
       run: wget https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz && tar xf gmp-6.1.2.tar.xz && rm gmp-6.1.2.tar.xz && cd gmp-6.1.2 && ./configure --prefix $PWD/../gmp --disable-shared ABI=64 CFLAGS=-fPIC CPPFLAGS=-DPIC && make -j && make install
 
       # Setup/cache Boolector
     - name: Cache Boolector
-      id: cache-boolector
+      id: cache-btor-v1
       uses: actions/cache@v2
       with:
         path: |
           boolector-release
           boolector
-        key: ${{ runner.os }}-bool
+        key: ${{ runner.os }}-btor-v1
 
-    - name: Setup boolector
-      if: steps.cache-bool.outputs.cache-hit != 'true'
+    - name: Setup Boolector
+      if: steps.cache-btor-v1.outputs.cache-hit != 'true'
       run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j && make install
 
       # Setup SymFPU
@@ -46,63 +46,63 @@ jobs:
 
       # Setup/cache CVC4
     - name: Cache CVC4
-      id: cache-cvc4
+      id: cache-cvc4-v1
       uses: actions/cache@v2
       with:
         path: cvc4
-        key: ${{ runner.os }}-cvc4
+        key: ${{ runner.os }}-cvc4-v1
 
     - name: Setup CVC4
-      if: steps.cache-cvc4.outputs.cache-hit != 'true'
+      if: steps.cache-cvc4-v1.outputs.cache-hit != 'true'
       run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./configure.sh production --symfpu --optimized --prefix=$PWD/../cvc4 --static --no-static-binary --ninja --symfpu-dir=$PWD/../ && cd build && ninja && ninja install
 
       # Setup/cache MathSAT
     - name: Cache MathSAT
-      id: cache-mathsat
+      id: cache-mathsat-v1
       uses: actions/cache@v2
       with:
         path: mathsat
-        key: ${{ runner.os }}-mathsat
+        key: ${{ runner.os }}-mathsat-v1
 
     - name: Setup MathSAT
-      if: steps.cache-mathsat.outputs.cache-hit != 'true'
+      if: steps.cache-mathsat-v1.outputs.cache-hit != 'true'
       run: wget https://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-linux-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-linux-x86_64 mathsat
 
       # Setup/cache STP
     - name: Cache STP
-      id: cache-stp
+      id: cache-stp-v1
       uses: actions/cache@v2
       with:
         path: stp-release
-        key: ${{ runner.os }}-stp
+        key: ${{ runner.os }}-stp-v1
 
     - name: Setup STP
       continue-on-error: true
-      if: steps.cache-stp.outputs.cache-hit != 'true'
+      if: steps.cache-stp-v1.outputs.cache-hit != 'true'
       run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release && ninja install
 
       # Setup/cache Yices
     - name: Cache Yices
-      id: cache-yices
+      id: cache-yices-v1
       uses: actions/cache@v2
       with:
         path: yices
-        key: ${{ runner.os }}-yices
+        key: ${{ runner.os }}-yices-v1
 
-    - name: Setup Yices 2
-      if: steps.cache-yices.outputs.cache-hit != 'true'
+    - name: Setup Yices
+      if: steps.cache-yices-v1.outputs.cache-hit != 'true'
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices --with-static-gmp=$PWD/../gmp/lib/libgmp.a && make -j && make static-lib && make install && cp ./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a ../yices/lib
 
       # Setup/cache Z3
     - name: Cache Z3
-      id: cache-z3
+      id: cache-z3-v1
       uses: actions/cache@v2
       with:
         path: z3
-        key: ${{ runner.os }}-z3
+        key: ${{ runner.os }}-z3-v1
 
     - name: Setup Z3
-      if: steps.cache-z3.outputs.cache-hit != 'true'
+      if: steps.cache-z3-v1.outputs.cache-hit != 'true'
       run: wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.9/z3-4.8.9-x64-ubuntu-16.04.zip && unzip z3-4.8.9-x64-ubuntu-16.04.zip && mv z3-4.8.9-x64-ubuntu-16.04 z3
 
     - name: Configure Camada
