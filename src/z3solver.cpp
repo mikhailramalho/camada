@@ -40,9 +40,7 @@ unsigned Z3Sort::getWidthFromSolver() const {
   return 3;
 }
 
-void Z3Sort::dump() const {
-  std::cerr << Z3_sort_to_string(*Context, Sort) << '\n';
-}
+void Z3Sort::dump() const { std::cerr << Sort << '\n'; }
 
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort)
@@ -50,9 +48,7 @@ bool Z3Expr::equal_to(SMTExpr const &Other) const {
   return z3::eq(Expr, dynamic_cast<const Z3Expr &>(Other).Expr);
 }
 
-void Z3Expr::dump() const {
-  std::cerr << Z3_ast_to_string(*Context, Expr) << '\n';
-}
+void Z3Expr::dump() const { std::cerr << Expr << '\n'; }
 
 Z3Solver::Z3Solver()
     : Context(std::make_shared<z3::context>()), Solver(*Context) {
@@ -759,13 +755,9 @@ std::string Z3Solver::getSolverNameAndVersion() const {
       .append(std::to_string(revision));
 }
 
-void Z3Solver::dumpImpl() {
-  std::cerr << Z3_solver_to_string(*Context, Solver) << '\n';
-}
+void Z3Solver::dumpImpl() { std::cerr << Solver << '\n'; }
 
-void Z3Solver::dumpModelImpl() {
-  std::cerr << Z3_model_to_string(*Context, Solver.get_model()) << '\n';
-}
+void Z3Solver::dumpModelImpl() { std::cerr << Solver.get_model() << '\n'; }
 
 } // namespace camada
 
