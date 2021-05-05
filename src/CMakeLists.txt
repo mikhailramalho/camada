@@ -39,6 +39,12 @@ add_library(${LIBRARY_TARGET_NAME} ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TAR
 # to use such a name for a different target type will result in an error.
 add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
 
+# Solvers
+if(${Boolector_FOUND})
+    target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC Boolector::boolector)
+    target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_BOOLECTOR_ENABLED)
+endif()
+
 # Set two minimum target properties for the library.
 # See https://cmake.org/cmake/help/latest/command/set_target_properties.html
 # Properties are: 1) Library version number 2) list of corresponding public headers
