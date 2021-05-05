@@ -45,6 +45,15 @@ if(${Boolector_FOUND})
     target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_BOOLECTOR_ENABLED)
 endif()
 
+if(${CVC4_FOUND})
+    target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC CVC4::cvc4)
+    target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC4_ENABLED)
+    if(DEFINED CVC4_SYMFPU_DIR)
+      target_include_directories(${LIBRARY_TARGET_NAME} PUBLIC ${CVC4_SYMFPU_DIR})
+    endif()
+endif()
+
+
 # Set two minimum target properties for the library.
 # See https://cmake.org/cmake/help/latest/command/set_target_properties.html
 # Properties are: 1) Library version number 2) list of corresponding public headers
