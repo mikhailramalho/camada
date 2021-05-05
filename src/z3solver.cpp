@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "ac_config.h"
-#ifdef SOLVER_Z3_ENABLED
+#if SOLVER_Z3_ENABLED
 
 #include "z3solver.h"
 

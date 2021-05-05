@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "ac_config.h"
-#ifdef SOLVER_YICES_ENABLED
+#if SOLVER_YICES_ENABLED
 
 #include "yicessolver.h"
 

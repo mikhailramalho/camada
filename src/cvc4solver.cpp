@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "ac_config.h"
-#ifdef SOLVER_CVC4_ENABLED
+#if SOLVER_CVC4_ENABLED
 
 #include "cvc4solver.h"
 
