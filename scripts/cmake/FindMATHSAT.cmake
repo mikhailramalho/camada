@@ -16,7 +16,7 @@ function(check_mathsat_version mathsat_include mathsat_lib)
   )
 
   if(NOT MATHSAT_COMPILED)
-    message(FATAL_ERROR "MathSAT lib found in ${mathsat_lib_path} but test compilation failed")
+    message(FATAL_ERROR "MathSAT lib found in ${mathsat_lib_path} but test compilation failed: ${SRC_OUTPUT}")
   endif()
 
   string(REGEX MATCH "([0-9]*\\.[0-9]*\\.[0-9]*)" mathsat_version "${SRC_OUTPUT}")

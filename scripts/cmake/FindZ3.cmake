@@ -23,7 +23,7 @@ function(check_z3_version z3_include z3_lib)
   )
 
   if(NOT Z3_COMPILED)
-    message(FATAL_ERROR "Z3 lib found in ${z3_lib_path} but test compilation failed")
+    message(FATAL_ERROR "Z3 lib found in ${z3_lib_path} but test compilation failed: ${SRC_OUTPUT}")
   endif()
 
   string(REGEX MATCH "([0-9]*\\.[0-9]*\\.[0-9]*)" z3_version "${SRC_OUTPUT}")

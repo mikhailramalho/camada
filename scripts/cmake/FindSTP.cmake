@@ -16,7 +16,7 @@ function(check_stp_version stp_include stp_lib)
   )
 
   if(NOT STP_COMPILED)
-    message(FATAL_ERROR "STP lib found in ${stp_lib_path} but test compilation failed")
+    message(FATAL_ERROR "STP lib found in ${stp_lib_path} but test compilation failed: ${SRC_OUTPUT}")
   endif()
 
   string(REGEX MATCH "([0-9]*\\.[0-9]*\\.[0-9]*)" stp_version "${SRC_OUTPUT}")
