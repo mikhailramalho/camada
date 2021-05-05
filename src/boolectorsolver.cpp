@@ -19,7 +19,6 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #if SOLVER_BOOLECTOR_ENABLED
 
 #include "boolectorsolver.h"
