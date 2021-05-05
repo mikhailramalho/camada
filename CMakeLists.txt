@@ -1,12 +1,9 @@
 cmake_minimum_required (VERSION 3.7)
-project (Camada LANGUAGES CXX)
 
-#-----------------------------------------------------------------------------#
-# Version number
+set (CAMADA_VER_MAJOR 0)
+set (CAMADA_VER_MINOR 0)
 
-set (CAMADA_VERSION_MAJOR 0)
-set (CAMADA_VERSION_MINOR 0)
-set (CAMADA_VERSION "${CAMADA_VERSION_MAJOR}.${CAMADA_VERSION_MINOR}")
+project (Camada LANGUAGES CXX C VERSION "${CAMADA_VER_MAJOR}.${CAMADA_VER_MINOR}")
 
 #-----------------------------------------------------------------------------#
 # General macros
@@ -36,47 +33,77 @@ macro(config_solver name version)
 
   # Set the variable to enable the solver to 0, if the solver is enabled, it will be set to 1
   set(SOLVER_${name}_ENABLED 0)
-
-  if(NOT CAMADA_ENABLE_SOLVER_${name} STREQUAL "OFF")
-    # Try to find the solver and version
-    find_package(${name} ${version})
-
-    # If the solver was found, enable it _IF_ the user did not explicitly disable it
-    if(${name}_FOUND)
-      set_option(CAMADA_ENABLE_SOLVER_${name} ON)
-    endif()
-
-    if(CAMADA_ENABLE_SOLVER_${name} STREQUAL "ON")
-
-      # If the solver was enabled but we could not find it, throw an error
-      if(NOT ${name}_FOUND)
-        message(FATAL_ERROR "CAMADA_ENABLE_SOLVER_${name} cannot be enabled when ${name} is not available")
-      endif()
-
-      # otherwise, add it to the list of available solvers
-      list(APPEND CAMADA_AVAILABLE_SOLVERS "${name}")
-
-      # Set the variable to enable the solver to 1
-      set(SOLVER_${name}_ENABLED 1)
-
-      # Add include dirs
-      include_directories(${SOLVER_${name}_INCLUDE_DIR})
-
-      # and the libs to the list of solver libs
-      list(APPEND CAMADA_SOLVER_LIBS "${SOLVER_${name}_LIB}")
-    endif()
-  endif()
 endmacro()
 
 #-----------------------------------------------------------------------------#
+
+# Defines the CMAKE_INSTALL_LIBDIR, CMAKE_INSTALL_BINDIR and many other useful macros.
+# See https://cmake.org/cmake/help/latest/module/GNUInstallDirs.html
+include(GNUInstallDirs)
+
+# Control where libraries and executables are placed during the build.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
+
+# To build shared libraries in Windows, we set CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS to TRUE.
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
+# Under MSVC, we set CMAKE_DEBUG_POSTFIX to "d" to add a trailing "d" to library
+# built in debug mode.
+if(MSVC)
+    set(CMAKE_DEBUG_POSTFIX "d")
+endif()
+
+# Build position independent code.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Disable C and C++ compiler extensions.
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 # Adds custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/scripts/cmake/")
 
+# Add option to build using sanitizers
 include(Sanitizers)
+
+# Enable ccache if available
 include(OptimizationCCache)
 
-#-----------------------------------------------------------------------------#
-# General options
+# Shared/Dynamic or Static library?
+option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
+
+option(ENABLE_WARNINGS "Enable -Wall, -Wextra, and -pedantic when compiling (default: OFF)" OFF)
+if(ENABLE_WALL)
+  add_definitions(-Wall -Wextra -pedantic)
+endif()
+
+option(ENABLE_WERROR "All warnings are treated as errors when compiling (default: OFF)" OFF)
+if(ENABLE_WERROR)
+  add_definitions(-Werror)
+endif()
+
+# Demand C++14
+set (CMAKE_CXX_STANDARD 14)
+
+# Generate compile commands by default
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Build test related commands
+option(CAMADA_ENABLE_REGRESSION "Enable regression testing" OFF)
+if(CAMADA_ENABLE_REGRESSION)
+  include(CTest)
+  find_package(Catch2 REQUIRED)
+  enable_testing()
+endif()
+
+# Enable RPATH support for installed binaries and libraries
+include(AddInstallRPATHSupport)
+add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_FULL_BINDIR}"
+                          LIB_DIRS "${CMAKE_INSTALL_FULL_LIBDIR}"
+                          INSTALL_NAME_DIR "${CMAKE_INSTALL_FULL_LIBDIR}"
+                          USE_LINK_PATH)
 
 # Set a default build type if none was specified
 set(default_build_type "RelWithDebInfo")
@@ -89,31 +116,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "Debug" "Release" "MinSizeRel" "RelWithDebInfo" "Sanitizer")
 endif()
 
-option(ENABLE_WERROR "All warnings are treated as errors during compilation (default: OFF)" OFF)
-if(ENABLE_WERROR)
-  add_definitions(-Werror)
-endif()
-
-option(ENABLE_WALL "Enable -Wall and -Wextra during compilation (default: OFF)" OFF)
-if(ENABLE_WALL)
-  add_definitions(-Wall -Wextra)
-endif()
-
-# Demand C++17
-set (CMAKE_CXX_STANDARD 17)
-
-# Used by try_compile
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# Generate compile commands by default
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Build only shared by default
-option(BUILD_SHARED_LIBS "Build shared library" ON)
-
-#-----------------------------------------------------------------------------#
 # Solvers
-
 config_solver(Z3 4.8.8)
 config_solver(MATHSAT 5.6.3)
 config_solver(CVC4 1.8)
@@ -121,51 +124,33 @@ config_solver(BOOLECTOR 3.2.1)
 config_solver(YICES 2.6.1)
 config_solver(STP 2.3.3)
 
-#-----------------------------------------------------------------------------#
 # Generate ac_config.h
-
 configure_file (
  "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/cmake_config.in"
  "${CMAKE_CURRENT_BINARY_DIR}/src/ac_config.h"
 )
 
-#-----------------------------------------------------------------------------#
-# Install version file
-
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/CamadaConfigVersion.cmake
-  VERSION ${CAMADA_VERSION}
-  COMPATIBILITY SameMajorVersion
-)
-
-# Install the config, configversion and custom find modules
-install(FILES
-  ${CMAKE_CURRENT_LIST_DIR}/scripts/cmake/CamadaConfig.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/CamadaConfigVersion.cmake
-  DESTINATION lib/cmake/Camada
-)
-
-#-----------------------------------------------------------------------------#
 # Define targets
-
 add_subdirectory(src)
 
-#-----------------------------------------------------------------------------#
-# Tests
+# Create and install CMake configuration files for your project that are
+# necessary to for other projects to call find_package(LibTemplateCMake).
+include(InstallBasicPackageFiles)
+install_basic_package_files(${PROJECT_NAME}
+                            VERSION ${${PROJECT_NAME}_VERSION}
+                            COMPATIBILITY AnyNewerVersion
+                            VARS_PREFIX ${PROJECT_NAME}
+                            NO_CHECK_REQUIRED_COMPONENTS_MACRO)
 
-option(CAMADA_ENABLE_REGRESSION "Enable regression testing" OFF)
+# Add the uninstall target
+include(AddUninstallTarget)
 
-if(CAMADA_ENABLE_REGRESSION)
-  include(CTest)
-  find_package(Catch2 REQUIRED)
-  enable_testing()
-  add_subdirectory(regression)
+# Add integration tests (unit tests for each library should be in each sublibrary directory).
+if(BUILD_TESTING)
+    add_subdirectory(regression)
 endif()
 
-#-----------------------------------------------------------------------------#
 # Print Camada configuration
-
 if(NOT WIN32)
   string(ASCII 27 Esc)
   set(Green "${Esc}[32m")

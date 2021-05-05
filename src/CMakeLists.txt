@@ -1,62 +1,54 @@
+# Include binary path so we can include ac_config.h
 include_directories(${CMAKE_BINARY_DIR}/src)
 
-#-----------------------------------------------------------------------------#
-# Macro to add solver files to compile
-function(compile_solver)
-  foreach(name IN LISTS ARGN)
-    string(TOLOWER ${name} lower_name)
+# This is the "physical" (i.e. real) name of the library.
+# The actual file name of the library built is constructed based on conventions
+# of the native platform, such as lib<LIBRARY_TARGET_NAME>.a,
+# lib<LIBRARY_TARGET_NAME>.dylib or <LIBRARY_TARGET_NAME>.lib.
+set(LIBRARY_TARGET_NAME ${PROJECT_NAME})
 
-    if(CAMADA_ENABLE_SOLVER_${name})
-      if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/${lower_name}solver.cpp")
-        message(FATAL_ERROR "Could not find backend implementation file ${CMAKE_SOURCE_DIR}/src/${lower_name}solver.cpp")
-      endif()
-
-      list(APPEND solver_src_files ${lower_name}solver.cpp)
-    endif()
-  endforeach()
-
-  set(libcamada_src_files ${libcamada_src_files} ${solver_src_files} PARENT_SCOPE)
-endfunction()
-
-# Add base implementation
-set(libcamada_src_files camada.cpp camadaexpr.cpp camadasort.cpp camadaimpl.cpp)
-
-# And compile each solver specific implementation, if it is enabled
-compile_solver(${CAMADA_AVAILABLE_SOLVERS})
-
-add_library(camada ${libcamada_src_files})
-target_link_libraries(camada PRIVATE ${CAMADA_SOLVER_LIBS})
-
-target_include_directories(camada INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
+# List of CPP (source) library files.
+set(${LIBRARY_TARGET_NAME}_SRC
+    camada.cpp
+    camadaexpr.cpp
+    camadasort.cpp
+    camadaimpl.cpp
 )
 
-install(TARGETS camada
-  EXPORT camada-export
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib
+# List of HPP (header) library files.
+set(${LIBRARY_TARGET_NAME}_HDR
+    camada.h camadasort.h camadaexpr.h camadaimpl.h
 )
 
-install(EXPORT camada-export
-  FILE CamadaTargets.cmake
-  NAMESPACE Camada::
-  DESTINATION lib/cmake/Camada)
+# Adds a library target called ${LIBRARY_TARGET_NAME} to be built from the
+# source and header files listed in the command invocation.
+add_library(${LIBRARY_TARGET_NAME} ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR})
 
-#-----------------------------------------------------------------------------#
-# Macro to add solver header to install
-function(install_solver_header)
-  foreach(name IN LISTS ARGN)
-    string(TOLOWER ${name} lower_name)
+# Within this project, you can link to this library by just specifing the name
+# of the target, i.e. ${LIBRARY_TARGET_NAME} = LibTemplateCMake. It is useful,
+# however, to define an alias of this library with the scope of the exported
+# library itself because (1) you will link against it with the exact same syntax
+# of an imported library and (2) because names having a double-colon (::) are
+# always treated as the name of either an alias or imported target. Any attempt
+# to use such a name for a different target type will result in an error.
+add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
 
-    if(CAMADA_ENABLE_SOLVER_${name})
-      install(FILES "${lower_name}solver.h" DESTINATION include/camada)
-    endif()
-  endforeach()
-endfunction()
+# Set two minimum target properties for the library.
+# See https://cmake.org/cmake/help/latest/command/set_target_properties.html
+# Properties are: 1) Library version number 2) list of corresponding public headers
+set_target_properties(${LIBRARY_TARGET_NAME} PROPERTIES VERSION       ${${PROJECT_NAME}_VERSION}
+                                                        PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_HDR}")
 
-# Install camada header
-install(FILES camada.h camadasort.h camadaexpr.h camadaimpl.h DESTINATION include/camada)
+# Specify include directories for both compilation and installation process.
+# The $<INSTALL_PREFIX> generator expression is useful to ensure to create
+# relocatable configuration files, see https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-relocatable-packages
+target_include_directories(${LIBRARY_TARGET_NAME} PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                                                         "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>")
 
-# And header for each enabled solver
-install_solver_header(${CAMADA_AVAILABLE_SOLVERS})
+# Specify installation targets, typology and destination folders.
+install(TARGETS ${LIBRARY_TARGET_NAME}
+        EXPORT  ${PROJECT_NAME}
+        LIBRARY       DESTINATION "${CMAKE_INSTALL_LIBDIR}"                            COMPONENT shlib
+        ARCHIVE       DESTINATION "${CMAKE_INSTALL_LIBDIR}"                            COMPONENT lib
+        RUNTIME       DESTINATION "${CMAKE_INSTALL_BINDIR}"                            COMPONENT bin
+        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}" COMPONENT dev)
