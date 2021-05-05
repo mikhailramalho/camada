@@ -13,6 +13,12 @@ set(${LIBRARY_TARGET_NAME}_SRC
     camadaexpr.cpp
     camadasort.cpp
     camadaimpl.cpp
+    boolectorsolver.cpp
+    cvc4solver.cpp
+    mathsatsolver.cpp
+    stpsolver.cpp
+    yicessolver.cpp
+    z3solver.cpp
 )
 
 # List of HPP (header) library files.

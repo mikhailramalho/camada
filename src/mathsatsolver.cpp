@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "ac_config.h"
-#ifdef SOLVER_MATHSAT_ENABLED
+#if SOLVER_MATHSAT_ENABLED
 
 #include "mathsatsolver.h"
 

@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "ac_config.h"
-#ifdef SOLVER_BOOLECTOR_ENABLED
+#if SOLVER_BOOLECTOR_ENABLED
 
 #include "boolectorsolver.h"
 

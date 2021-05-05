@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "ac_config.h"
-#ifdef SOLVER_STP_ENABLED
+#if SOLVER_STP_ENABLED
 
 #include "stpsolver.h"
 
