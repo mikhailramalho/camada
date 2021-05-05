@@ -23,7 +23,6 @@ macro(set_option var value)
   endif()
 endmacro()
 
-
 # Macro to configure a solver
 macro(config_solver name version)
   # Solver Base dir, it will be used to try to find the libs and headers
