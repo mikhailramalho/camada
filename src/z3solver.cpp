@@ -23,6 +23,7 @@
 #ifdef SOLVER_Z3_ENABLED
 
 #include "z3solver.h"
+#include "z3_version.h"
 
 namespace camada {
 
@@ -269,10 +270,9 @@ SMTExprRef Z3Solver::mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 }
 
 SMTExprRef Z3Solver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(Z3Expr(
-      Context, LHS->Sort,
-      z3::to_expr(*Context, Z3_mk_xor(*Context, toSolverExpr<Z3Expr>(*LHS).Expr,
-                                      toSolverExpr<Z3Expr>(*RHS).Expr))));
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           toSolverExpr<Z3Expr>(*LHS).Expr ^
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
@@ -314,16 +314,12 @@ SMTExprRef Z3Solver::mkBVConcatImpl(const SMTExprRef &LHS,
 
 SMTExprRef Z3Solver::mkBVRedOrImpl(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
-      Context, mkBVSort(1),
-      z3::to_expr(*Context,
-                  Z3_mk_bvredor(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+      Context, mkBVSort(1), z3::bvredor(toSolverExpr<Z3Expr>(*Exp).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVRedAndImpl(const SMTExprRef &Exp) {
   return newExprRef(Z3Expr(
-      Context, mkBVSort(1),
-      z3::to_expr(*Context,
-                  Z3_mk_bvredand(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+      Context, mkBVSort(1), z3::bvredand(toSolverExpr<Z3Expr>(*Exp).Expr)));
 }
 
 SMTExprRef Z3Solver::mkArraySelectImpl(const SMTExprRef &Array,
@@ -343,10 +339,8 @@ SMTExprRef Z3Solver::mkArrayStoreImpl(const SMTExprRef &Array,
 }
 
 SMTExprRef Z3Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBoolSort(),
-      z3::to_expr(*Context,
-                  Z3_mk_fpa_abs(*Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(
+      Z3Expr(Context, mkBoolSort(), z3::abs(toSolverExpr<Z3Expr>(*Exp).Expr)));
 }
 
 SMTExprRef Z3Solver::mkFPNegImpl(const SMTExprRef &Exp) {
@@ -355,62 +349,64 @@ SMTExprRef Z3Solver::mkFPNegImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef Z3Solver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBoolSort(),
-      z3::to_expr(*Context, Z3_mk_fpa_is_infinite(
-                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*Exp).Expr.mk_is_inf()));
 }
 
 SMTExprRef Z3Solver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBoolSort(),
-      z3::to_expr(*Context, Z3_mk_fpa_is_nan(
-                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*Exp).Expr.mk_is_nan()));
 }
 
 SMTExprRef Z3Solver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBoolSort(),
-      z3::to_expr(*Context, Z3_mk_fpa_is_subnormal(
-                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*Exp).Expr.mk_is_subnormal()));
 }
 
 SMTExprRef Z3Solver::mkFPIsNormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBoolSort(),
-      z3::to_expr(*Context, Z3_mk_fpa_is_normal(
-                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*Exp).Expr.mk_is_normal()));
 }
 
 SMTExprRef Z3Solver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBoolSort(),
-      z3::to_expr(*Context, Z3_mk_fpa_is_zero(
-                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*Exp).Expr.mk_is_zero()));
+}
+
+z3::rounding_mode convertToZ3RoundingMode(const RM &R) {
+  switch (R) {
+  default:
+    assert(0 && "Unsupported floating-point semantics.");
+    __builtin_unreachable();
+  case RM::ROUND_TO_EVEN:
+    return z3::RNE;
+  case RM::ROUND_TO_AWAY:
+    return z3::RNA;
+  case RM::ROUND_TO_PLUS_INF:
+    return z3::RTP;
+  case RM::ROUND_TO_MINUS_INF:
+    return z3::RTN;
+  case RM::ROUND_TO_ZERO:
+    return z3::RTZ;
+  }
 }
 
 SMTExprRef Z3Solver::mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                  const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, LHS->Sort,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_mul(*Context,
-                                       toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                                       toSolverExpr<Z3Expr>(*LHS).Expr,
-                                       toSolverExpr<Z3Expr>(*RHS).Expr))));
+  toSolverExpr<Z3Expr>(*LHS).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           toSolverExpr<Z3Expr>(*LHS).Expr *
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                  const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, LHS->Sort,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_div(*Context,
-                                       toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                                       toSolverExpr<Z3Expr>(*LHS).Expr,
-                                       toSolverExpr<Z3Expr>(*RHS).Expr))));
+  toSolverExpr<Z3Expr>(*LHS).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           toSolverExpr<Z3Expr>(*LHS).Expr /
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
@@ -421,49 +417,37 @@ SMTExprRef Z3Solver::mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef Z3Solver::mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                  const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, LHS->Sort,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_add(*Context,
-                                       toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                                       toSolverExpr<Z3Expr>(*LHS).Expr,
-                                       toSolverExpr<Z3Expr>(*RHS).Expr))));
+  toSolverExpr<Z3Expr>(*LHS).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           toSolverExpr<Z3Expr>(*LHS).Expr +
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                  const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, LHS->Sort,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_sub(*Context,
-                                       toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                                       toSolverExpr<Z3Expr>(*LHS).Expr,
-                                       toSolverExpr<Z3Expr>(*RHS).Expr))));
+  toSolverExpr<Z3Expr>(*LHS).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           toSolverExpr<Z3Expr>(*LHS).Expr -
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(Z3Expr(
-      Context, Exp->Sort,
-      z3::to_expr(*Context,
-                  Z3_mk_fpa_sqrt(*Context,
-                                 toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                                 toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(Z3Expr(Context, Exp->Sort,
+                           z3::sqrt(toSolverExpr<Z3Expr>(*Exp).Expr,
+                                    toSolverExpr<Z3Expr>(*roundingMode).Expr)));
 }
 
 SMTExprRef Z3Solver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                  const SMTExprRef &Z, const RM &R) {
   SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, X->Sort,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_fma(*Context,
-                                       toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                                       toSolverExpr<Z3Expr>(*X).Expr,
-                                       toSolverExpr<Z3Expr>(*Y).Expr,
-                                       toSolverExpr<Z3Expr>(*Z).Expr))));
+  return newExprRef(Z3Expr(Context, X->Sort,
+                           z3::fma(toSolverExpr<Z3Expr>(*X).Expr,
+                                   toSolverExpr<Z3Expr>(*Y).Expr,
+                                   toSolverExpr<Z3Expr>(*Z).Expr,
+                                   toSolverExpr<Z3Expr>(*roundingMode).Expr)));
 }
 
 SMTExprRef Z3Solver::mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
@@ -492,81 +476,64 @@ SMTExprRef Z3Solver::mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef Z3Solver::mkFPEqualImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      Z3Expr(Context, mkBoolSort(),
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_eq(*Context, toSolverExpr<Z3Expr>(*LHS).Expr,
-                                      toSolverExpr<Z3Expr>(*RHS).Expr))));
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           z3::fp_eq(toSolverExpr<Z3Expr>(*LHS).Expr,
+                                     toSolverExpr<Z3Expr>(*RHS).Expr)));
 }
 
 SMTExprRef Z3Solver::mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                   const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, To,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_to_fp_float(
-                             *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                             toSolverExpr<Z3Expr>(*From).Expr,
-                             toSolverSort<Z3Sort>(*To).Sort))));
+  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, To,
+                           z3::fpa_to_fpa(toSolverExpr<Z3Expr>(*From).Expr,
+                                          toSolverSort<Z3Sort>(*To).Sort)));
 }
 
 SMTExprRef Z3Solver::mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, To,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_to_fp_signed(
-                             *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                             toSolverExpr<Z3Expr>(*From).Expr,
-                             toSolverSort<Z3Sort>(*To).Sort))));
+  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, To,
+                           z3::sbv_to_fpa(toSolverExpr<Z3Expr>(*From).Expr,
+                                          toSolverSort<Z3Sort>(*To).Sort)));
 }
 
 SMTExprRef Z3Solver::mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, To,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_to_fp_unsigned(
-                             *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                             toSolverExpr<Z3Expr>(*From).Expr,
-                             toSolverSort<Z3Sort>(*To).Sort))));
+  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, To,
+                           z3::ubv_to_fpa(toSolverExpr<Z3Expr>(*From).Expr,
+                                          toSolverSort<Z3Sort>(*To).Sort)));
 }
 
 SMTExprRef Z3Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  SMTExprRef roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(RM::ROUND_TO_ZERO));
   return newExprRef(
       Z3Expr(Context, mkBVSort(ToWidth),
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_to_sbv(
-                             *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                             toSolverExpr<Z3Expr>(*From).Expr, ToWidth))));
+             z3::fpa_to_sbv(toSolverExpr<Z3Expr>(*From).Expr, ToWidth)));
 }
 
 SMTExprRef Z3Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  SMTExprRef roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(RM::ROUND_TO_ZERO));
   return newExprRef(
       Z3Expr(Context, mkBVSort(ToWidth),
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_to_ubv(
-                             *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                             toSolverExpr<Z3Expr>(*From).Expr, ToWidth))));
+             z3::fpa_to_ubv(toSolverExpr<Z3Expr>(*From).Expr, ToWidth)));
 }
 
 SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      Z3Expr(Context, From->Sort,
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_round_to_integral(
-                             *Context, toSolverExpr<Z3Expr>(*roundingMode).Expr,
-                             toSolverExpr<Z3Expr>(*From).Expr))));
+  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
+      convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(
+      Context, From->Sort,
+      z3::round_fpa_to_closest_integer(toSolverExpr<Z3Expr>(*From).Expr)));
 }
 
 bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
@@ -598,10 +565,9 @@ std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
 
   // Convert the float to bv
   Z3_ast fp_value;
-  bool eval = Z3_model_eval(
-      *Context, Solver.get_model(),
-      Z3_mk_fpa_to_ieee_bv(*Context, toSolverExpr<Z3Expr>(*value).Expr), true,
-      &fp_value);
+  bool eval = Z3_model_eval(*Context, Solver.get_model(),
+                            toSolverExpr<Z3Expr>(*value).Expr.mk_to_ieee_bv(),
+                            true, &fp_value);
   (void)eval;
   assert(eval && "Failed to convert FP to BV in Z3");
   return Z3_get_numeral_binary_string(*Context, fp_value);
@@ -614,7 +580,7 @@ SMTExprRef Z3Solver::getArrayElementImpl(const SMTExprRef &Array,
 
   return newExprRef(
       Z3Expr(Context, sel->Sort,
-             Solver.get_model().eval(toSolverExpr<Z3Expr>(*value).Expr)));
+             Solver.get_model().eval(toSolverExpr<Z3Expr>(*value).Expr, true)));
 }
 
 SMTExprRef Z3Solver::mkBoolImpl(const bool b) {
@@ -650,12 +616,10 @@ SMTExprRef Z3Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
   SMTExprRef exp = SMTSolverImpl::mkBVFromBin(FP.substr(1, EWidth));
   SMTExprRef sig = SMTSolverImpl::mkBVFromBin(FP.substr(1 + EWidth));
 
-  return newExprRef(
-      Z3Expr(Context, mkFPSort(EWidth, FP.length() - EWidth - 1),
-             z3::to_expr(*Context,
-                         Z3_mk_fpa_fp(*Context, toSolverExpr<Z3Expr>(*sgn).Expr,
+  return newExprRef(Z3Expr(Context, mkFPSort(EWidth, FP.length() - EWidth - 1),
+                           z3::fpa_fp(toSolverExpr<Z3Expr>(*sgn).Expr,
                                       toSolverExpr<Z3Expr>(*exp).Expr,
-                                      toSolverExpr<Z3Expr>(*sig).Expr))));
+                                      toSolverExpr<Z3Expr>(*sig).Expr)));
 }
 
 SMTExprRef Z3Solver::mkRMImpl(const RM &R) {
@@ -687,9 +651,7 @@ SMTExprRef Z3Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                const unsigned SigWidth) {
   SMTSortRef sort = mkFPSort(ExpWidth, SigWidth - 1);
   SMTExprRef theNaN = newExprRef(Z3Expr(
-      Context, sort,
-      z3::to_expr(*Context,
-                  Z3_mk_fpa_nan(*Context, toSolverSort<Z3Sort>(*sort).Sort))));
+      Context, sort, Context->fpa_nan(toSolverSort<Z3Sort>(*sort).Sort)));
 
   return Sgn ? mkFPNeg(theNaN) : theNaN;
 }
@@ -698,28 +660,21 @@ SMTExprRef Z3Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                const unsigned SigWidth) {
   SMTSortRef sort = mkFPSort(ExpWidth, SigWidth - 1);
   return newExprRef(Z3Expr(
-      Context, sort,
-      z3::to_expr(
-          *Context,
-          Z3_mk_fpa_inf(*Context, toSolverSort<Z3Sort>(*sort).Sort, Sgn))));
+      Context, sort, Context->fpa_inf(toSolverSort<Z3Sort>(*sort).Sort, Sgn)));
 }
 
 SMTExprRef Z3Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                       const SMTSortRef &To) {
-  return newExprRef(Z3Expr(
-      Context, To,
-      z3::to_expr(*Context,
-                  Z3_mk_fpa_to_fp_bv(*Context, toSolverExpr<Z3Expr>(*Exp).Expr,
-                                     toSolverSort<Z3Sort>(*To).Sort))));
+  return newExprRef(Z3Expr(Context, To,
+                           toSolverExpr<Z3Expr>(*Exp).Expr.mk_from_ieee_bv(
+                               toSolverSort<Z3Sort>(*To).Sort)));
 }
 
 SMTExprRef Z3Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   SMTSortRef to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
                              Exp->Sort->getFPSignificandWidth());
-  return newExprRef(Z3Expr(
-      Context, to,
-      z3::to_expr(*Context, Z3_mk_fpa_to_ieee_bv(
-                                *Context, toSolverExpr<Z3Expr>(*Exp).Expr))));
+  return newExprRef(
+      Z3Expr(Context, to, toSolverExpr<Z3Expr>(*Exp).Expr.mk_to_ieee_bv()));
 }
 
 SMTExprRef Z3Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
@@ -745,14 +700,12 @@ checkResult Z3Solver::checkImpl() {
 void Z3Solver::resetImpl() { Solver.reset(); }
 
 std::string Z3Solver::getSolverNameAndVersion() const {
-  unsigned int major, minor, build, revision;
-  Z3_get_version(&major, &minor, &build, &revision);
   return std::string("Z3 v")
-      .append(std::to_string(major))
+      .append(std::to_string(Z3_MAJOR_VERSION))
       .append(".")
-      .append(std::to_string(minor))
+      .append(std::to_string(Z3_MINOR_VERSION))
       .append(".")
-      .append(std::to_string(revision));
+      .append(std::to_string(Z3_BUILD_NUMBER));
 }
 
 void Z3Solver::dumpImpl() { std::cerr << Solver << '\n'; }
