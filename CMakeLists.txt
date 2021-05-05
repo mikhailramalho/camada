@@ -23,16 +23,31 @@ macro(set_option var value)
   endif()
 endmacro()
 
+
 # Macro to configure a solver
 macro(config_solver name version)
   # Solver Base dir, it will be used to try to find the libs and headers
-  set(SOLVER_${name}_DIR "" CACHE STRING "Directory of the ${name} solver (optional)")
+  set(CAMADA_${name}_DIR "" CACHE STRING "Directory of the ${name} solver (optional)")
 
   # Define the options
-  option3vl(CAMADA_ENABLE_SOLVER_${name} "Build Camada with ${name}")
+  option3vl(CAMADA_SOLVER_${name}_ENABLE "Build Camada with ${name}")
 
-  # Set the variable to enable the solver to 0, if the solver is enabled, it will be set to 1
-  set(SOLVER_${name}_ENABLED 0)
+  if(NOT CAMADA_SOLVER_${name}_ENABLE STREQUAL "OFF")
+    # Try to find the solver and version
+    find_package(${name} ${version})
+
+    # If the solver was found, enable it _IF_ the user did not explicitly disable it
+    if(${name}_FOUND)
+      set_option(CAMADA_SOLVER_${name}_ENABLE ON)
+    endif()
+
+    if(CAMADA_SOLVER_${name}_ENABLE STREQUAL "ON")
+      # If the solver was enabled but we could not find it, throw an error
+      if(NOT ${name}_FOUND)
+        message(FATAL_ERROR "CAMADA_SOLVER_${name}_ENABLE cannot be enabled when ${name} is not available")
+      endif()
+    endif()
+  endif()
 endmacro()
 
 #-----------------------------------------------------------------------------#
@@ -116,13 +131,8 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "Debug" "Release" "MinSizeRel" "RelWithDebInfo" "Sanitizer")
 endif()
 
-# Solvers
-config_solver(Z3 4.8.8)
-config_solver(MATHSAT 5.6.3)
-config_solver(CVC4 1.8)
-config_solver(BOOLECTOR 3.2.1)
-config_solver(YICES 2.6.1)
-config_solver(STP 2.3.3)
+# Find solvers
+config_solver(Boolector 3.2.1)
 
 # Generate ac_config.h
 configure_file (
@@ -173,9 +183,9 @@ endmacro()
 config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 
-config_info_bool("Solver Z3" "${CAMADA_ENABLE_SOLVER_Z3}")
-config_info_bool("Solver MathSAT" "${CAMADA_ENABLE_SOLVER_MATHSAT}")
-config_info_bool("Solver CVC4" "${CAMADA_ENABLE_SOLVER_CVC4}")
-config_info_bool("Solver Boolector" "${CAMADA_ENABLE_SOLVER_BOOLECTOR}")
-config_info_bool("Solver Yices" "${CAMADA_ENABLE_SOLVER_YICES}")
-config_info_bool("Solver STP" "${CAMADA_ENABLE_SOLVER_STP}")
+config_info_bool("Solver Z3" "${CAMADA_SOLVER_z3_ENABLE}")
+config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_mathsat_ENABLE}")
+config_info_bool("Solver CVC4" "${CAMADA_SOLVER_cvc4_ENABLE}")
+config_info_bool("Solver Boolector" "${CAMADA_SOLVER_Boolector_ENABLE}")
+config_info_bool("Solver Yices" "${CAMADA_SOLVER_yices_ENABLE}")
+config_info_bool("Solver STP" "${CAMADA_SOLVER_stp_ENABLE}")
