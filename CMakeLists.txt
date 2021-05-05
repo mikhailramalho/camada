@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.7)
 set (CAMADA_VER_MAJOR 0)
 set (CAMADA_VER_MINOR 0)
 
-project (Camada LANGUAGES CXX C VERSION "${CAMADA_VER_MAJOR}.${CAMADA_VER_MINOR}")
+project (camada LANGUAGES CXX C VERSION "${CAMADA_VER_MAJOR}.${CAMADA_VER_MINOR}")
 
 #-----------------------------------------------------------------------------#
 # General macros
