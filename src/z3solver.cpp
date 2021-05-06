@@ -483,8 +483,7 @@ SMTExprRef Z3Solver::mkFPEqualImpl(const SMTExprRef &LHS,
 
 SMTExprRef Z3Solver::mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                   const RM &R) {
-  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
-      convertToZ3RoundingMode(R));
+  Context->set_rounding_mode(convertToZ3RoundingMode(R));
   return newExprRef(Z3Expr(Context, To,
                            z3::fpa_to_fpa(toSolverExpr<Z3Expr>(*From).Expr,
                                           toSolverSort<Z3Sort>(*To).Sort)));
@@ -492,8 +491,7 @@ SMTExprRef Z3Solver::mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
 
 SMTExprRef Z3Solver::mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const RM &R) {
-  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
-      convertToZ3RoundingMode(R));
+  Context->set_rounding_mode(convertToZ3RoundingMode(R));
   return newExprRef(Z3Expr(Context, To,
                            z3::sbv_to_fpa(toSolverExpr<Z3Expr>(*From).Expr,
                                           toSolverSort<Z3Sort>(*To).Sort)));
@@ -501,8 +499,7 @@ SMTExprRef Z3Solver::mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
 
 SMTExprRef Z3Solver::mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const RM &R) {
-  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
-      convertToZ3RoundingMode(R));
+  Context->set_rounding_mode(convertToZ3RoundingMode(R));
   return newExprRef(Z3Expr(Context, To,
                            z3::ubv_to_fpa(toSolverExpr<Z3Expr>(*From).Expr,
                                           toSolverSort<Z3Sort>(*To).Sort)));
@@ -511,8 +508,7 @@ SMTExprRef Z3Solver::mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
 SMTExprRef Z3Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
-      convertToZ3RoundingMode(RM::ROUND_TO_ZERO));
+  Context->set_rounding_mode(convertToZ3RoundingMode(RM::ROUND_TO_ZERO));
   return newExprRef(
       Z3Expr(Context, mkBVSort(ToWidth),
              z3::fpa_to_sbv(toSolverExpr<Z3Expr>(*From).Expr, ToWidth)));
@@ -521,16 +517,14 @@ SMTExprRef Z3Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
 SMTExprRef Z3Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
-      convertToZ3RoundingMode(RM::ROUND_TO_ZERO));
+  Context->set_rounding_mode(convertToZ3RoundingMode(RM::ROUND_TO_ZERO));
   return newExprRef(
       Z3Expr(Context, mkBVSort(ToWidth),
              z3::fpa_to_ubv(toSolverExpr<Z3Expr>(*From).Expr, ToWidth)));
 }
 
 SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) {
-  toSolverExpr<Z3Expr>(*From).Expr.ctx().set_rounding_mode(
-      convertToZ3RoundingMode(R));
+  Context->set_rounding_mode(convertToZ3RoundingMode(R));
   return newExprRef(Z3Expr(
       Context, From->Sort,
       z3::round_fpa_to_closest_integer(toSolverExpr<Z3Expr>(*From).Expr)));
