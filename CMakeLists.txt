@@ -46,6 +46,9 @@ macro(config_solver name version)
         message(FATAL_ERROR "CAMADA_SOLVER_${name}_ENABLE cannot be enabled when ${name} is not available")
       endif()
     endif()
+
+    # Add to the list of dependencies so it can be added to the cmake export file
+    list(APPEND CAMADA_DEPENDENCIES "${name} ${version}")
   endif()
 endmacro()
 
@@ -150,7 +153,8 @@ install_basic_package_files(${PROJECT_NAME}
                             VERSION ${${PROJECT_NAME}_VERSION}
                             COMPATIBILITY AnyNewerVersion
                             VARS_PREFIX ${PROJECT_NAME}
-                            NO_CHECK_REQUIRED_COMPONENTS_MACRO)
+                            NO_CHECK_REQUIRED_COMPONENTS_MACRO
+                            DEPENDENCIES ${CAMADA_DEPENDENCIES})
 
 # Add the uninstall target
 include(AddUninstallTarget)
