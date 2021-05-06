@@ -31,21 +31,21 @@ macro(config_solver name version)
   set(CAMADA_${upper_name}_DIR "" CACHE STRING "Directory of the ${name} solver (optional)")
 
   # Define the options
-  option3vl(CAMADA_SOLVER_${upper_name}_ENABLE "Build Camada with ${name}")
+  option3vl(CAMADA_${upper_name}_ENABLE "Build Camada with ${name}")
 
-  if(NOT CAMADA_SOLVER_${upper_name}_ENABLE STREQUAL "OFF")
+  if(NOT CAMADA_${upper_name}_ENABLE STREQUAL "OFF")
     # Try to find the solver and version
     find_package(${name} ${version})
 
     # If the solver was found, enable it _IF_ the user did not explicitly disable it
     if(${name}_FOUND)
-      set_option(CAMADA_SOLVER_${upper_name}_ENABLE ON)
+      set_option(CAMADA_${upper_name}_ENABLE ON)
     endif()
 
-    if(CAMADA_SOLVER_${upper_name}_ENABLE STREQUAL "ON")
+    if(CAMADA_${upper_name}_ENABLE STREQUAL "ON")
       # If the solver was enabled but we could not find it, throw an error
       if(NOT ${name}_FOUND)
-        message(FATAL_ERROR "CAMADA_SOLVER_${name}_ENABLE cannot be enabled when ${name} is not available")
+        message(FATAL_ERROR "CAMADA_${upper_name}_ENABLE cannot be enabled when ${name} is not available")
       endif()
     endif()
 
@@ -193,9 +193,9 @@ endmacro()
 config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 
-config_info_bool("Solver Boolector" "${CAMADA_SOLVER_BOOLECTOR_ENABLE}")
-config_info_bool("Solver CVC4" "${CAMADA_SOLVER_CVC4_ENABLE}")
-config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_MATHSAT_ENABLE}")
-config_info_bool("Solver STP" "${CAMADA_SOLVER_STP_ENABLE}")
-config_info_bool("Solver Yices" "${CAMADA_SOLVER_YICES_ENABLE}")
-config_info_bool("Solver Z3" "${CAMADA_SOLVER_Z3_ENABLE}")
+config_info_bool("Solver Boolector" "${CAMADA_BOOLECTOR_ENABLE}")
+config_info_bool("Solver CVC4" "${CAMADA_CVC4_ENABLE}")
+config_info_bool("Solver MathSAT" "${CAMADA_MATHSAT_ENABLE}")
+config_info_bool("Solver STP" "${CAMADA_STP_ENABLE}")
+config_info_bool("Solver Yices" "${CAMADA_YICES_ENABLE}")
+config_info_bool("Solver Z3" "${CAMADA_Z3_ENABLE}")
