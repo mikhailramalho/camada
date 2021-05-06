@@ -23,28 +23,28 @@ function(check_mathsat_version mathsat_include mathsat_lib)
   set(MATHSAT_VERSION_STRING ${mathsat_version} PARENT_SCOPE)
 endfunction(check_mathsat_version)
 
-# Looking for MATHSAT in SOLVER_MATHSAT_INCLUDE_DIR
-find_path(SOLVER_MATHSAT_INCLUDE_DIR mathsat.h HINTS ${SOLVER_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES include)
+# Looking for MATHSAT in CAMADA_MATHSAT_INCLUDE_DIR
+find_path(CAMADA_MATHSAT_INCLUDE_DIR mathsat.h HINTS ${CAMADA_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES include)
 
-find_library(SOLVER_MATHSAT_LIB mathsat HINTS ${SOLVER_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES lib bin)
+find_library(CAMADA_MATHSAT_LIB mathsat HINTS ${CAMADA_MATHSAT_DIR} $ENV{HOME}/mathsat PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that
 # prints MATHSAT's version
-if(SOLVER_MATHSAT_INCLUDE_DIR AND SOLVER_MATHSAT_LIB)
+if(CAMADA_MATHSAT_INCLUDE_DIR AND CAMADA_MATHSAT_LIB)
   # We do not have the MATHSAT binary to query for a version. Try to use
   # a small C++ program to detect it via the MATHSAT_get_version() API call.
-  check_mathsat_version(${SOLVER_MATHSAT_INCLUDE_DIR} ${SOLVER_MATHSAT_LIB})
+  check_mathsat_version(${CAMADA_MATHSAT_INCLUDE_DIR} ${CAMADA_MATHSAT_LIB})
 endif()
 
 # Alright, now create a list with MathSAT and it's dependencies
 find_library(gmp gmp)
-list(APPEND SOLVER_MATHSAT_LIB "${gmp}")
+list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
 
 # handle the QUIETLY and REQUIRED arguments and set MATHSAT_FOUND to TRUE if
 # all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(MATHSAT
-                                  REQUIRED_VARS SOLVER_MATHSAT_LIB SOLVER_MATHSAT_INCLUDE_DIR
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(MathSAT
+                                  REQUIRED_VARS CAMADA_MATHSAT_LIB CAMADA_MATHSAT_INCLUDE_DIR
                                   VERSION_VAR MATHSAT_VERSION_STRING)
 
-mark_as_advanced(SOLVER_MATHSAT_LIB SOLVER_MATHSAT_INCLUDE_DIR)
+mark_as_advanced(CAMADA_MATHSAT_LIB CAMADA_MATHSAT_INCLUDE_DIR)

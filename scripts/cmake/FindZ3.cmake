@@ -30,25 +30,25 @@ function(check_z3_version z3_include z3_lib)
   set(Z3_VERSION_STRING ${z3_version} PARENT_SCOPE)
 endfunction(check_z3_version)
 
-# Looking for Z3 in SOLVER_Z3_INCLUDE_DIR
-find_path(SOLVER_Z3_INCLUDE_DIR z3.h HINTS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES include)
+# Looking for Z3 in CAMADA_Z3_INCLUDE_DIR
+find_path(CAMADA_Z3_INCLUDE_DIR z3.h HINTS ${CAMADA_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES include)
 
-find_library(SOLVER_Z3_LIB z3 HINTS ${SOLVER_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES lib bin)
+find_library(CAMADA_Z3_LIB z3 HINTS ${CAMADA_Z3_DIR} $ENV{HOME}/z3 PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that
 # prints Z3's version
-if(SOLVER_Z3_INCLUDE_DIR AND SOLVER_Z3_LIB)
+if(CAMADA_Z3_INCLUDE_DIR AND CAMADA_Z3_LIB)
   # We do not have the Z3 binary to query for a version. Try to use
   # a small C++ program to detect it via the Z3_get_version() API call.
-  check_z3_version(${SOLVER_Z3_INCLUDE_DIR} ${SOLVER_Z3_LIB})
+  check_z3_version(${CAMADA_Z3_INCLUDE_DIR} ${CAMADA_Z3_LIB})
 endif()
 
 # Alright, now create a list with z3 and it's dependencies
 if (NOT BUILD_SHARED_LIBS)
   find_package(Threads REQUIRED)
   if(Threads_FOUND)
-    list(APPEND SOLVER_Z3_LIB "${CMAKE_THREAD_LIBS_INIT}")
-    list(APPEND SOLVER_Z3_LIB "-ldl")
+    list(APPEND CAMADA_Z3_LIB "${CMAKE_THREAD_LIBS_INIT}")
+    list(APPEND CAMADA_Z3_LIB "-ldl")
   endif()
 endif ()
 
@@ -56,7 +56,7 @@ endif ()
 # all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(Z3
-                                  REQUIRED_VARS SOLVER_Z3_LIB SOLVER_Z3_INCLUDE_DIR
+                                  REQUIRED_VARS CAMADA_Z3_LIB CAMADA_Z3_INCLUDE_DIR
                                   VERSION_VAR Z3_VERSION_STRING)
 
-mark_as_advanced(SOLVER_Z3_LIB SOLVER_Z3_INCLUDE_DIR)
+mark_as_advanced(CAMADA_Z3_LIB CAMADA_Z3_INCLUDE_DIR)

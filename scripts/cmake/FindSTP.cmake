@@ -23,29 +23,29 @@ function(check_stp_version stp_include stp_lib)
   set(STP_VERSION_STRING ${stp_version} PARENT_SCOPE)
 endfunction(check_stp_version)
 
-# Looking for STP in SOLVER_STP_INCLUDE_DIR
-find_path(SOLVER_STP_INCLUDE_DIR c_interface.h HINTS ${SOLVER_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES include/stp)
+# Looking for STP in CAMADA_STP_INCLUDE_DIR
+find_path(CAMADA_STP_INCLUDE_DIR c_interface.h HINTS ${CAMADA_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES include/stp)
 
-find_library(SOLVER_STP_LIB stp HINTS ${SOLVER_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES lib bin)
+find_library(CAMADA_STP_LIB stp HINTS ${CAMADA_STP_DIR} $ENV{HOME}/stp PATH_SUFFIXES lib bin)
 
 
 # Try to check it dynamically, by compiling a small program that
 # prints STP's version
-if(SOLVER_STP_INCLUDE_DIR AND SOLVER_STP_LIB)
+if(CAMADA_STP_INCLUDE_DIR AND CAMADA_STP_LIB)
   # We do not have the STP binary to query for a version. Try to use
   # a small C++ program to detect it via the STP_get_version() API call.
-  check_stp_version(${SOLVER_STP_INCLUDE_DIR} ${SOLVER_STP_LIB})
+  check_stp_version(${CAMADA_STP_INCLUDE_DIR} ${CAMADA_STP_LIB})
 endif()
 
 # Alright, now create a list with STP and it's dependencies
 find_library(gmp gmp)
-list(APPEND SOLVER_STP_LIB "${gmp}")
+list(APPEND CAMADA_STP_LIB "${gmp}")
 
 # handle the QUIETLY and REQUIRED arguments and set STP_FOUND to TRUE if
 # all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(STP
-                                  REQUIRED_VARS SOLVER_STP_LIB SOLVER_STP_INCLUDE_DIR
+                                  REQUIRED_VARS CAMADA_STP_LIB CAMADA_STP_INCLUDE_DIR
                                   VERSION_VAR STP_VERSION_STRING)
 
-mark_as_advanced(SOLVER_STP_LIB SOLVER_STP_INCLUDE_DIR)
+mark_as_advanced(CAMADA_STP_LIB CAMADA_STP_INCLUDE_DIR)
