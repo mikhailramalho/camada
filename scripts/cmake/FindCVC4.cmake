@@ -10,7 +10,7 @@ if(CVC4_FOUND)
   endif()
 
   # Search for symfpu headers and set it a CVC4 include
-  find_path(CVC4_SYMFPU_DIR symfpu/core/unpackedFloat.h PATHS)
+  find_path(CAMADA_CVC4_SYMFPU_DIR symfpu/core/unpackedFloat.h PATHS)
 
   # TODO: this symfpu check should be clever: we should check if cvc4 was
   # actually built with symfpu and then abort/warn the user
