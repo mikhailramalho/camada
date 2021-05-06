@@ -96,14 +96,14 @@ jobs:
 
       # Setup/cache Yices
     - name: Cache Yices
-      id: cache-yices-v1
+      id: cache-yices-v2
       uses: actions/cache@v2
       with:
         path: yices
-        key: ${{ runner.os }}-yices-v1
+        key: ${{ runner.os }}-yices-v2
 
     - name: Setup Yices
-      if: steps.cache-yices-v1.outputs.cache-hit != 'true'
+      if: steps.cache-yices-v2.outputs.cache-hit != 'true'
       run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
 
     - name: Install Yices
