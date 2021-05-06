@@ -33,7 +33,7 @@ endif()
 if(${CAMADA_CVC4_ENABLE})
     target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC CVC4::cvc4)
     if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
-      target_include_directories(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_CVC4_SYMFPU_DIR})
+      target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_CVC4_SYMFPU_DIR})
     endif()
 endif()
 

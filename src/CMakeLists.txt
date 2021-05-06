@@ -53,7 +53,7 @@ if(${CAMADA_CVC4_ENABLE})
     target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC CVC4::cvc4)
     target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC4_ENABLED)
     if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
-      target_include_directories(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_CVC4_SYMFPU_DIR})
+      target_include_directories(${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_CVC4_SYMFPU_DIR})
     endif()
 endif()
 
