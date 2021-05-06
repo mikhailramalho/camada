@@ -22,13 +22,17 @@ set(${LIBRARY_TARGET_NAME}_SRC
 )
 
 # List of HPP (header) library files.
+set(${LIBRARY_TARGET_NAME}_PUB_HDR
+    camada.h camadasort.h camadaexpr.h
+)
+
 set(${LIBRARY_TARGET_NAME}_HDR
-    camada.h camadasort.h camadaexpr.h camadaimpl.h
+    camadaimpl.h
 )
 
 # Adds a library target called ${LIBRARY_TARGET_NAME} to be built from the
 # source and header files listed in the command invocation.
-add_library(${LIBRARY_TARGET_NAME} ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR})
+add_library(${LIBRARY_TARGET_NAME} ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR} ${${LIBRARY_TARGET_NAME}_PUB_HDR})
 
 # Within this project, you can link to this library by just specifing the name
 # of the target, i.e. ${LIBRARY_TARGET_NAME} = LibTemplateCMake. It is useful,
@@ -58,7 +62,7 @@ endif()
 # See https://cmake.org/cmake/help/latest/command/set_target_properties.html
 # Properties are: 1) Library version number 2) list of corresponding public headers
 set_target_properties(${LIBRARY_TARGET_NAME} PROPERTIES VERSION       ${${PROJECT_NAME}_VERSION}
-                                                        PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_HDR}")
+                                                        PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_PUB_HDR}")
 
 # Specify include directories for both compilation and installation process.
 # The $<INSTALL_PREFIX> generator expression is useful to ensure to create
