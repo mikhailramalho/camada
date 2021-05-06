@@ -25,17 +25,18 @@ endmacro()
 
 # Macro to configure a solver
 macro(config_solver name version)
+  string(TOUPPER ${name} upper_name)
+
   # Solver Base dir, it will be used to try to find the libs and headers
-  set(CAMADA_${name}_DIR "" CACHE STRING "Directory of the ${name} solver (optional)")
+  set(CAMADA_${upper_name}_DIR "" CACHE STRING "Directory of the ${name} solver (optional)")
 
   # Define the options
-  option3vl(CAMADA_SOLVER_${name}_ENABLE "Build Camada with ${name}")
+  option3vl(CAMADA_SOLVER_${upper_name}_ENABLE "Build Camada with ${name}")
 
-  if(NOT CAMADA_SOLVER_${name}_ENABLE STREQUAL "OFF")
+  if(NOT CAMADA_SOLVER_${upper_name}_ENABLE STREQUAL "OFF")
     # Try to find the solver and version
     find_package(${name} ${version})
 
-    string(TOUPPER ${name} upper_name)
     # If the solver was found, enable it _IF_ the user did not explicitly disable it
     if(${name}_FOUND)
       set_option(CAMADA_SOLVER_${upper_name}_ENABLE ON)
