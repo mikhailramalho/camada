@@ -4,7 +4,7 @@
 #include <catch2/catch.hpp>
 #include <yicessolver.h>
 
-TEST_CASE("Simple yices test", "[YICES]") {
+TEST_CASE("Simple Yices test", "[YICES]") {
   // Create Yices Solver
   auto yices = camada::createYicesSolver();
   tests(yices);

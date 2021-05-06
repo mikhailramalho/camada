@@ -1,12 +1,14 @@
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
+set(REGRESSION_TARGET_NAME ${PROJECT_NAME}-regression)
+
 #-----------------------------------------------------------------------------#
 # Macro to add solver files to test
 function(compile_test)
   foreach(name IN LISTS ARGN)
     string(TOLOWER ${name} lower_name)
 
-    if(CAMADA_ENABLE_SOLVER_${name})
+    if(CAMADA_SOLVER_${name}_ENABLE)
       if(NOT EXISTS "${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
         message(FATAL_ERROR "Could not find regression file ${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
       endif()
@@ -18,11 +20,42 @@ function(compile_test)
 endfunction()
 
 # add each solver specific implementation, if it is enabled
-compile_test(${CAMADA_AVAILABLE_SOLVERS})
+compile_test("BOOLECTOR;CVC4;MATHSAT;STP;YICES;Z3")
 
-add_executable(camada-regression main.cpp "${solver_test_files}")
+add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
+target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME})
 
-target_link_libraries(camada-regression camada Catch2::Catch2 ${CAMADA_SOLVER_LIBS})
+# Solvers
+if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
+    target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE Boolector::boolector)
+endif()
+
+if(${CAMADA_SOLVER_CVC4_ENABLE})
+    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC CVC4::cvc4)
+    if(DEFINED CVC4_SYMFPU_DIR)
+      target_include_directories(${REGRESSION_TARGET_NAME} PUBLIC ${CVC4_SYMFPU_DIR})
+    endif()
+endif()
+
+if(${CAMADA_SOLVER_MATHSAT_ENABLE})
+    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
+    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
+endif()
+
+if(${CAMADA_SOLVER_STP_ENABLE})
+    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
+    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_STP_INCLUDE_DIR})
+endif()
+
+if(${CAMADA_SOLVER_YICES_ENABLE})
+    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
+    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
+endif()
+
+if(${CAMADA_SOLVER_Z3_ENABLE})
+    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
+    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
+endif()
 
 include(Catch)
-catch_discover_tests(camada-regression)
+catch_discover_tests(${REGRESSION_TARGET_NAME})
