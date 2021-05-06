@@ -22,8 +22,8 @@
 #include "ac_config.h"
 #ifdef SOLVER_Z3_ENABLED
 
-#include "z3solver.h"
 #include "z3_version.h"
+#include "z3solver.h"
 
 namespace camada {
 
@@ -313,13 +313,13 @@ SMTExprRef Z3Solver::mkBVConcatImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef Z3Solver::mkBVRedOrImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBVSort(1), z3::bvredor(toSolverExpr<Z3Expr>(*Exp).Expr)));
+  return newExprRef(Z3Expr(Context, mkBVSort(1),
+                           z3::bvredor(toSolverExpr<Z3Expr>(*Exp).Expr)));
 }
 
 SMTExprRef Z3Solver::mkBVRedAndImpl(const SMTExprRef &Exp) {
-  return newExprRef(Z3Expr(
-      Context, mkBVSort(1), z3::bvredand(toSolverExpr<Z3Expr>(*Exp).Expr)));
+  return newExprRef(Z3Expr(Context, mkBVSort(1),
+                           z3::bvredand(toSolverExpr<Z3Expr>(*Exp).Expr)));
 }
 
 SMTExprRef Z3Solver::mkArraySelectImpl(const SMTExprRef &Array,
