@@ -82,7 +82,7 @@ SMTSortRef Z3Solver::mkBVSortImpl(unsigned BitWidth) {
 
 SMTSortRef Z3Solver::mkRMSortImpl() {
   return newSortRef<SolverRMSort<Z3Sort>>(
-      {Context, z3::to_sort(*Context, Z3_mk_fpa_rounding_mode_sort(*Context))});
+      {Context, Context->fpa_rounding_mode_sort()});
 }
 
 SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
@@ -617,28 +617,8 @@ SMTExprRef Z3Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
 }
 
 SMTExprRef Z3Solver::mkRMImpl(const RM &R) {
-  z3::expr e(*Context);
-  switch (R) {
-  default:
-    assert(0 && "Unsupported floating-point semantics.");
-    __builtin_unreachable();
-  case RM::ROUND_TO_EVEN:
-    e = z3::to_expr(*Context, Z3_mk_fpa_rne(*Context));
-    break;
-  case RM::ROUND_TO_AWAY:
-    e = z3::to_expr(*Context, Z3_mk_fpa_rna(*Context));
-    break;
-  case RM::ROUND_TO_PLUS_INF:
-    e = z3::to_expr(*Context, Z3_mk_fpa_rtp(*Context));
-    break;
-  case RM::ROUND_TO_MINUS_INF:
-    e = z3::to_expr(*Context, Z3_mk_fpa_rtn(*Context));
-    break;
-  case RM::ROUND_TO_ZERO:
-    e = z3::to_expr(*Context, Z3_mk_fpa_rtz(*Context));
-    break;
-  }
-  return newExprRef(Z3Expr(Context, mkRMSort(), e));
+  Context->set_rounding_mode(convertToZ3RoundingMode(R));
+  return newExprRef(Z3Expr(Context, mkRMSort(), Context->fpa_rounding_mode()));
 }
 
 SMTExprRef Z3Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
