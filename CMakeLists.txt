@@ -136,6 +136,10 @@ endif()
 # Find solvers
 config_solver(Boolector 3.2.1)
 config_solver(CVC4 1.8)
+config_solver(MathSAT 5.6.3)
+config_solver(STP 2.3.3)
+config_solver(Yices 2.6.1)
+config_solver(Z3 4.8.8)
 
 # Generate ac_config.h
 configure_file (
@@ -187,9 +191,9 @@ endmacro()
 config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 
-config_info_bool("Solver Z3" "${CAMADA_SOLVER_z3_ENABLE}")
-config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_mathsat_ENABLE}")
-config_info_bool("Solver CVC4" "${CAMADA_SOLVER_CVC4_ENABLE}")
 config_info_bool("Solver Boolector" "${CAMADA_SOLVER_Boolector_ENABLE}")
-config_info_bool("Solver Yices" "${CAMADA_SOLVER_yices_ENABLE}")
-config_info_bool("Solver STP" "${CAMADA_SOLVER_stp_ENABLE}")
+config_info_bool("Solver CVC4" "${CAMADA_SOLVER_CVC4_ENABLE}")
+config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_MathSAT_ENABLE}")
+config_info_bool("Solver STP" "${CAMADA_SOLVER_STP_ENABLE}")
+config_info_bool("Solver Yices" "${CAMADA_SOLVER_Yices_ENABLE}")
+config_info_bool("Solver Z3" "${CAMADA_SOLVER_Z3_ENABLE}")

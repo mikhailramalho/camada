@@ -57,6 +57,29 @@ if(${CVC4_FOUND})
     endif()
 endif()
 
+if(${MathSAT_FOUND})
+    target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
+    target_include_directories(${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
+    target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_MATHSAT_ENABLED)
+endif()
+
+if(${STP_FOUND})
+    target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
+    target_include_directories(${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_STP_INCLUDE_DIR})
+    target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
+endif()
+
+if(${Yices_FOUND})
+    target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
+    target_include_directories(${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
+    target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_YICES_ENABLED)
+endif()
+
+if(${Z3_FOUND})
+    target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
+    target_include_directories(${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
+    target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
+endif()
 
 # Set two minimum target properties for the library.
 # See https://cmake.org/cmake/help/latest/command/set_target_properties.html
