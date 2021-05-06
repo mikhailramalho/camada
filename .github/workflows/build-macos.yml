@@ -69,19 +69,7 @@ jobs:
     - name: Install MathSAT
       run: ln -Fs /usr/local/include/gmp.h mathsat/include/gmp.h && cp mathsat/lib/libmathsat.dylib /usr/local/lib && cp mathsat/lib/libmathsat.a /usr/local/lib
 
-      # Setup/cache CryptoMiniSAT
-    - name: Cache CryptoMiniSAT
-      id: cache-cryptominisat-v1
-      uses: actions/cache@v2
-      with:
-        path: cryptominisat
-        key: ${{ runner.os }}-cryptominisat-v1
-
-    - name: Setup CryptoMiniSAT
-      if: steps.cache-cryptominisat-v1.outputs.cache-hit != 'true'
-      run: wget -c https://github.com/msoos/cryptominisat/archive/5.8.0.zip && unzip 5.8.0.zip && cd cryptominisat-5.8.0 && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../cryptominisat && ninja && ninja install
-
-      # Setup/cache MiniSAT
+      # Setup/cache MiniSAT (for STP)
     - name: Cache MiniSAT
       id: cache-minisat-v1
       uses: actions/cache@v2
