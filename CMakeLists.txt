@@ -202,6 +202,9 @@ if(BUILD_TESTING)
   add_subdirectory(regression)
 endif()
 
+# Add targets related to doxygen documention generation
+add_subdirectory(doc)
+
 # Print Camada configuration
 if(NOT WIN32)
   string(ASCII 27 Esc)
