@@ -105,55 +105,48 @@ Add support to RPATH during installation to the project and the targets
 
 include(CMakeParseArguments)
 
-
 macro(__AddInstallRPATHSupport_GET_SYSTEM_LIB_DIRS _var)
   # Find system implicit lib directories
   set(${_var} ${CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES})
   if(EXISTS "/etc/debian_version") # is this a debian system ?
     if(CMAKE_LIBRARY_ARCHITECTURE)
       list(APPEND ${_var} "/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
-                          "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
+           "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
     endif()
   endif()
 endmacro()
 
-
 macro(__AddInstallRPATHSupport_APPEND_RELATIVE_RPATH _var _bin_dir _lib_dir)
   file(RELATIVE_PATH _rel_path ${_bin_dir} ${_lib_dir})
-  if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     list(APPEND ${_var} "@loader_path/${_rel_path}")
   else()
     list(APPEND ${_var} "\$ORIGIN/${_rel_path}")
   endif()
 endmacro()
 
-
-
 function(ADD_INSTALL_RPATH_SUPPORT)
 
   set(_options USE_LINK_PATH)
   set(_oneValueArgs INSTALL_NAME_DIR)
-  set(_multiValueArgs BIN_DIRS
-                      LIB_DIRS
-                      DEPENDS)
+  set(_multiValueArgs BIN_DIRS LIB_DIRS DEPENDS)
 
-  cmake_parse_arguments(_ARS "${_options}"
-                             "${_oneValueArgs}"
-                             "${_multiValueArgs}"
-                             "${ARGN}")
+  cmake_parse_arguments(_ARS "${_options}" "${_oneValueArgs}"
+                        "${_multiValueArgs}" "${ARGN}")
 
-  # if either RPATH or INSTALL_RPATH is disabled
-  # and the INSTALL_NAME_DIR variable is set, then hardcode the install name
+  # if either RPATH or INSTALL_RPATH is disabled and the INSTALL_NAME_DIR
+  # variable is set, then hardcode the install name
   if(CMAKE_SKIP_RPATH OR CMAKE_SKIP_INSTALL_RPATH)
     if(DEFINED _ARS_INSTALL_NAME_DIR)
-      set(CMAKE_INSTALL_NAME_DIR ${_ARS_INSTALL_NAME_DIR} PARENT_SCOPE)
+      set(CMAKE_INSTALL_NAME_DIR
+          ${_ARS_INSTALL_NAME_DIR}
+          PARENT_SCOPE)
     endif()
   endif()
 
-  if (CMAKE_SKIP_RPATH OR (CMAKE_SKIP_INSTALL_RPATH AND CMAKE_SKIP_BUILD_RPATH))
+  if(CMAKE_SKIP_RPATH OR (CMAKE_SKIP_INSTALL_RPATH AND CMAKE_SKIP_BUILD_RPATH))
     return()
   endif()
-
 
   set(_rpath_available 1)
   if(DEFINED _ARS_DEPENDS)
@@ -168,47 +161,50 @@ function(ADD_INSTALL_RPATH_SUPPORT)
   if(_rpath_available)
 
     # Enable RPATH on OSX.
-    set(CMAKE_MACOSX_RPATH TRUE PARENT_SCOPE)
+    set(CMAKE_MACOSX_RPATH
+        TRUE
+        PARENT_SCOPE)
 
-    __AddInstallRPATHSupport_get_system_lib_dirs(_system_lib_dirs)
+    __addinstallrpathsupport_get_system_lib_dirs(_system_lib_dirs)
 
     # This is relative RPATH for libraries built in the same project
     foreach(lib_dir ${_ARS_LIB_DIRS})
       list(FIND _system_lib_dirs "${lib_dir}" isSystemDir)
       if("${isSystemDir}" STREQUAL "-1")
         foreach(bin_dir ${_ARS_LIB_DIRS} ${_ARS_BIN_DIRS})
-          __AddInstallRPATHSupport_append_relative_rpath(CMAKE_INSTALL_RPATH ${bin_dir} ${lib_dir})
+          __addinstallrpathsupport_append_relative_rpath(CMAKE_INSTALL_RPATH
+                                                         ${bin_dir} ${lib_dir})
         endforeach()
       endif()
     endforeach()
     if(NOT "${CMAKE_INSTALL_RPATH}" STREQUAL "")
       list(REMOVE_DUPLICATES CMAKE_INSTALL_RPATH)
     endif()
-    set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_RPATH} PARENT_SCOPE)
+    set(CMAKE_INSTALL_RPATH
+        ${CMAKE_INSTALL_RPATH}
+        PARENT_SCOPE)
 
-    # add the automatically determined parts of the RPATH
-    # which point to directories outside the build tree to the install RPATH
-    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ${_ARS_USE_LINK_PATH} PARENT_SCOPE)
+    # add the automatically determined parts of the RPATH which point to
+    # directories outside the build tree to the install RPATH
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH
+        ${_ARS_USE_LINK_PATH}
+        PARENT_SCOPE)
 
   endif()
 
 endfunction()
 
-
 function(TARGET_APPEND_INSTALL_RPATH _target)
-  set(_options )
+  set(_options)
   set(_oneValueArgs INSTALL_DESTINATION)
-  set(_multiValueArgs LIB_DIRS
-                      DEPENDS)
+  set(_multiValueArgs LIB_DIRS DEPENDS)
 
-  if (CMAKE_SKIP_RPATH OR (CMAKE_SKIP_INSTALL_RPATH AND CMAKE_SKIP_BUILD_RPATH))
+  if(CMAKE_SKIP_RPATH OR (CMAKE_SKIP_INSTALL_RPATH AND CMAKE_SKIP_BUILD_RPATH))
     return()
   endif()
 
-  cmake_parse_arguments(_ARS "${_options}"
-                             "${_oneValueArgs}"
-                             "${_multiValueArgs}"
-                             "${ARGN}")
+  cmake_parse_arguments(_ARS "${_options}" "${_oneValueArgs}"
+                        "${_multiValueArgs}" "${ARGN}")
 
   set(_rpath_available 1)
   if(DEFINED _ARS_DEPENDS)
@@ -222,16 +218,18 @@ function(TARGET_APPEND_INSTALL_RPATH _target)
 
   if(_rpath_available)
 
-    __AddInstallRPATHSupport_get_system_lib_dirs(_system_lib_dirs)
+    __addinstallrpathsupport_get_system_lib_dirs(_system_lib_dirs)
 
     get_target_property(_current_rpath ${_target} INSTALL_RPATH)
     foreach(lib_dir ${_ARS_LIB_DIRS})
       list(FIND _system_lib_dirs "${lib_dir}" isSystemDir)
       if("${isSystemDir}" STREQUAL "-1")
-        __AddInstallRPATHSupport_append_relative_rpath(_current_rpath ${_ARS_INSTALL_DESTINATION} ${lib_dir})
+        __addinstallrpathsupport_append_relative_rpath(
+          _current_rpath ${_ARS_INSTALL_DESTINATION} ${lib_dir})
       endif()
     endforeach()
-    set_target_properties(${_target} PROPERTIES INSTALL_RPATH "${_current_rpath}")
+    set_target_properties(${_target} PROPERTIES INSTALL_RPATH
+                                                "${_current_rpath}")
   endif()
 
 endfunction()
