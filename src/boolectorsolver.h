@@ -34,14 +34,14 @@ namespace camada {
 
 using BtorContextRef = std::shared_ptr<Btor *>;
 
-/// Wrapper for CVC4 Sort
+/// Wrapper for Boolector Sort
 class BtorSort : public SolverSort<BtorContextRef, BoolectorSort> {
 public:
   using SolverSort<BtorContextRef, BoolectorSort>::SolverSort;
   ~BtorSort() override = default;
 
   unsigned getWidthFromSolver() const override;
-}; // end class CVC4Sort
+}; // end class BtorSort
 
 class BtorExpr : public SolverExpr<BtorContextRef, BoolectorNode *> {
 public:
