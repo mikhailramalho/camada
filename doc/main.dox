@@ -1,0 +1,17 @@
+/**
+ * \mainpage Main page
+ *
+ * \copyright Released under the terms of the Apache License.
+ *
+ * \section description Description
+ * Camada (“layer” in Portuguese) is a permissively licensed open-source C++ library written in modern C++11 for SMT solving.
+ *
+ * Camada aims to provide a unified API for several SMT solvers while also adding some missing features to all supported solvers:
+ *
+ * [x] floating-point encoding layer using bit-vectors.
+ *
+ * [ ] tuple encoding layer.
+ *
+ * [ ] array encoding layer.
+ *
+ */

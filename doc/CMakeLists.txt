@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.5)
 
 # This variable should contain the argument of the project call in the main
 # CMakeLists.txt
-set(ORIGINAL_PROJECT_NAME "camada")
+set(ORIGINAL_PROJECT_NAME "Camada")
 project(${ORIGINAL_PROJECT_NAME}-docs)
 
 include(GNUInstallDirs)
