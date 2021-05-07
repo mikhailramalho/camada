@@ -2,7 +2,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 
 set(REGRESSION_TARGET_NAME ${PROJECT_NAME}-regression)
 
-#-----------------------------------------------------------------------------#
+# -----------------------------------------------------------------------------#
 # Macro to add solver files to test
 function(compile_test)
   foreach(name IN LISTS ARGN)
@@ -10,12 +10,17 @@ function(compile_test)
 
     if(CAMADA_${name}_ENABLE)
       if(NOT EXISTS "${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
-        message(FATAL_ERROR "Could not find regression file ${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
+        message(
+          FATAL_ERROR
+            "Could not find regression file ${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp"
+        )
       endif()
       list(APPEND solver_src_test_files "${lower_name}.test.cpp")
     endif()
 
-  set(solver_test_files ${solver_src_test_files} PARENT_SCOPE)
+    set(solver_test_files
+        ${solver_src_test_files}
+        PARENT_SCOPE)
   endforeach()
 endfunction()
 
@@ -27,34 +32,39 @@ target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME})
 
 # Solvers
 if(${CAMADA_BOOLECTOR_ENABLE})
-    target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE Boolector::boolector)
+  target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE Boolector::boolector)
 endif()
 
 if(${CAMADA_CVC4_ENABLE})
-    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC CVC4::cvc4)
-    if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
-      target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_CVC4_SYMFPU_DIR})
-    endif()
+  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC CVC4::cvc4)
+  if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
+    target_include_directories(${REGRESSION_TARGET_NAME}
+                               PRIVATE ${CAMADA_CVC4_SYMFPU_DIR})
+  endif()
 endif()
 
 if(${CAMADA_MATHSAT_ENABLE})
-    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
-    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
+  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
+  target_include_directories(${REGRESSION_TARGET_NAME}
+                             PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
 endif()
 
 if(${CAMADA_STP_ENABLE})
-    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
-    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_STP_INCLUDE_DIR})
+  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
+  target_include_directories(${REGRESSION_TARGET_NAME}
+                             PRIVATE ${CAMADA_STP_INCLUDE_DIR})
 endif()
 
 if(${CAMADA_YICES_ENABLE})
-    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
-    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
+  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
+  target_include_directories(${REGRESSION_TARGET_NAME}
+                             PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
 endif()
 
 if(${CAMADA_Z3_ENABLE})
-    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
-    target_include_directories(${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
+  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
+  target_include_directories(${REGRESSION_TARGET_NAME}
+                             PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
 endif()
 
 include(Catch)
