@@ -61,7 +61,7 @@ if __name__ == '__main__':
     if args.permissive_solvers:
         btor = cvc4 = stp = z3 = True
 
-    print("Download and setup the following solvers?\n")
+    print("Download and setup the following solvers\n")
     print_option("Boolector v3.2.1", btor)
     print_option("CVC4 v1.8", cvc4)
     print_option("MathSAT v5.6.6", msat)

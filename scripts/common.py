@@ -9,7 +9,7 @@ try:
     from tqdm import *
     from git import Repo
 except:
-    print("Missing dependencies, please run:\n\tpip install -r requirements")
+    print("Missing dependencies, please run:\n\tpip install -r requirements.txt")
     exit(0)
 
 
