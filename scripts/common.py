@@ -37,8 +37,12 @@ def check_md5(the_file, md5):
             hash_md5.update(chunk)
 
     if str(hash_md5.hexdigest()) != md5:
-        print("MD5 mismatch. Please remove {} and try again".format(the_file))
-        exit(0)
+        print("MD5 mismatch".format(the_file))
+        ans = input(
+            "Remove {} and try to download it again? [y/N] ".format(the_file))
+        return ans != 'y'
+
+    return True
 
 
 def run_command(cmd):
@@ -60,24 +64,30 @@ def extract_tar_gz(the_file):
     tar.close()
 
 
-def download_solver_src(name, url, md5):
+def download_solver_src(name, url, md5, sep="/"):
     dire = "./deps/src"
 
-    filename = url.rsplit('/', 1)[1]
+    filename = url.rsplit(sep, 1)[1]
     the_file = "{}/{}".format(dire, filename)
 
     if(os.path.exists(the_file)):
         print("Found {}".format(the_file))
     else:
         print("Downloading {}".format(name))
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(the_file, 'wb') as f:
-                pbar = tqdm(total=int(r.headers['Content-Length']))
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:  # filter out keep-alive new chunks
-                        f.write(chunk)
-                        pbar.update(len(chunk))
+        try:
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+                with open(the_file, 'wb') as f:
+                    pbar = tqdm(total=int(r.headers['Content-Length']))
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:  # filter out keep-alive new chunks
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+        except:
+            pass
 
-    check_md5(the_file, md5)
+    if not check_md5(the_file, md5):
+        os.remove(the_file)
+        download_solver_src(name, url, md5, sep)
+
     return the_file
