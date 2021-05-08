@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import sys
 from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
 
 
@@ -20,9 +21,14 @@ def setup_cvc4():
     if not os.path.exists("./deps/symfpu-CVC4"):
         run_command("./contrib/get-symfpu")
     run_command("./contrib/get-antlr-3.4")
-    run_command(["./configure.sh", "production", "--symfpu", "--optimized",
-                 "--prefix=../../install/cvc4",
-                 "--no-static-binary", "--ninja"])
+    if sys.platform == "darwin":
+        run_command(["./configure.sh", "production", "--symfpu", "--optimized",
+                     "--prefix=../../install/cvc4", "--python3",
+                     "--no-static-binary", "--ninja"])
+    else:
+        run_command(["./configure.sh", "production", "--symfpu", "--optimized",
+                     "--prefix=../../install/cvc4",
+                     "--no-static-binary", "--ninja"])
     os.chdir("./build")
     run_command(["ninja"])
     run_command(["ninja", "install"])
