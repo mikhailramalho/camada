@@ -106,3 +106,5 @@ if __name__ == '__main__':
         z = importlib.import_module("get-z3")
         z.setup_z3()
         os.chdir(curr_dir)
+
+    print("All dependencies downloaded to ./deps/install/")
