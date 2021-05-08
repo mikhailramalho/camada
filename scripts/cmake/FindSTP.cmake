@@ -28,12 +28,12 @@ endfunction(check_stp_version)
 # Looking for STP in CAMADA_STP_INCLUDE_DIR
 find_path(
   CAMADA_STP_INCLUDE_DIR c_interface.h
-  HINTS ${CAMADA_STP_DIR} $ENV{HOME}/stp
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/stp ${CAMADA_STP_DIR} $ENV{HOME}/stp
   PATH_SUFFIXES include/stp)
 
 find_library(
   CAMADA_STP_LIB stp
-  HINTS ${CAMADA_STP_DIR} $ENV{HOME}/stp
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/stp ${CAMADA_STP_DIR} $ENV{HOME}/stp
   PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that prints STP's
