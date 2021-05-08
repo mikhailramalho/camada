@@ -66,7 +66,7 @@ if __name__ == '__main__':
     print_option("MathSAT v5.6.6", msat)
     print_option("STP v2.3.3 (commit 9a59a72e)", stp)
     print_option("Yices v2.3.4", yices)
-    print_option("Z3 4.8.8", z3)
+    print_option("Z3 4.8.10", z3)
     ans = input("\nContinue? [y/N] ")
     if ans != 'y':
         print("Exiting")
@@ -80,11 +80,19 @@ if __name__ == '__main__':
     if btor:
         b = importlib.import_module("get-boolector")
         b.setup_btor()
+        os.chdir(curr_dir)
 
     if msat:
         m = importlib.import_module("get-mathsat")
         m.setup_msat()
+        os.chdir(curr_dir)
+
+    if stp:
+        s = importlib.import_module("get-stp")
+        s.setup_stp()
+        os.chdir(curr_dir)
 
     if z3:
         z = importlib.import_module("get-z3")
         z.setup_z3()
+        os.chdir(curr_dir)

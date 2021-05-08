@@ -2,11 +2,12 @@ import os
 import hashlib
 import subprocess
 import tarfile
+import zipfile
 
 try:
     import requests
     from tqdm import *
-    import zipfile
+    from git import Repo
 except:
     print("Missing dependencies, please run:\n\tpip install -r requirements")
     exit(0)
@@ -51,7 +52,7 @@ def run_command(cmd):
     popen = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, universal_newlines=True)
     for stdout_line in iter(popen.stdout.readline, ""):
-        print(stdout_line)
+        print(stdout_line, end="")
     popen.stdout.close()
     return_code = popen.wait()
     if return_code:
@@ -98,3 +99,22 @@ def download_solver_src(name, url, md5, sep="/"):
         download_solver_src(name, url, md5, sep)
 
     return the_file
+
+
+def clone_repo_src(name, url, tag=None, commit=None):
+    dire = "./deps/src"
+    reponame = url.rsplit('/', 1)[-1].rsplit('.', 1)[0]
+    the_repo = "{}/{}".format(dire, reponame)
+
+    if(os.path.exists(the_repo)):
+        print("Found {}".format(the_repo))
+    else:
+        print("Cloning {}".format(name))
+        repo = Repo.clone_from(url, the_repo)
+
+        if tag is not None:
+            repo.git.reset('--hard', tag)
+        else:
+            repo.git.reset('--hard', commit)
+
+    return the_repo
