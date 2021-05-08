@@ -6,6 +6,7 @@ import tarfile
 try:
     import requests
     from tqdm import *
+    import zipfile
 except:
     print("Missing dependencies, please run:\n\tpip install -r requirements")
     exit(0)
@@ -62,6 +63,12 @@ def extract_tar_gz(the_file):
     tar = tarfile.open(the_file, "r:gz")
     tar.extractall()
     tar.close()
+
+
+def unzip(the_file):
+    print("Unzipping {}".format(the_file))
+    with zipfile.ZipFile(the_file, 'r') as zip_ref:
+        zip_ref.extractall('./')
 
 
 def download_solver_src(name, url, md5, sep="/"):
