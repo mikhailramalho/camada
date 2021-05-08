@@ -39,12 +39,7 @@ def check_md5(the_file, md5):
             hash_md5.update(chunk)
 
     if str(hash_md5.hexdigest()) != md5:
-        print("MD5 mismatch".format(the_file))
-        ans = input(
-            "Remove {} and try to download it again? [y/N] ".format(the_file))
-        if ans != 'y':
-            print("Exiting")
-            exit(0)
+        print("MD5 mismatch. Downloading {} again\n".format(the_file))
         return False
 
     return True

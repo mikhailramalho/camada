@@ -3,6 +3,7 @@
 import os
 import argparse
 import importlib
+import time
 from common import check_root_dir, create_dirs
 
 
@@ -67,10 +68,7 @@ if __name__ == '__main__':
     print_option("STP v2.3.3 (commit 9a59a72e)", stp)
     print_option("Yices v2.3.4", yices)
     print_option("Z3 4.8.10", z3)
-    ans = input("\nContinue? [y/N] ")
-    if ans != 'y':
-        print("Exiting")
-        exit(0)
+    time.sleep(2)
 
     check_root_dir()
     create_dirs()
