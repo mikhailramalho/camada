@@ -17,7 +17,7 @@ def setup_msat():
                                         "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.6-linux-x86_64.tar.gz",
                                         "794579f22930e846af7e7a51cfe74df3",
                                         sep="=")
-    print(file_path)
+
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
