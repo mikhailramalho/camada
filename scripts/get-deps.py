@@ -38,7 +38,7 @@ if __name__ == '__main__':
                         help='Downloads and setups only STP v2.3.3 (commit 9a59a72e)',
                         action='store_true')
     group1.add_argument('-y', '--yices', default=False,
-                        help='Downloads and setups only Yices v2.3.4', action='store_true')
+                        help='Downloads and setups only Yices v2.6.2', action='store_true')
     group1.add_argument('-z', '--z3', default=False,
                         help='Downloads and setups only Z3 4.8.8', action='store_true')
     args = parser.parse_args()
@@ -90,6 +90,11 @@ if __name__ == '__main__':
     if stp:
         s = importlib.import_module("get-stp")
         s.setup_stp()
+        os.chdir(curr_dir)
+
+    if yices:
+        y = importlib.import_module("get-yices")
+        y.setup_yices()
         os.chdir(curr_dir)
 
     if z3:
