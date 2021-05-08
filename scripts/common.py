@@ -62,9 +62,9 @@ def run_command(cmd):
         raise subprocess.CalledProcessError(return_code, cmd)
 
 
-def extract_tar_gz(the_file):
+def extract_tar(the_file, comp):
     print("Extracting {}".format(the_file))
-    tar = tarfile.open(the_file, "r:gz")
+    tar = tarfile.open(the_file, "r:{}".format(comp))
     tar.extractall()
     tar.close()
 

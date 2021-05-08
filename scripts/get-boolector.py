@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os
-from common import download_solver_src, run_command, extract_tar_gz, check_root_dir, create_dirs
+from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
 
 
 def setup_btor():
@@ -14,7 +14,7 @@ def setup_btor():
     os.chdir("{}".format(the_dire))
 
     # extracts solver to ./deps/src/boolector-3.2.1
-    extract_tar_gz(the_file)
+    extract_tar(the_file, "gz")
 
     os.chdir("./boolector-3.2.1")
     run_command("./contrib/setup-lingeling.sh")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os
-from common import download_solver_src, run_command, extract_tar_gz, check_root_dir, create_dirs
+from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
 import shutil
 
 
@@ -17,7 +17,7 @@ def setup_msat():
     os.chdir("{}".format(the_dire))
 
     # extracts solver to ./deps/src/mathsat-5.6.6
-    extract_tar_gz(the_file)
+    extract_tar(the_file, "gz")
 
     # delete mathsat dir if it exists
     if os.path.exists('../install/mathsat'):
