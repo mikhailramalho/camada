@@ -28,12 +28,14 @@ endfunction(check_yices_version)
 # Looking for YICES in CAMADA_YICES_INCLUDE_DIR
 find_path(
   CAMADA_YICES_INCLUDE_DIR yices.h
-  HINTS ${CAMADA_YICES_DIR} $ENV{HOME}/yices
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/yices ${CAMADA_YICES_DIR}
+        $ENV{HOME}/yices
   PATH_SUFFIXES include)
 
 find_library(
   CAMADA_YICES_LIB yices
-  HINTS ${CAMADA_YICES_DIR} $ENV{HOME}/yices
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/yices ${CAMADA_YICES_DIR}
+        $ENV{HOME}/yices
   PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that prints YICES's
