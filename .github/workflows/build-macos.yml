@@ -18,101 +18,30 @@ jobs:
       with:
         java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake boost zlib bison flex z3 && pip3 install toml
+      run: brew install gmp cmake ninja python3 automake boost zlib bison flex && pip3 install toml && pip3 install -r requirements.txt
 
       # Setup Catch2. TODO: replace it with https://github.com/marketplace/actions/continuous-benchmark
     - name: Setup Catch2
       run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.2 && cmake -Bbuild -H. -DBUILD_TESTING=OFF -GNinja && cd build && sudo ninja && sudo ninja install
 
-      # Setup/cache Boolector
-    - name: Cache Boolector
-      id: cache-btor-v1
+      # Setup/cache dependencies
+    - name: Cache deps
+      id: cache-deps-v1
       uses: actions/cache@v2
       with:
-        path: |
-          boolector-release
-          boolector
-        key: ${{ runner.os }}-btor-v1
+        path: deps
+        key: ${{ runner.os }}-deps-v1
 
-    - name: Setup Boolector
-      if: steps.cache-btor-v1.outputs.cache-hit != 'true'
-      run: git clone https://github.com/boolector/boolector && cd boolector && git reset --hard 3.2.1 && ./contrib/setup-lingeling.sh && ./contrib/setup-btor2tools.sh && ./configure.sh --prefix $PWD/../boolector-release && cd build && make -j && make install
-
-      # Setup SymFPU
-    - name: Setup SymFPU
-      run: git clone https://github.com/martin-cs/symfpu && cd symfpu && git reset --hard 8fbe139bf0071cbe0758d2f6690a546c69ff0053
-
-      # Setup/cache CVC4
-    - name: Cache CVC4
-      id: cache-cvc4-v1
-      uses: actions/cache@v2
-      with:
-        path: cvc4
-        key: ${{ runner.os }}-cvc4-v1
-
-    - name: Setup CVC4
-      if: steps.cache-cvc4-v1.outputs.cache-hit != 'true'
-      run: git clone https://github.com/CVC4/CVC4.git && cd CVC4 && git reset --hard 1.8 && ./contrib/get-antlr-3.4 && ./configure.sh production --symfpu --python3 --optimized --prefix=$PWD/../cvc4 --static --no-static-binary --ninja --symfpu-dir=$PWD/../ && cd build && ninja && ninja install
-
-      # Setup/cache MathSAT
-    - name: Cache MathSAT
-      id: cache-mathsat-v1
-      uses: actions/cache@v2
-      with:
-        path: mathsat
-        key: ${{ runner.os }}-mathsat-v1
-
-    - name: Setup MathSAT
-      if: steps.cache-mathsat-v1.outputs.cache-hit != 'true'
-      run: wget http://mathsat.fbk.eu/download.php?file=mathsat-5.6.3-darwin-libcxx-x86_64.tar.gz -O mathsat.tar.gz && tar xf mathsat.tar.gz && mv mathsat-5.6.3-darwin-libcxx-x86_64 mathsat
-
-    - name: Install MathSAT
-      run: ln -Fs /usr/local/include/gmp.h mathsat/include/gmp.h && cp mathsat/lib/libmathsat.dylib /usr/local/lib && cp mathsat/lib/libmathsat.a /usr/local/lib
-
-      # Setup/cache MiniSAT (for STP)
-    - name: Cache MiniSAT
-      id: cache-minisat-v1
-      uses: actions/cache@v2
-      with:
-        path: minisat
-        key: ${{ runner.os }}-minisat-v1
-
-    - name: Setup MiniSAT
-      if: steps.cache-minisat-v1.outputs.cache-hit != 'true'
-      run: git clone https://github.com/mikhailramalho/minisat-os-x.git && cd minisat-os-x && make config prefix=$PWD/../minisat && make -j install
-
-      # Setup/cache STP
-    - name: Cache STP
-      id: cache-stp-v1
-      uses: actions/cache@v2
-      with:
-        path: stp-release
-        key: ${{ runner.os }}-stp-v1
-
-    - name: Setup STP
-      continue-on-error: true
-      if: steps.cache-stp-v1.outputs.cache-hit != 'true'
-      run: git clone https://github.com/stp/stp.git && cd stp && git reset --hard 9a59a72e && mkdir build && cd build && cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../../stp-release -DMINISAT_INCLUDE_DIR=$PWD/../../minisat/include -DMINISAT_LIBRARY=$PWD/../../minisat/lib/libminisat.a && ninja install
-
-      # Setup/cache Yices
-    - name: Cache Yices
-      id: cache-yices-v2
-      uses: actions/cache@v2
-      with:
-        path: yices
-        key: ${{ runner.os }}-yices-v2
-
-    - name: Setup Yices
-      if: steps.cache-yices-v2.outputs.cache-hit != 'true'
-      run: git clone https://github.com/SRI-CSL/yices2.git && cd yices2 && git reset --hard Yices-2.6.1 && autoreconf -fi && ./configure --prefix $PWD/../yices && make -j && make static-lib && make install && cp ./build/x86_64-apple-darwin*release/static_lib/libyices.a ../yices/lib
-
-    - name: Install Yices
-      run: ls -R yices/ && mv yices/lib/libyices.dylib /usr/local/lib && mv yices/lib/libyices.a /usr/local/lib
+    - name: Setup Dependencies
+      if: steps.cache-deps-v1.outputs.cache-hit != 'true'
+      run: python3 ./scripts/get-deps.py -a
 
     - name: Configure Camada
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_BOOLECTOR_ENABLE=ON -DCAMADA_BOOLECTOR_DIR=$PWD/../boolector-release -DCAMADA_CVC4_ENABLE=ON -DCAMADA_CVC4_DIR=$PWD/../cvc4 -DCAMADA_CVC4_SYMFPU_DIR=$PWD/../ -DCAMADA_MATHSAT_ENABLE=ON -DCAMADA_MATHSAT_DIR=$PWD/../mathsat -DCAMADA_STP_ENABLE=ON -DCAMADA_STP_DIR=$PWD/../stp-release -DCAMADA_YICES_ENABLE=ON -DCAMADA_YICES_DIR=$PWD/../yices -DCAMADA_Z3_ENABLE=ON -DCAMADA_Z3_DIR=$PWD/../z3 -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_BOOLECTOR_ENABLE=ON -DCAMADA_CVC4_ENABLE=ON -DCAMADA_CVC4_SYMFPU_DIR=$PWD/../deps/src/cvc5-1.8/deps/install/include -DCAMADA_MATHSAT_ENABLE=ON -DCAMADA_STP_ENABLE=ON -DCAMADA_YICES_ENABLE=ON -DCAMADA_Z3_ENABLE=ON -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
+
     - name: Build Camada
       run: cd build && ninja && ninja install
+
     - name: Run tests
       run: cd build/regression && ctest -j --output-on-failure --progress .
 
