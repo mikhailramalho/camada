@@ -2,7 +2,7 @@
 
 import os
 import shutil
-from common import clone_repo_src, run_command, extract_tar_gz, check_root_dir, create_dirs
+from common import clone_repo_src, run_command, check_root_dir, create_dirs
 
 
 def setup_stp():
