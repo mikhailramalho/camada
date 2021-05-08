@@ -82,6 +82,11 @@ if __name__ == '__main__':
         b.setup_btor()
         os.chdir(curr_dir)
 
+    if cvc4:
+        c = importlib.import_module("get-cvc4")
+        c.setup_cvc4()
+        os.chdir(curr_dir)
+
     if msat:
         m = importlib.import_module("get-mathsat")
         m.setup_msat()
