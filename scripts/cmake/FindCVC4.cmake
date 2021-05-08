@@ -1,4 +1,5 @@
-find_package(CVC4 HINTS ${CAMADA_CVC4_DIR}/lib/cmake/CVC4 $ENV{HOME}/cvc4)
+find_package(CVC4 HINTS ${CMAKE_SOURCE_DIR}/deps/install/cvc4
+             ${CAMADA_CVC4_DIR}/lib/cmake/CVC4 $ENV{HOME}/cvc4)
 
 if(CVC4_FOUND)
   # Remove any suffix from CVC4's version string
