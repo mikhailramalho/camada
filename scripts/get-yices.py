@@ -2,6 +2,8 @@
 
 import os
 import shutil
+import sys
+import platform
 from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
 
 
@@ -26,10 +28,11 @@ def setup_gmp():
 
 
 def setup_yices():
-    # We need a custom gmp first
-    curr_dir = os.getcwd()
-    setup_gmp()
-    os.chdir(curr_dir)
+    # We need a custom gmp first on linux
+    if sys.platform == "linux" or sys.platform == "linux2":
+        curr_dir = os.getcwd()
+        setup_gmp()
+        os.chdir(curr_dir)
 
     # Now we can download yices
     file_path = download_solver_src("Yices 2.6.2",
@@ -46,13 +49,23 @@ def setup_yices():
     os.chdir("./yices2-Yices-2.6.2")
 
     run_command(["autoreconf", "-fi"])
-    run_command(["./configure", "--prefix", "{}/../../install/yices".format(os.getcwd()),
-                "--with-static-gmp={}/../../install/gmp/lib/libgmp.a".format(os.getcwd())])
+    if sys.platform == "darwin":
+        run_command(["./configure", "--prefix", "{}/../../install/yices".format(os.getcwd())])
+    else:
+        run_command(["./configure", "--prefix", "{}/../../install/yices".format(os.getcwd()),
+                    "--with-static-gmp={}/../../install/gmp/lib/libgmp.a".format(os.getcwd())])
     run_command(["make", "-j"])
     run_command(["make", "static-lib"])
     run_command(["make", "install"])
-    shutil.copy(
-        "./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a", "../../install/yices/lib")
+
+    if sys.platform == "darwin":
+        shutil.copy("./build/x86_64-apple-darwin{}-release/static_lib/libyices.a".format(platform.release()),
+                    "../../install/yices/lib")
+        run_command(["cp", "../../install/yices/lib/libyices.dylib", "/usr/local/lib"])
+        run_command(["cp", "../../install/yices/lib/libyices.a", "/usr/local/lib"])
+    else:
+        shutil.copy("./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a",
+                    "../../install/yices/lib")
 
 
 if __name__ == '__main__':

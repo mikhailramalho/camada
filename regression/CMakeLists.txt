@@ -7,8 +7,9 @@ set(REGRESSION_TARGET_NAME ${PROJECT_NAME}-regression)
 function(compile_test)
   foreach(name IN LISTS ARGN)
     string(TOLOWER ${name} lower_name)
+    string(TOUPPER ${name} upper_name)
 
-    if(CAMADA_${name}_ENABLE)
+    if(CAMADA_${upper_name}_ENABLE AND ${name}_FOUND)
       if(NOT EXISTS "${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
         message(
           FATAL_ERROR
@@ -25,7 +26,7 @@ function(compile_test)
 endfunction()
 
 # add each solver specific implementation, if it is enabled
-compile_test("BOOLECTOR;CVC4;MATHSAT;STP;YICES;Z3")
+compile_test("Boolector;CVC4;MathSAT;STP;Yices;Z3")
 
 add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME})
