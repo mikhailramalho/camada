@@ -84,3 +84,7 @@ if __name__ == '__main__':
     if msat:
         m = importlib.import_module("get-mathsat")
         m.setup_msat()
+
+    if z3:
+        z = importlib.import_module("get-z3")
+        z.setup_z3()
