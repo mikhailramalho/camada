@@ -42,7 +42,10 @@ def check_md5(the_file, md5):
         print("MD5 mismatch".format(the_file))
         ans = input(
             "Remove {} and try to download it again? [y/N] ".format(the_file))
-        return ans != 'y'
+        if ans != 'y':
+            print("Exiting")
+            exit(0)
+        return False
 
     return True
 
