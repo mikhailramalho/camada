@@ -11,33 +11,31 @@ inline void fp_arithmetics(const camada::SMTSolverRef &solver) {
   auto one = solver->mkFP32(1.f);
   auto two = solver->mkFP32(2.f);
 
+  auto r = solver->mkRM(camada::RM::ROUND_TO_EVEN);
+
   // Add
-  solver->addConstraint(solver->mkEqual(
-      solver->mkFPAdd(x, solver->mkFPNeg(y), camada::RM::ROUND_TO_EVEN), zero));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkFPAdd(x, solver->mkFPNeg(y), r), zero));
 
   // sub
-  solver->addConstraint(
-      solver->mkEqual(solver->mkFPSub(x, y, camada::RM::ROUND_TO_EVEN), zero));
+  solver->addConstraint(solver->mkEqual(solver->mkFPSub(x, y, r), zero));
 
   // mul
   auto mul = solver->mkFP32(0.562500119209f);
-  solver->addConstraint(
-      solver->mkEqual(solver->mkFPMul(x, y, camada::RM::ROUND_TO_EVEN), mul));
+  solver->addConstraint(solver->mkEqual(solver->mkFPMul(x, y, r), mul));
 
   // div
-  solver->addConstraint(
-      solver->mkEqual(solver->mkFPDiv(x, y, camada::RM::ROUND_TO_EVEN), one));
+  solver->addConstraint(solver->mkEqual(solver->mkFPDiv(x, y, r), one));
 
   // sqrt
-  solver->addConstraint(
-      solver->mkEqual(solver->mkFPSqrt(one, camada::RM::ROUND_TO_EVEN), one));
+  solver->addConstraint(solver->mkEqual(solver->mkFPSqrt(one, r), one));
 
   // rem
   solver->addConstraint(solver->mkEqual(solver->mkFPRem(x, y), zero));
 
   // fma
-  solver->addConstraint(solver->mkEqual(
-      solver->mkFPFMA(one, two, zero, camada::RM::ROUND_TO_EVEN), two));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkFPFMA(one, two, zero, r), two));
 
   // And check for satisfiability
   REQUIRE(solver->check() == camada::checkResult::SAT);

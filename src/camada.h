@@ -214,29 +214,29 @@ public:
 
   /// Creates a floating-point multiplication operation
   virtual SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) = 0;
+                             const SMTExprRef &R) = 0;
 
   /// Creates a floating-point division operation
   virtual SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) = 0;
+                             const SMTExprRef &R) = 0;
 
   /// Creates a floating-point remainder operation
   virtual SMTExprRef mkFPRem(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a floating-point addition operation
   virtual SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) = 0;
+                             const SMTExprRef &R) = 0;
 
   /// Creates a floating-point subtraction operation
   virtual SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             const RM &R) = 0;
+                             const SMTExprRef &R) = 0;
 
   /// Creates a floating-point square root operation
-  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RM &R) = 0;
+  virtual SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const SMTExprRef &R) = 0;
 
   /// Creates a floating-point fused-multiply add operation: round((x * y) + z)
   virtual SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                             const SMTExprRef &Z, const RM &R) = 0;
+                             const SMTExprRef &Z, const SMTExprRef &R) = 0;
 
   /// Creates a floating-point less-than operation
   virtual SMTExprRef mkFPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
@@ -257,17 +257,17 @@ public:
   /// Creates a floating-point conversion from floatint-point to floating-point
   /// operation
   virtual SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                              const RM &R) = 0;
+                              const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from signed bitvector to
   /// floatint-point operation
   virtual SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RM &R) = 0;
+                               const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from unsigned bitvector to
   /// floatint-point operation
   virtual SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                               const RM &R) = 0;
+                               const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from floatint-point to signed
   /// bitvector operation
@@ -279,7 +279,8 @@ public:
 
   /// Creates a floating-point conversion from floatint-point to the closest
   /// integer, considering the rounding mode.
-  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From, const RM &R) = 0;
+  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
+                                    const SMTExprRef &R) = 0;
 
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.

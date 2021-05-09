@@ -424,7 +424,7 @@ public:
   }
 
   SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) final {
+                     const SMTExprRef &R) final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPMulImpl(LHS, RHS, R)
@@ -434,7 +434,7 @@ public:
   }
 
   SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) final {
+                     const SMTExprRef &R) final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPDivImpl(LHS, RHS, R)
@@ -453,7 +453,7 @@ public:
   }
 
   SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) final {
+                     const SMTExprRef &R) final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPAddImpl(LHS, RHS, R)
@@ -463,7 +463,7 @@ public:
   }
 
   SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                     const RM &R) final {
+                     const SMTExprRef &R) final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPSubImpl(LHS, RHS, R)
@@ -472,7 +472,7 @@ public:
     return theExp;
   }
 
-  SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const RM &R) final {
+  SMTExprRef mkFPSqrt(const SMTExprRef &Exp, const SMTExprRef &R) final {
     assert(Exp->isFPSort());
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPSqrtImpl(Exp, R)
                                     : mkFPSqrtImpl(Exp, R);
@@ -481,7 +481,7 @@ public:
   }
 
   SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
-                     const SMTExprRef &Z, const RM &R) final {
+                     const SMTExprRef &Z, const SMTExprRef &R) final {
     assert(X->isFPSort());
     assert(X->Sort == Y->Sort);
     assert(Y->Sort == Z->Sort);
@@ -537,7 +537,7 @@ public:
   }
 
   SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                      const RM &R) final {
+                      const SMTExprRef &R) final {
     assert(From->isFPSort());
     assert(To->isFPSort());
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPtoFPImpl(From, To, R)
@@ -547,7 +547,7 @@ public:
   }
 
   SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RM &R) final {
+                       const SMTExprRef &R) final {
     assert(From->isBVSort());
     assert(To->isFPSort());
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkSBVtoFPImpl(From, To, R)
@@ -557,7 +557,7 @@ public:
   }
 
   SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
-                       const RM &R) final {
+                       const SMTExprRef &R) final {
     assert(From->isBVSort());
     assert(To->isFPSort());
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkUBVtoFPImpl(From, To, R)
@@ -584,7 +584,7 @@ public:
     return theExp;
   }
 
-  SMTExprRef mkFPtoIntegral(const SMTExprRef &From, const RM &R) final {
+  SMTExprRef mkFPtoIntegral(const SMTExprRef &From, const SMTExprRef &R) final {
     assert(From->isFPSort());
     SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPtoIntegralImpl(From, R)
                                     : mkFPtoIntegralImpl(From, R);
@@ -949,23 +949,23 @@ protected:
   virtual SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp);
 
   virtual SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                 const RM &R);
+                                 const SMTExprRef &R);
 
   virtual SMTExprRef mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                 const RM &R);
+                                 const SMTExprRef &R);
 
   virtual SMTExprRef mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                 const RM &R);
+                                 const SMTExprRef &R);
 
   virtual SMTExprRef mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                 const RM &R);
+                                 const SMTExprRef &R);
 
-  virtual SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const RM &R);
+  virtual SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const SMTExprRef &R);
 
   virtual SMTExprRef mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                                 const SMTExprRef &Z, const RM &R);
+                                 const SMTExprRef &Z, const SMTExprRef &R);
 
   virtual SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
@@ -983,19 +983,20 @@ protected:
                                    const SMTExprRef &RHS);
 
   virtual SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                                  const RM &R);
+                                  const SMTExprRef &R);
 
   virtual SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                                   const RM &R);
+                                   const SMTExprRef &R);
 
   virtual SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                                   const RM &R);
+                                   const SMTExprRef &R);
 
   virtual SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth);
 
   virtual SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth);
 
-  virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R);
+  virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
+                                        const SMTExprRef &R);
 
   virtual SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
                                        const SMTExprRef &Index) = 0;

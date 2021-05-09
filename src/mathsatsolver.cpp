@@ -423,24 +423,23 @@ SMTExprRef MathSATSolver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef MathSATSolver::mkFPMulImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
-      msat_make_fp_times(*Context,
-                         toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+      msat_make_fp_times(*Context, toSolverExpr<MathSATExpr>(*R).Expr,
                          toSolverExpr<MathSATExpr>(*LHS).Expr,
                          toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkFPDivImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_fp_div(*Context, toSolverExpr<MathSATExpr>(*roundingMode).Expr,
-                       toSolverExpr<MathSATExpr>(*LHS).Expr,
-                       toSolverExpr<MathSATExpr>(*RHS).Expr)));
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
+  return newExprRef(
+      MathSATExpr(Context, LHS->Sort,
+                  msat_make_fp_div(*Context, toSolverExpr<MathSATExpr>(*R).Expr,
+                                   toSolverExpr<MathSATExpr>(*LHS).Expr,
+                                   toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
@@ -466,48 +465,62 @@ SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef MathSATSolver::mkFPAddImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
-      msat_make_fp_plus(*Context, toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+      msat_make_fp_plus(*Context, toSolverExpr<MathSATExpr>(*R).Expr,
                         toSolverExpr<MathSATExpr>(*LHS).Expr,
                         toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkFPSubImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
   return newExprRef(MathSATExpr(
       Context, LHS->Sort,
-      msat_make_fp_minus(*Context,
-                         toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+      msat_make_fp_minus(*Context, toSolverExpr<MathSATExpr>(*R).Expr,
                          toSolverExpr<MathSATExpr>(*LHS).Expr,
                          toSolverExpr<MathSATExpr>(*RHS).Expr)));
 }
 
-SMTExprRef MathSATSolver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+SMTExprRef MathSATSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
+                                       const SMTExprRef &R) {
   return newExprRef(MathSATExpr(
       Context, Exp->Sort,
-      msat_make_fp_sqrt(*Context, toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+      msat_make_fp_sqrt(*Context, toSolverExpr<MathSATExpr>(*R).Expr,
                         toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                                      const SMTExprRef &Z, const RM &R) {
+                                      const SMTExprRef &Z,
+                                      const SMTExprRef &R) {
   // MathSAT does not support FMA, so convert to BVFP and call the fp_api
 
   // Save camada flag
   bool oldUseCamadaFP = useCamadaFP;
 
+  // To convert the rounding mode, we first need to generate the equalities in
+  // floating-point mode
+  SMTExprRef isNe = mkEqual(R, mkRM(RM::ROUND_TO_EVEN));
+  SMTExprRef isPi = mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF));
+  SMTExprRef isMi = mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF));
+
   // Enable fp conversion API
   useCamadaFP = true;
 
+  // Now we want to generate the correct rounding mode encoded as a bitvector,
+  // so use the equalities previously generated in an ite chain
+  SMTExprRef roundingMode = mkIte(isNe, mkBVFromDec(0, mkRMSort()),
+                                  mkIte(isPi, mkBVFromDec(2, mkRMSort()),
+                                        mkIte(isMi, mkBVFromDec(3, mkRMSort()),
+                                              mkBVFromDec(4, mkRMSort()))));
+
   // We can call the conversion API directly here because the arguments were
   // already checked
-  SMTExprRef fma = SMTSolverImpl::mkFPFMAImpl(
-      mkIEEEFPToBVImpl(X), mkIEEEFPToBVImpl(Y), mkIEEEFPToBVImpl(Z), R);
+  SMTExprRef fma =
+      SMTSolverImpl::mkFPFMAImpl(mkIEEEFPToBVImpl(X), mkIEEEFPToBVImpl(Y),
+                                 mkIEEEFPToBVImpl(Z), roundingMode);
 
   // Restore camada flag
   useCamadaFP = oldUseCamadaFP;
@@ -541,35 +554,35 @@ SMTExprRef MathSATSolver::mkFPEqualImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef MathSATSolver::mkFPtoFPImpl(const SMTExprRef &From,
-                                       const SMTSortRef &To, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(MathSATExpr(
-      Context, To,
-      msat_make_fp_cast(*Context, To->getFPExponentWidth(),
-                        To->getFPSignificandWidth(),
-                        toSolverExpr<MathSATExpr>(*roundingMode).Expr,
-                        toSolverExpr<MathSATExpr>(*From).Expr)));
+                                       const SMTSortRef &To,
+                                       const SMTExprRef &R) {
+  return newExprRef(
+      MathSATExpr(Context, To,
+                  msat_make_fp_cast(*Context, To->getFPExponentWidth(),
+                                    To->getFPSignificandWidth(),
+                                    toSolverExpr<MathSATExpr>(*R).Expr,
+                                    toSolverExpr<MathSATExpr>(*From).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkSBVtoFPImpl(const SMTExprRef &From,
-                                        const SMTSortRef &To, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                        const SMTSortRef &To,
+                                        const SMTExprRef &R) {
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_sbv(*Context, To->getFPExponentWidth(),
                             To->getFPSignificandWidth(),
-                            toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+                            toSolverExpr<MathSATExpr>(*R).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkUBVtoFPImpl(const SMTExprRef &From,
-                                        const SMTSortRef &To, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                        const SMTSortRef &To,
+                                        const SMTExprRef &R) {
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_ubv(*Context, To->getFPExponentWidth(),
                             To->getFPSignificandWidth(),
-                            toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+                            toSolverExpr<MathSATExpr>(*R).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
 
@@ -592,12 +605,10 @@ SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
 }
 
 SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
-                                             const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                             const SMTExprRef &R) {
   return newExprRef(MathSATExpr(
       Context, From->Sort,
-      msat_make_fp_round_to_int(*Context,
-                                toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+      msat_make_fp_round_to_int(*Context, toSolverExpr<MathSATExpr>(*R).Expr,
                                 toSolverExpr<MathSATExpr>(*From).Expr)));
 }
 

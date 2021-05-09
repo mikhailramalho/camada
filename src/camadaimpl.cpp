@@ -394,7 +394,8 @@ SMTExprRef SMTSolverImpl::mkFPIsZeroImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -479,8 +480,7 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   assert(rbits->getWidth() == 4);
   res_sig = mkBVConcat(h_p, rbits);
 
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef v7 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+  SMTExprRef v7 = round(R, res_sgn, res_sig, res_exp, ebits, sbits);
 
   // And finally, we tie them together.
   SMTExprRef result = mkIte(c6, v6, v7);
@@ -492,7 +492,8 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -591,8 +592,7 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
   res_sig = mkIte(shift_cond, res_sig, res_sig_shifted);
   res_exp = mkIte(shift_cond, res_exp, res_exp_shifted);
 
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef v8 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+  SMTExprRef v8 = round(R, res_sgn, res_sig, res_exp, ebits, sbits);
 
   // And finally, we tie them together.
   SMTExprRef result = mkIte(c7, v7, v8);
@@ -681,7 +681,8 @@ static inline void addCore(SMTSolver &S, unsigned int SWidth,
 }
 
 SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
@@ -719,8 +720,7 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
   SMTExprRef c4 = mkAnd(x_is_zero, y_is_zero);
   SMTExprRef signs_and = mkAnd(x_is_neg, y_is_neg);
   SMTExprRef signs_xor = mkXor(x_is_neg, y_is_neg);
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef rm_is_to_neg = mkIsRM(*this, rm, RM::ROUND_TO_MINUS_INF);
+  SMTExprRef rm_is_to_neg = mkIsRM(*this, R, RM::ROUND_TO_MINUS_INF);
   SMTExprRef rm_and_xor = mkAnd(rm_is_to_neg, signs_xor);
   SMTExprRef neg_cond = mkOr(signs_and, rm_and_xor);
   SMTExprRef v4 = mkIte(neg_cond, nzero, pzero);
@@ -756,7 +756,7 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
 
   SMTExprRef zero_case = mkIte(rm_is_to_neg, nzero, pzero);
 
-  SMTExprRef rounded = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+  SMTExprRef rounded = round(R, res_sgn, res_sig, res_exp, ebits, sbits);
 
   SMTExprRef v7 = mkIte(is_zero_sig, zero_case, rounded);
 
@@ -769,11 +769,13 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTSolverImpl::mkFPSubImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS, const RM &R) {
+                                      const SMTExprRef &RHS,
+                                      const SMTExprRef &R) {
   return mkFPAdd(LHS, mkFPNeg(RHS), R);
 }
 
-SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &RM) {
+SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp,
+                                       const SMTExprRef &RM) {
   unsigned ebits = Exp->Sort->getFPExponentWidth();
   unsigned sbits = Exp->Sort->getFPSignificandWidth();
 
@@ -862,8 +864,7 @@ SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &RM) {
 
   assert(res_sig->getWidth() == sbits + 4);
 
-  SMTExprRef rm = mkRM(RM);
-  SMTExprRef v5 = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+  SMTExprRef v5 = round(RM, res_sgn, res_sig, res_exp, ebits, sbits);
 
   // And finally, we tie them together.
   SMTExprRef result = mkIte(c4, v4, v5);
@@ -873,7 +874,8 @@ SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &RM) {
 }
 
 SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                                      const SMTExprRef &Z, const RM &R) {
+                                      const SMTExprRef &Z,
+                                      const SMTExprRef &R) {
   assert(X->getWidth() == Y->getWidth());
   assert(X->Sort->getFPExponentWidth() == Y->Sort->getFPExponentWidth());
   assert(X->getWidth() == Y->getWidth());
@@ -901,8 +903,7 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef z_is_neg = mkIsNeg(*this, Z);
   SMTExprRef z_is_inf = mkFPIsInfinite(Z);
 
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef rm_is_to_neg = mkIsRM(*this, rm, RM::ROUND_TO_MINUS_INF);
+  SMTExprRef rm_is_to_neg = mkIsRM(*this, R, RM::ROUND_TO_MINUS_INF);
 
   SMTExprRef inf_xor = mkXor(x_is_neg, y_is_neg);
   inf_xor = mkXor(inf_xor, z_is_neg);
@@ -1124,7 +1125,7 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
   SMTExprRef zero_case = mkIte(rm_is_to_neg, nzero, pzero);
 
-  SMTExprRef rounded = round(rm, res_sgn, res_sig, res_exp, ebits, sbits);
+  SMTExprRef rounded = round(R, res_sgn, res_sig, res_exp, ebits, sbits);
 
   SMTExprRef v8 = mkIte(is_zero_sig, zero_case, rounded);
 
@@ -1208,7 +1209,8 @@ SMTExprRef SMTSolverImpl::mkFPEqualImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTSolverImpl::mkFPtoFPImpl(const SMTExprRef &From,
-                                       const SMTSortRef &To, const RM &R) {
+                                       const SMTSortRef &To,
+                                       const SMTExprRef &R) {
   unsigned from_sbits = From->Sort->getFPSignificandWidth();
   unsigned from_ebits = From->Sort->getFPExponentWidth();
   unsigned to_sbits = To->getFPSignificandWidth();
@@ -1317,8 +1319,7 @@ SMTExprRef SMTSolverImpl::mkFPtoFPImpl(const SMTExprRef &From,
 
   assert(res_exp->getWidth() == to_ebits + 2);
 
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef rounded = round(rm, res_sgn, res_sig, res_exp, to_ebits, to_sbits);
+  SMTExprRef rounded = round(R, res_sgn, res_sig, res_exp, to_ebits, to_sbits);
 
   SMTExprRef is_neg = mkEqual(sgn, one1);
   SMTExprRef sig_inf = mkIte(is_neg, ninf, pinf);
@@ -1334,7 +1335,8 @@ SMTExprRef SMTSolverImpl::mkFPtoFPImpl(const SMTExprRef &From,
 }
 
 SMTExprRef SMTSolverImpl::mkSBVtoFPImpl(const SMTExprRef &From,
-                                        const SMTSortRef &To, const RM &R) {
+                                        const SMTSortRef &To,
+                                        const SMTExprRef &R) {
   // This is a conversion from unsigned bitvector to float:
   // ((_ to_fp_unsigned eb sb) RM (_ BitVec m) (_ FloatingPoint eb
   // sb)) Semantics:
@@ -1428,13 +1430,13 @@ SMTExprRef SMTSolverImpl::mkSBVtoFPImpl(const SMTExprRef &From,
   assert(sig->getWidth() == sbits + 4);
   assert(exp->getWidth() == ebits + 2);
 
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef v2 = round(rm, sgn, sig, exp, ebits, sbits);
+  SMTExprRef v2 = round(R, sgn, sig, exp, ebits, sbits);
   return mkIte(c1, v1, v2);
 }
 
 SMTExprRef SMTSolverImpl::mkUBVtoFPImpl(const SMTExprRef &From,
-                                        const SMTSortRef &To, const RM &R) {
+                                        const SMTSortRef &To,
+                                        const SMTExprRef &R) {
   // This is a conversion from unsigned bitvector to float:
   // ((_ to_fp_unsigned eb sb) RM (_ BitVec m) (_ FloatingPoint eb
   // sb)) Semantics:
@@ -1523,8 +1525,7 @@ SMTExprRef SMTSolverImpl::mkUBVtoFPImpl(const SMTExprRef &From,
   assert(sig->getWidth() == sbits + 4);
   assert(exp->getWidth() == ebits + 2);
 
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef v2 = round(rm, sgn, sig, exp, ebits, sbits);
+  SMTExprRef v2 = round(R, sgn, sig, exp, ebits, sbits);
   return mkIte(c1, v1, v2);
 }
 
@@ -1652,16 +1653,15 @@ SMTExprRef SMTSolverImpl::mkFPtoUBVImpl(const SMTExprRef &From,
 }
 
 SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
-                                             const RM &R) {
+                                             const SMTExprRef &R) {
   unsigned ebits = From->Sort->getFPExponentWidth();
   unsigned sbits = From->Sort->getFPSignificandWidth();
 
-  SMTExprRef rm = mkRM(R);
-  SMTExprRef rm_is_rta = mkIsRM(*this, rm, RM::ROUND_TO_AWAY);
-  SMTExprRef rm_is_rte = mkIsRM(*this, rm, RM::ROUND_TO_EVEN);
-  SMTExprRef rm_is_rtp = mkIsRM(*this, rm, RM::ROUND_TO_PLUS_INF);
-  SMTExprRef rm_is_rtn = mkIsRM(*this, rm, RM::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_is_rtz = mkIsRM(*this, rm, RM::ROUND_TO_ZERO);
+  SMTExprRef rm_is_rta = mkIsRM(*this, R, RM::ROUND_TO_AWAY);
+  SMTExprRef rm_is_rte = mkIsRM(*this, R, RM::ROUND_TO_EVEN);
+  SMTExprRef rm_is_rtp = mkIsRM(*this, R, RM::ROUND_TO_PLUS_INF);
+  SMTExprRef rm_is_rtn = mkIsRM(*this, R, RM::ROUND_TO_MINUS_INF);
+  SMTExprRef rm_is_rtz = mkIsRM(*this, R, RM::ROUND_TO_ZERO);
 
   SMTExprRef nzero = mkNZero(*this, ebits, sbits);
   SMTExprRef pzero = mkPZero(*this, ebits, sbits);

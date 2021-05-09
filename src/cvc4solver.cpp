@@ -457,23 +457,21 @@ SMTExprRef CVC4Solver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef CVC4Solver::mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                   const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                   const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_MULT,
-                               toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                               toSolverExpr<CVC4Expr>(*R).Expr,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                   const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                   const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_DIV,
-                               toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                               toSolverExpr<CVC4Expr>(*R).Expr,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
@@ -488,46 +486,42 @@ SMTExprRef CVC4Solver::mkFPRemImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef CVC4Solver::mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                   const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                   const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_PLUS,
-                               toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                               toSolverExpr<CVC4Expr>(*R).Expr,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                   const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                   const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, LHS->Sort,
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_SUB,
-                               toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                               toSolverExpr<CVC4Expr>(*R).Expr,
                                toSolverExpr<CVC4Expr>(*LHS).Expr,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
-SMTExprRef CVC4Solver::mkFPSqrtImpl(const SMTExprRef &Exp, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+SMTExprRef CVC4Solver::mkFPSqrtImpl(const SMTExprRef &Exp,
+                                    const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, Exp->Sort,
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_SQRT,
-                               toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                               toSolverExpr<CVC4Expr>(*R).Expr,
                                toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                                   const SMTExprRef &Z, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
-  return newExprRef(
-      CVC4Expr(Context, X->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_FMA,
-                               toSolverExpr<CVC4Expr>(*roundingMode).Expr,
-                               toSolverExpr<CVC4Expr>(*X).Expr,
-                               toSolverExpr<CVC4Expr>(*Y).Expr,
-                               toSolverExpr<CVC4Expr>(*Z).Expr)));
+                                   const SMTExprRef &Z, const SMTExprRef &R) {
+  return newExprRef(CVC4Expr(Context, X->Sort,
+                             Context->mkExpr(CVC4::kind::FLOATINGPOINT_FMA,
+                                             toSolverExpr<CVC4Expr>(*R).Expr,
+                                             toSolverExpr<CVC4Expr>(*X).Expr,
+                                             toSolverExpr<CVC4Expr>(*Y).Expr,
+                                             toSolverExpr<CVC4Expr>(*Z).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPLtImpl(const SMTExprRef &LHS,
@@ -576,41 +570,40 @@ SMTExprRef CVC4Solver::mkFPEqualImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef CVC4Solver::mkFPtoFPImpl(const SMTExprRef &From,
-                                    const SMTSortRef &To, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                    const SMTSortRef &To, const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, To,
                Context->mkExpr(
                    CVC4::kind::FLOATINGPOINT_TO_FP_FLOATINGPOINT,
                    Context->mkConst(CVC4::FloatingPointToFPFloatingPoint(
                        To->getFPExponentWidth(), To->getFPSignificandWidth())),
-                   toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                   toSolverExpr<CVC4Expr>(*R).Expr,
                    toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkSBVtoFPImpl(const SMTExprRef &From,
-                                     const SMTSortRef &To, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                     const SMTSortRef &To,
+                                     const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, To,
                Context->mkExpr(
                    CVC4::kind::FLOATINGPOINT_TO_FP_SIGNED_BITVECTOR,
                    Context->mkConst(CVC4::FloatingPointToFPSignedBitVector(
                        To->getFPExponentWidth(), To->getFPSignificandWidth())),
-                   toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                   toSolverExpr<CVC4Expr>(*R).Expr,
                    toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkUBVtoFPImpl(const SMTExprRef &From,
-                                     const SMTSortRef &To, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+                                     const SMTSortRef &To,
+                                     const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, To,
                Context->mkExpr(
                    CVC4::kind::FLOATINGPOINT_TO_FP_UNSIGNED_BITVECTOR,
                    Context->mkConst(CVC4::FloatingPointToFPUnsignedBitVector(
                        To->getFPExponentWidth(), To->getFPSignificandWidth())),
-                   toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                   toSolverExpr<CVC4Expr>(*R).Expr,
                    toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
@@ -638,12 +631,12 @@ SMTExprRef CVC4Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
                       toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
-SMTExprRef CVC4Solver::mkFPtoIntegralImpl(const SMTExprRef &From, const RM &R) {
-  SMTExprRef roundingMode = mkRM(R);
+SMTExprRef CVC4Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
+                                          const SMTExprRef &R) {
   return newExprRef(
       CVC4Expr(Context, From->Sort,
                Context->mkExpr(CVC4::kind::FLOATINGPOINT_RTI,
-                               toSolverExpr<CVC4Expr>(*roundingMode).Expr,
+                               toSolverExpr<CVC4Expr>(*R).Expr,
                                toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
