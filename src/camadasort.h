@@ -100,7 +100,7 @@ public:
   SolverSort(SolverContextRef C, const TheSort &SS)
       : Context(std::move(C)), Sort(SS) {}
 
-  ~SolverSort() override = default;
+  virtual ~SolverSort() override = default;
 };
 
 template <typename SolverSortBase> class SolverBVSort : public SolverSortBase {
@@ -110,7 +110,7 @@ public:
   SolverBVSort(unsigned W, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
       : SolverSortBase(C, S), Width(W) {}
-  ~SolverBVSort() override = default;
+  virtual ~SolverBVSort() override = default;
 
   bool isBVSort() const override { return true; }
 
@@ -123,7 +123,7 @@ public:
   SolverBoolSort(typename SolverSortBase::ContextType C,
                  typename SolverSortBase::SortType S)
       : SolverSortBase(C, S) {}
-  ~SolverBoolSort() override = default;
+  virtual ~SolverBoolSort() override = default;
 
   bool isBoolSort() const override { return true; }
 
@@ -138,7 +138,7 @@ public:
   SolverFPSort(unsigned EW, unsigned SW, typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
       : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
-  ~SolverFPSort() override = default;
+  virtual ~SolverFPSort() override = default;
 
   bool isFPSort() const override { return true; }
 
@@ -154,7 +154,7 @@ public:
   SolverRMSort(typename SolverSortBase::ContextType C,
                typename SolverSortBase::SortType S)
       : SolverSortBase(C, S) {}
-  ~SolverRMSort() override = default;
+  virtual ~SolverRMSort() override = default;
 
   unsigned getWidth() const override { return 3; }
 
@@ -171,7 +171,7 @@ public:
                  typename SolverSortBase::ContextType C,
                  typename SolverSortBase::SortType S)
       : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
-  ~SolverBVFPSort() override = default;
+  virtual ~SolverBVFPSort() override = default;
 
   bool isFPSort() const override { return true; }
 
@@ -190,7 +190,7 @@ public:
   SolverBVRMSort(typename SolverSortBase::ContextType C,
                  typename SolverSortBase::SortType S)
       : SolverSortBase(C, S) {}
-  ~SolverBVRMSort() override = default;
+  virtual ~SolverBVRMSort() override = default;
 
   unsigned getWidth() const override { return 3; }
 
@@ -210,7 +210,7 @@ public:
                   typename SolverSortBase::SortType S)
       : SolverSortBase(C, S), IndexSort(std::move(I)),
         ElementSort(std::move(E)) {}
-  ~SolverArraySort() override = default;
+  virtual ~SolverArraySort() override = default;
 
   bool isArraySort() const override { return true; }
 
