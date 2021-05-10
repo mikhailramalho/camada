@@ -5,6 +5,7 @@ import shutil
 import sys
 from common import clone_repo_src, run_command, check_root_dir, create_dirs
 
+
 def setup_minisat():
     the_repo = clone_repo_src("Minisat",
                               "https://github.com/mikhailramalho/minisat-os-x.git", commit='HEAD')
@@ -16,6 +17,7 @@ def setup_minisat():
 
     run_command(["make", "config", "prefix=../../install/minisat"])
     run_command(["make", "-j", "install"])
+
 
 def setup_stp():
     # We need to build minisat first on macOS

@@ -50,7 +50,8 @@ def setup_yices():
 
     run_command(["autoreconf", "-fi"])
     if sys.platform == "darwin":
-        run_command(["./configure", "--prefix", "{}/../../install/yices".format(os.getcwd())])
+        run_command(["./configure", "--prefix",
+                    "{}/../../install/yices".format(os.getcwd())])
     else:
         run_command(["./configure", "--prefix", "{}/../../install/yices".format(os.getcwd()),
                     "--with-static-gmp={}/../../install/gmp/lib/libgmp.a".format(os.getcwd())])
@@ -61,8 +62,10 @@ def setup_yices():
     if sys.platform == "darwin":
         shutil.copy("./build/x86_64-apple-darwin{}-release/static_lib/libyices.a".format(platform.release()),
                     "../../install/yices/lib")
-        run_command(["cp", "../../install/yices/lib/libyices.dylib", "/usr/local/lib"])
-        run_command(["cp", "../../install/yices/lib/libyices.a", "/usr/local/lib"])
+        run_command(
+            ["cp", "../../install/yices/lib/libyices.dylib", "/usr/local/lib"])
+        run_command(
+            ["cp", "../../install/yices/lib/libyices.a", "/usr/local/lib"])
     else:
         shutil.copy("./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a",
                     "../../install/yices/lib")

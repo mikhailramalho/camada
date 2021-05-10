@@ -33,11 +33,15 @@ def setup_msat():
     # move it to deps/install/mathsat
     if sys.platform == "darwin":
         shutil.move('mathsat-5.6.6-darwin-libcxx-x86_64', '../install/mathsat')
-        run_command(["ln", "-Fs", "/usr/local/include/gmp.h", "../install/mathsat/include/gmp.h"])
-        run_command(["cp", "../install/mathsat/lib/libmathsat.dylib", "/usr/local/lib"])
-        run_command(["cp", "../install/mathsat/lib/libmathsat.a", "/usr/local/lib"])
+        run_command(["ln", "-Fs", "/usr/local/include/gmp.h",
+                    "../install/mathsat/include/gmp.h"])
+        run_command(
+            ["cp", "../install/mathsat/lib/libmathsat.dylib", "/usr/local/lib"])
+        run_command(
+            ["cp", "../install/mathsat/lib/libmathsat.a", "/usr/local/lib"])
     else:
         shutil.move('./mathsat-5.6.6-linux-x86_64', '../install/mathsat')
+
 
 if __name__ == '__main__':
     check_root_dir()
