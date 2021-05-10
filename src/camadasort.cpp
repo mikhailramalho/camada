@@ -36,8 +36,18 @@ void camada::SMTSort::dump() const {
     k = "RoundingMode";
   else if (isFPSort())
     k = "Floating-point";
+  else if (isArraySort())
+    k = "Array";
 
   std::cerr << "kind: " << k << '\n';
+  if (isArraySort()) {
+    std::cerr << "Index: ";
+    getIndexSort()->dump();
+    std::cerr << "Element: ";
+    getElementSort()->dump();
+    return;
+  }
+
   std::cerr << "width: " << getWidth() << ", solver: " << getWidthFromSolver();
   if (isFPSort())
     std::cerr << " (exp: " << getFPExponentWidth()
