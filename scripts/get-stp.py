@@ -39,10 +39,15 @@ def setup_stp():
 
     os.mkdir("./build")
     os.chdir("./build")
-    run_command(["cmake", "..", "-GNinja",
-                "-DCMAKE_INSTALL_PREFIX=../../../install/stp",
-                "-DMINISAT_INCLUDE_DIR=../../../install/minisat/include",
-                "-DMINISAT_LIBRARY=../../../install/minisat/lib/libminisat.a"])
+    if sys.platform == "darwin":
+        run_command(["cmake", "..", "-GNinja",
+                    "-DCMAKE_INSTALL_PREFIX=../../../install/stp",
+                     "-DMINISAT_INCLUDE_DIR=../../../install/minisat/include",
+                     "-DMINISAT_LIBRARY=../../../install/minisat/lib/libminisat.a"])
+    else:
+        run_command(["cmake", "..", "-GNinja",
+                     "-DCMAKE_INSTALL_PREFIX=../../../install/stp"])
+
     run_command(["ninja"])
     try:
         run_command(["ninja", "install"])
