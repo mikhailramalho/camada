@@ -34,7 +34,7 @@ using MathSATContextRef = std::shared_ptr<msat_env>;
 class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
 public:
   using SolverSort<MathSATContextRef, msat_type>::SolverSort;
-  ~MathSATSort() override = default;
+  virtual ~MathSATSort() override = default;
 
   unsigned getWidthFromSolver() const override;
 
@@ -44,7 +44,7 @@ public:
 class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
 public:
   using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
-  ~MathSATExpr() override = default;
+  virtual ~MathSATExpr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -61,7 +61,7 @@ public:
   /// Create MathSAT custom configuration. User is responsible for freeing
   /// Config
   explicit MathSATSolver(const msat_config &Config);
-  ~MathSATSolver() override;
+  virtual ~MathSATSolver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 

@@ -62,7 +62,7 @@ public:
   SymbolTablet SymbolTable;
 
   explicit BtorSolver();
-  ~BtorSolver() override;
+  virtual ~BtorSolver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 

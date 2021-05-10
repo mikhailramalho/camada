@@ -34,7 +34,7 @@ using Z3ContextRef = std::shared_ptr<z3::context>;
 class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
 public:
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
-  ~Z3Sort() override = default;
+  virtual ~Z3Sort() override = default;
 
   unsigned getWidthFromSolver() const override;
 
@@ -44,7 +44,7 @@ public:
 class Z3Expr : public SolverExpr<Z3ContextRef, z3::expr> {
 public:
   using SolverExpr<Z3ContextRef, z3::expr>::SolverExpr;
-  ~Z3Expr() override = default;
+  virtual ~Z3Expr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;

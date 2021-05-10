@@ -78,7 +78,7 @@ public:
   SolverExpr(SolverContextRef C, const SMTSortRef &S, const TheExpr &SA)
       : SMTExpr(S), Context(std::move(C)), Expr(SA) {}
 
-  ~SolverExpr() override = default;
+  virtual ~SolverExpr() override = default;
 
   bool isBVSort() const override { return Sort->isBVSort(); }
 

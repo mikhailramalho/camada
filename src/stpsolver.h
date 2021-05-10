@@ -36,7 +36,7 @@ using STPContextRef = std::shared_ptr<STP::VC>;
 class STPSort : public SolverSort<STPContextRef, STP::Type> {
 public:
   using SolverSort<STPContextRef, STP::Type>::SolverSort;
-  ~STPSort() override = default;
+  virtual ~STPSort() override = default;
 
   unsigned getWidthFromSolver() const override;
 

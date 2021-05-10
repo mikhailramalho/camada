@@ -61,7 +61,7 @@ public:
   unsigned int ConstArrayCounter = 0;
 
   explicit YicesSolver();
-  ~YicesSolver() override;
+  virtual ~YicesSolver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
