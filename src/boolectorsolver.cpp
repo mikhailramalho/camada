@@ -473,7 +473,8 @@ SMTExprRef BtorSolver::mkBVFromBinImpl(const std::string &Int,
       BtorExpr(Context, Sort, boolector_const(*Context, Int.c_str())));
 }
 
-SMTExprRef BtorSolver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
+SMTExprRef BtorSolver::mkSymbolImpl(const std::string &Name,
+                                    const SMTSortRef &Sort) {
   auto it = SymbolTable.find(Name);
   if (it != SymbolTable.end())
     return it->second;

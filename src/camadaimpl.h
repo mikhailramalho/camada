@@ -732,7 +732,8 @@ public:
     return mkBVFromBin(Int, Int.length());
   }
 
-  SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) override final {
+  SMTExprRef mkSymbol(const std::string &Name,
+                      const SMTSortRef &Sort) override final {
     SMTExprRef theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
     return theExp;
@@ -1076,7 +1077,8 @@ protected:
   virtual SMTExprRef mkBVFromBinImpl(const std::string &Int,
                                      const SMTSortRef &Sort) = 0;
 
-  virtual SMTExprRef mkSymbolImpl(const std::string &Name, SMTSortRef Sort) = 0;
+  virtual SMTExprRef mkSymbolImpl(const std::string &Name,
+                                  const SMTSortRef &Sort) = 0;
 
   virtual SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth);
 

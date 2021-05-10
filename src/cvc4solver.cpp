@@ -682,7 +682,8 @@ SMTExprRef CVC4Solver::mkBVFromBinImpl(const std::string &Int,
       CVC4Expr(Context, Sort, Context->mkConst(CVC4::BitVector(Int))));
 }
 
-SMTExprRef CVC4Solver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
+SMTExprRef CVC4Solver::mkSymbolImpl(const std::string &Name,
+                                    const SMTSortRef &Sort) {
 
   // Standard arrangement: if we already have the name, return the expression
   // from the symbol table. If not, time for a new name.

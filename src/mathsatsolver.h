@@ -228,7 +228,8 @@ public:
   SMTExprRef mkBVFromBinImpl(const std::string &Int,
                              const SMTSortRef &Sort) override;
 
-  SMTExprRef mkSymbolImpl(const std::string &Name, SMTSortRef Sort) override;
+  SMTExprRef mkSymbolImpl(const std::string &Name,
+                          const SMTSortRef &Sort) override;
 
   SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
 

@@ -683,7 +683,7 @@ SMTExprRef MathSATSolver::mkBVFromBinImpl(const std::string &Int,
 }
 
 SMTExprRef MathSATSolver::mkSymbolImpl(const std::string &Name,
-                                       SMTSortRef Sort) {
+                                       const SMTSortRef &Sort) {
   msat_decl d = msat_declare_function(*Context, Name.c_str(),
                                       toSolverSort<MathSATSort>(*Sort).Sort);
   assert(!MSAT_ERROR_DECL(d) && "Invalid function symbol declaration sort");

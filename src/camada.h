@@ -347,7 +347,8 @@ public:
   virtual SMTExprRef mkBVFromBin(const std::string &Int) = 0;
 
   /// Creates a new symbol, given a name and a sort
-  virtual SMTExprRef mkSymbol(const std::string &Name, SMTSortRef Sort) = 0;
+  virtual SMTExprRef mkSymbol(const std::string &Name,
+                              const SMTSortRef &Sort) = 0;
 
   /// Constructs a floating-point from a binary string, in the IEEE-754 format:
   /// 1 bit for the sign + N bits for the exponent + M bits for the significand

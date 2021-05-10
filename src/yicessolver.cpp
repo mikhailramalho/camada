@@ -432,7 +432,8 @@ SMTExprRef YicesSolver::mkBVFromBinImpl(const std::string &Int,
   return newExprRef(YicesExpr(Context, Sort, yices_parse_bvbin(Int.c_str())));
 }
 
-SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
+SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
+                                     const SMTSortRef &Sort) {
   // We could use yices_get_term_by_name to check if the variable was already
   // created, but the we would need to create a new SMTExprRef, so use
   // this map instead

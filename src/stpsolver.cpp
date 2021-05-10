@@ -461,7 +461,8 @@ SMTExprRef STPSolver::mkBVFromBinImpl(const std::string &Int,
                             STP::vc_bvConstExprFromStr(*Context, Int.c_str())));
 }
 
-SMTExprRef STPSolver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
+SMTExprRef STPSolver::mkSymbolImpl(const std::string &Name,
+                                   const SMTSortRef &Sort) {
 
   std::string new_name = Name;
   std::replace(new_name.begin(), new_name.end(), '@', '_');

@@ -625,7 +625,8 @@ SMTExprRef Z3Solver::mkBVFromBinImpl(const std::string &Int,
   return bv;
 }
 
-SMTExprRef Z3Solver::mkSymbolImpl(const std::string &Name, SMTSortRef Sort) {
+SMTExprRef Z3Solver::mkSymbolImpl(const std::string &Name,
+                                  const SMTSortRef &Sort) {
   return newExprRef(Z3Expr(
       Context, Sort,
       Context->constant(Name.c_str(), toSolverSort<Z3Sort>(*Sort).Sort)));
