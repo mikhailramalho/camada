@@ -55,7 +55,7 @@ void YicesExpr::dump() const {
   yices_free_string(term_str);
 }
 
-YicesSolver::YicesSolver() {
+YicesSolver::YicesSolver() : SMTSolverImpl() {
   yices_init();
   yices_clear_error();
 

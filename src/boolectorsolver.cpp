@@ -49,7 +49,8 @@ void BtorErrorHandler(const char *msg) {
   assert(0 && msg);
 }
 
-BtorSolver::BtorSolver() : Context(std::make_shared<Btor *>(boolector_new())) {
+BtorSolver::BtorSolver()
+    : SMTSolverImpl(), Context(std::make_shared<Btor *>(boolector_new())) {
   boolector_set_abort(BtorErrorHandler);
   boolector_set_opt(*Context, BTOR_OPT_MODEL_GEN, 1);
   boolector_set_opt(*Context, BTOR_OPT_AUTO_CLEANUP, 1);

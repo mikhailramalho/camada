@@ -55,13 +55,14 @@ void Z3Expr::dump() const {
 }
 
 Z3Solver::Z3Solver()
-    : Context(std::make_shared<z3::context>()), Solver(*Context) {
+    : SMTSolverImpl(), Context(std::make_shared<z3::context>()),
+      Solver(*Context) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }
 
 Z3Solver::Z3Solver(Z3ContextRef C, const z3::solver &S)
-    : Context(std::move(C)), Solver(S) {
+    : SMTSolverImpl(), Context(std::move(C)), Solver(S) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }

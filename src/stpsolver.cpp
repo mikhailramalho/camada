@@ -66,7 +66,8 @@ STPSolver::STPSolver()
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 
-STPSolver::STPSolver(STPContextRef C) : Context(std::move(C)) {}
+STPSolver::STPSolver(STPContextRef C)
+    : SMTSolverImpl(), Context(std::move(C)) {}
 
 STPSolver::~STPSolver() { STP::vc_Destroy(*Context); }
 

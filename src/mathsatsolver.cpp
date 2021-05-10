@@ -75,7 +75,8 @@ MathSATSolver::MathSATSolver() {
 }
 
 MathSATSolver::MathSATSolver(const msat_config &Config)
-    : Context(std::make_shared<msat_env>(msat_create_env(Config))) {}
+    : SMTSolverImpl(),
+      Context(std::make_shared<msat_env>(msat_create_env(Config))) {}
 
 MathSATSolver::~MathSATSolver() {
   msat_destroy_env(*Context);
