@@ -24,6 +24,8 @@
 
 #include "camadaexpr.h"
 
+#include <string>
+
 namespace camada {
 
 /// Return camada version
@@ -47,15 +49,6 @@ class SMTSolver {
 public:
   SMTSolver() = default;
   virtual ~SMTSolver() = default;
-
-  /// Wrapper to create new SMTSort
-  template <typename SolverSort>
-  SMTSortRef newSortRef(const SolverSort &Sort) const {
-    return std::make_shared<SolverSort>(Sort);
-  }
-
-  /// Wrapper to create new SMTExpr
-  virtual SMTExprRef newExprRef(const SMTExpr &Exp) const = 0;
 
   /// Returns a boolean sort.
   virtual SMTSortRef mkBoolSort() = 0;
@@ -429,7 +422,7 @@ protected:
 };
 
 /// Shared pointer for SMTSolvers.
-using SMTSolverRef = std::shared_ptr<SMTSolver>;
+using SMTSolverRef = SMTSolver *;
 
 /// Convenience method to create a Z3Solver object
 SMTSolverRef createZ3Solver();

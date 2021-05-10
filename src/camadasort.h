@@ -22,14 +22,14 @@
 #ifndef CAMADASORT_H_
 #define CAMADASORT_H_
 
-#include <memory>
+#include <utility>
 
 namespace camada {
 
 class SMTSort;
 
-/// Shared pointer for SMTSorts, used by SMTSolver API.
-using SMTSortRef = std::shared_ptr<SMTSort>;
+/// Raw pointer for SMTSorts, used by SMTSolver API.
+using SMTSortRef = SMTSort *;
 
 /// Generic base class for SMT sorts
 class SMTSort {
@@ -82,10 +82,6 @@ public:
   virtual void dump() const;
 };
 
-inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {
-  return (*LHS.get() == *RHS.get());
-}
-
 /// Template to hold Solver specific Context and Sort
 template <typename SolverContextRef, typename TheSort>
 class SolverSort : public SMTSort {
@@ -97,7 +93,7 @@ public:
 
   TheSort Sort;
 
-  SolverSort(SolverContextRef C, const TheSort &SS)
+  SolverSort(SolverContextRef C, const TheSort SS)
       : Context(std::move(C)), Sort(SS) {}
 
   virtual ~SolverSort() override = default;

@@ -105,8 +105,8 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
     return true;
 
   if (isArraySort() && Other.isArraySort())
-    return (getIndexSort() == Other.getIndexSort()) &&
-           (getElementSort() == Other.getElementSort());
+    return (*getIndexSort() == *Other.getIndexSort()) &&
+           (*getElementSort() == *Other.getElementSort());
 
   if (getWidth() != Other.getWidth())
     return false;
