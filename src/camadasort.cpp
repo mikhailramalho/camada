@@ -38,6 +38,10 @@ void camada::SMTSort::dump() const {
     k = "Floating-point";
   else if (isArraySort())
     k = "Array";
+  else {
+    std::cerr << "Unknown sort.\n";
+    abort();
+  }
 
   std::cerr << "kind: " << k << '\n';
   if (isArraySort()) {
