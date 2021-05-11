@@ -8,4 +8,5 @@ TEST_CASE("Simple CVC4 test", "[CVC4]") {
   // Create CVC4 Solver
   auto cvc4 = camada::createCVC4Solver();
   tests(cvc4);
+  delete cvc4;
 }

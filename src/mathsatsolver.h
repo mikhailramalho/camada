@@ -28,12 +28,12 @@
 
 namespace camada {
 
-using MathSATContextRef = std::shared_ptr<msat_env>;
+using MathSATContext = msat_env;
 
 /// Wrapper for MathSAT Sort
-class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
+class MathSATSort : public SolverSort<MathSATContext, msat_type> {
 public:
-  using SolverSort<MathSATContextRef, msat_type>::SolverSort;
+  using SolverSort<MathSATContext, msat_type>::SolverSort;
   virtual ~MathSATSort() override = default;
 
   unsigned getWidthFromSolver() const override;
@@ -41,9 +41,9 @@ public:
   void dump() const override;
 }; // end class MathSATSort
 
-class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
+class MathSATExpr : public SolverExpr<MathSATContext, msat_term> {
 public:
-  using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
+  using SolverExpr<MathSATContext, msat_term>::SolverExpr;
   virtual ~MathSATExpr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
@@ -54,7 +54,7 @@ public:
 
 class MathSATSolver : public SMTSolverImpl {
 public:
-  MathSATContextRef Context;
+  MathSATContext Context;
 
   explicit MathSATSolver();
 
@@ -65,7 +65,9 @@ public:
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTSortRef newSortRefImpl(const SMTSortRef &Sort) const override;
+
+  SMTExprRef newExprRefImpl(const SMTExprRef &Exp) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

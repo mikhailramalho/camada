@@ -28,13 +28,13 @@
 
 namespace camada {
 
-using CVC4ContextRef = std::shared_ptr<CVC4::ExprManager>;
+using CVC4ContextRef = CVC4::ExprManager *;
 
 /// Wrapper for CVC4 Sort
 class CVC4Sort : public SolverSort<CVC4ContextRef, CVC4::Type> {
 public:
   using SolverSort<CVC4ContextRef, CVC4::Type>::SolverSort;
-  ~CVC4Sort() override = default;
+  virtual ~CVC4Sort() override = default;
 
   unsigned getWidthFromSolver() const override;
 
@@ -44,7 +44,7 @@ public:
 class CVC4Expr : public SolverExpr<CVC4ContextRef, CVC4::Expr> {
 public:
   using SolverExpr<CVC4ContextRef, CVC4::Expr>::SolverExpr;
-  ~CVC4Expr() override = default;
+  virtual ~CVC4Expr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -63,11 +63,13 @@ public:
   unsigned int ToBVCounter = 0;
 
   explicit CVC4Solver();
-  ~CVC4Solver() override = default;
+  virtual ~CVC4Solver() override = default;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTSortRef newSortRefImpl(const SMTSortRef &Sort) const override;
+
+  SMTExprRef newExprRefImpl(const SMTExprRef &Exp) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

@@ -52,7 +52,7 @@ std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
 
 camada::SMTSolverRef camada::createZ3Solver() {
 #if SOLVER_Z3_ENABLED
-  return std::make_shared<Z3Solver>();
+  return new Z3Solver();
 #else
   std::cerr << "Camada was not compiled with Z3 support, rebuild with "
                "-DCAMADA_ENABLE_SOLVER_Z3=ON\n";
@@ -62,7 +62,7 @@ camada::SMTSolverRef camada::createZ3Solver() {
 
 camada::SMTSolverRef camada::createMathSATSolver() {
 #if SOLVER_MATHSAT_ENABLED
-  return std::make_shared<MathSATSolver>();
+  return new MathSATSolver();
 #else
   std::cerr << "Camada was not compiled with MathSAT support, rebuild "
                "with -DCAMADA_ENABLE_SOLVER_MATHSAT=ON\n";
@@ -72,7 +72,7 @@ camada::SMTSolverRef camada::createMathSATSolver() {
 
 camada::SMTSolverRef camada::createCVC4Solver() {
 #if SOLVER_CVC4_ENABLED
-  return std::make_shared<CVC4Solver>();
+  return new CVC4Solver();
 #else
   std::cerr << "Camada was not compiled with CVC4 support, rebuild with "
                "-DCAMADA_ENABLE_SOLVER_CVC4=ON\n";
@@ -82,7 +82,7 @@ camada::SMTSolverRef camada::createCVC4Solver() {
 
 camada::SMTSolverRef camada::createBoolectorSolver() {
 #if SOLVER_BOOLECTOR_ENABLED
-  return std::make_shared<BtorSolver>();
+  return new BtorSolver();
 #else
   std::cerr << "Camada was not compiled with Boolector support, rebuild "
                "with -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON\n";
@@ -92,7 +92,7 @@ camada::SMTSolverRef camada::createBoolectorSolver() {
 
 camada::SMTSolverRef camada::createYicesSolver() {
 #if SOLVER_YICES_ENABLED
-  return std::make_shared<YicesSolver>();
+  return new YicesSolver();
 #else
   std::cerr << "Camada was not compiled with YICES support, rebuild with "
                "-DCAMADA_ENABLE_SOLVER_YICES=ON\n";
@@ -102,7 +102,7 @@ camada::SMTSolverRef camada::createYicesSolver() {
 
 camada::SMTSolverRef camada::createSTPSolver() {
 #if SOLVER_STP_ENABLED
-  return std::make_shared<STPSolver>();
+  return new STPSolver();
 #else
   std::cerr << "Camada was not compiled with STP support, rebuild with "
                "-DCAMADA_ENABLE_SOLVER_STP=ON\n";

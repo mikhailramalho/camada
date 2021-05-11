@@ -9,6 +9,7 @@ TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   // Create Mathsat Solver
   auto mathsat = camada::createMathSATSolver();
   tests(mathsat);
+  delete mathsat;
 }
 
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
@@ -42,8 +43,9 @@ TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
   msat_set_option(Config, "theory.arr.enable_witness", "true");
 
   // Create custom MathSAT Solver
-  camada::SMTSolverRef mathsat = std::make_shared<mySolver>(Config);
+  camada::SMTSolverRef mathsat = new mySolver(Config);
   msat_destroy_config(Config);
 
   tests(mathsat);
+  delete mathsat;
 }

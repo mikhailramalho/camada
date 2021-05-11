@@ -93,8 +93,8 @@ public:
   bool equal_to(SMTExpr const &other) const override = 0;
 };
 
-/// Shared pointer for SMTExprs, used by SMTSolver API.
-using SMTExprRef = std::shared_ptr<SMTExpr>;
+/// Raw pointer for SMTExprs, used by SMTSolver API.
+using SMTExprRef = SMTExpr *;
 
 /// Wrapper to downcast from SMTExpr to Solver specific expr
 template <typename SolverExpr>
