@@ -28,7 +28,7 @@
 
 namespace camada {
 
-using Z3ContextRef = std::shared_ptr<z3::context>;
+using Z3ContextRef = z3::context *;
 
 /// Wrapper for Z3 Sort
 class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
@@ -60,11 +60,13 @@ public:
 
   explicit Z3Solver();
   explicit Z3Solver(Z3ContextRef C, const z3::solver &S);
-  ~Z3Solver() override = default;
+  virtual ~Z3Solver() override = default;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTSortRef newSortRefImpl(const SMTSortRef &Sort) const override;
+
+  SMTExprRef newExprRefImpl(const SMTExprRef &Exp) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

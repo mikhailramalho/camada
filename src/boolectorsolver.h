@@ -32,13 +32,13 @@ extern "C" {
 
 namespace camada {
 
-using BtorContextRef = std::shared_ptr<Btor *>;
+using BtorContextRef = Btor *;
 
 /// Wrapper for Boolector Sort
 class BtorSort : public SolverSort<BtorContextRef, BoolectorSort> {
 public:
   using SolverSort<BtorContextRef, BoolectorSort>::SolverSort;
-  ~BtorSort() override = default;
+  virtual ~BtorSort();
 
   unsigned getWidthFromSolver() const override;
 }; // end class BtorSort
@@ -46,7 +46,7 @@ public:
 class BtorExpr : public SolverExpr<BtorContextRef, BoolectorNode *> {
 public:
   using SolverExpr<BtorContextRef, BoolectorNode *>::SolverExpr;
-  ~BtorExpr() override = default;
+  virtual ~BtorExpr();
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -66,7 +66,9 @@ public:
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTSortRef newSortRefImpl(const SMTSortRef &Sort) const override;
+
+  SMTExprRef newExprRefImpl(const SMTExprRef &Exp) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

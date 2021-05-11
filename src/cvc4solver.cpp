@@ -53,8 +53,7 @@ bool CVC4Expr::equal_to(SMTExpr const &Other) const {
 void CVC4Expr::dump() const { std::cerr << Expr.toString() << '\n'; }
 
 CVC4Solver::CVC4Solver()
-    : SMTSolverImpl(), Context(std::make_shared<CVC4::ExprManager>()),
-      Solver(Context.get()) {
+    : SMTSolverImpl(), Context(new CVC4::ExprManager()), Solver(Context) {
   Solver.setOption("produce-models", true);
   Solver.setOption("produce-assertions", true);
 }
@@ -63,68 +62,72 @@ void CVC4Solver::addConstraintImpl(const SMTExprRef &Exp) {
   Solver.assertFormula(toSolverExpr<CVC4Expr>(*Exp).Expr);
 }
 
-SMTExprRef CVC4Solver::newExprRefImpl(const SMTExpr &Exp) const {
-  return std::make_shared<CVC4Expr>(toSolverExpr<CVC4Expr>(Exp));
+SMTSortRef CVC4Solver::newSortRefImpl(const SMTSortRef &Sort) const {
+  return Sort;
+}
+
+SMTExprRef CVC4Solver::newExprRefImpl(const SMTExprRef &Exp) const {
+  return Exp;
 }
 
 SMTSortRef CVC4Solver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<CVC4Sort>>(
-      {Context, Context->booleanType()});
+  return newSortRef(
+      new SolverBoolSort<CVC4Sort>({Context, Context->booleanType()}));
 }
 
 SMTSortRef CVC4Solver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<SolverBVSort<CVC4Sort>>(
-      {BitWidth, Context, Context->mkBitVectorType(BitWidth)});
+  return newSortRef(new SolverBVSort<CVC4Sort>(
+      {BitWidth, Context, Context->mkBitVectorType(BitWidth)}));
 }
 
 SMTSortRef CVC4Solver::mkRMSortImpl() {
-  return newSortRef<SolverRMSort<CVC4Sort>>(
-      {Context, Context->roundingModeType()});
+  return newSortRef(
+      new SolverRMSort<CVC4Sort>({Context, Context->roundingModeType()}));
 }
 
 SMTSortRef CVC4Solver::mkFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  return newSortRef<SolverFPSort<CVC4Sort>>(
+  return newSortRef(new SolverFPSort<CVC4Sort>(
       {ExpWidth, SigWidth, Context,
-       Context->mkFloatingPointType(ExpWidth, SigWidth + 1)});
+       Context->mkFloatingPointType(ExpWidth, SigWidth + 1)}));
 }
 
 SMTSortRef CVC4Solver::mkBVFPSortImpl(const unsigned ExpWidth,
                                       const unsigned SigWidth) {
-  return newSortRef<SolverBVFPSort<CVC4Sort>>(
+  return newSortRef(new SolverBVFPSort<CVC4Sort>(
       {ExpWidth, SigWidth + 1, Context,
-       Context->mkBitVectorType(ExpWidth + SigWidth + 1)});
+       Context->mkBitVectorType(ExpWidth + SigWidth + 1)}));
 }
 
 SMTSortRef CVC4Solver::mkBVRMSortImpl() {
-  return newSortRef<SolverBVRMSort<CVC4Sort>>(
-      {Context, Context->mkBitVectorType(3)});
+  return newSortRef(
+      new SolverBVRMSort<CVC4Sort>({Context, Context->mkBitVectorType(3)}));
 }
 
 SMTSortRef CVC4Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                        const SMTSortRef &ElemSort) {
-  return newSortRef<SolverArraySort<CVC4Sort>>(
+  return newSortRef(new SolverArraySort<CVC4Sort>(
       {IndexSort, ElemSort, Context,
        Context->mkArrayType(toSolverSort<CVC4Sort>(*IndexSort).Sort,
-                            toSolverSort<CVC4Sort>(*ElemSort).Sort)});
+                            toSolverSort<CVC4Sort>(*ElemSort).Sort)}));
 }
 
 SMTExprRef CVC4Solver::mkBVNegImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, Exp->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_NEG,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, Exp->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_NEG,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVNotImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, Exp->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_NOT,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, Exp->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_NOT,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkNotImpl(const SMTExprRef &Exp) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, Exp->Sort,
       Context->mkExpr(CVC4::kind::NOT, toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
@@ -132,208 +135,208 @@ SMTExprRef CVC4Solver::mkNotImpl(const SMTExprRef &Exp) {
 SMTExprRef CVC4Solver::mkBVAddImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_PLUS,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_PLUS,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSubImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_SUB,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SUB,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVMulImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_MULT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_MULT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSRemImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_SREM,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SREM,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVURemImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_UREM,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_UREM,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSDivImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_SDIV,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SDIV,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVUDivImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_UDIV,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_UDIV,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVShlImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_SHL,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SHL,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVAshrImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_ASHR,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_ASHR,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVLshrImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_LSHR,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_LSHR,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVXorImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_XOR,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_XOR,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVOrImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_OR,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_OR,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVAndImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::BITVECTOR_AND,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::BITVECTOR_AND,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVUltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_ULT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_ULT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_SLT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SLT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVUgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_UGT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_UGT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_SGT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SGT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVUleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_ULE,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_ULE,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_SLE,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SLE,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVUgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_UGE,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_UGE,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::BITVECTOR_SGE,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_SGE,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, mkBoolSort(),
       Context->mkExpr(CVC4::kind::AND, toSolverExpr<CVC4Expr>(*LHS).Expr,
                       toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, mkBoolSort(),
       Context->mkExpr(CVC4::kind::OR, toSolverExpr<CVC4Expr>(*LHS).Expr,
                       toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, mkBoolSort(),
       Context->mkExpr(CVC4::kind::XOR, toSolverExpr<CVC4Expr>(*LHS).Expr,
                       toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -341,7 +344,7 @@ SMTExprRef CVC4Solver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef CVC4Solver::mkEqualImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, mkBoolSort(),
       Context->mkExpr(CVC4::kind::EQUAL, toSolverExpr<CVC4Expr>(*LHS).Expr,
                       toSolverExpr<CVC4Expr>(*RHS).Expr)));
@@ -349,32 +352,32 @@ SMTExprRef CVC4Solver::mkEqualImpl(const SMTExprRef &LHS,
 
 SMTExprRef CVC4Solver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                  const SMTExprRef &F) {
-  return newExprRef(CVC4Expr(Context, T->Sort,
-                             Context->mkExpr(CVC4::kind::ITE,
-                                             toSolverExpr<CVC4Expr>(*Cond).Expr,
-                                             toSolverExpr<CVC4Expr>(*T).Expr,
-                                             toSolverExpr<CVC4Expr>(*F).Expr)));
+  return newExprRef(new CVC4Expr(
+      Context, T->Sort,
+      Context->mkExpr(CVC4::kind::ITE, toSolverExpr<CVC4Expr>(*Cond).Expr,
+                      toSolverExpr<CVC4Expr>(*T).Expr,
+                      toSolverExpr<CVC4Expr>(*F).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC4Expr(Context, mkBVSort(i + Exp->getWidth()),
-               Context->mkExpr(CVC4::kind::BITVECTOR_SIGN_EXTEND,
-                               Context->mkConst(CVC4::BitVectorSignExtend(i)),
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+  return newExprRef(new CVC4Expr(
+      Context, mkBVSort(i + Exp->getWidth()),
+      Context->mkExpr(CVC4::kind::BITVECTOR_SIGN_EXTEND,
+                      Context->mkConst(CVC4::BitVectorSignExtend(i)),
+                      toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC4Expr(Context, mkBVSort(i + Exp->getWidth()),
-               Context->mkExpr(CVC4::kind::BITVECTOR_ZERO_EXTEND,
-                               Context->mkConst(CVC4::BitVectorZeroExtend(i)),
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+  return newExprRef(new CVC4Expr(
+      Context, mkBVSort(i + Exp->getWidth()),
+      Context->mkExpr(CVC4::kind::BITVECTOR_ZERO_EXTEND,
+                      Context->mkConst(CVC4::BitVectorZeroExtend(i)),
+                      toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBVExtractImpl(unsigned High, unsigned Low,
                                        const SMTExprRef &Exp) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, mkBVSort(High - Low + 1),
       Context->mkExpr(CVC4::Kind::BITVECTOR_EXTRACT,
                       Context->mkConst(CVC4::BitVectorExtract(High, Low)),
@@ -384,15 +387,15 @@ SMTExprRef CVC4Solver::mkBVExtractImpl(unsigned High, unsigned Low,
 SMTExprRef CVC4Solver::mkBVConcatImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
-               Context->mkExpr(CVC4::kind::BITVECTOR_CONCAT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
+                   Context->mkExpr(CVC4::kind::BITVECTOR_CONCAT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkArraySelectImpl(const SMTExprRef &Array,
                                          const SMTExprRef &Index) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, Array->Sort->getElementSort(),
       Context->mkExpr(CVC4::kind::SELECT, toSolverExpr<CVC4Expr>(*Array).Expr,
                       toSolverExpr<CVC4Expr>(*Index).Expr)));
@@ -401,7 +404,7 @@ SMTExprRef CVC4Solver::mkArraySelectImpl(const SMTExprRef &Array,
 SMTExprRef CVC4Solver::mkArrayStoreImpl(const SMTExprRef &Array,
                                         const SMTExprRef &Index,
                                         const SMTExprRef &Element) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, Array->Sort,
       Context->mkExpr(CVC4::kind::STORE, toSolverExpr<CVC4Expr>(*Array).Expr,
                       toSolverExpr<CVC4Expr>(*Index).Expr,
@@ -410,209 +413,209 @@ SMTExprRef CVC4Solver::mkArrayStoreImpl(const SMTExprRef &Array,
 
 SMTExprRef CVC4Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, Exp->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ABS,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, Exp->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_ABS,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPNegImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, Exp->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_NEG,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, Exp->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_NEG,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISINF,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISINF,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISNAN,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISNAN,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISSN,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISSN,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPIsNormalImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISN,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISN,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISZ,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_ISZ,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_MULT,
-                               toSolverExpr<CVC4Expr>(*R).Expr,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_MULT,
+                                   toSolverExpr<CVC4Expr>(*R).Expr,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_DIV,
-                               toSolverExpr<CVC4Expr>(*R).Expr,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_DIV,
+                                   toSolverExpr<CVC4Expr>(*R).Expr,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPRemImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_REM,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_REM,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_PLUS,
-                               toSolverExpr<CVC4Expr>(*R).Expr,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_PLUS,
+                                   toSolverExpr<CVC4Expr>(*R).Expr,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
   return newExprRef(
-      CVC4Expr(Context, LHS->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_SUB,
-                               toSolverExpr<CVC4Expr>(*R).Expr,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, LHS->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_SUB,
+                                   toSolverExpr<CVC4Expr>(*R).Expr,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPSqrtImpl(const SMTExprRef &Exp,
                                     const SMTExprRef &R) {
   return newExprRef(
-      CVC4Expr(Context, Exp->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_SQRT,
-                               toSolverExpr<CVC4Expr>(*R).Expr,
-                               toSolverExpr<CVC4Expr>(*Exp).Expr)));
+      new CVC4Expr(Context, Exp->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_SQRT,
+                                   toSolverExpr<CVC4Expr>(*R).Expr,
+                                   toSolverExpr<CVC4Expr>(*Exp).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                    const SMTExprRef &Z, const SMTExprRef &R) {
-  return newExprRef(CVC4Expr(Context, X->Sort,
-                             Context->mkExpr(CVC4::kind::FLOATINGPOINT_FMA,
-                                             toSolverExpr<CVC4Expr>(*R).Expr,
-                                             toSolverExpr<CVC4Expr>(*X).Expr,
-                                             toSolverExpr<CVC4Expr>(*Y).Expr,
-                                             toSolverExpr<CVC4Expr>(*Z).Expr)));
+  return newExprRef(new CVC4Expr(
+      Context, X->Sort,
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_FMA, toSolverExpr<CVC4Expr>(*R).Expr,
+          toSolverExpr<CVC4Expr>(*X).Expr, toSolverExpr<CVC4Expr>(*Y).Expr,
+          toSolverExpr<CVC4Expr>(*Z).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPLtImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_LT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_LT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPGtImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_GT,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_GT,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPLeImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_LEQ,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_LEQ,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPGeImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_GEQ,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_GEQ,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPEqualImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   return newExprRef(
-      CVC4Expr(Context, mkBoolSort(),
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_EQ,
-                               toSolverExpr<CVC4Expr>(*LHS).Expr,
-                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+      new CVC4Expr(Context, mkBoolSort(),
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_EQ,
+                                   toSolverExpr<CVC4Expr>(*LHS).Expr,
+                                   toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPtoFPImpl(const SMTExprRef &From,
                                     const SMTSortRef &To, const SMTExprRef &R) {
-  return newExprRef(
-      CVC4Expr(Context, To,
-               Context->mkExpr(
-                   CVC4::kind::FLOATINGPOINT_TO_FP_FLOATINGPOINT,
-                   Context->mkConst(CVC4::FloatingPointToFPFloatingPoint(
-                       To->getFPExponentWidth(), To->getFPSignificandWidth())),
-                   toSolverExpr<CVC4Expr>(*R).Expr,
-                   toSolverExpr<CVC4Expr>(*From).Expr)));
+  return newExprRef(new CVC4Expr(
+      Context, To,
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_FLOATINGPOINT,
+          Context->mkConst(CVC4::FloatingPointToFPFloatingPoint(
+              To->getFPExponentWidth(), To->getFPSignificandWidth())),
+          toSolverExpr<CVC4Expr>(*R).Expr,
+          toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkSBVtoFPImpl(const SMTExprRef &From,
                                      const SMTSortRef &To,
                                      const SMTExprRef &R) {
-  return newExprRef(
-      CVC4Expr(Context, To,
-               Context->mkExpr(
-                   CVC4::kind::FLOATINGPOINT_TO_FP_SIGNED_BITVECTOR,
-                   Context->mkConst(CVC4::FloatingPointToFPSignedBitVector(
-                       To->getFPExponentWidth(), To->getFPSignificandWidth())),
-                   toSolverExpr<CVC4Expr>(*R).Expr,
-                   toSolverExpr<CVC4Expr>(*From).Expr)));
+  return newExprRef(new CVC4Expr(
+      Context, To,
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_SIGNED_BITVECTOR,
+          Context->mkConst(CVC4::FloatingPointToFPSignedBitVector(
+              To->getFPExponentWidth(), To->getFPSignificandWidth())),
+          toSolverExpr<CVC4Expr>(*R).Expr,
+          toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkUBVtoFPImpl(const SMTExprRef &From,
                                      const SMTSortRef &To,
                                      const SMTExprRef &R) {
-  return newExprRef(
-      CVC4Expr(Context, To,
-               Context->mkExpr(
-                   CVC4::kind::FLOATINGPOINT_TO_FP_UNSIGNED_BITVECTOR,
-                   Context->mkConst(CVC4::FloatingPointToFPUnsignedBitVector(
-                       To->getFPExponentWidth(), To->getFPSignificandWidth())),
-                   toSolverExpr<CVC4Expr>(*R).Expr,
-                   toSolverExpr<CVC4Expr>(*From).Expr)));
+  return newExprRef(new CVC4Expr(
+      Context, To,
+      Context->mkExpr(
+          CVC4::kind::FLOATINGPOINT_TO_FP_UNSIGNED_BITVECTOR,
+          Context->mkConst(CVC4::FloatingPointToFPUnsignedBitVector(
+              To->getFPExponentWidth(), To->getFPSignificandWidth())),
+          toSolverExpr<CVC4Expr>(*R).Expr,
+          toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   SMTExprRef roundingMode = mkRM(RM::ROUND_TO_ZERO);
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, mkBVSort(ToWidth),
       Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_SBV,
                       Context->mkConst(CVC4::FloatingPointToSBV(ToWidth)),
@@ -624,7 +627,7 @@ SMTExprRef CVC4Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   SMTExprRef roundingMode = mkRM(RM::ROUND_TO_ZERO);
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, mkBVSort(ToWidth),
       Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_UBV,
                       Context->mkConst(CVC4::FloatingPointToUBV(ToWidth)),
@@ -635,10 +638,10 @@ SMTExprRef CVC4Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
 SMTExprRef CVC4Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
                                           const SMTExprRef &R) {
   return newExprRef(
-      CVC4Expr(Context, From->Sort,
-               Context->mkExpr(CVC4::kind::FLOATINGPOINT_RTI,
-                               toSolverExpr<CVC4Expr>(*R).Expr,
-                               toSolverExpr<CVC4Expr>(*From).Expr)));
+      new CVC4Expr(Context, From->Sort,
+                   Context->mkExpr(CVC4::kind::FLOATINGPOINT_RTI,
+                                   toSolverExpr<CVC4Expr>(*R).Expr,
+                                   toSolverExpr<CVC4Expr>(*From).Expr)));
 }
 
 bool CVC4Solver::getBoolImpl(const SMTExprRef &Exp) {
@@ -660,26 +663,26 @@ std::string CVC4Solver::getFPInBinImpl(const SMTExprRef &Exp) {
 SMTExprRef CVC4Solver::getArrayElementImpl(const SMTExprRef &Array,
                                            const SMTExprRef &Index) {
   SMTExprRef sel = mkArraySelect(Array, Index);
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, sel->Sort, Solver.getValue(toSolverExpr<CVC4Expr>(*sel).Expr)));
 }
 
 SMTExprRef CVC4Solver::mkBoolImpl(const bool b) {
-  return newExprRef(CVC4Expr(Context, mkBoolSort(), Context->mkConst(b)));
+  return newExprRef(new CVC4Expr(Context, mkBoolSort(), Context->mkConst(b)));
 }
 
 SMTExprRef CVC4Solver::mkBVFromDecImpl(const int64_t Int,
                                        const SMTSortRef &Sort) {
   return newExprRef(
-      CVC4Expr(Context, Sort,
-               Context->mkConst(CVC4::BitVector(Sort->getWidth(),
-                                                static_cast<uint64_t>(Int)))));
+      new CVC4Expr(Context, Sort,
+                   Context->mkConst(CVC4::BitVector(
+                       Sort->getWidth(), static_cast<uint64_t>(Int)))));
 }
 
 SMTExprRef CVC4Solver::mkBVFromBinImpl(const std::string &Int,
                                        const SMTSortRef &Sort) {
   return newExprRef(
-      CVC4Expr(Context, Sort, Context->mkConst(CVC4::BitVector(Int))));
+      new CVC4Expr(Context, Sort, Context->mkConst(CVC4::BitVector(Int))));
 }
 
 SMTExprRef CVC4Solver::mkSymbolImpl(const std::string &Name,
@@ -688,10 +691,10 @@ SMTExprRef CVC4Solver::mkSymbolImpl(const std::string &Name,
   // Standard arrangement: if we already have the name, return the expression
   // from the symbol table. If not, time for a new name.
   if (SymbolTable.isBound(Name))
-    return newExprRef(CVC4Expr(Context, Sort, SymbolTable.lookup(Name)));
+    return newExprRef(new CVC4Expr(Context, Sort, SymbolTable.lookup(Name)));
 
   // Time for a new one.
-  SMTExprRef sym = newExprRef(CVC4Expr(
+  SMTExprRef sym = newExprRef(new CVC4Expr(
       Context, Sort, Context->mkVar(Name, toSolverSort<CVC4Sort>(*Sort).Sort)));
   SymbolTable.bind(Name, toSolverExpr<CVC4Expr>(*sym).Expr, true);
   return sym;
@@ -699,9 +702,9 @@ SMTExprRef CVC4Solver::mkSymbolImpl(const std::string &Name,
 
 SMTExprRef CVC4Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
   unsigned SWidth = FP.length() - EWidth - 1;
-  return newExprRef(
-      CVC4Expr(Context, mkFPSort(EWidth, SWidth),
-               Context->mkConst(CVC4::FloatingPoint(EWidth, SWidth + 1, FP))));
+  return newExprRef(new CVC4Expr(
+      Context, mkFPSort(EWidth, SWidth),
+      Context->mkConst(CVC4::FloatingPoint(EWidth, SWidth + 1, FP))));
 }
 
 SMTExprRef CVC4Solver::mkRMImpl(const RM &R) {
@@ -726,16 +729,16 @@ SMTExprRef CVC4Solver::mkRMImpl(const RM &R) {
     e = Context->mkConst(CVC4::RoundingMode::roundTowardZero);
     break;
   }
-  return newExprRef(CVC4Expr(Context, mkRMSortImpl(), e));
+  return newExprRef(new CVC4Expr(Context, mkRMSortImpl(), e));
 }
 
 SMTExprRef CVC4Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
   SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
-  SMTExprRef theNaN =
-      newExprRef(CVC4Expr(Context, sort,
-                          Context->mkConst(CVC4::FloatingPoint::makeNaN(
-                              CVC4::FloatingPointSize(ExpWidth, SigWidth)))));
+  SMTExprRef theNaN = newExprRef(
+      new CVC4Expr(Context, sort,
+                   Context->mkConst(CVC4::FloatingPoint::makeNaN(
+                       CVC4::FloatingPointSize(ExpWidth, SigWidth)))));
 
   return Sgn ? mkFPNeg(theNaN) : theNaN;
 }
@@ -744,14 +747,14 @@ SMTExprRef CVC4Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
   SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
   return newExprRef(
-      CVC4Expr(Context, sort,
-               Context->mkConst(CVC4::FloatingPoint::makeInf(
-                   CVC4::FloatingPointSize(ExpWidth, SigWidth), Sgn))));
+      new CVC4Expr(Context, sort,
+                   Context->mkConst(CVC4::FloatingPoint::makeInf(
+                       CVC4::FloatingPointSize(ExpWidth, SigWidth), Sgn))));
 }
 
 SMTExprRef CVC4Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                         const SMTSortRef &To) {
-  return newExprRef(CVC4Expr(
+  return newExprRef(new CVC4Expr(
       Context, To,
       Context->mkExpr(
           CVC4::kind::FLOATINGPOINT_TO_FP_IEEE_BITVECTOR,
@@ -780,10 +783,11 @@ SMTExprRef CVC4Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 SMTExprRef CVC4Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
   SMTSortRef sort = mkArraySort(IndexSort, InitValue->Sort);
-  return newExprRef(CVC4Expr(Context, sort,
-                             Context->mkConst(CVC4::ArrayStoreAll(
-                                 toSolverSort<CVC4Sort>(*sort).Sort,
-                                 toSolverExpr<CVC4Expr>(*InitValue).Expr))));
+  return newExprRef(
+      new CVC4Expr(Context, sort,
+                   Context->mkConst(CVC4::ArrayStoreAll(
+                       toSolverSort<CVC4Sort>(*sort).Sort,
+                       toSolverExpr<CVC4Expr>(*InitValue).Expr))));
 }
 
 checkResult CVC4Solver::checkImpl() {
@@ -798,6 +802,7 @@ checkResult CVC4Solver::checkImpl() {
 }
 
 void CVC4Solver::resetImpl() {
+  SymbolTable.reset();
   Solver.reset();
   Solver.setOption("produce-models", true);
   Solver.setOption("produce-assertions", true);

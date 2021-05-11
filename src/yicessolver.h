@@ -30,13 +30,13 @@
 
 namespace camada {
 
-using YicesContextRef = std::shared_ptr<context_t *>;
+using YicesContextRef = context_t *;
 
 /// Wrapper for Yices Sort
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
 public:
   using SolverSort<YicesContextRef, type_t>::SolverSort;
-  ~YicesSort() override = default;
+  virtual ~YicesSort() override;
 
   unsigned getWidthFromSolver() const override;
 
@@ -46,7 +46,7 @@ public:
 class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
 public:
   using SolverExpr<YicesContextRef, term_t>::SolverExpr;
-  ~YicesExpr() override = default;
+  virtual ~YicesExpr() override;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -65,7 +65,9 @@ public:
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTSortRef newSortRefImpl(const SMTSortRef &Sort) const override;
+
+  SMTExprRef newExprRefImpl(const SMTExprRef &Exp) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

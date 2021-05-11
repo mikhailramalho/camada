@@ -8,6 +8,7 @@ TEST_CASE("Simple Z3 test", "[Z3]") {
   // Create Z3 Solver
   auto z3 = camada::createZ3Solver();
   tests(z3);
+  delete z3;
 }
 
 TEST_CASE("Override Z3 Solver", "[Z3]") {
@@ -22,8 +23,7 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
   };
 
   // Create Z3 Solver
-  camada::SMTSolverRef z3 =
-      std::make_shared<myZ3Solver>(std::make_shared<z3::context>());
-
+  camada::SMTSolverRef z3 = new myZ3Solver(new z3::context());
   tests(z3);
+  delete z3;
 }

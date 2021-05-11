@@ -8,6 +8,7 @@ TEST_CASE("Simple Yices test", "[YICES]") {
   // Create Yices Solver
   auto yices = camada::createYicesSolver();
   tests(yices);
+  delete yices;
 }
 
 TEST_CASE("Override Yices Solver", "[YICES]") {
@@ -40,13 +41,13 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
       yices_set_config(config, "array-solver", "none");
       yices_set_config(config, "arith-solver", "none");
 
-      Context = std::make_shared<context_t *>(yices_new_context(config));
+      Context = yices_new_context(config);
       yices_free_config(config);
     }
   };
 
   // Create Yices Solver
-  camada::SMTSolverRef yices = std::make_shared<myYicesSolver>();
-
+  camada::SMTSolverRef yices = new myYicesSolver();
   tests(yices);
+  delete yices;
 }

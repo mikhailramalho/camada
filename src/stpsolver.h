@@ -30,12 +30,12 @@ namespace STP {
 
 namespace camada {
 
-using STPContextRef = std::shared_ptr<STP::VC>;
+using STPContext = STP::VC;
 
 /// Wrapper for STP Sort
-class STPSort : public SolverSort<STPContextRef, STP::Type> {
+class STPSort : public SolverSort<STPContext, STP::Type> {
 public:
-  using SolverSort<STPContextRef, STP::Type>::SolverSort;
+  using SolverSort<STPContext, STP::Type>::SolverSort;
   virtual ~STPSort() override = default;
 
   unsigned getWidthFromSolver() const override;
@@ -43,9 +43,9 @@ public:
   void dump() const override;
 }; // end class STPSort
 
-class STPExpr : public SolverExpr<STPContextRef, STP::Expr> {
+class STPExpr : public SolverExpr<STPContext, STP::Expr> {
 public:
-  using SolverExpr<STPContextRef, STP::Expr>::SolverExpr;
+  using SolverExpr<STPContext, STP::Expr>::SolverExpr;
   virtual ~STPExpr() = default;
 
   /// Comparison of Expr equality, not model equivalence.
@@ -56,17 +56,19 @@ public:
 
 class STPSolver : public SMTSolverImpl {
 public:
-  STPContextRef Context;
+  STPContext Context;
 
   unsigned int ConstArrayCounter = 0;
 
   explicit STPSolver();
-  explicit STPSolver(STPContextRef C);
+  explicit STPSolver(STPContext C);
   virtual ~STPSolver();
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTSortRef newSortRefImpl(const SMTSortRef &Sort) const override;
+
+  SMTExprRef newExprRefImpl(const SMTExprRef &Exp) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

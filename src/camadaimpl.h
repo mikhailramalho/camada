@@ -34,6 +34,12 @@ public:
   SMTSolverImpl() = default;
   virtual ~SMTSolverImpl() override = default;
 
+  SMTSortRef newSortRef(const SMTSortRef &Sort) const {
+    SMTSortRef theSort = newSortRefImpl(Sort);
+    theSort->validateSortWidth();
+    return theSort;
+  }
+
   SMTExprRef newExprRef(const SMTExprRef &Exp) const {
     SMTExprRef theExp = newExprRefImpl(Exp);
     theExp->Sort->validateSortWidth();
@@ -301,7 +307,7 @@ public:
     return theExp;
   }
 
-  SMTExprRef mkEqual(const SMTExprRef &LHS, 
+  SMTExprRef mkEqual(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final {
     assert(*LHS->Sort == *RHS->Sort);
     SMTExprRef theExp = mkEqualImpl(LHS, RHS);
@@ -857,6 +863,8 @@ public:
   }
 
 protected:
+  virtual SMTSortRef newSortRefImpl(const SMTSortRef &Sort) const = 0;
+
   virtual SMTExprRef newExprRefImpl(const SMTExprRef &Exp) const = 0;
 
   virtual SMTSortRef mkBoolSortImpl() = 0;
