@@ -118,6 +118,14 @@ public:
 
   SMTExprRef mkBVAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVSltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;

@@ -246,6 +246,33 @@ SMTExprRef CVC4Solver::mkBVAndImpl(const SMTExprRef &LHS,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
+SMTExprRef CVC4Solver::mkBVXnorImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(
+      CVC4Expr(Context, LHS->Sort,
+               Context->mkExpr(CVC4::kind::BITVECTOR_XNOR,
+                               toSolverExpr<CVC4Expr>(*LHS).Expr,
+                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+}
+
+SMTExprRef CVC4Solver::mkBVNorImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
+  return newExprRef(
+      CVC4Expr(Context, LHS->Sort,
+               Context->mkExpr(CVC4::kind::BITVECTOR_NOR,
+                               toSolverExpr<CVC4Expr>(*LHS).Expr,
+                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+}
+
+SMTExprRef CVC4Solver::mkBVNandImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(
+      CVC4Expr(Context, LHS->Sort,
+               Context->mkExpr(CVC4::kind::BITVECTOR_NAND,
+                               toSolverExpr<CVC4Expr>(*LHS).Expr,
+                               toSolverExpr<CVC4Expr>(*RHS).Expr)));
+}
+
 SMTExprRef CVC4Solver::mkBVUltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
@@ -320,7 +347,7 @@ SMTExprRef CVC4Solver::mkBVSgeImpl(const SMTExprRef &LHS,
 
 SMTExprRef CVC4Solver::mkImpliesImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(new CVC4Expr(
+  return newExprRef(CVC4Expr(
       Context, mkBoolSort(),
       Context->mkExpr(CVC4::kind::IMPLIES, toSolverExpr<CVC4Expr>(*LHS).Expr,
                       toSolverExpr<CVC4Expr>(*RHS).Expr)));

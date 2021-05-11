@@ -307,9 +307,9 @@ SMTExprRef STPSolver::mkBVSgeImpl(const SMTExprRef &LHS,
 SMTExprRef STPSolver::mkImpliesImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(
-      new STPExpr(Context, mkBoolSort(),
-                  STP::vc_impliesExpr(Context, toSolverExpr<STPExpr>(*LHS).Expr,
-                                      toSolverExpr<STPExpr>(*RHS).Expr)));
+      STPExpr(Context, mkBoolSort(),
+              STP::vc_impliesExpr(*Context, toSolverExpr<STPExpr>(*LHS).Expr,
+                                  toSolverExpr<STPExpr>(*RHS).Expr)));
 }
 
 SMTExprRef STPSolver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {

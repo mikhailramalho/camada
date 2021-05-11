@@ -222,6 +222,33 @@ public:
     return theExp;
   }
 
+  SMTExprRef mkBVXnor(const SMTExprRef &LHS,
+                      const SMTExprRef &RHS) override final {
+    assert(LHS->isBVSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkBVXnorImpl(LHS, RHS);
+    assert(theExp->Sort == LHS->Sort);
+    return theExp;
+  }
+
+  SMTExprRef mkBVNor(const SMTExprRef &LHS,
+                     const SMTExprRef &RHS) override final {
+    assert(LHS->isBVSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkBVNorImpl(LHS, RHS);
+    assert(theExp->Sort == LHS->Sort);
+    return theExp;
+  }
+
+  SMTExprRef mkBVNand(const SMTExprRef &LHS,
+                      const SMTExprRef &RHS) override final {
+    assert(LHS->isBVSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkBVNandImpl(LHS, RHS);
+    assert(theExp->Sort == LHS->Sort);
+    return theExp;
+  }
+
   SMTExprRef mkBVUlt(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final {
     assert(LHS->isBVSort());
@@ -924,6 +951,20 @@ protected:
 
   virtual SMTExprRef mkBVAndImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
+
+  virtual SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
+    return mkBVNot(mkBVXor(LHS, RHS));
+  };
+
+  virtual SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+    return mkBVNot(mkBVOr(LHS, RHS));
+  };
+
+  virtual SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
+    return mkBVNot(mkBVAnd(LHS, RHS));
+  };
 
   virtual SMTExprRef mkBVUltImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
