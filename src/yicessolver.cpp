@@ -412,7 +412,7 @@ bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   auto res = yices_get_bool_value(yices_get_model(*Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
   (void)res;
-  assert(res && "Can't get boolean value from Yices");
+  assert(!res && "Can't get boolean value from Yices");
   return val ? true : false;
 }
 
@@ -420,8 +420,10 @@ std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
   int32_t *data = new int32_t[width];
-  yices_get_bv_value(yices_get_model(*Context, 1),
-                     toSolverExpr<YicesExpr>(*Exp).Expr, data);
+  auto res = yices_get_bv_value(yices_get_model(*Context, 1),
+                                toSolverExpr<YicesExpr>(*Exp).Expr, data);
+  (void)res;
+  assert(!res && "Can't get boolean value from Yices");
 
   std::string val;
   for (unsigned i = 0; i < width; i++)
