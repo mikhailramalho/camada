@@ -286,6 +286,14 @@ SMTExprRef BtorSolver::mkBVSgeImpl(const SMTExprRef &LHS,
                               toSolverExpr<BtorExpr>(*RHS).Expr)));
 }
 
+SMTExprRef BtorSolver::mkImpliesImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  return newExprRef(
+      new BtorExpr(Context, mkBoolSort(),
+                   boolector_implies(Context, toSolverExpr<BtorExpr>(*LHS).Expr,
+                                     toSolverExpr<BtorExpr>(*RHS).Expr)));
+}
+
 SMTExprRef BtorSolver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(
       BtorExpr(Context, mkBoolSort(),

@@ -318,6 +318,14 @@ SMTExprRef CVC4Solver::mkBVSgeImpl(const SMTExprRef &LHS,
                                toSolverExpr<CVC4Expr>(*RHS).Expr)));
 }
 
+SMTExprRef CVC4Solver::mkImpliesImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  return newExprRef(new CVC4Expr(
+      Context, mkBoolSort(),
+      Context->mkExpr(CVC4::kind::IMPLIES, toSolverExpr<CVC4Expr>(*LHS).Expr,
+                      toSolverExpr<CVC4Expr>(*RHS).Expr)));
+}
+
 SMTExprRef CVC4Solver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(CVC4Expr(
       Context, mkBoolSort(),

@@ -286,6 +286,14 @@ SMTExprRef YicesSolver::mkBVSgeImpl(const SMTExprRef &LHS,
                                  toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
+SMTExprRef YicesSolver::mkImpliesImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(
+      new YicesExpr(Context, mkBoolSort(),
+                    yices_implies(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                  toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
 SMTExprRef YicesSolver::mkAndImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(Context, mkBoolSort(),

@@ -261,6 +261,13 @@ SMTExprRef Z3Solver::mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
+SMTExprRef Z3Solver::mkImpliesImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
+  return newExprRef(new Z3Expr(Context, mkBoolSort(),
+                               toSolverExpr<Z3Expr>(*LHS).Expr &&
+                                   toSolverExpr<Z3Expr>(*RHS).Expr));
+}
+
 SMTExprRef Z3Solver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, mkBoolSort(),
                            toSolverExpr<Z3Expr>(*LHS).Expr &&

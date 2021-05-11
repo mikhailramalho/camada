@@ -309,6 +309,15 @@ public:
     return theExp;
   }
 
+  SMTExprRef mkImplies(const SMTExprRef &LHS,
+                       const SMTExprRef &RHS) override final {
+    assert(LHS->isBoolSort());
+    assert(*LHS->Sort == *RHS->Sort);
+    SMTExprRef theExp = mkImpliesImpl(LHS, RHS);
+    assert(theExp->isBoolSort());
+    return theExp;
+  }
+
   SMTExprRef mkAnd(const SMTExprRef &LHS,
                    const SMTExprRef &RHS) override final {
     assert(LHS->isBoolSort());
@@ -948,6 +957,12 @@ protected:
 
   virtual SMTExprRef mkEqualImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
+
+  virtual SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
+    // This is: logical-or(logical-not(LHS), RHS)
+    return mkOr(mkNot(LHS), RHS);
+  }
 
   virtual SMTExprRef mkAndImpl(const SMTExprRef &LHS,
                                const SMTExprRef &RHS) = 0;
