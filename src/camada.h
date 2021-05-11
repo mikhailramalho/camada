@@ -158,6 +158,10 @@ public:
   /// Creates a boolean equality operation
   virtual SMTExprRef mkEqual(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
+  /// Creates a boolean implication operation
+  virtual SMTExprRef mkImplies(const SMTExprRef &LHS,
+                               const SMTExprRef &RHS) = 0;
+
   /// Creates a boolean and operation
   virtual SMTExprRef mkAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 

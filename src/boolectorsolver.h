@@ -134,6 +134,9 @@ public:
 
   SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
