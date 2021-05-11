@@ -213,6 +213,26 @@ SMTExprRef Z3Solver::mkBVAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                                toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
+SMTExprRef Z3Solver::mkBVXnorImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           z3::xnor(toSolverExpr<Z3Expr>(*LHS).Expr,
+                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
+}
+
+SMTExprRef Z3Solver::mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           z3::nor(toSolverExpr<Z3Expr>(*LHS).Expr,
+                                   toSolverExpr<Z3Expr>(*RHS).Expr)));
+}
+
+SMTExprRef Z3Solver::mkBVNandImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, LHS->Sort,
+                           z3::nand(toSolverExpr<Z3Expr>(*LHS).Expr,
+                                    toSolverExpr<Z3Expr>(*RHS).Expr)));
+}
+
 SMTExprRef Z3Solver::mkBVUltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, mkBoolSort(),
                            z3::ult(toSolverExpr<Z3Expr>(*LHS).Expr,
@@ -263,9 +283,9 @@ SMTExprRef Z3Solver::mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef Z3Solver::mkImpliesImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(new Z3Expr(Context, mkBoolSort(),
-                               toSolverExpr<Z3Expr>(*LHS).Expr &&
-                                   toSolverExpr<Z3Expr>(*RHS).Expr));
+  return newExprRef(Z3Expr(Context, mkBoolSort(),
+                           toSolverExpr<Z3Expr>(*LHS).Expr &&
+                               toSolverExpr<Z3Expr>(*RHS).Expr));
 }
 
 SMTExprRef Z3Solver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {

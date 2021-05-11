@@ -128,6 +128,15 @@ public:
   /// Creates a bitvector and operation
   virtual SMTExprRef mkBVAnd(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
+  /// Creates a bitvector xnor operation
+  virtual SMTExprRef mkBVXnor(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a bitvector nor operation
+  virtual SMTExprRef mkBVNor(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a bitvector nand operation
+  virtual SMTExprRef mkBVNand(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
   /// Creates a bitvector unsigned less-than operation
   virtual SMTExprRef mkBVUlt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
