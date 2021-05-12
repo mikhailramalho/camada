@@ -34,12 +34,12 @@ def setup_cvc4():
 
     if sys.platform == "darwin":
         run_command(["./configure.sh", "production", "--symfpu", "--optimized",
-                     "--prefix=../../install/", "--python3", "--static",
+                     "--prefix=../../install/", "--python3",
                      "--cadical", "--cryptominisat", "--kissat",
                      "--no-static-binary", "--ninja"])
     else:
         run_command(["./configure.sh", "production", "--symfpu", "--optimized",
-                     "--prefix=../../install/", "--static", "--cadical",
+                     "--prefix=../../install/", "--cadical",
                      "--kissat", "--cryptominisat", "--no-static-binary",
                      "--ninja"])
     os.chdir("./build")
