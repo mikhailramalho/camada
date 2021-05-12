@@ -198,7 +198,7 @@ include(AddUninstallTarget)
 
 # Add integration tests (unit tests for each library should be in each
 # sublibrary directory).
-if(BUILD_TESTING)
+if(CAMADA_ENABLE_REGRESSION)
   add_subdirectory(regression)
 endif()
 
