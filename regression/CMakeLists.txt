@@ -32,11 +32,11 @@ add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME})
 
 # Solvers
-if(${CAMADA_BOOLECTOR_ENABLE})
+if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE Boolector::boolector)
 endif()
 
-if(${CAMADA_CVC4_ENABLE})
+if(${CAMADA_SOLVER_CVC4_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC CVC4::cvc4)
   if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
     target_include_directories(${REGRESSION_TARGET_NAME}
@@ -44,25 +44,25 @@ if(${CAMADA_CVC4_ENABLE})
   endif()
 endif()
 
-if(${CAMADA_MATHSAT_ENABLE})
+if(${CAMADA_SOLVER_MATHSAT_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
 endif()
 
-if(${CAMADA_STP_ENABLE})
+if(${CAMADA_SOLVER_STP_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_STP_INCLUDE_DIR})
 endif()
 
-if(${CAMADA_YICES_ENABLE})
+if(${CAMADA_SOLVER_YICES_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
 endif()
 
-if(${CAMADA_Z3_ENABLE})
+if(${CAMADA_SOLVER_Z3_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
