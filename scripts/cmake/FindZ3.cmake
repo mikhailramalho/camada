@@ -35,12 +35,12 @@ endfunction(check_z3_version)
 # Looking for Z3 in CAMADA_Z3_INCLUDE_DIR
 find_path(
   CAMADA_Z3_INCLUDE_DIR z3.h
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/z3 ${CAMADA_Z3_DIR} $ENV{HOME}/z3
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_Z3_DIR} $ENV{HOME}/z3
   PATH_SUFFIXES include)
 
 find_library(
   CAMADA_Z3_LIB z3
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/z3 ${CAMADA_Z3_DIR} $ENV{HOME}/z3
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_Z3_DIR} $ENV{HOME}/z3
   PATH_SUFFIXES lib bin)
 
 # Try to check it dynamically, by compiling a small program that prints Z3's
