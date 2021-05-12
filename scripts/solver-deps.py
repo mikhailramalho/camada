@@ -61,15 +61,19 @@ def setup_gmp():
 
 def setup_minisat():
     curr_dir = os.getcwd()
-    if sys.platform == "darwin":
-        the_repo = clone_repo_src("Minisat",
-                                  "https://github.com/mikhailramalho/minisat-os-x.git", commit='HEAD')
-    else:
-        the_repo = clone_repo_src("Minisat",
-                                  "https://github.com/msoos/minisat.git", commit='HEAD')
 
+    the_repo = clone_repo_src("Minisat",
+                              "https://github.com/msoos/minisat.git", commit='HEAD')
     os.chdir("{}".format(the_repo))
 
-    run_command(["make", "config", "prefix=../../install/"])
-    run_command(["make", "-j", "install"])
+    if os.path.exists('./build'):
+        shutil.rmtree('./build')
+    os.mkdir("./build")
+    os.chdir("./build")
+
+    run_command(["cmake", "..", "-GNinja",
+                 "-DCMAKE_INSTALL_PREFIX=../../../../install/"])
+    run_command(["ninja"])
+    run_command(["ninja", "install"])
+
     os.chdir(curr_dir)
