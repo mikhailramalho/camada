@@ -43,13 +43,13 @@ add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS
             ${LIBRARY_TARGET_NAME})
 
 # Solvers
-if(${CAMADA_BOOLECTOR_ENABLE})
+if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC Boolector::boolector)
   target_compile_definitions(${LIBRARY_TARGET_NAME}
                              PRIVATE SOLVER_BOOLECTOR_ENABLED)
 endif()
 
-if(${CAMADA_CVC4_ENABLE})
+if(${CAMADA_SOLVER_CVC4_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC CVC4::cvc4)
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC4_ENABLED)
   if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
@@ -58,7 +58,7 @@ if(${CAMADA_CVC4_ENABLE})
   endif()
 endif()
 
-if(${CAMADA_MATHSAT_ENABLE})
+if(${CAMADA_SOLVER_MATHSAT_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
@@ -66,14 +66,14 @@ if(${CAMADA_MATHSAT_ENABLE})
                              PRIVATE SOLVER_MATHSAT_ENABLED)
 endif()
 
-if(${CAMADA_STP_ENABLE})
+if(${CAMADA_SOLVER_STP_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PRIVATE ${CAMADA_STP_INCLUDE_DIR})
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
 endif()
 
-if(${CAMADA_YICES_ENABLE})
+if(${CAMADA_SOLVER_YICES_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
@@ -81,7 +81,7 @@ if(${CAMADA_YICES_ENABLE})
                              PRIVATE SOLVER_YICES_ENABLED)
 endif()
 
-if(${CAMADA_Z3_ENABLE})
+if(${CAMADA_SOLVER_Z3_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
