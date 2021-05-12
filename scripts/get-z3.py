@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
 import os
+import shutil
 import sys
 from common import download_solver_src, run_command, unzip, check_root_dir, create_dirs
-import shutil
 
 
 def setup_z3():
+    curr_dir = os.getcwd()
     if sys.platform == "darwin":
         print("We use brew to download z3 on MacOS")
         run_command(["brew", "install", "z3"])
@@ -23,15 +24,12 @@ def setup_z3():
     # extracts solver to ./deps/src/z3
     unzip(the_file)
 
-    # delete z3 dir if it exists
-    if os.path.exists('../install/z3'):
-        shutil.rmtree('../install/z3')
-
-    # move it to deps/install/mathsat
-    if sys.platform == "darwin":
-        shutil.move('./z3-4.8.10-x64-ubuntu-18.04', '../install/z3')
-    else:
-        shutil.move('./z3-4.8.10-x64-ubuntu-18.04', '../install/z3')
+    # move it to deps/install/
+    run_command(
+        ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/bin", "../install/"])
+    run_command(
+        ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/include", "../install/"])
+    os.chdir(curr_dir)
 
 
 if __name__ == '__main__':
