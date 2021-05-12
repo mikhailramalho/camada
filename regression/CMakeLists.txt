@@ -9,7 +9,7 @@ function(compile_test)
     string(TOLOWER ${name} lower_name)
     string(TOUPPER ${name} upper_name)
 
-    if(CAMADA_${upper_name}_ENABLE AND ${name}_FOUND)
+    if(CAMADA_SOLVER_${upper_name}_ENABLE AND ${name}_FOUND)
       if(NOT EXISTS "${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
         message(
           FATAL_ERROR
