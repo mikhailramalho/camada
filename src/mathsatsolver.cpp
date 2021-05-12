@@ -67,7 +67,7 @@ void MathSATExpr::dump() const {
   msat_free(ast);
 }
 
-MathSATSolver::MathSATSolver() {
+MathSATSolver::MathSATSolver() : SMTSolverImpl() {
   msat_config cfg = msat_create_config();
   msat_set_option(cfg, "model_generation", "true");
   Context = std::make_shared<msat_env>(msat_create_env(cfg));

@@ -62,7 +62,8 @@ void STPErrorHandler(const char *msg) {
 }
 
 STPSolver::STPSolver()
-    : Context(std::make_shared<STP::VC>(STP::vc_createValidityChecker())) {
+    : SMTSolverImpl(),
+      Context(std::make_shared<STP::VC>(STP::vc_createValidityChecker())) {
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 
