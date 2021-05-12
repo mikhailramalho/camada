@@ -468,7 +468,7 @@ SMTExprRef BtorSolver::getArrayElementImpl(const SMTExprRef &Array,
   if (bv.empty())
     return mkBVFromDec(0, Array->Sort->getElementSort());
 
-  SMTSortRef elementSort = Array->Sort->getElementSort();
+  const SMTSortRef &elementSort = Array->Sort->getElementSort();
   if (elementSort->isBVSort())
     return SMTSolverImpl::mkBVFromBin(bv);
 
@@ -511,7 +511,7 @@ SMTExprRef BtorSolver::mkSymbolImpl(const std::string &Name,
   if (it != SymbolTable.end())
     return it->second;
 
-  SMTExprRef newSymbol =
+  const SMTExprRef &newSymbol =
       Sort->isArraySort()
           ? newExprRef(BtorExpr(
                 Context, Sort,
@@ -530,7 +530,7 @@ SMTExprRef BtorSolver::mkSymbolImpl(const std::string &Name,
 
 SMTExprRef BtorSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
-  SMTSortRef sort = mkArraySort(IndexSort, InitValue->Sort);
+  const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
   return newExprRef(BtorExpr(
       Context, sort,
       boolector_const_array(*Context, toSolverSort<BtorSort>(*sort).Sort,

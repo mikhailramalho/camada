@@ -341,7 +341,7 @@ SMTExprRef STPSolver::mkEqualImpl(const SMTExprRef &LHS,
     // variable
     const std::string name =
         "__CAMADA_index" + std::to_string(ConstArrayCounter++);
-    SMTExprRef index = mkSymbol(name, LHS->Sort->getIndexSort());
+    const SMTExprRef &index = mkSymbol(name, LHS->Sort->getIndexSort());
 
     // and do select(A,i) == select(B,i)
     return mkEqual(mkArraySelect(LHS, index), mkArraySelect(RHS, index));
@@ -376,7 +376,7 @@ SMTExprRef STPSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
 }
 
 SMTExprRef STPSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
-  SMTExprRef z = SMTSolverImpl::mkBVFromDec(0, i);
+  const SMTExprRef &z = SMTSolverImpl::mkBVFromDec(0, i);
   return mkBVConcat(z, Exp);
 }
 
@@ -433,9 +433,9 @@ std::string STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
 
 SMTExprRef STPSolver::getArrayElementImpl(const SMTExprRef &Array,
                                           const SMTExprRef &Index) {
-  SMTExprRef sel = mkArraySelect(Array, Index);
+  const SMTExprRef &sel = mkArraySelect(Array, Index);
 
-  SMTSortRef elementSort = Array->Sort->getElementSort();
+  const SMTSortRef &elementSort = Array->Sort->getElementSort();
   if (elementSort->isBoolSort())
     return mkBool(getBool(sel));
 

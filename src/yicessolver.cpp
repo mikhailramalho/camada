@@ -435,9 +435,9 @@ std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
 
 SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
                                             const SMTExprRef &Index) {
-  SMTExprRef sel = mkArraySelect(Array, Index);
+  const SMTExprRef &sel = mkArraySelect(Array, Index);
 
-  SMTSortRef elementSort = Array->Sort->getElementSort();
+  const SMTSortRef &elementSort = Array->Sort->getElementSort();
   if (elementSort->isBoolSort())
     return mkBool(getBool(sel));
 

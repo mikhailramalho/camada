@@ -646,7 +646,7 @@ SMTExprRef CVC4Solver::mkUBVtoFPImpl(const SMTExprRef &From,
 SMTExprRef CVC4Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  SMTExprRef roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
   return newExprRef(CVC4Expr(
       Context, mkBVSort(ToWidth),
       Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_SBV,
@@ -658,7 +658,7 @@ SMTExprRef CVC4Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
 SMTExprRef CVC4Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  SMTExprRef roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
   return newExprRef(CVC4Expr(
       Context, mkBVSort(ToWidth),
       Context->mkExpr(CVC4::kind::FLOATINGPOINT_TO_UBV,
@@ -694,7 +694,7 @@ std::string CVC4Solver::getFPInBinImpl(const SMTExprRef &Exp) {
 
 SMTExprRef CVC4Solver::getArrayElementImpl(const SMTExprRef &Array,
                                            const SMTExprRef &Index) {
-  SMTExprRef sel = mkArraySelect(Array, Index);
+  const SMTExprRef &sel = mkArraySelect(Array, Index);
   return newExprRef(CVC4Expr(
       Context, sel->Sort, Solver.getValue(toSolverExpr<CVC4Expr>(*sel).Expr)));
 }
@@ -726,7 +726,7 @@ SMTExprRef CVC4Solver::mkSymbolImpl(const std::string &Name,
     return newExprRef(CVC4Expr(Context, Sort, SymbolTable.lookup(Name)));
 
   // Time for a new one.
-  SMTExprRef sym = newExprRef(CVC4Expr(
+  const SMTExprRef &sym = newExprRef(CVC4Expr(
       Context, Sort, Context->mkVar(Name, toSolverSort<CVC4Sort>(*Sort).Sort)));
   SymbolTable.bind(Name, toSolverExpr<CVC4Expr>(*sym).Expr, true);
   return sym;
@@ -766,8 +766,8 @@ SMTExprRef CVC4Solver::mkRMImpl(const RM &R) {
 
 SMTExprRef CVC4Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
-  SMTExprRef theNaN =
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth);
+  const SMTExprRef &theNaN =
       newExprRef(CVC4Expr(Context, sort,
                           Context->mkConst(CVC4::FloatingPoint::makeNaN(
                               CVC4::FloatingPointSize(ExpWidth, SigWidth)))));
@@ -777,7 +777,7 @@ SMTExprRef CVC4Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef CVC4Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  SMTSortRef sort = mkFPSort(ExpWidth, SigWidth);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth);
   return newExprRef(
       CVC4Expr(Context, sort,
                Context->mkConst(CVC4::FloatingPoint::makeInf(
@@ -800,9 +800,9 @@ SMTExprRef CVC4Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   // to bv, so we create a new symbol
   const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
 
-  SMTSortRef to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
-                             Exp->Sort->getFPSignificandWidth());
-  SMTExprRef newSymbol = mkSymbol(name, to);
+  const SMTSortRef &to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
+                                    Exp->Sort->getFPSignificandWidth());
+  const SMTExprRef &newSymbol = mkSymbol(name, to);
 
   // and constraint it to be the conversion of the fp, since
   // (fp_matches_bv f bv) <-> (= f ((_ to_fp E S) bv))
@@ -814,7 +814,7 @@ SMTExprRef CVC4Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 
 SMTExprRef CVC4Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
-  SMTSortRef sort = mkArraySort(IndexSort, InitValue->Sort);
+  const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
   return newExprRef(CVC4Expr(Context, sort,
                              Context->mkConst(CVC4::ArrayStoreAll(
                                  toSolverSort<CVC4Sort>(*sort).Sort,
