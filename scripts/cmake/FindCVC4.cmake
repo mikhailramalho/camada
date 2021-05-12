@@ -1,4 +1,4 @@
-find_package(CVC4 HINTS ${CMAKE_SOURCE_DIR}/deps/install/cvc4
+find_package(CVC4 HINTS ${CMAKE_SOURCE_DIR}/deps/install/
              ${CAMADA_CVC4_DIR}/lib/cmake/CVC4 $ENV{HOME}/cvc4)
 
 if(CVC4_FOUND)
