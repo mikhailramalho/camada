@@ -29,13 +29,13 @@ endfunction(check_mathsat_version)
 # Looking for MATHSAT in CAMADA_MATHSAT_INCLUDE_DIR
 find_path(
   CAMADA_MATHSAT_INCLUDE_DIR mathsat.h
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/mathsat/ ${CAMADA_MATHSAT_DIR}
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_MATHSAT_DIR}
         $ENV{HOME}/mathsat
   PATH_SUFFIXES include)
 
 find_library(
   CAMADA_MATHSAT_LIB mathsat
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/mathsat/ ${CAMADA_MATHSAT_DIR}
+  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_MATHSAT_DIR}
         $ENV{HOME}/mathsat
   PATH_SUFFIXES lib bin)
 
