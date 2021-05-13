@@ -125,6 +125,21 @@ target_include_directories(
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
          "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>")
 
+if(${RELEASE_MODE})
+  add_custom_target(
+    repack-btor-static-lib ALL
+    COMMAND
+      rm -rf deps && mkdir deps && cd deps && ar -x
+      "../../lib/$<TARGET_FILE_NAME:${LIBRARY_TARGET_NAME}>" && ar -x
+      "../../../deps/install/lib/libboolector.a" && ar -x
+      "../../../deps/src/boolector-3.2.1/deps/lingeling/liblgl.a" && ar -x
+      "../../../deps/src/boolector-3.2.1/deps/btor2tools/build/libbtor2parser.a"
+      && ar -x "../../../deps/install/lib/libminisat.a" && ar -x
+      "../../../deps/install/lib/libcryptominisat5.a" && ar -x
+      "../../../deps/install/lib/libcadical.a" && cd ../ && ar -qc
+      "../lib/$<TARGET_FILE_NAME:${LIBRARY_TARGET_NAME}>" ./deps/*.o)
+endif()
+
 # Specify installation targets, typology and destination folders.
 install(
   TARGETS ${LIBRARY_TARGET_NAME}
