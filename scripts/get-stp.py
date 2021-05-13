@@ -24,14 +24,9 @@ def setup_stp():
     os.mkdir("./build")
     os.chdir("./build")
 
-    if sys.platform == "darwin":
-        run_command(["cmake", "..", "-GNinja",
-                    "-DCMAKE_INSTALL_PREFIX=../../../install/",
-                     "-DMINISAT_INCLUDE_DIR=../../../install/include",
-                     "-DMINISAT_LIBRARY=../../../install/lib/libminisat.a"])
-    else:
-        run_command(["cmake", "..", "-GNinja",
-                     "-DCMAKE_INSTALL_PREFIX=../../../install/"])
+    run_command(["cmake", "..", "-GNinja", "-DBUILD_SHARED_LIBS=OFF",
+                 "-DSTATICCOMPILE=ON", "-DONLY_SIMPLE=ON",
+                 "-DCMAKE_INSTALL_PREFIX=../../../install/"])
 
     run_command(["ninja"])
     try:
