@@ -64,7 +64,9 @@ macro(config_solver name version)
 
     # Add to the list of dependencies so it can be added to the cmake export
     # file
-    list(APPEND CAMADA_DEPENDENCIES "${name} ${version}")
+    if(NOT ${RELEASE_MODE})
+      list(APPEND CAMADA_DEPENDENCIES "${name} ${version}")
+    endif()
   endif()
 endmacro()
 
@@ -162,6 +164,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel"
                                     "RelWithDebInfo" "Sanitizer")
 endif()
+
+# Special hidden variable to force the repacking of the static lib
+set(RELEASE_MODE
+    OFF
+    CACHE INTERNAL "Force release mode")
 
 # Find solvers
 config_solver(Boolector 3.2.1)
