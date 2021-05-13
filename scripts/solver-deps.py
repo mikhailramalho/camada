@@ -16,7 +16,7 @@ def setup_cms():
     os.chdir("./build")
 
     run_command(["cmake", "..", "-GNinja", "-DSTATICCOMPILE=ON", "-DONLY_SIMPLE=ON",
-                 "-DENABLE_PYTHON_INTERFACE=OFF",
+                 "-DENABLE_PYTHON_INTERFACE=OFF", "-DNOM4RI=ON",
                  "-DCMAKE_INSTALL_PREFIX=../../../install/"])
     run_command(["ninja"])
     run_command(["ninja", "install"])
