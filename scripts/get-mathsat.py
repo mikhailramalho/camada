@@ -30,9 +30,9 @@ def setup_msat():
     # move it to deps/install/
     if sys.platform == "darwin":
         run_command(
-            ["cp", "-r", "./mathsat-5.6.6-darwin-libcxx-x86_64/lib/", "../install/"])
+            ["cp", "-r", "./mathsat-5.6.6-darwin-libcxx-x86_64/lib/", "../install/lib/"])
         run_command(
-            ["cp", "-r", "./mathsat-5.6.6-darwin-libcxx-x86_64/include/", "../install/"])
+            ["cp", "-r", "./mathsat-5.6.6-darwin-libcxx-x86_64/include/", "../install/include/"])
 
         run_command(["ln", "-Fs", "/usr/local/include/gmp.h",
                     "../install//include/gmp.h"])
