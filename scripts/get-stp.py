@@ -12,6 +12,7 @@ def setup_stp():
 
     deps = importlib.import_module("solver-deps")
     deps.setup_minisat()
+    deps.setup_cms()
 
     the_repo = clone_repo_src("STP v2.3.3 (commit 9a59a72e)",
                               "https://github.com/stp/stp.git", commit='9a59a72e')
