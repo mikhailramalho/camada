@@ -1,3 +1,18 @@
+function(add_header_to_install)
+  foreach(name IN LISTS ARGN)
+    string(TOLOWER ${name} lower_name)
+    string(TOUPPER ${name} upper_name)
+
+    if(CAMADA_SOLVER_${upper_name}_ENABLE AND ${name}_FOUND)
+      list(APPEND solver_src_test_files "${lower_name}solver.h")
+    endif()
+
+    set(${LIBRARY_TARGET_NAME}_PUB_HDR
+        ${${LIBRARY_TARGET_NAME}_PUB_HDR} ${solver_src_test_files}
+        PARENT_SCOPE)
+  endforeach()
+endfunction()
+
 # Include binary path so we can include ac_config.h
 include_directories(${CMAKE_BINARY_DIR}/src)
 
@@ -20,8 +35,12 @@ set(${LIBRARY_TARGET_NAME}_SRC
     yicessolver.cpp
     z3solver.cpp)
 
-# List of HPP (header) library files.
+# List of HPP (header) library files, the public ones will be installed on the
+# system
 set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadasort.h camadaexpr.h)
+
+# add each solver specific header, if it is enabled
+add_header_to_install("Boolector;CVC4;MathSAT;STP;Yices;Z3")
 
 set(${LIBRARY_TARGET_NAME}_HDR camadaimpl.h)
 
