@@ -9,11 +9,14 @@ if __name__ == '__main__':
 
     curr_dir = os.getcwd()
 
+    if os.path.exists('./deps'):
+        shutil.rmtree('./deps')
+
     check_root_dir()
     create_dirs()
 
     b = importlib.import_module("get-boolector")
-    # b.setup_btor()
+    b.setup_btor()
 
     if os.path.exists('./release'):
         shutil.rmtree('./release')
@@ -62,11 +65,15 @@ if __name__ == '__main__':
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
     run_command(["cp", "LICENSE", "./release/license/"])
-    run_command(["cp", "./deps/src/boolector-3.2.1/COPYING",
-                "./release/license/BOOLECTOR_LICENSE.txt"])
-    run_command(["cp", "./deps/src/cadical/LICENSE",
-                "./release/license/CADICAL_LICENSE.txt"])
-    run_command(["cp", "./deps/src/minisat/LICENSE",
-                "./release/license/MINISAT_LICENSE.txt"])
-    run_command(["cp", "./deps/src/cryptominisat/LICENSE.txt",
-                "./release/license/CRYPTOMINISAT_LICENSE.txt"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/BOOLECTOR_LICENSE.txt", "./release/license/"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/BTOR2TOOLS_LICENSE.txt", "./release/license/"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/CADICAL_LICENSE.txt", "./release/license/"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/CRYPTOMINISAT_LICENSE.txt", "./release/license/"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/LINGELING_LICENSE", "./release/license/"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/MINISAT_LICENSE.txt", "./release/license/"])
