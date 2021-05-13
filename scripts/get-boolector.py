@@ -26,11 +26,10 @@ def setup_btor():
 
     os.chdir("./boolector-3.2.1")
     run_command("./contrib/setup-lingeling.sh")
-    run_command("./contrib/setup-picosat.sh")
     run_command("./contrib/setup-btor2tools.sh")
     run_command("ls")
-    run_command(["./configure.sh", "--prefix",
-                "../../../install/", "-fPIC"])
+    run_command(["./configure.sh", "--prefix", "../../../install/",
+                 "-fPIC", "--no-picosat"])
     os.chdir("./build")
     run_command(["make", "-j"])
     run_command(["make", "install"])
