@@ -87,9 +87,7 @@ if(${CAMADA_SOLVER_MATHSAT_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_STP_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
-  target_include_directories(${LIBRARY_TARGET_NAME}
-                             PRIVATE ${CAMADA_STP_INCLUDE_DIR})
+  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC stp)
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
 endif()
 
