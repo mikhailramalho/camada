@@ -99,6 +99,6 @@ if __name__ == '__main__':
     run_command(
         ["cp", "-r", "./scripts/licenses/MINISAT_LICENSE.txt", "./release/license/"])
     run_command(
-        ["cp", "-r", "./scripts/licenses/STP_LICENSE.txt", "./release/license/"])
+        ["cp", "-r", "./scripts/licenses/STP_LICENSE", "./release/license/"])
     run_command(
         ["cp", "-r", "./scripts/licenses/Z3_LICENSE.txt", "./release/license/"])
