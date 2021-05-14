@@ -25,6 +25,8 @@ def setup_stp():
     os.chdir("./build")
 
     run_command(["cmake", "..", "-GNinja", "-DONLY_SIMPLE=ON",
+                 "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF",
+                 "-DCMAKE_BUILD_TYPE=Release",
                  "-DCMAKE_INSTALL_PREFIX=../../../install/"])
 
     run_command(["ninja"])
