@@ -16,7 +16,7 @@ def setup_cms():
     os.chdir("./build")
 
     run_command(["cmake", "..", "-GNinja", "-DSTATICCOMPILE=ON", "-DONLY_SIMPLE=ON",
-                 "-DENABLE_PYTHON_INTERFACE=OFF", "-DNOM4RI=ON",
+                 "-DENABLE_PYTHON_INTERFACE=OFF", "-DNOM4RI=ON", "-DCMAKE_BUILD_TYPE=Release",
                  "-DCMAKE_INSTALL_PREFIX=../../../install/"])
     run_command(["ninja"])
     run_command(["ninja", "install"])
@@ -29,7 +29,7 @@ def setup_cadical():
                               "https://github.com/arminbiere/cadical.git", tag='rel-1.4.0')
     os.chdir("{}".format(the_repo))
 
-    run_command(["./configure", "-fPIC"])
+    run_command(["./configure", "-fPIC", "-O3"])
     run_command(["make", "-j"])
     shutil.copy("./build/libcadical.a", "../../install/lib")
     shutil.copy("./src/ccadical.h", "../../install/include/")
