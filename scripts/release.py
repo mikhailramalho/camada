@@ -64,12 +64,24 @@ if __name__ == '__main__':
     fin.write(data)
     fin.close()
 
-    # We'll also copy boolector's header, in case the user
+    # We'll also copy solver's headers, in case the user
     # wants to override the solver
+
+    # First boolector
     if not os.path.exists('./release/include/boolector'):
         os.mkdir('./release/include/boolector')
     run_command(
         ["cp", "-r", "./deps/install/include/boolector", "./release/include"])
+
+    # Z3
+    run_command(
+        ["cp", "-r", "./deps/src/z3-4.8.10-x64-ubuntu-18.04/include", "./release/"])
+
+    # and STP
+    if not os.path.exists('./release/include/stp'):
+        os.mkdir('./release/include/stp')
+    run_command(
+        ["cp", "-r", "./deps/install/include/stp", "./release/include"])
 
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
@@ -86,3 +98,7 @@ if __name__ == '__main__':
         ["cp", "-r", "./scripts/licenses/LINGELING_LICENSE", "./release/license/"])
     run_command(
         ["cp", "-r", "./scripts/licenses/MINISAT_LICENSE.txt", "./release/license/"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/STP_LICENSE.txt", "./release/license/"])
+    run_command(
+        ["cp", "-r", "./scripts/licenses/Z3_LICENSE.txt", "./release/license/"])
