@@ -26,14 +26,14 @@ jobs:
 
       # Setup/cache dependencies
     - name: Cache deps
-      id: cache-deps-v3
+      id: cache-deps-v4
       uses: actions/cache@v2
       with:
         path: deps
-        key: ${{ runner.os }}-deps-v3
+        key: ${{ runner.os }}-deps-v4
 
     - name: Setup Dependencies
-      if: steps.cache-deps-v3.outputs.cache-hit != 'true'
+      if: steps.cache-deps-v4.outputs.cache-hit != 'true'
       run: python3 ./scripts/get-deps.py -a
 
     - name: Configure Camada

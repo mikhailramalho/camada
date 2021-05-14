@@ -25,7 +25,7 @@
 #include "camadaimpl.h"
 
 namespace STP {
-#include <c_interface.h>
+#include <stp/c_interface.h>
 }
 
 namespace camada {

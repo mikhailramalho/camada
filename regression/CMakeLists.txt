@@ -51,9 +51,7 @@ if(${CAMADA_SOLVER_MATHSAT_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_STP_ENABLE})
-  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_STP_LIB})
-  target_include_directories(${REGRESSION_TARGET_NAME}
-                             PRIVATE ${CAMADA_STP_INCLUDE_DIR})
+  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC stp)
 endif()
 
 if(${CAMADA_SOLVER_YICES_ENABLE})
