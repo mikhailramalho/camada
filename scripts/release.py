@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import importlib
+import re
 import shutil
 from common import *
 
@@ -18,6 +19,12 @@ if __name__ == '__main__':
     b = importlib.import_module("get-boolector")
     b.setup_btor()
 
+    z = importlib.import_module("get-z3")
+    z.setup_z3()
+
+    s = importlib.import_module("get-stp")
+    s.setup_stp()
+
     if os.path.exists('./release'):
         shutil.rmtree('./release')
 
@@ -31,14 +38,15 @@ if __name__ == '__main__':
                  "-DCAMADA_SOLVER_BOOLECTOR_ENABLE=ON",
                  "-DCAMADA_SOLVER_CVC4_ENABLE=OFF",
                  "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",
-                 "-DCAMADA_SOLVER_STP_ENABLE=OFF",
+                 "-DCAMADA_SOLVER_STP_ENABLE=ON",
                  "-DCAMADA_SOLVER_YICES_ENABLE=OFF",
-                 "-DCAMADA_SOLVER_Z3_ENABLE=OFF",
+                 "-DCAMADA_SOLVER_Z3_ENABLE=ON",
                  "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
                  "-DCMAKE_INSTALL_PREFIX=../release/",
                  "-DRELEASE_MODE=ON"])
 
     run_command(["ninja"])
+    run_command(["ninja", "docs"])
     run_command(["ninja", "install"])
 
     os.chdir(curr_dir)
@@ -47,9 +55,10 @@ if __name__ == '__main__':
     # boolector dependency with only -phtread
     fin = open('release/lib/cmake/camada/camadaTargets.cmake', 'rt')
     data = fin.read()
-    data = data.replace('  INTERFACE_LINK_LIBRARIES "Boolector::boolector"',
-                        '  INTERFACE_LINK_LIBRARIES "-pthread"')
     fin.close()
+
+    data = re.sub(r'INTERFACE_LINK_LIBRARIES ".*"',
+                  'INTERFACE_LINK_LIBRARIES "-lpthread;-ldl"', data)
 
     fin = open('release/lib/cmake/camada/camadaTargets.cmake', 'wt')
     fin.write(data)
