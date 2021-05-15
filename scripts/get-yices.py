@@ -33,12 +33,14 @@ def setup_yices():
     os.chdir("./yices2-Yices-2.6.2")
 
     run_command(["autoreconf", "-fi"])
-    if sys.platform == "darwin":
-        run_command(["./configure", "--prefix",
-                    "{}/../../install/".format(os.getcwd())])
-    else:
-        run_command(["./configure", "--prefix", "{}/../../install/".format(os.getcwd()),
-                    "--with-static-gmp={}/../../install/lib/libgmp.a".format(os.getcwd())])
+
+    config_cmd = ["./configure", "--prefix",
+                  "{}/../../install/".format(os.getcwd())]
+    if sys.platform != "darwin":
+        config_cmd += [
+            "--with-static-gmp={}/../../install/lib/libgmp.a".format(os.getcwd())]
+
+    run_command(config_cmd)
     run_command(["make", "-j"])
     run_command(["make", "static-lib"])
     run_command(["make", "install"])

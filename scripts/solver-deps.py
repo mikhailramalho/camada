@@ -71,14 +71,14 @@ def setup_minisat():
     os.mkdir("./build")
     os.chdir("./build")
 
-    if sys.platform == "darwin":
-        run_command(["cmake", "..", "-GNinja",
-                     "-DCMAKE_INSTALL_PREFIX=../../../install/", "-DCMAKE_BUILD_TYPE=Release",
-                     "-DCMAKE_CXX_FLAGS_RELEASE='-O3 -DNDEBUG -fPIC'"])
-    else:
-        run_command(["cmake", "..", "-GNinja", "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF",
-                     "-DCMAKE_INSTALL_PREFIX=../../../install/", "-DCMAKE_BUILD_TYPE=Release",
-                     "-DCMAKE_CXX_FLAGS_RELEASE='-O3 -DNDEBUG -fPIC'"])
+    build_cmd = ["cmake", "..", "-GNinja",
+                 "-DCMAKE_INSTALL_PREFIX=../../../install/", "-DCMAKE_BUILD_TYPE=Release",
+                 "-DCMAKE_CXX_FLAGS_RELEASE='-O3 -DNDEBUG -fPIC'"]
+
+    if sys.platform != "darwin":
+        build_cmd += ["-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF"]
+
+    run_command(build_cmd)
     run_command(["ninja"])
     run_command(["ninja", "install"])
 
