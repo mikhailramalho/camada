@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build gperf && pip install toml && pip install -r requirements.txt
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build gperf && pip3 install toml && pip3 install -r requirements.txt
 
       # Setup Catch2. TODO: replace it with https://github.com/marketplace/actions/continuous-benchmark
     - name: Setup Catch2
