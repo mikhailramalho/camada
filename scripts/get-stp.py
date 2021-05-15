@@ -24,10 +24,14 @@ def setup_stp():
     os.mkdir("./build")
     os.chdir("./build")
 
-    run_command(["cmake", "..", "-GNinja", "-DONLY_SIMPLE=ON",
+    build_cmd = ["cmake", "..", "-GNinja", "-DONLY_SIMPLE=ON",
                  "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF",
-                 "-DCMAKE_BUILD_TYPE=Release",
-                 "-DCMAKE_INSTALL_PREFIX=../../../install/"])
+                 "-DCMAKE_INSTALL_PREFIX=../../../install/"]
+    if sys.platform == "darwin":
+        build_cmd += ["-DCMAKE_BUILD_TYPE=RelWithDebInfo"]
+    else:
+        build_cmd += ["-DCMAKE_BUILD_TYPE=Release"]
+    run_command(build_cmd)
 
     run_command(["ninja"])
     try:

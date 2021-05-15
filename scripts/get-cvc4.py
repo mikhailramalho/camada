@@ -32,16 +32,14 @@ def setup_cvc4():
     if not os.path.exists("./deps/kissat"):
         run_command("./contrib/get-kissat")
 
+    build_cmd = ["./configure.sh", "production", "--symfpu", "--optimized",
+                 "--prefix=../../install/", "--cadical", "--cryptominisat",
+                 "--kissat", "--no-static-binary", "--ninja"]
+
     if sys.platform == "darwin":
-        run_command(["./configure.sh", "production", "--symfpu", "--optimized",
-                     "--prefix=../../install/", "--python3",
-                     "--cadical", "--cryptominisat", "--kissat",
-                     "--no-static-binary", "--ninja"])
-    else:
-        run_command(["./configure.sh", "production", "--symfpu", "--optimized",
-                     "--prefix=../../install/", "--cadical",
-                     "--kissat", "--cryptominisat", "--no-static-binary",
-                     "--ninja"])
+        build_cmd += ["--python3"]
+
+    run_command(build_cmd)
     os.chdir("./build")
     run_command(["ninja"])
     run_command(["ninja", "install"])
