@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import importlib
@@ -34,10 +34,7 @@ def setup_cvc4():
 
     build_cmd = ["./configure.sh", "production", "--symfpu", "--optimized",
                  "--prefix=../../install/", "--cadical", "--cryptominisat",
-                 "--kissat", "--no-static-binary", "--ninja"]
-
-    if sys.platform == "darwin":
-        build_cmd += ["--python3"]
+                 "--kissat", "--no-static-binary", "--ninja", "--python3"]
 
     run_command(build_cmd)
     os.chdir("./build")
