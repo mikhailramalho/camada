@@ -10,9 +10,6 @@ if __name__ == '__main__':
 
     curr_dir = os.getcwd()
 
-    if os.path.exists('./deps'):
-        shutil.rmtree('./deps')
-
     check_root_dir()
     create_dirs()
 
