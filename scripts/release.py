@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import importlib
 import re
 import shutil
+import sys
 from common import *
 
 
@@ -62,8 +62,12 @@ if __name__ == '__main__':
         ["cp", "-r", "./deps/install/include/boolector", "./release/include"])
 
     # Z3
-    run_command(
-        ["cp", "-r", "./deps/src/z3-4.8.10-x64-ubuntu-18.04/include", "./release/"])
+    if sys.platform == "darwin":
+        run_command(
+            ["cp", "-r", "./deps/src/z3-4.8.10-x64-osx-10.15.7/include", "./release/"])
+    else:
+        run_command(
+            ["cp", "-r", "./deps/src/z3-4.8.10-x64-ubuntu-18.04/include", "./release/"])
 
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
