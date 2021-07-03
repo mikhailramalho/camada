@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build gperf && pip3 install toml && pip3 install -r requirements.txt
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build gperf doxygen && pip3 install toml && pip3 install -r requirements.txt
 
       # Setup/cache dependencies
     - name: Cache deps
@@ -48,7 +48,7 @@ jobs:
       with:
         java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake boost zlib bison flex z3 && pip3 install toml && pip3 install -r requirements.txt
+      run: brew install gmp cmake ninja python3 automake boost zlib bison flex z3 doxygen && pip3 install toml && pip3 install -r requirements.txt
 
       # Setup/cache dependencies
     - name: Cache deps
