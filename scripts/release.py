@@ -26,7 +26,7 @@ if __name__ == '__main__':
                  "-DCAMADA_SOLVER_BOOLECTOR_ENABLE=ON",
                  "-DCAMADA_SOLVER_CVC4_ENABLE=OFF",
                  "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",
-                 "-DCAMADA_SOLVER_STP_ENABLE=ON",
+                 "-DCAMADA_SOLVER_STP_ENABLE=OFF",
                  "-DCAMADA_SOLVER_YICES_ENABLE=OFF",
                  "-DCAMADA_SOLVER_Z3_ENABLE=ON",
                  "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
