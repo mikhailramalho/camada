@@ -11,7 +11,6 @@ def setup_btor():
     deps = importlib.import_module("solver-deps")
     deps.setup_cms()
     deps.setup_cadical()
-    deps.setup_minisat()
 
     file_path = download_solver_src("Boolector-3.2.1",
                                     "https://github.com/Boolector/boolector/archive/refs/tags/3.2.1.tar.gz",
