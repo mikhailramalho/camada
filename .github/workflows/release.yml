@@ -1,0 +1,75 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Upload Release Asset
+
+jobs:
+  build-linux:
+    name: Build Linux Release
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Dependencies
+      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build gperf && pip3 install toml && pip3 install -r requirements.txt
+
+      # Setup/cache dependencies
+    - name: Cache deps
+      id: cache-deps-v1
+      uses: actions/cache@v2
+      with:
+        path: deps
+        key: ${{ runner.os }}-deps-v1
+
+    - name: Download and build Release
+      if: steps.cache-deps-v1.outputs.cache-hit != 'true'
+      run: python3 ./scripts/get-deps.py -z -s -b
+
+    - name: Generate release
+      run: python3 ./scripts/release.py
+    
+    - name: Create tarball
+      run: tar -czvf camada-linux.tar.gz release/
+
+      # Upload asset
+    - uses: actions/upload-artifact@v1
+      with:
+        name: release-linux
+        path: ./camada-linux.tar.gz
+        
+  build-macos:
+    name: Build MacOS Release
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-java@v1
+      with:
+        java-version: '9.0.4'
+    - name: Install Dependencies
+      run: brew install gmp cmake ninja python3 automake boost zlib bison flex z3 && pip3 install toml && pip3 install -r requirements.txt
+
+      # Setup/cache dependencies
+    - name: Cache deps
+      id: cache-deps-v1
+      uses: actions/cache@v2
+      with:
+        path: deps
+        key: ${{ runner.os }}-deps-v1
+
+    - name: Download and build Release
+      if: steps.cache-deps-v1.outputs.cache-hit != 'true'
+      run: python3 ./scripts/get-deps.py -z -b
+
+    - name: Generate release
+      run: python3 ./scripts/release.py
+    
+    - name: Create tarball
+      run: tar -czvf camada-macos.tar.gz release/
+
+      # Upload asset
+    - uses: actions/upload-artifact@v1
+      with:
+        name: release-macos
+        path: ./camada-macos.tar.gz
