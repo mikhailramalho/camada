@@ -73,3 +73,53 @@ jobs:
       with:
         name: release-macos
         path: ./camada-macos.tar.gz
+
+  create-release:
+    name: Upload Release Asset
+    runs-on: ubuntu-20.04
+    needs: [build-linux, build-macos]
+    steps:
+    - name: Download Linux Build
+      uses: actions/download-artifact@v1
+      with:
+        name: release-linux
+        path: ./
+
+    - name: Download Macos Build
+      uses: actions/download-artifact@v1
+      with:
+        name: release-darwin
+        path: ./
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset (Linux)
+      id: upload-release-asset-linux
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./camada-linux.tar.gz
+        asset_name: camada-linux.tar.gz
+        asset_content_type: text/x-shellscript
+
+    - name: Upload Release Asset (Darwin)
+      id: upload-release-asset-macos
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./camada-macos.tar.gz
+        asset_name: camada-macos.tar.gz
+        asset_content_type: text/x-shellscript
