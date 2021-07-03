@@ -88,7 +88,7 @@ jobs:
     - name: Download Macos Build
       uses: actions/download-artifact@v1
       with:
-        name: release-darwin
+        name: release-macos
         path: ./
 
     - name: Create Release
@@ -113,7 +113,7 @@ jobs:
         asset_name: camada-linux.tar.gz
         asset_content_type: text/x-shellscript
 
-    - name: Upload Release Asset (Darwin)
+    - name: Upload Release Asset (MacOS)
       id: upload-release-asset-macos
       uses: actions/upload-release-asset@v1.0.1
       env:
