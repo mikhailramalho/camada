@@ -426,13 +426,13 @@ public:
   /// Dump Model
   virtual void dumpModel() = 0;
 
-protected:
   /// Flag to enable encoding floating-points using bitvectors even if the
   /// solver supports floating-points. For solvers that don't support
   /// floating-point arithmetic, bitvectors will be used even if this flag is
   /// false
   bool useCamadaFP = false;
 
+protected:
   /// Returns an appropriate floating-point sort, encoded as a bitvector.
   virtual SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                                 const unsigned SigWidth) = 0;
