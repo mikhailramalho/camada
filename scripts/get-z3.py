@@ -9,13 +9,13 @@ from common import download_solver_src, run_command, unzip, check_root_dir, crea
 def setup_z3():
     curr_dir = os.getcwd()
     if sys.platform == "darwin":
-        print("We use brew to download z3 on MacOS")
-        run_command(["brew", "install", "z3"])
-        return
-
-    file_path = download_solver_src("Z3 4.8.10",
-                                    "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-ubuntu-18.04.zip",
-                                    "ab53d3b4b0ef525a62f06f762a441adf")
+        file_path = download_solver_src("Z3 4.8.10",
+                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-osx-10.15.7.zip",
+                                        "750773630d05cc7c6e4e92be937bfdc6")
+    else:
+        file_path = download_solver_src("Z3 4.8.10",
+                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-ubuntu-18.04.zip",
+                                        "ab53d3b4b0ef525a62f06f762a441adf")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
@@ -25,10 +25,16 @@ def setup_z3():
     unzip(the_file)
 
     # move it to deps/install/
-    run_command(
-        ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/bin", "../install/"])
-    run_command(
-        ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/include", "../install/"])
+    if sys.platform == "darwin":
+        run_command(
+            ["cp", "-r", "./z3-4.8.10-x64-osx-10.15.7/bin", "../install/"])
+        run_command(
+            ["cp", "-r", "./z3-4.8.10-x64-osx-10.15.7/include", "../install/"])
+    else:
+        run_command(
+            ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/bin", "../install/"])
+        run_command(
+            ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/include", "../install/"])
     os.chdir(curr_dir)
 
 
