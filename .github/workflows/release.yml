@@ -25,7 +25,7 @@ jobs:
 
     - name: Download and build Release
       if: steps.cache-deps-v1.outputs.cache-hit != 'true'
-      run: python3 ./scripts/get-deps.py -z -s -b
+      run: python3 ./scripts/get-deps.py -z -b
 
     - name: Generate release
       run: python3 ./scripts/release.py

@@ -65,12 +65,6 @@ if __name__ == '__main__':
     run_command(
         ["cp", "-r", "./deps/src/z3-4.8.10-x64-ubuntu-18.04/include", "./release/"])
 
-    # and STP
-    if not os.path.exists('./release/include/stp'):
-        os.mkdir('./release/include/stp')
-    run_command(
-        ["cp", "-r", "./deps/install/include/stp", "./release/include"])
-
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
     run_command(["cp", "LICENSE", "./release/license/"])
@@ -84,9 +78,5 @@ if __name__ == '__main__':
         ["cp", "-r", "./scripts/licenses/CRYPTOMINISAT_LICENSE.txt", "./release/license/"])
     run_command(
         ["cp", "-r", "./scripts/licenses/LINGELING_LICENSE", "./release/license/"])
-    run_command(
-        ["cp", "-r", "./scripts/licenses/MINISAT_LICENSE.txt", "./release/license/"])
-    run_command(
-        ["cp", "-r", "./scripts/licenses/STP_LICENSE", "./release/license/"])
     run_command(
         ["cp", "-r", "./scripts/licenses/Z3_LICENSE.txt", "./release/license/"])
