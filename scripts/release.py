@@ -16,15 +16,6 @@ if __name__ == '__main__':
     check_root_dir()
     create_dirs()
 
-    b = importlib.import_module("get-boolector")
-    b.setup_btor()
-
-    z = importlib.import_module("get-z3")
-    z.setup_z3()
-
-    s = importlib.import_module("get-stp")
-    s.setup_stp()
-
     if os.path.exists('./release'):
         shutil.rmtree('./release')
 
