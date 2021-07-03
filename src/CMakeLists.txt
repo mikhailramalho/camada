@@ -134,14 +134,11 @@ if(${RELEASE_MODE})
       "../../../deps/src/boolector-3.2.1/deps/lingeling/liblgl.a" && cd ../ &&
       rm -rf btor2tool && mkdir btor2tool && cd btor2tool && ar -x
       "../../../deps/src/boolector-3.2.1/deps/btor2tools/build/libbtor2parser.a"
-      && cd ../ && rm -rf mini && mkdir mini && cd mini && ar -x
-      "../../../deps/install/lib/libminisat.a" && cd ../ && rm -rf cms && mkdir
-      cms && cd cms && ar -x "../../../deps/install/lib/libcryptominisat5.a" &&
-      cd ../ && rm -rf cad && mkdir cad && cd cad && ar -x
-      "../../../deps/install/lib/libcadical.a" && cd ../ && rm -rf z3 && mkdir
-      z3 && cd z3 && ar -x "../../../deps/install/bin/libz3.a" && cd ../ && rm
-      -rf stp && mkdir stp && cd stp && ar -x
-      "../../../deps/install/lib/libstp.a" && cd ../ && rm -rf main && mkdir
+      && cd ../ && rm -rf cms && mkdir cms && cd cms && ar -x
+      "../../../deps/install/lib/libcryptominisat5.a" && cd ../ && rm -rf cad
+      && mkdir cad && cd cad && ar -x "../../../deps/install/lib/libcadical.a"
+      && cd ../ && rm -rf z3 && mkdir z3 && cd z3 && ar -x
+      "../../../deps/install/bin/libz3.a" && cd ../ && rm -rf main && mkdir
       main && cd main && ar -x
       "../../lib/$<TARGET_FILE_NAME:${LIBRARY_TARGET_NAME}>" && cd ../ && rm
       "../lib/$<TARGET_FILE_NAME:${LIBRARY_TARGET_NAME}>" && ar -qc
