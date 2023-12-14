@@ -3,7 +3,7 @@
 import os
 import importlib
 import sys
-from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
+from common import download_solver_src, run_command, unzip, check_root_dir, create_dirs
 
 
 def setup_cvc4():
@@ -13,27 +13,20 @@ def setup_cvc4():
     deps.setup_cms()
     deps.setup_cadical()
 
-    file_path = download_solver_src("CVC4 v1.8",
-                                    "https://github.com/cvc5/cvc5/archive/refs/tags/1.8.tar.gz")
+    file_path = download_solver_src("CVC5 v1.0.8",
+                                    "https://github.com/cvc5/cvc5/archive/refs/tags/cvc5-1.0.8.zip")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
     os.chdir("{}".format(the_dire))
 
     # extracts solver to ./deps/src/cvc5-1.8
-    extract_tar(the_file, "gz")
+    unzip(the_file)
 
-    os.chdir("./cvc5-1.8")
-    if not os.path.exists("./deps/symfpu-CVC4"):
-        run_command("./contrib/get-symfpu")
-    if not os.path.exists("./deps/antlr-3.4"):
-        run_command("./contrib/get-antlr-3.4")
-    if not os.path.exists("./deps/kissat"):
-        run_command("./contrib/get-kissat")
-
-    build_cmd = ["./configure.sh", "production", "--symfpu", "--optimized",
-                 "--prefix=../../install/", "--cadical", "--cryptominisat",
-                 "--kissat", "--no-static-binary", "--ninja", "--python3"]
+    os.chdir("./cvc5-cvc5-1.0.8")
+    build_cmd = ["./configure.sh", "production", "--auto-download", "--kissat",
+                 "--prefix=../../install/", "--cryptominisat", "--ninja",
+                 "--no-static-binary"]
 
     run_command(build_cmd)
     os.chdir("./build")
