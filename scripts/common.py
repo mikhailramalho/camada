@@ -51,9 +51,7 @@ def extract_tar(the_file, comp):
 
 def unzip(the_file):
     print("Unzipping {}".format(the_file))
-    with zipfile.ZipFile(the_file, 'r') as zip_ref:
-        zip_ref.extractall('./')
-
+    run_command(["unzip", the_file])
 
 def download_solver_src(name, url, sep="/"):
     dire = "./deps/src"
