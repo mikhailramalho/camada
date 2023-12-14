@@ -5,7 +5,7 @@ import os
 import platform
 import shutil
 import sys
-from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
+from common import download_solver_src, run_command, unzip, check_root_dir, create_dirs
 
 
 def setup_yices():
@@ -20,18 +20,18 @@ def setup_yices():
 
     # Now we can download yices
     file_path = download_solver_src("Yices 2.6.2",
-                                    "https://github.com/SRI-CSL/yices2/archive/refs/tags/Yices-2.6.2.tar.gz")
+                                    "https://github.com/SRI-CSL/yices2/archive/refs/tags/Yices-2.6.4.zip")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
     os.chdir("{}".format(the_dire))
 
-    # extracts solver to ./deps/src/yices2-Yices-2.6.2
-    extract_tar(the_file, "gz")
+    # extracts solver to ./deps/src/yices2-Yices-2.6.4
+    unzip(the_file)
 
-    os.chdir("./yices2-Yices-2.6.2")
+    os.chdir("./yices2-Yices-2.6.4")
 
-    run_command(["autoreconf", "-fi"])
+    run_command("autoreconf")
 
     config_cmd = ["./configure", "--prefix",
                   "{}/../../install/".format(os.getcwd())]
