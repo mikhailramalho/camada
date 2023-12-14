@@ -13,8 +13,8 @@ def setup_msat():
                                         "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.6-darwin-libcxx-x86_64.tar.gz",
                                         sep="=")
     else:
-        file_path = download_solver_src("MathSAT 5.6.6",
-                                        "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.6-linux-x86_64.tar.gz",
+        file_path = download_solver_src("MathSAT 5.6.10",
+                                        "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.10-linux-x86_64.tar.gz",
                                         sep="=")
 
     the_dire = file_path.rsplit('/', 1)[0]
@@ -40,9 +40,9 @@ def setup_msat():
             ["cp", "../install//lib/libmathsat.a", "/usr/local/lib"])
     else:
         run_command(
-            ["cp", "-r", "./mathsat-5.6.6-linux-x86_64/lib/", "../install/"])
+            ["cp", "-r", "./mathsat-5.6.10-linux-x86_64/lib/", "../install/"])
         run_command(
-            ["cp", "-r", "./mathsat-5.6.6-linux-x86_64/include/", "../install/"])
+            ["cp", "-r", "./mathsat-5.6.10-linux-x86_64/include/", "../install/"])
     os.chdir(curr_dir)
 
 
