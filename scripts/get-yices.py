@@ -20,8 +20,7 @@ def setup_yices():
 
     # Now we can download yices
     file_path = download_solver_src("Yices 2.6.2",
-                                    "https://github.com/SRI-CSL/yices2/archive/refs/tags/Yices-2.6.2.tar.gz",
-                                    "c0cb8ce2c3c010971c997657990575a0")
+                                    "https://github.com/SRI-CSL/yices2/archive/refs/tags/Yices-2.6.2.tar.gz")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 

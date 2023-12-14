@@ -10,12 +10,10 @@ def setup_z3():
     curr_dir = os.getcwd()
     if sys.platform == "darwin":
         file_path = download_solver_src("Z3 4.8.10",
-                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-osx-10.15.7.zip",
-                                        "750773630d05cc7c6e4e92be937bfdc6")
+                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-osx-10.15.7.zip")
     else:
         file_path = download_solver_src("Z3 4.8.10",
-                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-ubuntu-18.04.zip",
-                                        "ab53d3b4b0ef525a62f06f762a441adf")
+                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-ubuntu-18.04.zip")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 

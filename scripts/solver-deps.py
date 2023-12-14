@@ -42,8 +42,7 @@ def setup_cadical():
 def setup_gmp():
     curr_dir = os.getcwd()
     file_path = download_solver_src("GMP 6.1.2",
-                                    "https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz",
-                                    "f58fa8001d60c4c77595fbbb62b63c1d")
+                                    "https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 

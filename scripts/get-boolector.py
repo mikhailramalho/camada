@@ -13,8 +13,7 @@ def setup_btor():
     deps.setup_cadical()
 
     file_path = download_solver_src("Boolector-3.2.1",
-                                    "https://github.com/Boolector/boolector/archive/refs/tags/3.2.1.tar.gz",
-                                    "0ea7a9fa35284faada84c84b28d230e0")
+                                    "https://github.com/Boolector/boolector/archive/refs/tags/3.2.1.tar.gz")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 

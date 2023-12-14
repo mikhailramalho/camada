@@ -14,8 +14,7 @@ def setup_cvc4():
     deps.setup_cadical()
 
     file_path = download_solver_src("CVC4 v1.8",
-                                    "https://github.com/cvc5/cvc5/archive/refs/tags/1.8.tar.gz",
-                                    "377aa832868f260bfe1a084c471befa2")
+                                    "https://github.com/cvc5/cvc5/archive/refs/tags/1.8.tar.gz")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 

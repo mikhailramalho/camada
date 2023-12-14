@@ -11,12 +11,10 @@ def setup_msat():
     if sys.platform == "darwin":
         file_path = download_solver_src("MathSAT 5.6.6",
                                         "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.6-darwin-libcxx-x86_64.tar.gz",
-                                        "1899b5c2df32473d1bac8b51e41fd591",
                                         sep="=")
     else:
         file_path = download_solver_src("MathSAT 5.6.6",
                                         "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.6-linux-x86_64.tar.gz",
-                                        "794579f22930e846af7e7a51cfe74df3",
                                         sep="=")
 
     the_dire = file_path.rsplit('/', 1)[0]

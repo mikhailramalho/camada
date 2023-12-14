@@ -20,7 +20,6 @@ def check_root_dir():
         print("Please run this script from the camada's root directory")
         exit(0)
 
-
 def create_dirs():
     if not os.path.exists("./deps"):
         os.makedirs("./deps")
@@ -30,22 +29,6 @@ def create_dirs():
 
     if not os.path.exists("./deps/install"):
         os.makedirs("./deps/install")
-
-
-def check_md5(the_file, md5):
-    print("Checking {} md5".format(the_file))
-
-    hash_md5 = hashlib.md5()
-    with open(the_file, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-
-    if str(hash_md5.hexdigest()) != md5:
-        print("MD5 mismatch. Downloading {} again\n".format(the_file))
-        return False
-
-    return True
-
 
 def run_command(cmd):
     print(cmd)
@@ -72,7 +55,7 @@ def unzip(the_file):
         zip_ref.extractall('./')
 
 
-def download_solver_src(name, url, md5, sep="/"):
+def download_solver_src(name, url, sep="/"):
     dire = "./deps/src"
 
     filename = url.rsplit(sep, 1)[1]
@@ -93,10 +76,6 @@ def download_solver_src(name, url, md5, sep="/"):
                             pbar.update(len(chunk))
         except:
             pass
-
-    if not check_md5(the_file, md5):
-        os.remove(the_file)
-        download_solver_src(name, url, md5, sep)
 
     return the_file
 
