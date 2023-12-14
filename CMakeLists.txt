@@ -172,7 +172,7 @@ set(RELEASE_MODE
 
 # Find solvers
 config_solver(Boolector 3.2.1)
-config_solver(CVC4 1.8)
+config_solver(CVC5 1.0.8)
 config_solver(MathSAT 5.6.3)
 config_solver(STP 2.3.3)
 config_solver(Yices 2.6.1)
@@ -236,7 +236,7 @@ config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 
 config_info_bool("Solver Boolector" "${CAMADA_SOLVER_BOOLECTOR_ENABLE}")
-config_info_bool("Solver CVC4" "${CAMADA_SOLVER_CVC4_ENABLE}")
+config_info_bool("Solver CVC5" "${CAMADA_SOLVER_CVC5_ENABLE}")
 config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_MATHSAT_ENABLE}")
 config_info_bool("Solver STP" "${CAMADA_SOLVER_STP_ENABLE}")
 config_info_bool("Solver Yices" "${CAMADA_SOLVER_YICES_ENABLE}")
