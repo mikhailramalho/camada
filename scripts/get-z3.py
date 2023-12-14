@@ -12,8 +12,8 @@ def setup_z3():
         file_path = download_solver_src("Z3 4.8.10",
                                         "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-osx-10.15.7.zip")
     else:
-        file_path = download_solver_src("Z3 4.8.10",
-                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.8.10/z3-4.8.10-x64-ubuntu-18.04.zip")
+        file_path = download_solver_src("Z3 4.12.4",
+                                        "https://github.com/Z3Prover/z3/releases/download/z3-4.12.4/z3-4.12.4-x64-glibc-2.35.zip")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
@@ -30,9 +30,9 @@ def setup_z3():
             ["cp", "-r", "./z3-4.8.10-x64-osx-10.15.7/include", "../install/"])
     else:
         run_command(
-            ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/bin", "../install/"])
+            ["cp", "-r", "./z3-4.12.4-x64-glibc-2.35/bin", "../install/"])
         run_command(
-            ["cp", "-r", "./z3-4.8.10-x64-ubuntu-18.04/include", "../install/"])
+            ["cp", "-r", "./z3-4.12.4-x64-glibc-2.35/include", "../install/"])
     os.chdir(curr_dir)
 
 

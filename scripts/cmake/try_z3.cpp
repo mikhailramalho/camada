@@ -1,4 +1,5 @@
 #include <z3.h>
+#include <stdio.h>
 
 int main() {
   unsigned int major, minor, build, rev;
