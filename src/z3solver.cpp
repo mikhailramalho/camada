@@ -24,6 +24,8 @@
 
 #include "z3solver.h"
 
+#include <iostream>
+
 namespace camada {
 
 unsigned Z3Sort::getWidthFromSolver() const {
