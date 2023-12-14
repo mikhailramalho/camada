@@ -2,7 +2,7 @@
 
 import importlib
 import os
-from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
+from common import download_solver_src, run_command, unzip, check_root_dir, create_dirs
 
 
 def setup_btor():
@@ -12,21 +12,21 @@ def setup_btor():
     deps.setup_cms()
     deps.setup_cadical()
 
-    file_path = download_solver_src("Boolector-3.2.1",
-                                    "https://github.com/Boolector/boolector/archive/refs/tags/3.2.1.tar.gz")
+    file_path = download_solver_src("Boolector-3.2.3",
+                                    "https://github.com/Boolector/boolector/archive/refs/tags/3.2.3.zip")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
     os.chdir("{}".format(the_dire))
 
     # extracts solver to ./deps/src/boolector-3.2.1
-    extract_tar(the_file, "gz")
+    unzip(the_file)
 
-    os.chdir("./boolector-3.2.1")
-    run_command("./contrib/setup-lingeling.sh")
-    run_command("./contrib/setup-btor2tools.sh")
+    os.chdir("./boolector-3.2.3")
+    run_command(["sh", "./contrib/setup-lingeling.sh"])
+    run_command(["sh", "./contrib/setup-btor2tools.sh"])
     run_command("ls")
-    run_command(["./configure.sh", "--prefix", "../../../install/",
+    run_command(["sh", "./configure.sh", "--prefix", "../../../install/",
                  "-fPIC", "--no-picosat"])
     os.chdir("./build")
     run_command(["make", "-j"])
