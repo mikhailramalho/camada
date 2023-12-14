@@ -19,7 +19,7 @@ def setup_yices():
         os.chdir(curr_dir)
 
     # Now we can download yices
-    file_path = download_solver_src("Yices 2.6.2",
+    file_path = download_solver_src("Yices 2.6.4",
                                     "https://github.com/SRI-CSL/yices2/archive/refs/tags/Yices-2.6.4.zip")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]

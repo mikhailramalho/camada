@@ -12,12 +12,12 @@ def print_option(solver_name, enabled):
         print(solver_name)
 
 if __name__ == '__main__':
-    boolector_str = "Boolector v3.2.1"
-    cvc4_str = "CVC4 v1.8 (non-gpl mode)"
-    z3_str = "Z3 4.8.8"
-    stp_str = "STP v2.3.3"
-    yices_str = "Yices v2.3.4"
-    mathsat_str = "MathSAT v5.6.6"
+    boolector_str = "Boolector v3.2.3"
+    cvc4_str = "CVC5 v1.0.8 (non-gpl mode)"
+    z3_str = "Z3 4.12.4"
+    stp_str = "STP v2.3.3 (commit 0510509)"
+    yices_str = "Yices v2.6.4"
+    mathsat_str = "MathSAT v5.6.10"
     all_perm_solvers_str = boolector_str + ', ' + cvc4_str + ', ' + stp_str + ', ' + z3_str
     all_solvers_str = boolector_str + ', ' + cvc4_str + ', ' + z3_str + ', ' + \
                        stp_str + ', ' + yices_str + ', ' + mathsat_str
@@ -34,18 +34,17 @@ if __name__ == '__main__':
                                        description='Enable each solver individually')
 
     group1.add_argument('-b', '--boolector', default=False,
-                        help='Downloads and setups only ' + boolector_str + '', action='store_true')
+                        help='Downloads and setups only ' + boolector_str, action='store_true')
     group1.add_argument('-c', '--cvc4', default=False,
-                        help='Downloads and setups only CVC4 v1.8 (non-gpl mode)', action='store_true')
+                        help='Downloads and setups only ' + cvc4_str, action='store_true')
     group1.add_argument('-m', '--mathsat', default=False,
-                        help='Downloads and setups only MathSAT v5.6.6', action='store_true')
+                        help='Downloads and setups only ' + mathsat_str, action='store_true')
     group1.add_argument('-s', '--stp', default=False,
-                        help='Downloads and setups only STP v2.3.3 (commit 9a59a72e)',
-                        action='store_true')
+                        help='Downloads and setups only ' + stp_str, action='store_true')
     group1.add_argument('-y', '--yices', default=False,
-                        help='Downloads and setups only Yices v2.6.2', action='store_true')
+                        help='Downloads and setups only ' + yices_str, action='store_true')
     group1.add_argument('-z', '--z3', default=False,
-                        help='Downloads and setups only Z3 4.8.8', action='store_true')
+                        help='Downloads and setups only ' + z3_str, action='store_true')
     args = parser.parse_args()
 
     btor = args.boolector
