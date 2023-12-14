@@ -11,26 +11,30 @@ def print_option(solver_name, enabled):
     if enabled:
         print(solver_name)
 
-
 if __name__ == '__main__':
+    boolector_str = "Boolector v3.2.1"
+    cvc4_str = "CVC4 v1.8 (non-gpl mode)"
+    z3_str = "Z3 4.8.8"
+    stp_str = "STP v2.3.3"
+    yices_str = "Yices v2.3.4"
+    mathsat_str = "MathSAT v5.6.6"
+    all_perm_solvers_str = boolector_str + ', ' + cvc4_str + ', ' + stp_str + ', ' + z3_str
+    all_solvers_str = boolector_str + ', ' + cvc4_str + ', ' + z3_str + ', ' + \
+                       stp_str + ', ' + yices_str + ', ' + mathsat_str
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--permissive-solvers', default=False,
                         action='store_true',
-                        help='Downloads and setups \
-                              Boolector v3.2.1, CVC4 v1.8 (non-gpl mode), \
-                              STP v2.3.3, and Z3 4.8.8')
+                        help='Downloads and setups permissive solvers: ' + all_perm_solvers_str)
     parser.add_argument('-a', '--all-solvers', default=False,
                         action='store_true',
-                        help='Downloads and setups \
-                              Boolector v3.2.1, CVC4 v1.8 (non-gpl mode), \
-                              MathSAT v5.6.6, STP v2.3.3 (commit 9a59a72e), \
-                              Yices v2.3.4, and Z3 4.8.8')
+                        help='Downloads and setups all solvers: ' + all_solvers_str)
 
     group1 = parser.add_argument_group(title='Solvers',
                                        description='Enable each solver individually')
 
     group1.add_argument('-b', '--boolector', default=False,
-                        help='Downloads and setups only Boolector v3.2.1', action='store_true')
+                        help='Downloads and setups only ' + boolector_str + '', action='store_true')
     group1.add_argument('-c', '--cvc4', default=False,
                         help='Downloads and setups only CVC4 v1.8 (non-gpl mode)', action='store_true')
     group1.add_argument('-m', '--mathsat', default=False,
@@ -62,12 +66,12 @@ if __name__ == '__main__':
         btor = cvc4 = stp = z3 = True
 
     print("Download and setup the following solvers\n")
-    print_option("Boolector v3.2.1", btor)
-    print_option("CVC4 v1.8", cvc4)
-    print_option("MathSAT v5.6.6", msat)
-    print_option("STP v2.3.3 (commit 9a59a72e)", stp)
-    print_option("Yices v2.3.4", yices)
-    print_option("Z3 4.8.10", z3)
+    print_option(boolector_str, btor)
+    print_option(cvc4_str, cvc4)
+    print_option(mathsat_str, msat)
+    print_option(stp_str, stp)
+    print_option(yices_str, yices)
+    print_option(z3_str, z3)
     time.sleep(2)
 
     check_root_dir()
