@@ -14,8 +14,8 @@ def setup_stp():
     deps.setup_minisat()
     deps.setup_cms()
 
-    the_repo = clone_repo_src("STP v2.3.3 (commit 9a59a72e)",
-                              "https://github.com/stp/stp.git", commit='9a59a72e')
+    the_repo = clone_repo_src("STP v2.3.3 (commit 0510509)",
+                              "https://github.com/stp/stp.git", commit='0510509')
 
     os.chdir("{}".format(the_repo))
 
@@ -29,7 +29,7 @@ def setup_stp():
     if sys.platform == "darwin":
         build_cmd += ["-DCMAKE_BUILD_TYPE=RelWithDebInfo"]
     else:
-        build_cmd += ["-DCMAKE_BUILD_TYPE=Release",
+        build_cmd += ["-DCMAKE_BUILD_TYPE=Release", "-DBUILD_EXECUTABLES=OFF",
                       "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF"]
     run_command(build_cmd)
 
