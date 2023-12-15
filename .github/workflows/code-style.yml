@@ -9,7 +9,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install clang-tools-9 && pip install cmake_format
+      run: sudo apt-get update && sudo apt-get install clang-tools && pip install cmake_format
     - name: Run clang-format
       run: find src -iname *.h -o -iname *.c -o -iname *.cpp -o -iname *.hpp -iname *.hh | xargs clang-format -style=llvm -i
     - name: Run clang-format
