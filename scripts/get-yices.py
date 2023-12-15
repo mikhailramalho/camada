@@ -31,9 +31,9 @@ def setup_yices():
     run_command("autoreconf")
 
     config_cmd = ["./configure", "--prefix",
-                  "{}/../../install/".format(os.getcwd())]
-    config_cmd += [
-        "--with-static-gmp={}/../../install/lib/libgmp.a".format(os.getcwd())]
+                  "{}/../../install/".format(os.getcwd()),
+                  "--with-static-gmp={}/../../install/lib/libgmp.a".format(os.getcwd()),
+                  "LDFLAGS=-L{}/../../install/lib/".format(os.getcwd())]
 
     run_command(config_cmd)
     run_command(["make", "-j"])
