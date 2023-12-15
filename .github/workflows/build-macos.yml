@@ -18,7 +18,7 @@ jobs:
       with:
         java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp catch2 cmake ninja python@3.11 automake boost zlib bison flex libtool pkgconfig gettext texinfo && pip3 install toml && pip3 install -r requirements.txt && brew uninstall python@3.12
+      run: brew install gmp catch2 cmake ninja python@3.11 automake boost zlib bison flex libtool pkgconfig gettext texinfo && pip3 install toml && pip3 install -r requirements.txt && brew uninstall --ignore-dependencies python@3.12
 
       # Setup/cache dependencies
     - name: Cache deps
