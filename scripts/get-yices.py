@@ -40,12 +40,6 @@ def setup_yices():
     run_command(["make", "static-lib"])
     run_command(["make", "install"])
 
-    if sys.platform == "darwin":
-        shutil.copy("./build/{}-apple-darwin{}-release/static_lib/libyices.a".format(platform.processor(),platform.release()),
-                    "../../install/lib")
-    else:
-        shutil.copy("./build/x86_64-pc-linux-gnu-release/static_lib/libyices.a",
-                    "../../install/lib")
     os.chdir(curr_dir)
 
 
