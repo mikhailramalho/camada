@@ -680,7 +680,8 @@ bool CVC5Solver::getBoolImpl(const SMTExprRef &Exp) {
 }
 
 std::string CVC5Solver::getBVInBinImpl(const SMTExprRef &Exp) {
-  return Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr).getBitVectorValue();
+  return Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr)
+      .getBitVectorValue();
 }
 
 std::string CVC5Solver::getFPInBinImpl(const SMTExprRef &Exp) {
@@ -832,9 +833,7 @@ checkResult CVC5Solver::checkImpl() {
   return checkResult::UNSAT;
 }
 
-void CVC5Solver::resetImpl() {
-  Context->resetAssertions();
-}
+void CVC5Solver::resetImpl() { Context->resetAssertions(); }
 
 std::string CVC5Solver::getSolverNameAndVersion() const {
   return std::string("CVC5 v").append(Context->getVersion());
