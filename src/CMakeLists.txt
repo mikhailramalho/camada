@@ -29,7 +29,7 @@ set(${LIBRARY_TARGET_NAME}_SRC
     camadasort.cpp
     camadaimpl.cpp
     boolectorsolver.cpp
-    cvc4solver.cpp
+    cvc5solver.cpp
     mathsatsolver.cpp
     stpsolver.cpp
     yicessolver.cpp
@@ -41,7 +41,7 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadasort.h camadaexpr.h
                                    camadaimpl.h)
 
 # add each solver specific header, if it is enabled
-add_header_to_install("Boolector;CVC4;MathSAT;STP;Yices;Z3")
+add_header_to_install("Boolector;CVC5;MathSAT;STP;Yices;Z3")
 
 set(${LIBRARY_TARGET_NAME}_HDR camadaimpl.h)
 
@@ -69,13 +69,9 @@ if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
                              PRIVATE SOLVER_BOOLECTOR_ENABLED)
 endif()
 
-if(${CAMADA_SOLVER_CVC4_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC CVC4::cvc4)
-  target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC4_ENABLED)
-  if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
-    target_include_directories(${LIBRARY_TARGET_NAME}
-                               PRIVATE ${CAMADA_CVC4_SYMFPU_DIR})
-  endif()
+if(${CAMADA_SOLVER_CVC5_ENABLE})
+  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC cvc5::cvc5)
+  target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC5_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_MATHSAT_ENABLE})

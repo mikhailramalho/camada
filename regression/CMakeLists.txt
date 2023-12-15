@@ -26,7 +26,7 @@ function(compile_test)
 endfunction()
 
 # add each solver specific implementation, if it is enabled
-compile_test("Boolector;CVC4;MathSAT;STP;Yices;Z3")
+compile_test("Boolector;CVC5;MathSAT;STP;Yices;Z3")
 
 add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME})
@@ -36,12 +36,8 @@ if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE Boolector::boolector)
 endif()
 
-if(${CAMADA_SOLVER_CVC4_ENABLE})
-  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC CVC4::cvc4)
-  if(DEFINED CAMADA_CVC4_SYMFPU_DIR)
-    target_include_directories(${REGRESSION_TARGET_NAME}
-                               PRIVATE ${CAMADA_CVC4_SYMFPU_DIR})
-  endif()
+if(${CAMADA_SOLVER_CVC5_ENABLE})
+  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC cvc5::cvc5)
 endif()
 
 if(${CAMADA_SOLVER_MATHSAT_ENABLE})

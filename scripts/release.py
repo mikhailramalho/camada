@@ -24,7 +24,7 @@ if __name__ == '__main__':
     run_command(["cmake", "..", "-GNinja", "-DBUILD_SHARED_LIBS=OFF",
                  "-DCAMADA_ENABLE_REGRESSION=OFF",
                  "-DCAMADA_SOLVER_BOOLECTOR_ENABLE=ON",
-                 "-DCAMADA_SOLVER_CVC4_ENABLE=OFF",
+                 "-DCAMADA_SOLVER_CVC5_ENABLE=OFF",
                  "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",
                  "-DCAMADA_SOLVER_STP_ENABLE=OFF",
                  "-DCAMADA_SOLVER_YICES_ENABLE=OFF",

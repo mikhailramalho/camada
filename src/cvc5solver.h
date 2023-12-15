@@ -19,51 +19,47 @@
  *
  **************************************************************************/
 
-#ifndef CVC4SOLVER_H_
-#define CVC4SOLVER_H_
+#ifndef CVC5SOLVER_H_
+#define CVC5SOLVER_H_
 
 #include "camadaimpl.h"
 
-#include <cvc4/cvc4.h>
+#include <cvc5/cvc5.h>
 
 namespace camada {
 
-using CVC4ContextRef = std::shared_ptr<CVC4::ExprManager>;
+using CVC5ContextRef = std::shared_ptr<cvc5::Solver>;
 
-/// Wrapper for CVC4 Sort
-class CVC4Sort : public SolverSort<CVC4ContextRef, CVC4::Type> {
+/// Wrapper for CVC5 Sort
+class CVC5Sort : public SolverSort<CVC5ContextRef, cvc5::Sort> {
 public:
-  using SolverSort<CVC4ContextRef, CVC4::Type>::SolverSort;
-  ~CVC4Sort() override = default;
+  using SolverSort<CVC5ContextRef, cvc5::Sort>::SolverSort;
+  ~CVC5Sort() override = default;
 
   unsigned getWidthFromSolver() const override;
 
   void dump() const override;
-}; // end class CVC4Sort
+}; // end class CVC5Sort
 
-class CVC4Expr : public SolverExpr<CVC4ContextRef, CVC4::Expr> {
+class CVC5Expr : public SolverExpr<CVC5ContextRef, cvc5::Term> {
 public:
-  using SolverExpr<CVC4ContextRef, CVC4::Expr>::SolverExpr;
-  ~CVC4Expr() override = default;
+  using SolverExpr<CVC5ContextRef, cvc5::Term>::SolverExpr;
+  ~CVC5Expr() override = default;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;
-}; // end class CVC4Expr
+}; // end class CVC5Expr
 
-class CVC4Solver : public SMTSolverImpl {
+class CVC5Solver : public SMTSolverImpl {
 public:
-  CVC4ContextRef Context;
-
-  CVC4::SmtEngine Solver;
-
-  CVC4::SymbolTable SymbolTable;
+  CVC5ContextRef Context;
 
   unsigned int ToBVCounter = 0;
 
-  explicit CVC4Solver();
-  ~CVC4Solver() override = default;
+  explicit CVC5Solver();
+  ~CVC5Solver() override = default;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -285,7 +281,12 @@ public:
   void dumpImpl() override;
 
   void dumpModelImpl() override;
-}; // end class CVC4Solver
+
+protected:
+  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
+  SymbolTablet SymbolTable;
+
+}; // end class CVC5Solver
 
 } // namespace camada
 

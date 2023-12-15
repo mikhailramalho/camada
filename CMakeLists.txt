@@ -126,7 +126,7 @@ if(ENABLE_WERROR)
 endif()
 
 # Demand C++14
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # Generate compile commands by default
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

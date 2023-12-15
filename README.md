@@ -15,7 +15,7 @@ Camada aims to provide a unified API for several SMT solvers while also adding s
 | Backend    | Minimum version |
 | ---------- | :-------------: |
 | [Boolector](https://boolector.github.io/)  |  3.2.1          |
-| [CVC4](https://cvc4.github.io/)            |  1.8            |
+| [CVC5](https://cvc5.github.io/)            |  1.8            |
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          |
 | [STP](https://stp.github.io/)              |  > 2.3.3 *      |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |

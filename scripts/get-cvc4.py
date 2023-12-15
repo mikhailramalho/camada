@@ -6,7 +6,7 @@ import sys
 from common import download_solver_src, run_command, unzip, check_root_dir, create_dirs
 
 
-def setup_cvc4():
+def setup_cvc5():
     curr_dir = os.getcwd()
 
     deps = importlib.import_module("solver-deps")
@@ -38,4 +38,4 @@ def setup_cvc4():
 if __name__ == '__main__':
     check_root_dir()
     create_dirs()
-    setup_cvc4()
+    setup_cvc5()

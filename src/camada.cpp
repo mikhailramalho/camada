@@ -32,8 +32,8 @@
 #include "mathsatsolver.h"
 #endif
 
-#if SOLVER_CVC4_ENABLED
-#include "cvc4solver.h"
+#if SOLVER_CVC5_ENABLED
+#include "cvc5solver.h"
 #endif
 
 #if SOLVER_BOOLECTOR_ENABLED
@@ -70,12 +70,12 @@ camada::SMTSolverRef camada::createMathSATSolver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createCVC4Solver() {
-#if SOLVER_CVC4_ENABLED
-  return std::make_shared<CVC4Solver>();
+camada::SMTSolverRef camada::createCVC5Solver() {
+#if SOLVER_CVC5_ENABLED
+  return std::make_shared<CVC5Solver>();
 #else
-  std::cerr << "Camada was not compiled with CVC4 support, rebuild with "
-               "-DCAMADA_ENABLE_SOLVER_CVC4=ON\n";
+  std::cerr << "Camada was not compiled with CVC5 support, rebuild with "
+               "-DCAMADA_ENABLE_SOLVER_CVC5=ON\n";
   abort();
 #endif
 }
