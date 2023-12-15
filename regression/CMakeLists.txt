@@ -31,7 +31,8 @@ find_package(Catch2 2 REQUIRED)
 compile_test("Boolector;CVC5;MathSAT;STP;Yices;Z3")
 
 add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
-target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME} Catch2::Catch2)
+target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME}
+                                                        Catch2::Catch2)
 
 # Solvers
 if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})

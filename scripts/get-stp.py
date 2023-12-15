@@ -26,11 +26,8 @@ def setup_stp():
 
     build_cmd = ["cmake", "..", "-GNinja", "-DONLY_SIMPLE=ON",
                  "-DCMAKE_INSTALL_PREFIX=../../../install/"]
-    if sys.platform == "darwin":
-        build_cmd += ["-DCMAKE_BUILD_TYPE=RelWithDebInfo"]
-    else:
-        build_cmd += ["-DCMAKE_BUILD_TYPE=Release", "-DBUILD_EXECUTABLES=OFF",
-                      "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF"]
+    build_cmd += ["-DCMAKE_BUILD_TYPE=Release", "-DBUILD_EXECUTABLES=OFF",
+                 "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF"]
     run_command(build_cmd)
 
     run_command(["ninja"])
