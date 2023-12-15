@@ -24,9 +24,12 @@ def setup_cvc5():
     unzip(the_file)
 
     os.chdir("./cvc5-cvc5-1.0.8")
-    build_cmd = ["./configure.sh", "production", "--auto-download", "--kissat",
+    build_cmd = ["./configure.sh", "production", "--auto-download",
                  "--prefix=../../install/", "--cryptominisat", "--ninja",
                  "--no-static-binary"]
+
+    if sys.platform != "darwin":
+        build_cmd.append("--kissat")
 
     run_command(build_cmd)
     os.chdir("./build")
