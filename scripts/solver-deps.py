@@ -41,17 +41,17 @@ def setup_cadical():
 
 def setup_gmp():
     curr_dir = os.getcwd()
-    file_path = download_solver_src("GMP 6.1.2",
-                                    "https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz")
+    file_path = download_solver_src("GMP 6.3.0",
+                                    "https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
     os.chdir("{}".format(the_dire))
 
-    # extracts gmp to ./deps/src/gmp-6.1.2
+    # extracts gmp to ./deps/src/gmp-6.3.0
     extract_tar(the_file, "xz")
 
-    os.chdir("./gmp-6.1.2")
+    os.chdir("./gmp-6.3.0")
 
     run_command(["./configure", "--prefix", "{}/../../install/".format(os.getcwd()),
                  "--disable-shared", "ABI=64", "CFLAGS=-fPIC", "CPPFLAGS=-DPIC"])

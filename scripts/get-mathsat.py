@@ -9,8 +9,8 @@ def setup_msat():
     curr_dir = os.getcwd()
 
     if sys.platform == "darwin":
-        file_path = download_solver_src("MathSAT 5.6.6",
-                                        "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.6-darwin-libcxx-x86_64.tar.gz",
+        file_path = download_solver_src("MathSAT 5.6.10",
+                                        "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.10-osx.tar.gz",
                                         sep="=")
     else:
         file_path = download_solver_src("MathSAT 5.6.10",
@@ -28,16 +28,12 @@ def setup_msat():
     # move it to deps/install/
     if sys.platform == "darwin":
         run_command(
-            ["cp", "-r", "./mathsat-5.6.6-darwin-libcxx-x86_64/lib/", "../install/lib/"])
+            ["cp", "-r", "./mathsat-5.6.10-osx/lib", "../install/lib/"])
         run_command(
-            ["cp", "-r", "./mathsat-5.6.6-darwin-libcxx-x86_64/include/", "../install/include/"])
+            ["cp", "-r", "./mathsat-5.6.10-osx/include", "../install/include/"])
 
         run_command(["ln", "-Fs", "/usr/local/include/gmp.h",
                     "../install//include/gmp.h"])
-        run_command(
-            ["cp", "../install//lib/libmathsat.dylib", "/usr/local/lib"])
-        run_command(
-            ["cp", "../install//lib/libmathsat.a", "/usr/local/lib"])
     else:
         run_command(
             ["cp", "-r", "./mathsat-5.6.10-linux-x86_64/lib/", "../install/"])
