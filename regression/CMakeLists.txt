@@ -25,11 +25,13 @@ function(compile_test)
   endforeach()
 endfunction()
 
+find_package(Catch2 2 REQUIRED)
+
 # add each solver specific implementation, if it is enabled
 compile_test("Boolector;CVC5;MathSAT;STP;Yices;Z3")
 
 add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
-target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME})
+target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME} Catch2::Catch2)
 
 # Solvers
 if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
