@@ -12,11 +12,8 @@ def setup_yices():
     curr_dir = os.getcwd()
 
     # We need a custom gmp first on linux
-    if sys.platform == "linux" or sys.platform == "linux2":
-        curr_dir = os.getcwd()
-        deps = importlib.import_module("solver-deps")
-        deps.setup_gmp()
-        os.chdir(curr_dir)
+    deps = importlib.import_module("solver-deps")
+    deps.setup_gmp()
 
     # Now we can download yices
     file_path = download_solver_src("Yices 2.6.4",
@@ -35,9 +32,8 @@ def setup_yices():
 
     config_cmd = ["./configure", "--prefix",
                   "{}/../../install/".format(os.getcwd())]
-    if sys.platform != "darwin":
-        config_cmd += [
-            "--with-static-gmp={}/../../install/lib/libgmp.a".format(os.getcwd())]
+    config_cmd += [
+        "--with-static-gmp={}/../../install/lib/libgmp.a".format(os.getcwd())]
 
     run_command(config_cmd)
     run_command(["make", "-j"])
