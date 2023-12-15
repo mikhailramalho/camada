@@ -46,13 +46,13 @@ static inline SMTExprRef extractExpSig(SMTSolver &S, const SMTExprRef &Exp) {
   return S.mkBVExtract(Exp->getWidth() - 2, 0, Exp);
 }
 
-static inline __uint128_t power2(unsigned int N, bool Negated) {
-  __uint128_t b = 1ULL << N;
+static inline int64_t power2(unsigned int N, bool Negated) {
+  int64_t b = 1ULL << N;
   return Negated ? -b : b;
 }
 
-static inline __uint128_t power2m1(unsigned int N, bool Negated) {
-  __uint128_t b = 1ULL << N;
+static inline int64_t power2m1(unsigned int N, bool Negated) {
+  int64_t b = 1ULL << N;
   b -= 1;
   return Negated ? -b : b;
 }
