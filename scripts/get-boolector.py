@@ -23,10 +23,10 @@ def setup_btor():
     unzip(the_file)
 
     os.chdir("./boolector-3.2.3")
-    run_command(["sh", "./contrib/setup-lingeling.sh"])
-    run_command(["sh", "./contrib/setup-btor2tools.sh"])
+    run_command(["./contrib/setup-lingeling.sh"])
+    run_command(["./contrib/setup-btor2tools.sh"])
     run_command("ls")
-    run_command(["sh", "./configure.sh", "--prefix", "../../../install/",
+    run_command(["./configure.sh", "--prefix", "../../../install/",
                  "-fPIC", "--no-picosat"])
     os.chdir("./build")
     run_command(["make", "-j"])
