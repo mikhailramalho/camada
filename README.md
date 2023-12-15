@@ -60,7 +60,7 @@ The `deps/install` directory will contain the binaries for the supported solvers
 | Backend    | Minimum version | Native floating-point support |
 | ---------- | :-------------: | :-------------: |
 | [Boolector](https://boolector.github.io/)  |  3.2.1          |   |
-| [CVC5](https://cvc5.github.io/)            |  1.8            | ✔️ |
+| [CVC5](https://cvc5.github.io/)            |  1.0.8            | ✔️ |
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>2</sup> |
 | [STP](https://stp.github.io/)              |  > 2.3.3<sup>1</sup>      |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
