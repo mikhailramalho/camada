@@ -3,7 +3,7 @@
 import os
 import importlib
 import sys
-from common import download_solver_src, run_command, unzip, check_root_dir, create_dirs
+from common import clone_repo_src, run_command, unzip, check_root_dir, create_dirs
 
 
 def setup_cvc5():
