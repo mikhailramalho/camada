@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import importlib
 import sys
 from common import download_solver_src, run_command, extract_tar, check_root_dir, create_dirs
 
