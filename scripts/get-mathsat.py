@@ -7,6 +7,7 @@ from common import download_solver_src, run_command, extract_tar, check_root_dir
 
 def setup_msat():
     curr_dir = os.getcwd()
+    deps.setup_gmp()
 
     if sys.platform == "darwin":
         file_path = download_solver_src("MathSAT 5.6.10",

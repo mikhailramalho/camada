@@ -9,8 +9,8 @@ function(check_mathsat_version mathsat_include mathsat_lib)
     MATHSAT_RETURNCODE MATHSAT_COMPILED ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/scripts/cmake/try_mathsat.cpp
     COMPILE_DEFINITIONS -I"${mathsat_include}" LINK_LIBRARIES
-                        -L${mathsat_lib_path} ${mathsat_lib}
-    RUN_OUTPUT_VARIABLE SRC_OUTPUT)
+                        -L${mathsat_lib_path} ${mathsat_lib} ${gmp}
+    COMPILE_OUTPUT_VARIABLE SRC_OUTPUT)
 
   if(NOT MATHSAT_COMPILED)
     message(
@@ -39,6 +39,8 @@ find_library(
         $ENV{HOME}/mathsat
   PATH_SUFFIXES lib bin)
 
+find_library(gmp gmp PATHS ${CMAKE_SOURCE_DIR}/deps/install/)
+
 # Try to check it dynamically, by compiling a small program that prints
 # MATHSAT's version
 if(CAMADA_MATHSAT_INCLUDE_DIR AND CAMADA_MATHSAT_LIB)
@@ -48,7 +50,6 @@ if(CAMADA_MATHSAT_INCLUDE_DIR AND CAMADA_MATHSAT_LIB)
 endif()
 
 # Alright, now create a list with MathSAT and it's dependencies
-find_library(gmp gmp)
 list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
 
 # handle the QUIETLY and REQUIRED arguments and set MATHSAT_FOUND to TRUE if all
