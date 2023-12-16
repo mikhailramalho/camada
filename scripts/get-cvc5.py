@@ -20,10 +20,7 @@ def setup_cvc5():
 
     os.chdir("{}".format(the_dire))
 
-    # extracts solver to ./deps/src/cvc5-1.8
-    unzip(the_file)
-
-    os.chdir("./cvc5-cvc5-1.0.8")
+    os.chdir("./cvc5")
     build_cmd = ["./configure.sh", "production", "--auto-download",
                  "--prefix=../../install/", "--cryptominisat", "--ninja",
                  "--no-static-binary"]
