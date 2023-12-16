@@ -18,7 +18,11 @@ jobs:
       with:
         java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp catch2 cmake ninja python@3.11 automake boost zlib bison flex libtool pkgconfig gettext texinfo && pip3 install toml && pip3 install -r requirements.txt && brew uninstall --ignore-dependencies python@3.12
+      run: brew install gmp cmake ninja python@3.11 automake boost zlib bison flex libtool pkgconfig gettext texinfo && pip3 install toml && pip3 install -r requirements.txt && brew uninstall --ignore-dependencies python@3.12
+
+      # Setup Catch2. TODO: replace it with https://github.com/marketplace/actions/continuous-benchmark
+    - name: Setup Catch2
+      run: git clone https://github.com/catchorg/Catch2.git && cd Catch2 && git reset --hard v2.13.10 && cmake -Bbuild -H. -DBUILD_TESTING=OFF -GNinja && cd build && sudo ninja && sudo ninja install
 
       # Setup/cache dependencies
     - name: Cache deps
