@@ -13,8 +13,8 @@ def setup_cvc5():
     deps.setup_cms()
     deps.setup_cadical()
 
-    file_path = download_solver_src("CVC5 v1.0.8",
-                                    "https://github.com/cvc5/cvc5/archive/refs/tags/cvc5-1.0.8.zip")
+    file_path = clone_repo_src("CVC5 v1.0.8",
+                               "https://github.com/cvc5/cvc5.git", tag="cvc5-1.0.8")
     the_dire = file_path.rsplit('/', 1)[0]
     the_file = file_path.rsplit('/', 1)[1]
 
