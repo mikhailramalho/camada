@@ -27,7 +27,8 @@ def setup_stp():
     build_cmd = ["cmake", "..", "-GNinja", "-DONLY_SIMPLE=ON",
                  "-DCMAKE_INSTALL_PREFIX=../../../install/"]
     build_cmd += ["-DCMAKE_BUILD_TYPE=Release", "-DBUILD_EXECUTABLES=OFF",
-                 "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF"]
+                 "-DSTATICCOMPILE=ON", "-DBUILD_SHARED_LIBS=OFF",
+                 "-Dminisat_DIR=../../../install/lib/cmake/minisat"]
     run_command(build_cmd)
 
     run_command(["ninja"])
