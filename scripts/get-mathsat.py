@@ -7,6 +7,8 @@ from common import download_solver_src, run_command, extract_tar, check_root_dir
 
 def setup_msat():
     curr_dir = os.getcwd()
+
+    deps = importlib.import_module("solver-deps")
     deps.setup_gmp()
 
     if sys.platform == "darwin":
