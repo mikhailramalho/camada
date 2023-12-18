@@ -30,7 +30,7 @@ jobs:
       run: python3 ./scripts/get-deps.py -a
 
     - name: Configure Camada
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_BOOLECTOR_ENABLE=ON -DCAMADA_CVC4_ENABLE=ON -DCAMADA_CVC4_SYMFPU_DIR=$PWD/../deps/src/cvc5-1.8/deps/install/include -DCAMADA_MATHSAT_ENABLE=ON -DCAMADA_STP_ENABLE=ON -DCAMADA_YICES_ENABLE=ON -DCAMADA_Z3_ENABLE=ON -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_BOOLECTOR_ENABLE=ON -DCAMADA_CVC5_ENABLE=ON -DCAMADA_MATHSAT_ENABLE=ON -DCAMADA_STP_ENABLE=ON -DCAMADA_YICES_ENABLE=ON -DCAMADA_Z3_ENABLE=ON -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
 
     - name: Build Camada
       run: cd build && ninja && ninja install
