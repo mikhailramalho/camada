@@ -31,13 +31,13 @@ jobs:
       run: python3 ./scripts/release.py
 
     - name: Create tarball
-      run: tar -czvf camada-linux-${{ runner.os }}.tar.gz release/
+      run: tar -czvf camada-${{ runner.os }}-${{ runner.arch }}.tar.gz release/
 
       # Upload asset
     - uses: actions/upload-artifact@v1
       with:
         name: release-linux
-        path: ./camada-linux-${{ runner.os }}.tar.gz
+        path: ./camada-${{ runner.os }}-${{ runner.arch }}.tar.gz
 
   build-macos:
     name: Build MacOS Release
@@ -72,7 +72,7 @@ jobs:
     - uses: actions/upload-artifact@v1
       with:
         name: release-macos
-        path: ./camada-macos-${{ runner.os }}.tar.gz
+        path: camada-${{ runner.os }}-${{ runner.arch }}.tar.gz
 
   create-release:
     name: Upload Release Asset
@@ -109,8 +109,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./camada-linux-${{ runner.os }}.tar.gz
-        asset_name: camada-linux-${{ runner.os }}.tar.gz
+        asset_path: ./camada-${{ runner.os }}-${{ runner.arch }}.tar.gz
+        asset_name: camada-${{ runner.os }}-${{ runner.arch }}.tar.gz
         asset_content_type: text/x-shellscript
 
     - name: Upload Release Asset (MacOS)
@@ -120,6 +120,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./camada-macos-${{ runner.os }}.tar.gz
-        asset_name: camada-macos-${{ runner.os }}.tar.gz
+        asset_path: ./camada-${{ runner.os }}-${{ runner.arch }}.tar.gz
+        asset_name: camada-${{ runner.os }}-${{ runner.arch }}.tar.gz
         asset_content_type: text/x-shellscript
