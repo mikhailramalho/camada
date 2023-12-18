@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install cmake linux-libc-dev ninja-build gperf doxygen && pip3 install toml && pip3 install -r requirements.txt
+      run: sudo apt-get update && sudo apt-get install catch2 cmake linux-libc-dev ninja-build gperf doxygen && pip3 install toml && pip3 install -r requirements.txt
 
       # Setup/cache dependencies
     - name: Cache deps
@@ -29,7 +29,7 @@ jobs:
 
     - name: Generate release
       run: python3 ./scripts/release.py
-    
+
     - name: Create tarball
       run: tar -czvf camada-linux.tar.gz release/
 
@@ -38,7 +38,7 @@ jobs:
       with:
         name: release-linux
         path: ./camada-linux.tar.gz
-        
+
   build-macos:
     name: Build MacOS Release
     runs-on: macos-latest
@@ -48,7 +48,7 @@ jobs:
       with:
         java-version: '9.0.4'
     - name: Install Dependencies
-      run: brew install gmp cmake ninja python3 automake boost zlib bison flex doxygen && pip3 install toml && pip3 install -r requirements.txt
+      run: brew install gmp cmake ninja python@3.11 automake boost zlib bison flex doxygen libtool pkgconfig gettext texinfo && pip3 install toml && pip3 install -r requirements.txt && brew uninstall --ignore-dependencies python@3.12
 
       # Setup/cache dependencies
     - name: Cache deps
@@ -64,7 +64,7 @@ jobs:
 
     - name: Generate release
       run: python3 ./scripts/release.py
-    
+
     - name: Create tarball
       run: tar -czvf camada-macos.tar.gz release/
 
