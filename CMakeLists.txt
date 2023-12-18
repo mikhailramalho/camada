@@ -125,7 +125,7 @@ if(ENABLE_WERROR)
   add_definitions(-Werror)
 endif()
 
-# Demand C++14
+# Demand C++17
 set(CMAKE_CXX_STANDARD 17)
 
 # Generate compile commands by default
