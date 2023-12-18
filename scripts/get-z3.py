@@ -20,7 +20,7 @@ def setup_z3():
     unzip(the_file)
 
     os.chdir("./z3-z3-4.12.4")
-    run_command(["python3", "scripts/mk_make.py", "--prefix=../../../install/"])
+    run_command(["python3", "scripts/mk_make.py", "--prefix=../../../install/", "--staticlib"])
     os.chdir("./build")
     run_command(["make", "-j"])
     run_command(["make", "install"])
