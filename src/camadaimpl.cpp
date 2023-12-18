@@ -615,6 +615,8 @@ static inline void addCore(SMTSolver &S, unsigned int SWidth,
                            const SMTExprRef &DSgn, const SMTExprRef &DSig,
                            const SMTExprRef &DExp, SMTExprRef &ResSgn,
                            SMTExprRef &ResSig, SMTExprRef &ResExp) {
+  assert(SWidth >= EWidth);
+
   // c/d are now such that c_exp >= d_exp.
   SMTExprRef exp_delta = S.mkBVSub(CExp, DExp);
 
