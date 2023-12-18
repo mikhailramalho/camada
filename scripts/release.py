@@ -54,20 +54,7 @@ if __name__ == '__main__':
 
     # We'll also copy solver's headers, in case the user
     # wants to override the solver
-
-    # First boolector
-    if not os.path.exists('./release/include/boolector'):
-        os.mkdir('./release/include/boolector')
-    run_command(
-        ["cp", "-r", "./deps/install/include/boolector", "./release/include"])
-
-    # Z3
-    if sys.platform == "darwin":
-        run_command(
-            ["cp", "-r", "./deps/src/z3-4.8.10-x64-osx-10.15.7/include", "./release/"])
-    else:
-        run_command(
-            ["cp", "-r", "./deps/src/z3-4.8.10-x64-ubuntu-18.04/include", "./release/"])
+    run_command(["cp", "-r", "./deps/install/include/", "./release/"])
 
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
