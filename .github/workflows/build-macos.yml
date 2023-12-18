@@ -14,9 +14,6 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-java@v1
-      with:
-        java-version: '9.0.4'
     - name: Install Dependencies
       run: brew install gmp cmake ninja python@3.11 automake boost zlib bison flex libtool pkgconfig gettext texinfo && pip3 install toml && pip3 install -r requirements.txt && brew uninstall --ignore-dependencies python@3.12
 
