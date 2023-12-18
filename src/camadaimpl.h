@@ -1081,7 +1081,8 @@ protected:
   virtual SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkFPLt(RHS, LHS));
+    // (a >= b) iff (b <= a)
+    return mkFPLe(RHS, LHS);
   }
 
   virtual SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
