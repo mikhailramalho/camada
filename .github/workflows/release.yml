@@ -80,13 +80,13 @@ jobs:
     needs: [build-linux, build-macos]
     steps:
     - name: Download Linux Build
-      uses: actions/download-artifact@v1
+      uses: actions/download-artifact@v4.1.7
       with:
         name: release-linux
         path: ./
 
     - name: Download Macos Build
-      uses: actions/download-artifact@v1
+      uses: actions/download-artifact@v4.1.7
       with:
         name: release-macos
         path: ./
