@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install catch2 cmake linux-libc-dev ninja-build gperf && pip3 install toml && pip3 install -r requirements.txt
+      run: sudo apt-get update && sudo apt-get install catch2 cmake linux-libc-dev ninja-build gperf lcov doxygen graphviz && pip3 install toml && pip3 install -r requirements.txt
 
       # Setup/cache dependencies
     - name: Cache deps
@@ -30,11 +30,41 @@ jobs:
       run: python3 ./scripts/get-deps.py -a
 
     - name: Configure Camada
-      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_BOOLECTOR_ENABLE=ON -DCAMADA_CVC5_ENABLE=ON -DCAMADA_MATHSAT_ENABLE=ON -DCAMADA_STP_ENABLE=ON -DCAMADA_YICES_ENABLE=ON -DCAMADA_Z3_ENABLE=ON -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Debug
+      run: mkdir build && cd build && cmake .. -GNinja -DCAMADA_ENABLE_REGRESSION=On -DBUILD_SHARED_LIBS=OFF -DCAMADA_BOOLECTOR_ENABLE=ON -DCAMADA_CVC5_ENABLE=ON -DCAMADA_MATHSAT_ENABLE=ON -DCAMADA_STP_ENABLE=ON -DCAMADA_YICES_ENABLE=ON -DCAMADA_Z3_ENABLE=ON -DCMAKE_INSTALL_PREFIX:PATH=$PWD/../release -DCMAKE_BUILD_TYPE=Coverage -DENABLE_WARNINGS=ON -DENABLE_WERROR=ON
 
     - name: Build Camada
       run: cd build && ninja && ninja install
 
     - name: Run tests
       run: cd build/regression && ctest -j --output-on-failure --progress .
+
+    - name: Collect coverage data
+      run: |
+        cd build
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info # Remove system header coverage
+        lcov --remove coverage.info '*/Catch2/*' --output-file coverage.info # Remove Catch2 coverage
+        lcov --remove coverage.info '*/regression/*' --output-file coverage.info # Remove regression test files themselves
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # Repository secret storing the Codecov token
+        file: ./build/coverage.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: true
+
+    - name: Generate Doxygen Documentation
+      run: |
+        # CMake should have configured Doxygen. Output is typically in the build directory.
+        # The 'doc' target should be available from the top-level build directory.
+        cd build
+        ninja doc
+
+    - name: Deploy Doxygen Documentation to GitHub Pages
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/'))
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build/doc/html
 

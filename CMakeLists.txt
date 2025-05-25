@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.15)
 
 set(CAMADA_VER_MAJOR 0)
 set(CAMADA_VER_MINOR 0)
@@ -135,7 +135,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(CAMADA_ENABLE_REGRESSION "Enable regression testing" OFF)
 if(CAMADA_ENABLE_REGRESSION)
   include(CTest)
-  find_package(Catch2 REQUIRED)
+  include(FetchContent)
+  FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v2.13.10 # Specify the exact version
+  )
+  FetchContent_MakeAvailable(Catch2)
   enable_testing()
 endif()
 
@@ -162,7 +168,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   # Set the possible values of build type for cmake-gui
   set_property(
     CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel"
-                                    "RelWithDebInfo" "Sanitizer")
+                                    "RelWithDebInfo" "Sanitizer" "Coverage")
 endif()
 
 # Special hidden variable to force the repacking of the static lib
@@ -172,6 +178,19 @@ set(RELEASE_MODE
 
 # Find solvers
 config_solver(Boolector 3.2.1)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+  if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+    message(STATUS "Coverage flags enabled.")
+  else()
+    message(WARNING "Coverage build type is selected, but the compiler is not GCC or Clang. Coverage flags not added.")
+  endif()
+endif()
+
 config_solver(CVC5 1.0.8)
 config_solver(MathSAT 5.6.3)
 config_solver(STP 2.3.3)
