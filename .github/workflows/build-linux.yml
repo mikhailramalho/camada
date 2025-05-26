@@ -20,7 +20,7 @@ jobs:
       # Setup/cache dependencies
     - name: Cache deps
       id: cache-deps-v5
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: deps
         key: ${{ runner.os }}-deps-v5
