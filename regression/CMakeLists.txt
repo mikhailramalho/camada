@@ -25,7 +25,7 @@ function(compile_test)
   endforeach()
 endfunction()
 
-find_package(Catch2 2 REQUIRED)
+find_package(Catch2 3 REQUIRED)
 
 # add each solver specific implementation, if it is enabled
 compile_test("Boolector;CVC5;MathSAT;STP;Yices;Z3")

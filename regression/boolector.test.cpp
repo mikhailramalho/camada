@@ -2,7 +2,7 @@
 #include "tests.h"
 
 #include <boolectorsolver.h>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Simple Boolector test", "[Boolector]") {
   // Create Boolector Solver
