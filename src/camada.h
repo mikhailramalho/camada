@@ -22,6 +22,8 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
+#include <cstdint>
+
 #include "camadaexpr.h"
 
 namespace camada {
