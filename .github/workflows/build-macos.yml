@@ -17,6 +17,12 @@ jobs:
     - name: Install Dependencies
       run: brew install catch2 gmp cmake ninja automake boost zlib bison flex libtool pkg-config gettext texinfo doxygen
 
+    - name: Configure Homebrew Environment
+      run: |
+        echo "CPPFLAGS=-I$(brew --prefix gmp)/include" >> $GITHUB_ENV
+        echo "LDFLAGS=-L$(brew --prefix gmp)/lib" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=$(brew --prefix gmp)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig" >> $GITHUB_ENV
+
       # Setup/cache dependencies
     - name: Cache deps
       id: cache-deps-v6
