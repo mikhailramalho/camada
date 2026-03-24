@@ -54,6 +54,7 @@ public:
 
 class CVC5Solver : public SMTSolverImpl {
 public:
+  std::shared_ptr<cvc5::TermManager> Terms;
   CVC5ContextRef Context;
 
   unsigned int ToBVCounter = 0;
