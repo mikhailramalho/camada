@@ -26,6 +26,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdlib>
 #include <gmp.h>
 #include <iostream>
 
@@ -580,7 +581,7 @@ SMTExprRef MathSATSolver::mkFPtoFPImpl(const SMTExprRef &From,
   return newExprRef(
       MathSATExpr(Context, To,
                   msat_make_fp_cast(*Context, To->getFPExponentWidth(),
-                                    To->getFPSignificandWidth(),
+                                    To->getFPSignificandWidth() + 1,
                                     toSolverExpr<MathSATExpr>(*R).Expr,
                                     toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -591,7 +592,7 @@ SMTExprRef MathSATSolver::mkSBVtoFPImpl(const SMTExprRef &From,
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_sbv(*Context, To->getFPExponentWidth(),
-                            To->getFPSignificandWidth(),
+                            To->getFPSignificandWidth() + 1,
                             toSolverExpr<MathSATExpr>(*R).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -602,7 +603,7 @@ SMTExprRef MathSATSolver::mkUBVtoFPImpl(const SMTExprRef &From,
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_ubv(*Context, To->getFPExponentWidth(),
-                            To->getFPSignificandWidth(),
+                            To->getFPSignificandWidth() + 1,
                             toSolverExpr<MathSATExpr>(*R).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -741,11 +742,14 @@ SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
   msat_term e;
   switch (R) {
   default:
-    assert(0 && "Unsupported floating-point semantics.");
-    __builtin_unreachable();
+    std::cerr << "MathSAT Error unsupported floating-point rounding mode.\n";
+    std::abort();
   case RM::ROUND_TO_EVEN:
     e = msat_make_fp_roundingmode_nearest_even(*Context);
     break;
+  case RM::ROUND_TO_AWAY:
+    std::cerr << "MathSAT Error ROUND_TO_AWAY is not supported.\n";
+    std::abort();
   case RM::ROUND_TO_PLUS_INF:
     e = msat_make_fp_roundingmode_plus_inf(*Context);
     break;
@@ -782,7 +786,7 @@ SMTExprRef MathSATSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_ieeebv(*Context, To->getFPExponentWidth(),
-                               To->getFPSignificandWidth(),
+                               To->getFPSignificandWidth() + 1,
                                toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
@@ -820,7 +824,7 @@ std::string MathSATSolver::getSolverNameAndVersion() const {
   char *tmp = msat_get_version();
   std::string ver = tmp;
   msat_free(tmp);
-  return ver;
+  return std::string("MathSAT v").append(ver);
 }
 
 void MathSATSolver::dumpImpl() {
