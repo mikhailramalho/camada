@@ -52,6 +52,10 @@ set(CAMADA_CVC5_MACOS_X86_64_URL
     "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-macOS-x86_64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt cvc5 archive for macOS x86_64")
+set(CAMADA_CVC5_MACOS_ARM64_URL
+    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-macOS-arm64-static.zip"
+    CACHE STRING
+          "URL used to download the prebuilt cvc5 archive for macOS arm64")
 set(CAMADA_BITWUZLA_LINUX_X86_64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Linux-x86_64-static.zip"
     CACHE STRING
