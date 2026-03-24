@@ -20,10 +20,11 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
       SymbolTable.clear();
       Assertions.clear();
 
-      // Delete
+      OwnedContext.reset();
+      Context = nullptr;
+
       yices_exit();
 
-      // and recreate
       create();
     }
 
@@ -40,7 +41,8 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
       yices_set_config(config, "array-solver", "none");
       yices_set_config(config, "arith-solver", "none");
 
-      Context = std::make_shared<context_t *>(yices_new_context(config));
+      OwnedContext.reset(yices_new_context(config));
+      Context = OwnedContext.get();
       yices_free_config(config);
     }
   };

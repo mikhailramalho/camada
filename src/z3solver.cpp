@@ -57,14 +57,21 @@ void Z3Expr::dump() const {
 }
 
 Z3Solver::Z3Solver()
-    : SMTSolverImpl(), Context(std::make_shared<z3::context>()),
-      Solver(*Context) {
+    : SMTSolverImpl(), OwnedContext(std::make_unique<z3::context>()),
+      Context(OwnedContext.get()), Solver(*Context) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }
 
-Z3Solver::Z3Solver(Z3ContextRef C, const z3::solver &S)
-    : SMTSolverImpl(), Context(std::move(C)), Solver(S) {
+Z3Solver::Z3Solver(std::unique_ptr<z3::context> C)
+    : SMTSolverImpl(), OwnedContext(std::move(C)), Context(OwnedContext.get()),
+      Solver(*Context) {
+  z3::set_param("rewriter.hi_fp_unspecified", true);
+}
+
+Z3Solver::Z3Solver(std::unique_ptr<z3::context> C, z3::solver S)
+    : SMTSolverImpl(), OwnedContext(std::move(C)), Context(OwnedContext.get()),
+      Solver(std::move(S)) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }

@@ -14,16 +14,22 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
-    explicit myZ3Solver(const camada::Z3ContextRef &C)
-        : camada::Z3Solver(
-              C, (z3::tactic(*C, "simplify") & z3::tactic(*C, "solve-eqs") &
-                  z3::tactic(*C, "simplify") & z3::tactic(*C, "smt"))
-                     .mk_solver()) {}
+    explicit myZ3Solver(std::unique_ptr<z3::context> C)
+        : camada::Z3Solver(std::move(C)) {
+      Solver = makeSolver(*Context);
+    }
+
+  private:
+    static z3::solver makeSolver(z3::context &C) {
+      return (z3::tactic(C, "simplify") & z3::tactic(C, "solve-eqs") &
+              z3::tactic(C, "simplify") & z3::tactic(C, "smt"))
+          .mk_solver();
+    }
   };
 
   // Create Z3 Solver
   camada::SMTSolverRef z3 =
-      std::make_unique<myZ3Solver>(std::make_shared<z3::context>());
+      std::make_unique<myZ3Solver>(std::make_unique<z3::context>());
 
   tests(z3);
 }

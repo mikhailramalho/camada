@@ -30,6 +30,13 @@
 
 namespace camada {
 
+void STPContextOwner::reset() {
+  if (Valid) {
+    STP::vc_Destroy(Context);
+    Valid = false;
+  }
+}
+
 STPExpr::~STPExpr() {
   if (OwnsExpr && Expr != nullptr)
     STP::vc_DeleteExpr(Expr);
@@ -67,17 +74,17 @@ void STPErrorHandler(const char *msg) {
 }
 
 STPSolver::STPSolver()
-    : SMTSolverImpl(),
-      Context(std::make_shared<STP::VC>(STP::vc_createValidityChecker())) {
+    : SMTSolverImpl(), OwnedContext(STP::vc_createValidityChecker()),
+      Context(OwnedContext.get()) {
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 
 STPSolver::STPSolver(STPContextRef C)
-    : SMTSolverImpl(), Context(std::move(C)) {}
+    : SMTSolverImpl(), OwnedContext(*C), Context(OwnedContext.get()) {}
 
 STPSolver::~STPSolver() {
   invalidateGeneratedObjects();
-  STP::vc_Destroy(*Context);
+  OwnedContext.reset();
 }
 
 void STPSolver::addConstraintImpl(const SMTExprRef &Exp) {
@@ -535,8 +542,8 @@ checkResult STPSolver::checkImpl() {
 }
 
 void STPSolver::resetImpl() {
-  STP::vc_Destroy(*Context);
-  Context = std::make_shared<STP::VC>(STP::vc_createValidityChecker());
+  OwnedContext.reset(STP::vc_createValidityChecker());
+  Context = OwnedContext.get();
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 

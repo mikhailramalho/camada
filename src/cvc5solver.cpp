@@ -56,8 +56,10 @@ bool CVC5Expr::equal_to(SMTExpr const &Other) const {
 void CVC5Expr::dump() const { std::cerr << Expr.toString() << '\n'; }
 
 CVC5Solver::CVC5Solver()
-    : SMTSolverImpl(), Terms(std::make_shared<cvc5::TermManager>()),
-      Context(std::make_shared<cvc5::Solver>(*Terms)) {
+    : SMTSolverImpl(), OwnedTerms(std::make_unique<cvc5::TermManager>()),
+      Terms(OwnedTerms.get()),
+      OwnedContext(std::make_unique<cvc5::Solver>(*Terms)),
+      Context(OwnedContext.get()) {
   Context->setOption("arrays-exp", "true");
   Context->setOption("produce-models", "true");
   Context->setOption("produce-assertions", "true");

@@ -24,6 +24,7 @@
 
 #include "camadaimpl.h"
 
+#include <memory>
 #include <unordered_map>
 
 extern "C" {
@@ -32,7 +33,13 @@ extern "C" {
 
 namespace camada {
 
-using BitwuzlaContextRef = std::shared_ptr<Bitwuzla *>;
+using BitwuzlaContextRef = Bitwuzla *;
+
+struct BitwuzlaContextDeleter {
+  void operator()(Bitwuzla *Ctx) const;
+};
+
+using BitwuzlaContextOwner = std::unique_ptr<Bitwuzla, BitwuzlaContextDeleter>;
 
 class BitwSort : public SolverSort<BitwuzlaContextRef, BitwuzlaSort> {
 public:
@@ -55,7 +62,8 @@ class BitwuzlaSolver : public SMTSolverImpl {
 public:
   using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
 
-  BitwuzlaContextRef Context;
+  BitwuzlaContextOwner OwnedContext;
+  BitwuzlaContextRef Context = nullptr;
   BitwuzlaOptions *Options = nullptr;
   BitwuzlaTermManager *TermManager = nullptr;
   SymbolTablet SymbolTable;

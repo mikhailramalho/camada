@@ -30,7 +30,49 @@ namespace STP {
 
 namespace camada {
 
-using STPContextRef = std::shared_ptr<STP::VC>;
+using STPContextRef = STP::VC *;
+
+class STPContextOwner {
+public:
+  STPContextOwner() = default;
+
+  explicit STPContextOwner(STP::VC Ctx) : Context(Ctx), Valid(true) {}
+
+  ~STPContextOwner() { reset(); }
+
+  STPContextOwner(STPContextOwner &&Other) noexcept
+      : Context(Other.Context), Valid(Other.Valid) {
+    Other.Valid = false;
+  }
+
+  STPContextOwner &operator=(STPContextOwner &&Other) noexcept {
+    if (this != &Other) {
+      reset();
+      Context = Other.Context;
+      Valid = Other.Valid;
+      Other.Valid = false;
+    }
+    return *this;
+  }
+
+  STPContextOwner(const STPContextOwner &) = delete;
+  STPContextOwner &operator=(const STPContextOwner &) = delete;
+
+  void reset();
+
+  void reset(STP::VC Ctx) {
+    reset();
+    Context = Ctx;
+    Valid = true;
+  }
+
+  STPContextRef get() { return Valid ? &Context : nullptr; }
+  const STP::VC *get() const { return Valid ? &Context : nullptr; }
+
+private:
+  STP::VC Context = nullptr;
+  bool Valid = false;
+};
 
 /// Wrapper for STP Sort
 class STPSort : public SolverSort<STPContextRef, STP::Type> {
@@ -62,7 +104,8 @@ public:
 
 class STPSolver : public SMTSolverImpl {
 public:
-  STPContextRef Context;
+  STPContextOwner OwnedContext;
+  STPContextRef Context = nullptr;
 
   unsigned int ConstArrayCounter = 0;
 

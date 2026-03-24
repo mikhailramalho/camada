@@ -29,6 +29,11 @@
 
 namespace camada {
 
+void YicesContextDeleter::operator()(context_t *Ctx) const {
+  if (Ctx)
+    yices_free_context(Ctx);
+}
+
 unsigned YicesSort::getWidthFromSolver() const {
   if (yices_type_is_bool(Sort))
     return 1;
@@ -62,19 +67,21 @@ YicesSolver::YicesSolver() : SMTSolverImpl() {
   ctx_config_t *config = yices_new_config();
   yices_default_config_for_logic(config, "QF_AUFBV");
 
-  Context = std::make_shared<context_t *>(yices_new_context(config));
+  OwnedContext.reset(yices_new_context(config));
+  Context = OwnedContext.get();
   yices_free_config(config);
 }
 
 YicesSolver::~YicesSolver() {
   invalidateGeneratedObjects();
-  yices_exit();
+  OwnedContext.reset();
   Context = nullptr;
+  yices_exit();
 }
 
 void YicesSolver::addConstraintImpl(const SMTExprRef &Exp) {
   Assertions.push_back(Exp);
-  yices_assert_formula(*Context, toSolverExpr<YicesExpr>(*Exp).Expr);
+  yices_assert_formula(Context, toSolverExpr<YicesExpr>(*Exp).Expr);
 }
 
 SMTExprRef YicesSolver::newExprRefImpl(const SMTExpr &Exp) const {
@@ -419,7 +426,7 @@ SMTExprRef YicesSolver::mkArrayStoreImpl(const SMTExprRef &Array,
 
 bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   int32_t val;
-  auto res = yices_get_bool_value(yices_get_model(*Context, 1),
+  auto res = yices_get_bool_value(yices_get_model(Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
   (void)res;
   assert(!res && "Can't get boolean value from Yices");
@@ -430,7 +437,7 @@ std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
   int32_t *data = new int32_t[width];
-  auto res = yices_get_bv_value(yices_get_model(*Context, 1),
+  auto res = yices_get_bv_value(yices_get_model(Context, 1),
                                 toSolverExpr<YicesExpr>(*Exp).Expr, data);
   (void)res;
   assert(!res && "Can't get boolean value from Yices");
@@ -513,7 +520,7 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
 }
 
 checkResult YicesSolver::checkImpl() {
-  smt_status_t res = yices_check_context(*Context, nullptr);
+  smt_status_t res = yices_check_context(Context, nullptr);
   if (res == YICES_STATUS_SAT)
     return checkResult::SAT;
 
@@ -528,6 +535,8 @@ void YicesSolver::resetImpl() {
   Assertions.clear();
 
   // Delete
+  OwnedContext.reset();
+  Context = nullptr;
   yices_exit();
 
   // and recreate
@@ -537,7 +546,8 @@ void YicesSolver::resetImpl() {
   ctx_config_t *config = yices_new_config();
   yices_default_config_for_logic(config, "QF_AUFBV");
 
-  Context = std::make_shared<context_t *>(yices_new_context(config));
+  OwnedContext.reset(yices_new_context(config));
+  Context = OwnedContext.get();
   yices_free_config(config);
 }
 
@@ -552,7 +562,7 @@ void YicesSolver::dumpImpl() {
 
 void YicesSolver::dumpModelImpl() {
   char *model_str =
-      yices_model_to_string(yices_get_model(*Context, 1), 160, 80, 0);
+      yices_model_to_string(yices_get_model(Context, 1), 160, 80, 0);
   std::cerr << model_str << '\n';
   yices_free_string(model_str);
 }

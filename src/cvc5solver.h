@@ -28,7 +28,7 @@
 
 namespace camada {
 
-using CVC5ContextRef = std::shared_ptr<cvc5::Solver>;
+using CVC5ContextRef = cvc5::Solver *;
 
 /// Wrapper for CVC5 Sort
 class CVC5Sort : public SolverSort<CVC5ContextRef, cvc5::Sort> {
@@ -54,8 +54,10 @@ public:
 
 class CVC5Solver : public SMTSolverImpl {
 public:
-  std::shared_ptr<cvc5::TermManager> Terms;
-  CVC5ContextRef Context;
+  std::unique_ptr<cvc5::TermManager> OwnedTerms;
+  cvc5::TermManager *Terms = nullptr;
+  std::unique_ptr<cvc5::Solver> OwnedContext;
+  CVC5ContextRef Context = nullptr;
 
   unsigned int ToBVCounter = 0;
 

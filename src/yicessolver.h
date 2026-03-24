@@ -24,13 +24,20 @@
 
 #include "camadaimpl.h"
 
+#include <memory>
 #include <unordered_map>
 #include <vector>
 #include <yices.h>
 
 namespace camada {
 
-using YicesContextRef = std::shared_ptr<context_t *>;
+using YicesContextRef = context_t *;
+
+struct YicesContextDeleter {
+  void operator()(context_t *Ctx) const;
+};
+
+using YicesContextOwner = std::unique_ptr<context_t, YicesContextDeleter>;
 
 /// Wrapper for Yices Sort
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
@@ -56,7 +63,8 @@ public:
 
 class YicesSolver : public SMTSolverImpl {
 public:
-  YicesContextRef Context;
+  YicesContextOwner OwnedContext;
+  YicesContextRef Context = nullptr;
 
   unsigned int ConstArrayCounter = 0;
 
