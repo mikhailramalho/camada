@@ -623,11 +623,11 @@ SMTExprRef CVC5Solver::mkFPtoFPImpl(const SMTExprRef &From,
                                     const SMTSortRef &To, const SMTExprRef &R) {
   return newExprRef(CVC5Expr(
       Context, To,
-      Terms->mkTerm(
-          Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_FP,
-                      {To->getFPExponentWidth(), To->getFPSignificandWidth()}),
-          {toSolverExpr<CVC5Expr>(*R).Expr,
-           toSolverExpr<CVC5Expr>(*From).Expr})));
+      Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_FP,
+                                {To->getFPExponentWidth(),
+                                 To->getFPSignificandWidth() + 1}),
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkSBVtoFPImpl(const SMTExprRef &From,
@@ -635,11 +635,11 @@ SMTExprRef CVC5Solver::mkSBVtoFPImpl(const SMTExprRef &From,
                                      const SMTExprRef &R) {
   return newExprRef(CVC5Expr(
       Context, To,
-      Terms->mkTerm(
-          Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_SBV,
-                      {To->getFPExponentWidth(), To->getFPSignificandWidth()}),
-          {toSolverExpr<CVC5Expr>(*R).Expr,
-           toSolverExpr<CVC5Expr>(*From).Expr})));
+      Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_SBV,
+                                {To->getFPExponentWidth(),
+                                 To->getFPSignificandWidth() + 1}),
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
@@ -647,11 +647,11 @@ SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
                                      const SMTExprRef &R) {
   return newExprRef(CVC5Expr(
       Context, To,
-      Terms->mkTerm(
-          Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_UBV,
-                      {To->getFPExponentWidth(), To->getFPSignificandWidth()}),
-          {toSolverExpr<CVC5Expr>(*R).Expr,
-           toSolverExpr<CVC5Expr>(*From).Expr})));
+      Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_UBV,
+                                {To->getFPExponentWidth(),
+                                 To->getFPSignificandWidth() + 1}),
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
