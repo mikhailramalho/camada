@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install -y catch2 cmake linux-libc-dev ninja-build gperf doxygen pkg-config
+      run: sudo apt-get update && sudo apt-get install -y catch2 cmake linux-libc-dev ninja-build gperf doxygen pkg-config libgmp-dev libmpfr-dev
 
       # Setup/cache dependencies
     - name: Cache deps
