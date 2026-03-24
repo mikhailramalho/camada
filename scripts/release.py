@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 
+import os
 import re
 import shutil
-import sys
-from common import *
+import subprocess
+
+
+def check_root_dir():
+    if not os.path.exists('src/camadaimpl.h'):
+        raise SystemExit("Please run this script from the camada root directory")
+
+
+def run_command(cmd):
+    print(cmd)
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == '__main__':
@@ -11,7 +21,6 @@ if __name__ == '__main__':
     curr_dir = os.getcwd()
 
     check_root_dir()
-    create_dirs()
 
     if os.path.exists('./release'):
         shutil.rmtree('./release')
@@ -23,6 +32,7 @@ if __name__ == '__main__':
 
     run_command(["cmake", "..", "-GNinja", "-DBUILD_SHARED_LIBS=OFF",
                  "-DCAMADA_ENABLE_REGRESSION=OFF",
+                 "-DCAMADA_DOWNLOAD_DEPENDENCIES=PERMISSIVE-ONLY",
                  "-DCAMADA_SOLVER_BITWUZLA_ENABLE=ON",
                  "-DCAMADA_SOLVER_CVC5_ENABLE=OFF",
                  "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",
@@ -54,12 +64,12 @@ if __name__ == '__main__':
 
     # We'll also copy solver's headers, in case the user
     # wants to override the solver
-    run_command(["cp", "-r", "./deps/install/include/", "./release/"])
+    run_command(["cp", "-r", "./build/deps/install/include/", "./release/"])
 
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
     run_command(["cp", "LICENSE", "./release/license/"])
-    if os.path.exists("./deps/install/COPYING"):
-        run_command(["cp", "-r", "./deps/install/COPYING", "./release/license/BITWUZLA_LICENSE.txt"])
+    if os.path.exists("./build/deps/install/COPYING"):
+        run_command(["cp", "-r", "./build/deps/install/COPYING", "./release/license/BITWUZLA_LICENSE.txt"])
     run_command(
         ["cp", "-r", "./scripts/licenses/Z3_LICENSE.txt", "./release/license/"])
