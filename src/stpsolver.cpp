@@ -238,9 +238,9 @@ SMTExprRef STPSolver::mkBVLshrImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
       STPExpr(Context, LHS->Sort,
-              STP::vc_bvLeftShiftExprExpr(*Context, LHS->getWidth(),
-                                          toSolverExpr<STPExpr>(*LHS).Expr,
-                                          toSolverExpr<STPExpr>(*RHS).Expr)));
+              STP::vc_bvRightShiftExprExpr(*Context, LHS->getWidth(),
+                                           toSolverExpr<STPExpr>(*LHS).Expr,
+                                           toSolverExpr<STPExpr>(*RHS).Expr)));
 }
 
 SMTExprRef STPSolver::mkBVXorImpl(const SMTExprRef &LHS,
