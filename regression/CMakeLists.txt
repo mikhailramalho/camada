@@ -25,7 +25,12 @@ function(compile_test)
   endforeach()
 endfunction()
 
-find_package(Catch2 3 REQUIRED)
+if(NOT TARGET Catch2::Catch2)
+  find_package(Catch2 3 REQUIRED)
+endif()
+if(DEFINED Catch2_SOURCE_DIR)
+  list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
+endif()
 
 # add each solver specific implementation, if it is enabled
 compile_test("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")

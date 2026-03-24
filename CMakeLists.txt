@@ -136,7 +136,25 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(CAMADA_ENABLE_REGRESSION "Enable regression testing" OFF)
 if(CAMADA_ENABLE_REGRESSION)
   include(CTest)
-  find_package(Catch2 REQUIRED)
+  find_package(Catch2 3 QUIET)
+  if(NOT Catch2_FOUND AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF")
+    message(STATUS "Catch2 not found locally. Downloading it for regression.")
+    camada_include_cpm()
+    CPMAddPackage(
+      NAME
+      Catch2
+      GITHUB_REPOSITORY
+      catchorg/Catch2
+      VERSION
+      3.8.1
+      OPTIONS
+      "CATCH_INSTALL_DOCS OFF"
+      "CATCH_INSTALL_EXTRAS ON")
+    list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
+  endif()
+  if(NOT TARGET Catch2::Catch2)
+    find_package(Catch2 3 REQUIRED)
+  endif()
   enable_testing()
 endif()
 

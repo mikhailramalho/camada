@@ -147,6 +147,30 @@ function(camada_run_checked)
   endif()
 endfunction()
 
+function(camada_find_gmp_header out_var)
+  find_path(
+    _camada_gmp_header_dir gmp.h
+    HINTS ${CAMADA_DEPS_INSTALL_DIR} ${CMAKE_PREFIX_PATH} /opt/homebrew
+          /usr/local
+    PATH_SUFFIXES include)
+  set(${out_var}
+      "${_camada_gmp_header_dir}"
+      PARENT_SCOPE)
+endfunction()
+
+function(camada_find_program_with_prefixes out_var program_name)
+  string(TOUPPER "${program_name}" _camada_program_upper)
+  set(_camada_program_cache_var "CAMADA_FOUND_PROGRAM_${_camada_program_upper}")
+  unset(${_camada_program_cache_var} CACHE)
+  find_program(
+    ${_camada_program_cache_var} ${program_name}
+    HINTS ${CMAKE_PREFIX_PATH} /opt/homebrew /usr/local
+    PATH_SUFFIXES bin "opt/${program_name}/bin")
+  set(${out_var}
+      "${${_camada_program_cache_var}}"
+      PARENT_SCOPE)
+endfunction()
+
 function(camada_download_file url output_path)
   get_filename_component(output_dir "${output_path}" DIRECTORY)
   file(MAKE_DIRECTORY "${output_dir}")
@@ -571,6 +595,7 @@ function(camada_setup_cryptominisat)
     -DONLY_SIMPLE=ON
     -DENABLE_PYTHON_INTERFACE=OFF
     -DNOM4RI=ON
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR})
   camada_run_checked(WORKING_DIRECTORY "${cms_build_dir}" MESSAGE
@@ -587,7 +612,19 @@ endfunction()
 
 function(camada_setup_gmp)
   set(gmp_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
-  if(EXISTS "${gmp_lib}")
+  set(gmp_header "${CAMADA_DEPS_INSTALL_DIR}/include/gmp.h")
+  if(EXISTS "${gmp_lib}" AND EXISTS "${gmp_header}")
+    return()
+  endif()
+
+  camada_find_gmp_header(_camada_system_gmp_include_dir)
+  if(EXISTS "${gmp_lib}" AND NOT EXISTS "${gmp_header}"
+     AND _camada_system_gmp_include_dir)
+    file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/include")
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E create_symlink
+              "${_camada_system_gmp_include_dir}/gmp.h"
+              "${gmp_header}")
     return()
   endif()
 
@@ -638,6 +675,15 @@ function(camada_setup_gmp)
     COMMAND
     make
     install)
+
+  camada_find_gmp_header(_camada_system_gmp_include_dir)
+  if(NOT EXISTS "${gmp_header}" AND _camada_system_gmp_include_dir)
+    file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/include")
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E create_symlink
+              "${_camada_system_gmp_include_dir}/gmp.h"
+              "${gmp_header}")
+  endif()
 endfunction()
 
 function(camada_setup_minisat)
@@ -652,6 +698,20 @@ function(camada_setup_minisat)
   camada_ensure_deps_dirs()
   camada_fetch_git_source(minisat msoos/minisat 2.2.1 minisat_source_dir)
   set(minisat_prefix "${CAMADA_DEPS_INSTALL_DIR}")
+
+  if(APPLE)
+    set(minisat_system_cc "${minisat_source_dir}/minisat/utils/System.cc")
+    if(EXISTS "${minisat_system_cc}")
+      file(READ "${minisat_system_cc}" minisat_system_cc_contents)
+      string(
+        REPLACE
+          "double Minisat::memUsedPeak() { return memUsed(); }"
+          "double Minisat::memUsedPeak(bool strictlyPeak) { (void)strictlyPeak; return memUsed(); }"
+          minisat_system_cc_contents
+          "${minisat_system_cc_contents}")
+      file(WRITE "${minisat_system_cc}" "${minisat_system_cc_contents}")
+    endif()
+  endif()
 
   camada_run_checked(
     WORKING_DIRECTORY
@@ -788,16 +848,12 @@ function(camada_setup_stp)
 
   set(stp_build_dir "${stp_source_dir}/build")
   set(cms_config_dir "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5")
+  camada_find_program_with_prefixes(stp_bison_executable bison)
+  camada_find_program_with_prefixes(stp_flex_executable flex)
   file(REMOVE_RECURSE "${stp_build_dir}")
   file(MAKE_DIRECTORY "${stp_build_dir}")
 
-  camada_run_checked(
-    WORKING_DIRECTORY
-    "${stp_build_dir}"
-    MESSAGE
-    "Configuring STP"
-    COMMAND
-    ${CMAKE_COMMAND}
+  set(_camada_stp_cmake_args
     ..
     -GNinja
     -DONLY_SIMPLE=ON
@@ -808,6 +864,20 @@ function(camada_setup_stp)
     -DBUILD_SHARED_LIBS=OFF
     -Dminisat_DIR=${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat
     -Dcryptominisat5_DIR=${cms_config_dir})
+  if(stp_bison_executable)
+    list(APPEND _camada_stp_cmake_args -DBISON_EXECUTABLE=${stp_bison_executable})
+  endif()
+  if(stp_flex_executable)
+    list(APPEND _camada_stp_cmake_args -DFLEX_EXECUTABLE=${stp_flex_executable})
+  endif()
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${stp_build_dir}"
+    MESSAGE
+    "Configuring STP"
+    COMMAND
+    ${CMAKE_COMMAND}
+    ${_camada_stp_cmake_args})
   camada_run_checked(WORKING_DIRECTORY "${stp_build_dir}" MESSAGE
                      "Building STP" COMMAND ninja)
   camada_run_checked(
@@ -869,6 +939,7 @@ function(camada_setup_yices)
     --prefix
     ${CAMADA_DEPS_INSTALL_DIR}
     --with-static-gmp=${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a
+    CPPFLAGS=-I${CAMADA_DEPS_INSTALL_DIR}/include
     LDFLAGS=-L${CAMADA_DEPS_INSTALL_DIR}/lib/)
   camada_run_checked(
     WORKING_DIRECTORY

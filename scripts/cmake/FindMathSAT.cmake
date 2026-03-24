@@ -35,6 +35,8 @@ endfunction(check_mathsat_version)
 set(_camada_mathsat_hints
     ${CAMADA_DEPS_INSTALL_DIR} ${CAMADA_SOLVER_MATHSAT_DIR}
     ${CAMADA_MATHSAT_DIR} $ENV{HOME}/mathsat)
+set(_camada_mathsat_gmp_hints ${CAMADA_DEPS_INSTALL_DIR} ${CMAKE_PREFIX_PATH}
+                              /opt/homebrew /usr/local)
 camada_should_download_dependency(_camada_download_mathsat FALSE)
 
 # Looking for MATHSAT in CAMADA_MATHSAT_INCLUDE_DIR
@@ -51,7 +53,7 @@ find_library(
 find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
 find_path(
   CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
-  HINTS ${CAMADA_DEPS_INSTALL_DIR} /opt/homebrew/opt/gmp /usr/local/opt/gmp
+  HINTS ${_camada_mathsat_gmp_hints}
   PATH_SUFFIXES include)
 
 if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
@@ -68,7 +70,7 @@ if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
   find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
   find_path(
     CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
-    HINTS ${CAMADA_DEPS_INSTALL_DIR} /opt/homebrew/opt/gmp /usr/local/opt/gmp
+    HINTS ${_camada_mathsat_gmp_hints}
     PATH_SUFFIXES include)
 endif()
 
