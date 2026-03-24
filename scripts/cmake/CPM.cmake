@@ -38,8 +38,9 @@ function(download_cpm)
   find_program(CURL_EXECUTABLE curl)
   if(CURL_EXECUTABLE)
     execute_process(
-      COMMAND ${CURL_EXECUTABLE} -L --fail --output ${CPM_DOWNLOAD_LOCATION}
-              https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake
+      COMMAND
+        ${CURL_EXECUTABLE} -L --fail --output ${CPM_DOWNLOAD_LOCATION}
+        https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake
       RESULT_VARIABLE curl_result
       OUTPUT_VARIABLE curl_stdout
       ERROR_VARIABLE curl_stderr)

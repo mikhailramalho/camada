@@ -24,8 +24,8 @@
 #include "bitwuzlasolver.h"
 
 #include <cassert>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 
 namespace camada {
 
@@ -58,10 +58,9 @@ BitwuzlaTerm mkTerm3(BitwuzlaTermManager *tm, BitwuzlaKind kind,
 BitwuzlaTerm mkTerm4(BitwuzlaTermManager *tm, BitwuzlaKind kind,
                      const SMTExprRef &A, const SMTExprRef &B,
                      const SMTExprRef &C, const SMTExprRef &D) {
-  BitwuzlaTerm args[] = {toSolverExpr<BitwExpr>(*A).Expr,
-                         toSolverExpr<BitwExpr>(*B).Expr,
-                         toSolverExpr<BitwExpr>(*C).Expr,
-                         toSolverExpr<BitwExpr>(*D).Expr};
+  BitwuzlaTerm args[] = {
+      toSolverExpr<BitwExpr>(*A).Expr, toSolverExpr<BitwExpr>(*B).Expr,
+      toSolverExpr<BitwExpr>(*C).Expr, toSolverExpr<BitwExpr>(*D).Expr};
   return bitwuzla_mk_term(tm, kind, 4, args);
 }
 
@@ -75,7 +74,9 @@ bool BitwExpr::equal_to(SMTExpr const &Other) const {
   return Expr == dynamic_cast<const BitwExpr &>(Other).Expr;
 }
 
-void BitwExpr::dump() const { fprintf(stderr, "%s", bitwuzla_term_to_string(Expr)); }
+void BitwExpr::dump() const {
+  fprintf(stderr, "%s", bitwuzla_term_to_string(Expr));
+}
 
 BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() { initializeContext(); }
 
@@ -151,29 +152,31 @@ SMTSortRef BitwuzlaSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                            const SMTSortRef &ElemSort) {
   return newSortRef<SolverArraySort<BitwSort>>(
       {IndexSort, ElemSort, Context,
-       bitwuzla_mk_array_sort(TermManager, toSolverSort<BitwSort>(*IndexSort).Sort,
+       bitwuzla_mk_array_sort(TermManager,
+                              toSolverSort<BitwSort>(*IndexSort).Sort,
                               toSolverSort<BitwSort>(*ElemSort).Sort)});
 }
 
 SMTExprRef BitwuzlaSolver::mkBVNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      BitwExpr(Context, Exp->Sort, mkTerm1(TermManager, BITWUZLA_KIND_BV_NEG, Exp)));
+  return newExprRef(BitwExpr(Context, Exp->Sort,
+                             mkTerm1(TermManager, BITWUZLA_KIND_BV_NEG, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVNotImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      BitwExpr(Context, Exp->Sort, mkTerm1(TermManager, BITWUZLA_KIND_BV_NOT, Exp)));
+  return newExprRef(BitwExpr(Context, Exp->Sort,
+                             mkTerm1(TermManager, BITWUZLA_KIND_BV_NOT, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkNotImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      BitwExpr(Context, Exp->Sort, mkTerm1(TermManager, BITWUZLA_KIND_NOT, Exp)));
+  return newExprRef(BitwExpr(Context, Exp->Sort,
+                             mkTerm1(TermManager, BITWUZLA_KIND_NOT, Exp)));
 }
 
-#define BITWUZLA_BINARY_IMPL(method, kind, sort_expr)                               \
-  SMTExprRef BitwuzlaSolver::method(const SMTExprRef &LHS, const SMTExprRef &RHS) { \
-    return newExprRef(BitwExpr(Context, sort_expr,                                  \
-                               mkTerm2(TermManager, kind, LHS, RHS)));              \
+#define BITWUZLA_BINARY_IMPL(method, kind, sort_expr)                          \
+  SMTExprRef BitwuzlaSolver::method(const SMTExprRef &LHS,                     \
+                                    const SMTExprRef &RHS) {                   \
+    return newExprRef(                                                         \
+        BitwExpr(Context, sort_expr, mkTerm2(TermManager, kind, LHS, RHS)));   \
   }
 
 BITWUZLA_BINARY_IMPL(mkBVAddImpl, BITWUZLA_KIND_BV_ADD, LHS->Sort)
@@ -208,10 +211,10 @@ BITWUZLA_BINARY_IMPL(mkEqualImpl, BITWUZLA_KIND_EQUAL, mkBoolSort())
 
 #undef BITWUZLA_BINARY_IMPL
 
-SMTExprRef BitwuzlaSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
-                                     const SMTExprRef &F) {
-  return newExprRef(
-      BitwExpr(Context, T->Sort, mkTerm3(TermManager, BITWUZLA_KIND_ITE, Cond, T, F)));
+SMTExprRef BitwuzlaSolver::mkIteImpl(const SMTExprRef &Cond,
+                                     const SMTExprRef &T, const SMTExprRef &F) {
+  return newExprRef(BitwExpr(
+      Context, T->Sort, mkTerm3(TermManager, BITWUZLA_KIND_ITE, Cond, T, F)));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
@@ -230,97 +233,108 @@ SMTExprRef BitwuzlaSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
 
 SMTExprRef BitwuzlaSolver::mkBVExtractImpl(unsigned High, unsigned Low,
                                            const SMTExprRef &Exp) {
-  return newExprRef(BitwExpr(
-      Context, mkBVSort(High - Low + 1),
-      bitwuzla_mk_term1_indexed2(TermManager, BITWUZLA_KIND_BV_EXTRACT,
-                                 toSolverExpr<BitwExpr>(*Exp).Expr, High, Low)));
+  return newExprRef(
+      BitwExpr(Context, mkBVSort(High - Low + 1),
+               bitwuzla_mk_term1_indexed2(TermManager, BITWUZLA_KIND_BV_EXTRACT,
+                                          toSolverExpr<BitwExpr>(*Exp).Expr,
+                                          High, Low)));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVConcatImpl(const SMTExprRef &LHS,
                                           const SMTExprRef &RHS) {
-  return newExprRef(BitwExpr(
-      Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
-      mkTerm2(TermManager, BITWUZLA_KIND_BV_CONCAT, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
+               mkTerm2(TermManager, BITWUZLA_KIND_BV_CONCAT, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVRedOrImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      BitwExpr(Context, mkBVSort(1), mkTerm1(TermManager, BITWUZLA_KIND_BV_REDOR, Exp)));
+  return newExprRef(BitwExpr(
+      Context, mkBVSort(1), mkTerm1(TermManager, BITWUZLA_KIND_BV_REDOR, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVRedAndImpl(const SMTExprRef &Exp) {
-  return newExprRef(BitwExpr(Context, mkBVSort(1),
-                             mkTerm1(TermManager, BITWUZLA_KIND_BV_REDAND, Exp)));
+  return newExprRef(
+      BitwExpr(Context, mkBVSort(1),
+               mkTerm1(TermManager, BITWUZLA_KIND_BV_REDAND, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      BitwExpr(Context, Exp->Sort, mkTerm1(TermManager, BITWUZLA_KIND_FP_ABS, Exp)));
+  return newExprRef(BitwExpr(Context, Exp->Sort,
+                             mkTerm1(TermManager, BITWUZLA_KIND_FP_ABS, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      BitwExpr(Context, Exp->Sort, mkTerm1(TermManager, BITWUZLA_KIND_FP_NEG, Exp)));
+  return newExprRef(BitwExpr(Context, Exp->Sort,
+                             mkTerm1(TermManager, BITWUZLA_KIND_FP_NEG, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
-  return newExprRef(BitwExpr(Context, mkBoolSort(),
-                             mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_INF, Exp)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_INF, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
-  return newExprRef(BitwExpr(Context, mkBoolSort(),
-                             mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_NAN, Exp)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_NAN, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(BitwExpr(
-      Context, mkBoolSort(),
-      mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_SUBNORMAL, Exp)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_SUBNORMAL, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPIsNormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(BitwExpr(Context, mkBoolSort(),
-                             mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_NORMAL, Exp)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_NORMAL, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
-  return newExprRef(BitwExpr(Context, mkBoolSort(),
-                             mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_ZERO, Exp)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_ZERO, Exp)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPMulImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS,
                                        const SMTExprRef &R) {
-  return newExprRef(BitwExpr(
-      Context, LHS->Sort, mkTerm3(TermManager, BITWUZLA_KIND_FP_MUL, R, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, LHS->Sort,
+               mkTerm3(TermManager, BITWUZLA_KIND_FP_MUL, R, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPDivImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS,
                                        const SMTExprRef &R) {
-  return newExprRef(BitwExpr(
-      Context, LHS->Sort, mkTerm3(TermManager, BITWUZLA_KIND_FP_DIV, R, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, LHS->Sort,
+               mkTerm3(TermManager, BITWUZLA_KIND_FP_DIV, R, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPRemImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(BitwExpr(Context, LHS->Sort,
-                             mkTerm2(TermManager, BITWUZLA_KIND_FP_REM, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, LHS->Sort,
+               mkTerm2(TermManager, BITWUZLA_KIND_FP_REM, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPAddImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS,
                                        const SMTExprRef &R) {
-  return newExprRef(BitwExpr(
-      Context, LHS->Sort, mkTerm3(TermManager, BITWUZLA_KIND_FP_ADD, R, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, LHS->Sort,
+               mkTerm3(TermManager, BITWUZLA_KIND_FP_ADD, R, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPSubImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS,
                                        const SMTExprRef &R) {
-  return newExprRef(BitwExpr(
-      Context, LHS->Sort, mkTerm3(TermManager, BITWUZLA_KIND_FP_SUB, R, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, LHS->Sort,
+               mkTerm3(TermManager, BITWUZLA_KIND_FP_SUB, R, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
@@ -332,38 +346,44 @@ SMTExprRef BitwuzlaSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
 SMTExprRef BitwuzlaSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                        const SMTExprRef &Z,
                                        const SMTExprRef &R) {
-  return newExprRef(BitwExpr(
-      Context, X->Sort, mkTerm4(TermManager, BITWUZLA_KIND_FP_FMA, R, X, Y, Z)));
+  return newExprRef(
+      BitwExpr(Context, X->Sort,
+               mkTerm4(TermManager, BITWUZLA_KIND_FP_FMA, R, X, Y, Z)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPLtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(
-      BitwExpr(Context, mkBoolSort(), mkTerm2(TermManager, BITWUZLA_KIND_FP_LT, LHS, RHS)));
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm2(TermManager, BITWUZLA_KIND_FP_LT, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPGtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(
-      BitwExpr(Context, mkBoolSort(), mkTerm2(TermManager, BITWUZLA_KIND_FP_GT, LHS, RHS)));
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm2(TermManager, BITWUZLA_KIND_FP_GT, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPLeImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(BitwExpr(Context, mkBoolSort(),
-                             mkTerm2(TermManager, BITWUZLA_KIND_FP_LEQ, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm2(TermManager, BITWUZLA_KIND_FP_LEQ, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPGeImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(BitwExpr(Context, mkBoolSort(),
-                             mkTerm2(TermManager, BITWUZLA_KIND_FP_GEQ, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm2(TermManager, BITWUZLA_KIND_FP_GEQ, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPEqualImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
-  return newExprRef(BitwExpr(
-      Context, mkBoolSort(), mkTerm2(TermManager, BITWUZLA_KIND_FP_EQUAL, LHS, RHS)));
+  return newExprRef(
+      BitwExpr(Context, mkBoolSort(),
+               mkTerm2(TermManager, BITWUZLA_KIND_FP_EQUAL, LHS, RHS)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPtoFPImpl(const SMTExprRef &From,
@@ -371,11 +391,10 @@ SMTExprRef BitwuzlaSolver::mkFPtoFPImpl(const SMTExprRef &From,
                                         const SMTExprRef &R) {
   return newExprRef(BitwExpr(
       Context, To,
-      bitwuzla_mk_term2_indexed2(TermManager, BITWUZLA_KIND_FP_TO_FP_FROM_FP,
-                                 toSolverExpr<BitwExpr>(*R).Expr,
-                                 toSolverExpr<BitwExpr>(*From).Expr,
-                                 To->getFPExponentWidth(),
-                                 To->getFPSignificandWidth() + 1)));
+      bitwuzla_mk_term2_indexed2(
+          TermManager, BITWUZLA_KIND_FP_TO_FP_FROM_FP,
+          toSolverExpr<BitwExpr>(*R).Expr, toSolverExpr<BitwExpr>(*From).Expr,
+          To->getFPExponentWidth(), To->getFPSignificandWidth() + 1)));
 }
 
 SMTExprRef BitwuzlaSolver::mkSBVtoFPImpl(const SMTExprRef &From,
@@ -383,11 +402,10 @@ SMTExprRef BitwuzlaSolver::mkSBVtoFPImpl(const SMTExprRef &From,
                                          const SMTExprRef &R) {
   return newExprRef(BitwExpr(
       Context, To,
-      bitwuzla_mk_term2_indexed2(TermManager, BITWUZLA_KIND_FP_TO_FP_FROM_SBV,
-                                 toSolverExpr<BitwExpr>(*R).Expr,
-                                 toSolverExpr<BitwExpr>(*From).Expr,
-                                 To->getFPExponentWidth(),
-                                 To->getFPSignificandWidth() + 1)));
+      bitwuzla_mk_term2_indexed2(
+          TermManager, BITWUZLA_KIND_FP_TO_FP_FROM_SBV,
+          toSolverExpr<BitwExpr>(*R).Expr, toSolverExpr<BitwExpr>(*From).Expr,
+          To->getFPExponentWidth(), To->getFPSignificandWidth() + 1)));
 }
 
 SMTExprRef BitwuzlaSolver::mkUBVtoFPImpl(const SMTExprRef &From,
@@ -395,11 +413,10 @@ SMTExprRef BitwuzlaSolver::mkUBVtoFPImpl(const SMTExprRef &From,
                                          const SMTExprRef &R) {
   return newExprRef(BitwExpr(
       Context, To,
-      bitwuzla_mk_term2_indexed2(TermManager, BITWUZLA_KIND_FP_TO_FP_FROM_UBV,
-                                 toSolverExpr<BitwExpr>(*R).Expr,
-                                 toSolverExpr<BitwExpr>(*From).Expr,
-                                 To->getFPExponentWidth(),
-                                 To->getFPSignificandWidth() + 1)));
+      bitwuzla_mk_term2_indexed2(
+          TermManager, BITWUZLA_KIND_FP_TO_FP_FROM_UBV,
+          toSolverExpr<BitwExpr>(*R).Expr, toSolverExpr<BitwExpr>(*From).Expr,
+          To->getFPExponentWidth(), To->getFPSignificandWidth() + 1)));
 }
 
 SMTExprRef BitwuzlaSolver::mkFPtoSBVImpl(const SMTExprRef &From,
@@ -424,15 +441,16 @@ SMTExprRef BitwuzlaSolver::mkFPtoUBVImpl(const SMTExprRef &From,
 
 SMTExprRef BitwuzlaSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
                                               const SMTExprRef &R) {
-  return newExprRef(BitwExpr(
-      Context, From->Sort, mkTerm2(TermManager, BITWUZLA_KIND_FP_RTI, R, From)));
+  return newExprRef(
+      BitwExpr(Context, From->Sort,
+               mkTerm2(TermManager, BITWUZLA_KIND_FP_RTI, R, From)));
 }
 
 SMTExprRef BitwuzlaSolver::mkArraySelectImpl(const SMTExprRef &Array,
                                              const SMTExprRef &Index) {
-  return newExprRef(BitwExpr(
-      Context, Array->Sort->getElementSort(),
-      mkTerm2(TermManager, BITWUZLA_KIND_ARRAY_SELECT, Array, Index)));
+  return newExprRef(
+      BitwExpr(Context, Array->Sort->getElementSort(),
+               mkTerm2(TermManager, BITWUZLA_KIND_ARRAY_SELECT, Array, Index)));
 }
 
 SMTExprRef BitwuzlaSolver::mkArrayStoreImpl(const SMTExprRef &Array,
@@ -444,8 +462,8 @@ SMTExprRef BitwuzlaSolver::mkArrayStoreImpl(const SMTExprRef &Array,
 }
 
 bool BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
-  const char *result =
-      bitwuzla_term_to_string(bitwuzla_get_value(*Context, toSolverExpr<BitwExpr>(*Exp).Expr));
+  const char *result = bitwuzla_term_to_string(
+      bitwuzla_get_value(*Context, toSolverExpr<BitwExpr>(*Exp).Expr));
 
   assert(result != nullptr && "Bitwuzla returned null boolean value string");
   if (!strcmp(result, "true"))
@@ -472,9 +490,9 @@ std::string BitwuzlaSolver::getFPInBinImpl(const SMTExprRef &Exp) {
 SMTExprRef BitwuzlaSolver::getArrayElementImpl(const SMTExprRef &Array,
                                                const SMTExprRef &Index) {
   const SMTExprRef &select = mkArraySelect(Array, Index);
-  return newExprRef(
-      BitwExpr(Context, select->Sort,
-               bitwuzla_get_value(*Context, toSolverExpr<BitwExpr>(*select).Expr)));
+  return newExprRef(BitwExpr(
+      Context, select->Sort,
+      bitwuzla_get_value(*Context, toSolverExpr<BitwExpr>(*select).Expr)));
 }
 
 SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
@@ -485,14 +503,14 @@ SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef BitwuzlaSolver::mkBVFromDecImpl(const int64_t Int,
                                            const SMTSortRef &Sort) {
-  uint64_t mask = Sort->getWidth() >= 64 ? ~0ULL : ((1ULL << Sort->getWidth()) - 1);
+  uint64_t mask =
+      Sort->getWidth() >= 64 ? ~0ULL : ((1ULL << Sort->getWidth()) - 1);
   uint64_t newInt = static_cast<uint64_t>(Int) & mask;
 
   return newExprRef(
       BitwExpr(Context, Sort,
-               bitwuzla_mk_bv_value_uint64(TermManager,
-                                           toSolverSort<BitwSort>(*Sort).Sort,
-                                           newInt)));
+               bitwuzla_mk_bv_value_uint64(
+                   TermManager, toSolverSort<BitwSort>(*Sort).Sort, newInt)));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVFromBinImpl(const std::string &Int,
@@ -552,10 +570,12 @@ SMTExprRef BitwuzlaSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 SMTExprRef BitwuzlaSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                      const unsigned SigWidth) {
   const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1);
-  return newExprRef(BitwExpr(
-      Context, sort,
-      Sgn ? bitwuzla_mk_fp_neg_inf(TermManager, toSolverSort<BitwSort>(*sort).Sort)
-          : bitwuzla_mk_fp_pos_inf(TermManager, toSolverSort<BitwSort>(*sort).Sort)));
+  return newExprRef(
+      BitwExpr(Context, sort,
+               Sgn ? bitwuzla_mk_fp_neg_inf(TermManager,
+                                            toSolverSort<BitwSort>(*sort).Sort)
+                   : bitwuzla_mk_fp_pos_inf(
+                         TermManager, toSolverSort<BitwSort>(*sort).Sort)));
 }
 
 SMTExprRef BitwuzlaSolver::mkSymbolImpl(const std::string &Name,
@@ -564,10 +584,10 @@ SMTExprRef BitwuzlaSolver::mkSymbolImpl(const std::string &Name,
   if (it != SymbolTable.end())
     return it->second;
 
-  const SMTExprRef &newSymbol = newExprRef(
-      BitwExpr(Context, Sort,
-               bitwuzla_mk_const(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
-                                 Name.c_str())));
+  const SMTExprRef &newSymbol = newExprRef(BitwExpr(
+      Context, Sort,
+      bitwuzla_mk_const(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
+                        Name.c_str())));
 
   auto inserted = SymbolTable.insert(SymbolTablet::value_type(Name, newSymbol));
   assert(inserted.second && "Could not cache new Bitwuzla variable");
@@ -621,12 +641,15 @@ std::string BitwuzlaSolver::getSolverNameAndVersion() const {
   return std::string("Bitwuzla v").append(bitwuzla_version());
 }
 
-void BitwuzlaSolver::dumpImpl() { bitwuzla_print_formula(*Context, "smt2", stderr, 2); }
+void BitwuzlaSolver::dumpImpl() {
+  bitwuzla_print_formula(*Context, "smt2", stderr, 2);
+}
 
 void BitwuzlaSolver::dumpModelImpl() {
   for (const auto &entry : SymbolTable) {
     const BitwuzlaTerm term = toSolverExpr<BitwExpr>(*entry.second).Expr;
-    fprintf(stderr, "(define-fun %s () %s %s)\n", bitwuzla_term_get_symbol(term),
+    fprintf(stderr, "(define-fun %s () %s %s)\n",
+            bitwuzla_term_get_symbol(term),
             bitwuzla_sort_to_string(bitwuzla_term_get_sort(term)),
             bitwuzla_term_to_string(bitwuzla_get_value(*Context, term)));
   }

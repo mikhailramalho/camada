@@ -70,12 +70,13 @@ if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_CVC5_ENABLE})
-  target_link_directories(${LIBRARY_TARGET_NAME}
-                          PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
-                                  ${CAMADA_DEPS_INSTALL_DIR}/lib64)
+  target_link_directories(
+    ${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
+    ${CAMADA_DEPS_INSTALL_DIR}/lib64)
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC cvc5::cvc5)
   if(CAMADA_CVC5_EXTRA_LIBS)
-    target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
+    target_link_libraries(${LIBRARY_TARGET_NAME}
+                          PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
   endif()
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC5_ENABLED)
 endif()

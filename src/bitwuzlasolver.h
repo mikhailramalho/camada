@@ -122,8 +122,7 @@ public:
   SMTExprRef mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
   SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-  SMTExprRef mkEqualImpl(const SMTExprRef &LHS,
-                         const SMTExprRef &RHS) override;
+  SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
   SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                        const SMTExprRef &F) override;
   SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) override;

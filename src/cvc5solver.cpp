@@ -72,7 +72,8 @@ SMTExprRef CVC5Solver::newExprRefImpl(const SMTExpr &Exp) const {
 }
 
 SMTSortRef CVC5Solver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<CVC5Sort>>({Context, Terms->getBooleanSort()});
+  return newSortRef<SolverBoolSort<CVC5Sort>>(
+      {Context, Terms->getBooleanSort()});
 }
 
 SMTSortRef CVC5Solver::mkBVSortImpl(unsigned BitWidth) {
@@ -612,11 +613,11 @@ SMTExprRef CVC5Solver::mkFPtoFPImpl(const SMTExprRef &From,
                                     const SMTSortRef &To, const SMTExprRef &R) {
   return newExprRef(CVC5Expr(
       Context, To,
-      Context->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_FP,
-                                  {To->getFPExponentWidth(),
-                                   To->getFPSignificandWidth()}),
-                      {toSolverExpr<CVC5Expr>(*R).Expr,
-                       toSolverExpr<CVC5Expr>(*From).Expr})));
+      Context->mkTerm(
+          Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_FP,
+                      {To->getFPExponentWidth(), To->getFPSignificandWidth()}),
+          {toSolverExpr<CVC5Expr>(*R).Expr,
+           toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkSBVtoFPImpl(const SMTExprRef &From,
@@ -624,11 +625,11 @@ SMTExprRef CVC5Solver::mkSBVtoFPImpl(const SMTExprRef &From,
                                      const SMTExprRef &R) {
   return newExprRef(CVC5Expr(
       Context, To,
-      Context->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_SBV,
-                                  {To->getFPExponentWidth(),
-                                   To->getFPSignificandWidth()}),
-                      {toSolverExpr<CVC5Expr>(*R).Expr,
-                       toSolverExpr<CVC5Expr>(*From).Expr})));
+      Context->mkTerm(
+          Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_SBV,
+                      {To->getFPExponentWidth(), To->getFPSignificandWidth()}),
+          {toSolverExpr<CVC5Expr>(*R).Expr,
+           toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
@@ -636,35 +637,33 @@ SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
                                      const SMTExprRef &R) {
   return newExprRef(CVC5Expr(
       Context, To,
-      Context->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_UBV,
-                                  {To->getFPExponentWidth(),
-                                   To->getFPSignificandWidth()}),
-                      {toSolverExpr<CVC5Expr>(*R).Expr,
-                       toSolverExpr<CVC5Expr>(*From).Expr})));
+      Context->mkTerm(
+          Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_UBV,
+                      {To->getFPExponentWidth(), To->getFPSignificandWidth()}),
+          {toSolverExpr<CVC5Expr>(*R).Expr,
+           toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
-  return newExprRef(
-      CVC5Expr(Context, mkBVSort(ToWidth),
-               Context->mkTerm(
-                   Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_SBV, {ToWidth}),
-                   {toSolverExpr<CVC5Expr>(*roundingMode).Expr,
-                    toSolverExpr<CVC5Expr>(*From).Expr})));
+  return newExprRef(CVC5Expr(
+      Context, mkBVSort(ToWidth),
+      Context->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_SBV, {ToWidth}),
+                      {toSolverExpr<CVC5Expr>(*roundingMode).Expr,
+                       toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
-  return newExprRef(
-      CVC5Expr(Context, mkBVSort(ToWidth),
-               Context->mkTerm(
-                   Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_UBV, {ToWidth}),
-                   {toSolverExpr<CVC5Expr>(*roundingMode).Expr,
-                    toSolverExpr<CVC5Expr>(*From).Expr})));
+  return newExprRef(CVC5Expr(
+      Context, mkBVSort(ToWidth),
+      Context->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_UBV, {ToWidth}),
+                      {toSolverExpr<CVC5Expr>(*roundingMode).Expr,
+                       toSolverExpr<CVC5Expr>(*From).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
@@ -788,13 +787,12 @@ SMTExprRef CVC5Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef CVC5Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                         const SMTSortRef &To) {
-  return newExprRef(
-      CVC5Expr(Context, To,
-               Context->mkTerm(
-                   Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_IEEE_BV,
-                               {To->getFPExponentWidth(),
-                                To->getFPSignificandWidth() + 1}),
-                   {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return newExprRef(CVC5Expr(
+      Context, To,
+      Context->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_IEEE_BV,
+                                  {To->getFPExponentWidth(),
+                                   To->getFPSignificandWidth() + 1}),
+                      {toSolverExpr<CVC5Expr>(*Exp).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {

@@ -47,8 +47,7 @@ find_library(
   HINTS ${_camada_z3_hints}
   PATH_SUFFIXES lib bin)
 
-if((NOT CAMADA_Z3_INCLUDE_DIR OR NOT CAMADA_Z3_LIB)
-   AND _camada_download_z3)
+if((NOT CAMADA_Z3_INCLUDE_DIR OR NOT CAMADA_Z3_LIB) AND _camada_download_z3)
   camada_setup_z3()
   find_path(
     CAMADA_Z3_INCLUDE_DIR z3.h

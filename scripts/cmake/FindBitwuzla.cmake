@@ -1,15 +1,17 @@
-set(_camada_bitwuzla_hints ${CAMADA_DEPS_INSTALL_DIR}
-                           ${CAMADA_SOLVER_BITWUZLA_DIR}
-                           ${CAMADA_BITWUZLA_DIR} $ENV{HOME}/bitwuzla)
+set(_camada_bitwuzla_hints
+    ${CAMADA_DEPS_INSTALL_DIR} ${CAMADA_SOLVER_BITWUZLA_DIR}
+    ${CAMADA_BITWUZLA_DIR} $ENV{HOME}/bitwuzla)
 
 function(_camada_collect_bitwuzla_pkgconfig_paths out_var)
   set(_camada_bitwuzla_pkgconfig_paths)
   foreach(_camada_bitwuzla_hint IN LISTS _camada_bitwuzla_hints)
     if(_camada_bitwuzla_hint)
-      list(APPEND _camada_bitwuzla_pkgconfig_paths
-           "${_camada_bitwuzla_hint}/lib/pkgconfig"
-           "${_camada_bitwuzla_hint}/lib64/pkgconfig"
-           "${_camada_bitwuzla_hint}/share/pkgconfig")
+      list(
+        APPEND
+        _camada_bitwuzla_pkgconfig_paths
+        "${_camada_bitwuzla_hint}/lib/pkgconfig"
+        "${_camada_bitwuzla_hint}/lib64/pkgconfig"
+        "${_camada_bitwuzla_hint}/share/pkgconfig")
       file(GLOB _camada_bitwuzla_arch_pkgconfig_paths
            "${_camada_bitwuzla_hint}/lib/*/pkgconfig")
       list(APPEND _camada_bitwuzla_pkgconfig_paths
@@ -17,7 +19,9 @@ function(_camada_collect_bitwuzla_pkgconfig_paths out_var)
     endif()
   endforeach()
   list(REMOVE_DUPLICATES _camada_bitwuzla_pkgconfig_paths)
-  set(${out_var} "${_camada_bitwuzla_pkgconfig_paths}" PARENT_SCOPE)
+  set(${out_var}
+      "${_camada_bitwuzla_pkgconfig_paths}"
+      PARENT_SCOPE)
 endfunction()
 
 if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
@@ -31,7 +35,8 @@ find_package(PkgConfig QUIET)
 
 if(PkgConfig_FOUND)
   set(_camada_bitwuzla_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
-  foreach(_camada_bitwuzla_pkgconfig_path IN LISTS _camada_bitwuzla_pkgconfig_paths)
+  foreach(_camada_bitwuzla_pkgconfig_path IN
+          LISTS _camada_bitwuzla_pkgconfig_paths)
     if(EXISTS "${_camada_bitwuzla_pkgconfig_path}")
       if(_camada_bitwuzla_saved_pkg_config_path)
         set(ENV{PKG_CONFIG_PATH}
@@ -52,7 +57,8 @@ if(NOT Bitwuzla_FOUND AND _camada_download_bitwuzla)
 
   if(PkgConfig_FOUND)
     set(_camada_bitwuzla_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
-    foreach(_camada_bitwuzla_pkgconfig_path IN LISTS _camada_bitwuzla_pkgconfig_paths)
+    foreach(_camada_bitwuzla_pkgconfig_path IN
+            LISTS _camada_bitwuzla_pkgconfig_paths)
       if(EXISTS "${_camada_bitwuzla_pkgconfig_path}")
         if(_camada_bitwuzla_saved_pkg_config_path)
           set(ENV{PKG_CONFIG_PATH}

@@ -1,9 +1,12 @@
-set(_camada_cvc5_hints ${CAMADA_DEPS_INSTALL_DIR}
-                       ${CAMADA_SOLVER_CVC5_DIR}
-                       ${CAMADA_SOLVER_CVC5_DIR}/lib/cmake
-                       ${CAMADA_SOLVER_CVC5_DIR}/lib64/cmake
-                       ${CAMADA_CVC5_DIR} ${CAMADA_CVC5_DIR}/lib/cmake
-                       ${CAMADA_CVC5_DIR}/lib64/cmake $ENV{HOME}/cvc5)
+set(_camada_cvc5_hints
+    ${CAMADA_DEPS_INSTALL_DIR}
+    ${CAMADA_SOLVER_CVC5_DIR}
+    ${CAMADA_SOLVER_CVC5_DIR}/lib/cmake
+    ${CAMADA_SOLVER_CVC5_DIR}/lib64/cmake
+    ${CAMADA_CVC5_DIR}
+    ${CAMADA_CVC5_DIR}/lib/cmake
+    ${CAMADA_CVC5_DIR}/lib64/cmake
+    $ENV{HOME}/cvc5)
 camada_should_download_dependency(_camada_download_cvc5 TRUE)
 
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
@@ -26,15 +29,15 @@ if(CVC5_FOUND)
     message(FATAL_ERROR "Expected version ${CVC5_MIN_VERSION} or greater")
   endif()
 
-  set(_camada_cvc5_lib_hints ${CAMADA_DEPS_INSTALL_DIR}/lib
-                             ${CAMADA_DEPS_INSTALL_DIR}/lib64
-                             ${CAMADA_SOLVER_CVC5_DIR}/lib
-                             ${CAMADA_SOLVER_CVC5_DIR}/lib64
-                             ${CAMADA_CVC5_DIR}/lib ${CAMADA_CVC5_DIR}/lib64)
+  set(_camada_cvc5_lib_hints
+      ${CAMADA_DEPS_INSTALL_DIR}/lib ${CAMADA_DEPS_INSTALL_DIR}/lib64
+      ${CAMADA_SOLVER_CVC5_DIR}/lib ${CAMADA_SOLVER_CVC5_DIR}/lib64
+      ${CAMADA_CVC5_DIR}/lib ${CAMADA_CVC5_DIR}/lib64)
   foreach(_camada_cvc5_extra_lib_name IN ITEMS cadical picpoly picpolyxx)
-    find_library(_camada_cvc5_extra_lib
-                 NAMES ${_camada_cvc5_extra_lib_name}
-                 HINTS ${_camada_cvc5_lib_hints})
+    find_library(
+      _camada_cvc5_extra_lib
+      NAMES ${_camada_cvc5_extra_lib_name}
+      HINTS ${_camada_cvc5_lib_hints})
     if(_camada_cvc5_extra_lib)
       list(APPEND CAMADA_CVC5_EXTRA_LIBS "${_camada_cvc5_extra_lib}")
     endif()

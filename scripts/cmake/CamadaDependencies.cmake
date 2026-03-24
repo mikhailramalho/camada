@@ -1,18 +1,18 @@
-set(
-  CAMADA_DOWNLOAD_DEPENDENCIES
-  "OFF"
-  CACHE STRING
-        "Download missing solver dependencies during CMake configure: OFF, ALL, or PERMISSIVE-ONLY")
+set(CAMADA_DOWNLOAD_DEPENDENCIES
+    "OFF"
+    CACHE
+      STRING
+      "Download missing solver dependencies during CMake configure: OFF, ALL, or PERMISSIVE-ONLY"
+)
 set_property(CACHE CAMADA_DOWNLOAD_DEPENDENCIES PROPERTY STRINGS OFF ALL
-                                                             PERMISSIVE-ONLY)
+                                                         PERMISSIVE-ONLY)
 
 if(NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF"
    AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "ALL"
    AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE-ONLY")
   message(
     FATAL_ERROR
-      "CAMADA_DOWNLOAD_DEPENDENCIES must be one of: OFF, ALL, PERMISSIVE-ONLY"
-  )
+      "CAMADA_DOWNLOAD_DEPENDENCIES must be one of: OFF, ALL, PERMISSIVE-ONLY")
 endif()
 
 set(CAMADA_DEPS_DIR
@@ -27,13 +27,16 @@ set(CAMADA_DEPS_INSTALL_DIR
 
 set(CAMADA_Z3_LINUX_X86_64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-glibc-2.39.zip"
-    CACHE STRING "URL used to download the prebuilt Z3 archive for Linux x86_64")
+    CACHE STRING
+          "URL used to download the prebuilt Z3 archive for Linux x86_64")
 set(CAMADA_Z3_LINUX_AARCH64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-glibc-2.38.zip"
-    CACHE STRING "URL used to download the prebuilt Z3 archive for Linux aarch64")
+    CACHE STRING
+          "URL used to download the prebuilt Z3 archive for Linux aarch64")
 set(CAMADA_Z3_MACOS_X86_64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-osx-15.7.3.zip"
-    CACHE STRING "URL used to download the prebuilt Z3 archive for macOS x86_64")
+    CACHE STRING
+          "URL used to download the prebuilt Z3 archive for macOS x86_64")
 set(CAMADA_Z3_MACOS_ARM64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-osx-15.7.3.zip"
     CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
@@ -56,7 +59,8 @@ set(CAMADA_BITWUZLA_LINUX_X86_64_URL
 set(CAMADA_BITWUZLA_LINUX_AARCH64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Linux-arm64-static.zip"
     CACHE STRING
-          "URL used to download the prebuilt Bitwuzla archive for Linux aarch64")
+          "URL used to download the prebuilt Bitwuzla archive for Linux aarch64"
+)
 set(CAMADA_BITWUZLA_MACOS_ARM64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-macOS-arm64-static.zip"
     CACHE STRING
@@ -85,17 +89,22 @@ endfunction()
 
 function(camada_should_download_dependency out_var is_permissive)
   if(CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "ALL")
-    set(${out_var} TRUE PARENT_SCOPE)
+    set(${out_var}
+        TRUE
+        PARENT_SCOPE)
     return()
   endif()
 
-  if(CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE-ONLY"
-     AND is_permissive)
-    set(${out_var} TRUE PARENT_SCOPE)
+  if(CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE-ONLY" AND is_permissive)
+    set(${out_var}
+        TRUE
+        PARENT_SCOPE)
     return()
   endif()
 
-  set(${out_var} FALSE PARENT_SCOPE)
+  set(${out_var}
+      FALSE
+      PARENT_SCOPE)
 endfunction()
 
 function(camada_include_cpm)
@@ -147,8 +156,11 @@ function(camada_download_file url output_path)
   endif()
 
   message(STATUS "Downloading ${url}")
-  file(DOWNLOAD "${url}" "${output_path}" STATUS download_status
-       LOG download_log SHOW_PROGRESS)
+  file(
+    DOWNLOAD "${url}" "${output_path}"
+    STATUS download_status
+    LOG download_log
+    SHOW_PROGRESS)
   list(GET download_status 0 download_status_code)
   list(GET download_status 1 download_status_message)
 
@@ -201,22 +213,29 @@ function(camada_try_download_file url output_path result_var)
   if(EXISTS "${output_path}")
     file(SIZE "${output_path}" output_size)
     if(output_size GREATER 0)
-      set(${result_var} TRUE PARENT_SCOPE)
+      set(${result_var}
+          TRUE
+          PARENT_SCOPE)
       return()
     endif()
     file(REMOVE "${output_path}")
   endif()
 
   message(STATUS "Downloading ${url}")
-  file(DOWNLOAD "${url}" "${output_path}" STATUS download_status
-       LOG download_log SHOW_PROGRESS)
+  file(
+    DOWNLOAD "${url}" "${output_path}"
+    STATUS download_status
+    LOG download_log
+    SHOW_PROGRESS)
   list(GET download_status 0 download_status_code)
   list(GET download_status 1 download_status_message)
 
   if(download_status_code EQUAL 0)
     file(SIZE "${output_path}" output_size)
     if(output_size GREATER 0)
-      set(${result_var} TRUE PARENT_SCOPE)
+      set(${result_var}
+          TRUE
+          PARENT_SCOPE)
       return()
     endif()
     set(download_status_message
@@ -238,7 +257,9 @@ function(camada_try_download_file url output_path result_var)
     if(curl_result EQUAL 0 AND EXISTS "${output_path}")
       file(SIZE "${output_path}" output_size)
       if(output_size GREATER 0)
-        set(${result_var} TRUE PARENT_SCOPE)
+        set(${result_var}
+            TRUE
+            PARENT_SCOPE)
         return()
       endif()
       file(REMOVE "${output_path}")
@@ -249,7 +270,9 @@ function(camada_try_download_file url output_path result_var)
       WARNING
         "Failed to download ${url}\nfile(DOWNLOAD): ${download_status_code} ${download_status_message}\n${download_log}\ncurl exit code: ${curl_result}\nstdout:\n${curl_stdout}\nstderr:\n${curl_stderr}"
     )
-    set(${result_var} FALSE PARENT_SCOPE)
+    set(${result_var}
+        FALSE
+        PARENT_SCOPE)
     return()
   endif()
 
@@ -257,13 +280,17 @@ function(camada_try_download_file url output_path result_var)
     WARNING
       "Failed to download ${url}\nfile(DOWNLOAD): ${download_status_code} ${download_status_message}\n${download_log}\nNo curl executable was found for a retry."
   )
-  set(${result_var} FALSE PARENT_SCOPE)
+  set(${result_var}
+      FALSE
+      PARENT_SCOPE)
 endfunction()
 
 function(camada_extract_archive)
   set(options)
-  set(one_value_args ARCHIVE_PATH DESTINATION_DIR MARKER_PATH ARCHIVE_URL SOURCE_DIR)
-  cmake_parse_arguments(CAMADA_EXTRACT "${options}" "${one_value_args}" "" ${ARGN})
+  set(one_value_args ARCHIVE_PATH DESTINATION_DIR MARKER_PATH ARCHIVE_URL
+                     SOURCE_DIR)
+  cmake_parse_arguments(CAMADA_EXTRACT "${options}" "${one_value_args}" ""
+                        ${ARGN})
 
   if(EXISTS "${CAMADA_EXTRACT_MARKER_PATH}")
     return()
@@ -288,7 +315,8 @@ function(camada_extract_archive)
       OUTPUT_VARIABLE _camada_extract_stdout
       ERROR_VARIABLE _camada_extract_stderr)
 
-    if(_camada_extract_result EQUAL 0 AND EXISTS "${CAMADA_EXTRACT_MARKER_PATH}")
+    if(_camada_extract_result EQUAL 0 AND EXISTS
+                                          "${CAMADA_EXTRACT_MARKER_PATH}")
       return()
     endif()
 
@@ -331,14 +359,16 @@ function(camada_select_prebuilt_url output_var package_name)
     if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
       if(DEFINED CAMADA_${package_name}_LINUX_X86_64_URL
          AND NOT CAMADA_${package_name}_LINUX_X86_64_URL STREQUAL "")
-        set(${output_var} "${CAMADA_${package_name}_LINUX_X86_64_URL}"
+        set(${output_var}
+            "${CAMADA_${package_name}_LINUX_X86_64_URL}"
             PARENT_SCOPE)
         return()
       endif()
     elseif(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
       if(DEFINED CAMADA_${package_name}_LINUX_AARCH64_URL
          AND NOT CAMADA_${package_name}_LINUX_AARCH64_URL STREQUAL "")
-        set(${output_var} "${CAMADA_${package_name}_LINUX_AARCH64_URL}"
+        set(${output_var}
+            "${CAMADA_${package_name}_LINUX_AARCH64_URL}"
             PARENT_SCOPE)
         return()
       endif()
@@ -347,14 +377,16 @@ function(camada_select_prebuilt_url output_var package_name)
     if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
       if(DEFINED CAMADA_${package_name}_MACOS_X86_64_URL
          AND NOT CAMADA_${package_name}_MACOS_X86_64_URL STREQUAL "")
-        set(${output_var} "${CAMADA_${package_name}_MACOS_X86_64_URL}"
+        set(${output_var}
+            "${CAMADA_${package_name}_MACOS_X86_64_URL}"
             PARENT_SCOPE)
         return()
       endif()
     elseif(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
       if(DEFINED CAMADA_${package_name}_MACOS_ARM64_URL
          AND NOT CAMADA_${package_name}_MACOS_ARM64_URL STREQUAL "")
-        set(${output_var} "${CAMADA_${package_name}_MACOS_ARM64_URL}"
+        set(${output_var}
+            "${CAMADA_${package_name}_MACOS_ARM64_URL}"
             PARENT_SCOPE)
         return()
       endif()
@@ -371,7 +403,9 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
          output_source_dir_var)
   if(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin")
     if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
-      set(${output_url_var} "${CAMADA_MATHSAT_MACOS_X86_64_URL}" PARENT_SCOPE)
+      set(${output_url_var}
+          "${CAMADA_MATHSAT_MACOS_X86_64_URL}"
+          PARENT_SCOPE)
       set(${output_archive_var}
           "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-osx.tar.gz"
           PARENT_SCOPE)
@@ -381,7 +415,9 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
       return()
     endif()
     if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-      set(${output_url_var} "${CAMADA_MATHSAT_MACOS_ARM64_URL}" PARENT_SCOPE)
+      set(${output_url_var}
+          "${CAMADA_MATHSAT_MACOS_ARM64_URL}"
+          PARENT_SCOPE)
       set(${output_archive_var}
           "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-macos.tar.gz"
           PARENT_SCOPE)
@@ -396,31 +432,31 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
     )
   endif()
 
-  if(CMAKE_HOST_SYSTEM_NAME MATCHES "Linux"
-     AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
-    set(${output_url_var} "${CAMADA_MATHSAT_LINUX_X86_64_URL}" PARENT_SCOPE)
-    set(
-      ${output_archive_var}
-      "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-x86_64.tar.gz"
-      PARENT_SCOPE)
-    set(
-      ${output_source_dir_var}
-      "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-x86_64"
-      PARENT_SCOPE)
+  if(CMAKE_HOST_SYSTEM_NAME MATCHES "Linux" AND CMAKE_HOST_SYSTEM_PROCESSOR
+                                                MATCHES "^(x86_64|amd64)$")
+    set(${output_url_var}
+        "${CAMADA_MATHSAT_LINUX_X86_64_URL}"
+        PARENT_SCOPE)
+    set(${output_archive_var}
+        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-x86_64.tar.gz"
+        PARENT_SCOPE)
+    set(${output_source_dir_var}
+        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-x86_64"
+        PARENT_SCOPE)
     return()
   endif()
 
-  if(CMAKE_HOST_SYSTEM_NAME MATCHES "Linux"
-     AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-    set(${output_url_var} "${CAMADA_MATHSAT_LINUX_AARCH64_URL}" PARENT_SCOPE)
-    set(
-      ${output_archive_var}
-      "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-aarch64.tar.gz"
-      PARENT_SCOPE)
-    set(
-      ${output_source_dir_var}
-      "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-aarch64"
-      PARENT_SCOPE)
+  if(CMAKE_HOST_SYSTEM_NAME MATCHES "Linux" AND CMAKE_HOST_SYSTEM_PROCESSOR
+                                                MATCHES "^(aarch64|arm64)$")
+    set(${output_url_var}
+        "${CAMADA_MATHSAT_LINUX_AARCH64_URL}"
+        PARENT_SCOPE)
+    set(${output_archive_var}
+        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-aarch64.tar.gz"
+        PARENT_SCOPE)
+    set(${output_source_dir_var}
+        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-aarch64"
+        PARENT_SCOPE)
     return()
   endif()
 
@@ -433,13 +469,20 @@ endfunction()
 function(camada_fetch_git_source package_name repository git_tag out_var)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
-  CPMAddPackage(
-    NAME ${package_name}
-    DOWNLOAD_ONLY YES
-    GITHUB_REPOSITORY ${repository}
-    GIT_TAG ${git_tag}
-    GIT_PROGRESS TRUE)
-  set(${out_var} "${${package_name}_SOURCE_DIR}" PARENT_SCOPE)
+  cpmaddpackage(
+    NAME
+    ${package_name}
+    DOWNLOAD_ONLY
+    YES
+    GITHUB_REPOSITORY
+    ${repository}
+    GIT_TAG
+    ${git_tag}
+    GIT_PROGRESS
+    TRUE)
+  set(${out_var}
+      "${${package_name}_SOURCE_DIR}"
+      PARENT_SCOPE)
 endfunction()
 
 function(camada_prepare_cryptominisat_dependency_layout dependency_dir
@@ -452,8 +495,7 @@ function(camada_prepare_cryptominisat_dependency_layout dependency_dir
     COMMAND ${CMAKE_COMMAND} -E create_symlink "${fetched_source_dir}"
             "${dependency_dir}"
     RESULT_VARIABLE symlink_result
-    OUTPUT_QUIET
-    ERROR_QUIET)
+    OUTPUT_QUIET ERROR_QUIET)
   if(NOT symlink_result EQUAL 0)
     file(COPY "${fetched_source_dir}" DESTINATION "${dependency_dir}/..")
     get_filename_component(dependency_name "${dependency_dir}" NAME)
@@ -475,25 +517,37 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     camada_prepare_cryptominisat_dependency_layout("${cms_cadical_dir}"
                                                    "${cms_cadical_source_dir}")
     camada_run_checked(
-      WORKING_DIRECTORY "${cms_cadical_dir}"
-      MESSAGE "Configuring CryptoMiniSat CaDiCaL"
-      COMMAND ./configure -fPIC -O3)
+      WORKING_DIRECTORY
+      "${cms_cadical_dir}"
+      MESSAGE
+      "Configuring CryptoMiniSat CaDiCaL"
+      COMMAND
+      ./configure
+      -fPIC
+      -O3)
     camada_run_checked(
-      WORKING_DIRECTORY "${cms_cadical_dir}/build"
-      MESSAGE "Building CryptoMiniSat CaDiCaL"
-      COMMAND make -j libcadical.a)
+      WORKING_DIRECTORY
+      "${cms_cadical_dir}/build"
+      MESSAGE
+      "Building CryptoMiniSat CaDiCaL"
+      COMMAND
+      make
+      -j
+      libcadical.a)
   endif()
 endfunction()
 
 function(camada_setup_cryptominisat)
   set(cms_config
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake")
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake"
+  )
   if(EXISTS "${cms_config}")
     return()
   endif()
 
   camada_ensure_deps_dirs()
-  camada_fetch_git_source(cryptominisat msoos/cryptominisat 5.6.3 cms_source_dir)
+  camada_fetch_git_source(cryptominisat msoos/cryptominisat 5.6.3
+                          cms_source_dir)
   camada_setup_cryptominisat_solver_deps("${cms_source_dir}")
 
   set(cms_build_dir "${cms_source_dir}/build")
@@ -501,20 +555,30 @@ function(camada_setup_cryptominisat)
   file(MAKE_DIRECTORY "${cms_build_dir}")
 
   camada_run_checked(
-    WORKING_DIRECTORY "${cms_build_dir}"
-    MESSAGE "Configuring CryptoMiniSat"
+    WORKING_DIRECTORY
+    "${cms_build_dir}"
+    MESSAGE
+    "Configuring CryptoMiniSat"
     COMMAND
-      ${CMAKE_COMMAND} .. -GNinja -DSTATICCOMPILE=ON -DONLY_SIMPLE=ON
-      -DENABLE_PYTHON_INTERFACE=OFF -DNOM4RI=ON -DCMAKE_BUILD_TYPE=Release
-      -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR})
+    ${CMAKE_COMMAND}
+    ..
+    -GNinja
+    -DSTATICCOMPILE=ON
+    -DONLY_SIMPLE=ON
+    -DENABLE_PYTHON_INTERFACE=OFF
+    -DNOM4RI=ON
+    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR})
+  camada_run_checked(WORKING_DIRECTORY "${cms_build_dir}" MESSAGE
+                     "Building CryptoMiniSat" COMMAND ninja)
   camada_run_checked(
-    WORKING_DIRECTORY "${cms_build_dir}"
-    MESSAGE "Building CryptoMiniSat"
-    COMMAND ninja)
-  camada_run_checked(
-    WORKING_DIRECTORY "${cms_build_dir}"
-    MESSAGE "Installing CryptoMiniSat"
-    COMMAND ninja install)
+    WORKING_DIRECTORY
+    "${cms_build_dir}"
+    MESSAGE
+    "Installing CryptoMiniSat"
+    COMMAND
+    ninja
+    install)
 endfunction()
 
 function(camada_setup_gmp)
@@ -527,26 +591,49 @@ function(camada_setup_gmp)
   camada_fetch_git_source(gmp gmp-mirror/gmp 141ed4f98a50 gmp_source_dir)
 
   camada_run_checked(
-    WORKING_DIRECTORY "${gmp_source_dir}"
-    MESSAGE "Preparing GMP"
-    COMMAND autoreconf -fi)
+    WORKING_DIRECTORY
+    "${gmp_source_dir}"
+    MESSAGE
+    "Preparing GMP"
+    COMMAND
+    autoreconf
+    -fi)
   camada_run_checked(
-    WORKING_DIRECTORY "${gmp_source_dir}"
-    MESSAGE "Configuring GMP"
-    COMMAND ./configure --prefix=${CAMADA_DEPS_INSTALL_DIR} --disable-shared
-            ABI=64 CFLAGS=-fPIC CPPFLAGS=-DPIC)
+    WORKING_DIRECTORY
+    "${gmp_source_dir}"
+    MESSAGE
+    "Configuring GMP"
+    COMMAND
+    ./configure
+    --prefix=${CAMADA_DEPS_INSTALL_DIR}
+    --disable-shared
+    ABI=64
+    CFLAGS=-fPIC
+    CPPFLAGS=-DPIC)
   camada_run_checked(
-    WORKING_DIRECTORY "${gmp_source_dir}/doc"
-    MESSAGE "Preparing GMP docs"
-    COMMAND make stamp-vti)
+    WORKING_DIRECTORY
+    "${gmp_source_dir}/doc"
+    MESSAGE
+    "Preparing GMP docs"
+    COMMAND
+    make
+    stamp-vti)
   camada_run_checked(
-    WORKING_DIRECTORY "${gmp_source_dir}"
-    MESSAGE "Building GMP"
-    COMMAND make -j)
+    WORKING_DIRECTORY
+    "${gmp_source_dir}"
+    MESSAGE
+    "Building GMP"
+    COMMAND
+    make
+    -j)
   camada_run_checked(
-    WORKING_DIRECTORY "${gmp_source_dir}"
-    MESSAGE "Installing GMP"
-    COMMAND make install)
+    WORKING_DIRECTORY
+    "${gmp_source_dir}"
+    MESSAGE
+    "Installing GMP"
+    COMMAND
+    make
+    install)
 endfunction()
 
 function(camada_setup_minisat)
@@ -563,13 +650,25 @@ function(camada_setup_minisat)
   set(minisat_prefix "${CAMADA_DEPS_INSTALL_DIR}")
 
   camada_run_checked(
-    WORKING_DIRECTORY "${minisat_source_dir}"
-    MESSAGE "Configuring Minisat"
-    COMMAND make config BUILD_DIR=build prefix=${minisat_prefix})
+    WORKING_DIRECTORY
+    "${minisat_source_dir}"
+    MESSAGE
+    "Configuring Minisat"
+    COMMAND
+    make
+    config
+    BUILD_DIR=build
+    prefix=${minisat_prefix})
   camada_run_checked(
-    WORKING_DIRECTORY "${minisat_source_dir}"
-    MESSAGE "Building Minisat"
-    COMMAND make -j CXXFLAGS=-fPIC build/release/lib/libminisat.a)
+    WORKING_DIRECTORY
+    "${minisat_source_dir}"
+    MESSAGE
+    "Building Minisat"
+    COMMAND
+    make
+    -j
+    CXXFLAGS=-fPIC
+    build/release/lib/libminisat.a)
 
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/lib")
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/include")
@@ -599,23 +698,31 @@ function(camada_setup_bitwuzla)
 
     camada_download_file("${bitwuzla_url}" "${bitwuzla_archive}")
     camada_extract_archive(
-      ARCHIVE_PATH "${bitwuzla_archive}"
-      DESTINATION_DIR "${CAMADA_DEPS_SRC_DIR}"
-      MARKER_PATH "${bitwuzla_root_dir}"
-      ARCHIVE_URL "${bitwuzla_url}"
-      SOURCE_DIR "${bitwuzla_root_dir}")
+      ARCHIVE_PATH
+      "${bitwuzla_archive}"
+      DESTINATION_DIR
+      "${CAMADA_DEPS_SRC_DIR}"
+      MARKER_PATH
+      "${bitwuzla_root_dir}"
+      ARCHIVE_URL
+      "${bitwuzla_url}"
+      SOURCE_DIR
+      "${bitwuzla_root_dir}")
     camada_stage_prebuilt_tree("${bitwuzla_root_dir}")
   endif()
 
   file(
-    GLOB bitwuzla_pc_files
+    GLOB
+    bitwuzla_pc_files
     "${CAMADA_DEPS_INSTALL_DIR}/lib/pkgconfig/bitwuzla.pc"
     "${CAMADA_DEPS_INSTALL_DIR}/lib/*/pkgconfig/bitwuzla.pc"
     "${CAMADA_DEPS_INSTALL_DIR}/lib64/pkgconfig/bitwuzla.pc"
     "${CAMADA_DEPS_INSTALL_DIR}/lib64/*/pkgconfig/bitwuzla.pc")
   foreach(bitwuzla_pc_file IN LISTS bitwuzla_pc_files)
-    get_filename_component(bitwuzla_pkgconfig_dir "${bitwuzla_pc_file}" DIRECTORY)
-    get_filename_component(bitwuzla_libdir "${bitwuzla_pkgconfig_dir}" DIRECTORY)
+    get_filename_component(bitwuzla_pkgconfig_dir "${bitwuzla_pc_file}"
+                           DIRECTORY)
+    get_filename_component(bitwuzla_libdir "${bitwuzla_pkgconfig_dir}"
+                           DIRECTORY)
     file(
       WRITE "${bitwuzla_pc_file}"
       "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
@@ -643,11 +750,16 @@ function(camada_setup_cvc5)
 
   camada_download_file("${cvc5_url}" "${cvc5_archive}")
   camada_extract_archive(
-    ARCHIVE_PATH "${cvc5_archive}"
-    DESTINATION_DIR "${CAMADA_DEPS_SRC_DIR}"
-    MARKER_PATH "${cvc5_root_dir}"
-    ARCHIVE_URL "${cvc5_url}"
-    SOURCE_DIR "${cvc5_root_dir}")
+    ARCHIVE_PATH
+    "${cvc5_archive}"
+    DESTINATION_DIR
+    "${CAMADA_DEPS_SRC_DIR}"
+    MARKER_PATH
+    "${cvc5_root_dir}"
+    ARCHIVE_URL
+    "${cvc5_url}"
+    SOURCE_DIR
+    "${cvc5_root_dir}")
   camada_stage_prebuilt_tree("${cvc5_root_dir}")
   file(READ "${cvc5_config}" cvc5_config_contents)
   string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
@@ -671,28 +783,37 @@ function(camada_setup_stp)
   camada_fetch_git_source(stpsrc stp/stp 2.3.4 stp_source_dir)
 
   set(stp_build_dir "${stp_source_dir}/build")
-  set(cms_config_dir
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5")
+  set(cms_config_dir "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5")
   file(REMOVE_RECURSE "${stp_build_dir}")
   file(MAKE_DIRECTORY "${stp_build_dir}")
 
   camada_run_checked(
-    WORKING_DIRECTORY "${stp_build_dir}"
-    MESSAGE "Configuring STP"
-    COMMAND ${CMAKE_COMMAND} .. -GNinja -DONLY_SIMPLE=ON
-            -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
-            -DCMAKE_BUILD_TYPE=Release -DBUILD_EXECUTABLES=OFF
-            -DSTATICCOMPILE=ON -DBUILD_SHARED_LIBS=OFF
-            -Dminisat_DIR=${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat
-            -Dcryptominisat5_DIR=${cms_config_dir})
+    WORKING_DIRECTORY
+    "${stp_build_dir}"
+    MESSAGE
+    "Configuring STP"
+    COMMAND
+    ${CMAKE_COMMAND}
+    ..
+    -GNinja
+    -DONLY_SIMPLE=ON
+    -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
+    -DCMAKE_BUILD_TYPE=Release
+    -DBUILD_EXECUTABLES=OFF
+    -DSTATICCOMPILE=ON
+    -DBUILD_SHARED_LIBS=OFF
+    -Dminisat_DIR=${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat
+    -Dcryptominisat5_DIR=${cms_config_dir})
+  camada_run_checked(WORKING_DIRECTORY "${stp_build_dir}" MESSAGE
+                     "Building STP" COMMAND ninja)
   camada_run_checked(
-    WORKING_DIRECTORY "${stp_build_dir}"
-    MESSAGE "Building STP"
-    COMMAND ninja)
-  camada_run_checked(
-    WORKING_DIRECTORY "${stp_build_dir}"
-    MESSAGE "Installing STP"
-    COMMAND ninja install)
+    WORKING_DIRECTORY
+    "${stp_build_dir}"
+    MESSAGE
+    "Installing STP"
+    COMMAND
+    ninja
+    install)
 endfunction()
 
 function(camada_setup_yices)
@@ -700,12 +821,17 @@ function(camada_setup_yices)
   set(yices_header "${CAMADA_DEPS_INSTALL_DIR}/include/yices.h")
   set(yices_shared_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so")
   set(yices_shared_soname "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so.2.7.0")
-  set(yices_source_stamp "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices/camada-source-build.stamp")
-  if(BUILD_SHARED_LIBS AND EXISTS "${yices_shared_lib}" AND EXISTS "${yices_header}"
+  set(yices_source_stamp
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices/camada-source-build.stamp")
+  if(BUILD_SHARED_LIBS
+     AND EXISTS "${yices_shared_lib}"
+     AND EXISTS "${yices_header}"
      AND EXISTS "${yices_source_stamp}")
     return()
   endif()
-  if(NOT BUILD_SHARED_LIBS AND EXISTS "${yices_lib}" AND EXISTS "${yices_header}")
+  if(NOT BUILD_SHARED_LIBS
+     AND EXISTS "${yices_lib}"
+     AND EXISTS "${yices_header}")
     if(EXISTS "${yices_shared_soname}" AND NOT EXISTS "${yices_shared_lib}")
       file(CREATE_LINK "${yices_shared_soname}" "${yices_shared_lib}" SYMBOLIC)
     endif()
@@ -727,28 +853,43 @@ function(camada_setup_yices)
 
   camada_setup_gmp()
   camada_fetch_git_source(yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir)
+  camada_run_checked(WORKING_DIRECTORY "${yices_source_dir}" MESSAGE
+                     "Preparing Yices" COMMAND autoreconf)
   camada_run_checked(
-    WORKING_DIRECTORY "${yices_source_dir}"
-    MESSAGE "Preparing Yices"
-    COMMAND autoreconf)
+    WORKING_DIRECTORY
+    "${yices_source_dir}"
+    MESSAGE
+    "Configuring Yices"
+    COMMAND
+    ./configure
+    --prefix
+    ${CAMADA_DEPS_INSTALL_DIR}
+    --with-static-gmp=${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a
+    LDFLAGS=-L${CAMADA_DEPS_INSTALL_DIR}/lib/)
   camada_run_checked(
-    WORKING_DIRECTORY "${yices_source_dir}"
-    MESSAGE "Configuring Yices"
-    COMMAND ./configure --prefix ${CAMADA_DEPS_INSTALL_DIR}
-            --with-static-gmp=${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a
-            LDFLAGS=-L${CAMADA_DEPS_INSTALL_DIR}/lib/)
+    WORKING_DIRECTORY
+    "${yices_source_dir}"
+    MESSAGE
+    "Building Yices"
+    COMMAND
+    make
+    -j)
   camada_run_checked(
-    WORKING_DIRECTORY "${yices_source_dir}"
-    MESSAGE "Building Yices"
-    COMMAND make -j)
+    WORKING_DIRECTORY
+    "${yices_source_dir}"
+    MESSAGE
+    "Building Yices static library"
+    COMMAND
+    make
+    static-lib)
   camada_run_checked(
-    WORKING_DIRECTORY "${yices_source_dir}"
-    MESSAGE "Building Yices static library"
-    COMMAND make static-lib)
-  camada_run_checked(
-    WORKING_DIRECTORY "${yices_source_dir}"
-    MESSAGE "Installing Yices"
-    COMMAND make install)
+    WORKING_DIRECTORY
+    "${yices_source_dir}"
+    MESSAGE
+    "Installing Yices"
+    COMMAND
+    make
+    install)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices")
   file(WRITE "${yices_source_stamp}" "1\n")
 endfunction()
@@ -756,7 +897,8 @@ endfunction()
 function(camada_setup_z3)
   set(z3_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libz3.a")
   if(BUILD_SHARED_LIBS)
-    set(z3_lib "${CAMADA_DEPS_INSTALL_DIR}/bin/libz3${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set(z3_lib
+        "${CAMADA_DEPS_INSTALL_DIR}/bin/libz3${CMAKE_SHARED_LIBRARY_SUFFIX}")
   endif()
   if(EXISTS "${z3_lib}" OR EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/z3.h")
     return()
@@ -772,11 +914,16 @@ function(camada_setup_z3)
 
   camada_download_file("${z3_url}" "${z3_archive}")
   camada_extract_archive(
-    ARCHIVE_PATH "${z3_archive}"
-    DESTINATION_DIR "${CAMADA_DEPS_SRC_DIR}"
-    MARKER_PATH "${z3_root_dir}"
-    ARCHIVE_URL "${z3_url}"
-    SOURCE_DIR "${z3_root_dir}")
+    ARCHIVE_PATH
+    "${z3_archive}"
+    DESTINATION_DIR
+    "${CAMADA_DEPS_SRC_DIR}"
+    MARKER_PATH
+    "${z3_root_dir}"
+    ARCHIVE_URL
+    "${z3_url}"
+    SOURCE_DIR
+    "${z3_root_dir}")
   camada_stage_prebuilt_tree("${z3_root_dir}")
 endfunction()
 
@@ -801,11 +948,16 @@ function(camada_setup_mathsat)
     return()
   endif()
   camada_extract_archive(
-    ARCHIVE_PATH "${mathsat_archive}"
-    DESTINATION_DIR "${CAMADA_DEPS_SRC_DIR}"
-    MARKER_PATH "${mathsat_source_dir}/include/mathsat.h"
-    ARCHIVE_URL "${mathsat_url}"
-    SOURCE_DIR "${mathsat_source_dir}")
+    ARCHIVE_PATH
+    "${mathsat_archive}"
+    DESTINATION_DIR
+    "${CAMADA_DEPS_SRC_DIR}"
+    MARKER_PATH
+    "${mathsat_source_dir}/include/mathsat.h"
+    ARCHIVE_URL
+    "${mathsat_url}"
+    SOURCE_DIR
+    "${mathsat_source_dir}")
 
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/lib")
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/include")
