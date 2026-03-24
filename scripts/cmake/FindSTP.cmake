@@ -1,6 +1,7 @@
 set(_camada_stp_hints ${CAMADA_DEPS_INSTALL_DIR} ${CAMADA_SOLVER_STP_DIR}
                       ${CAMADA_SOLVER_STP_DIR}/lib/cmake ${CAMADA_STP_DIR}
                       ${CAMADA_STP_DIR}/lib/cmake $ENV{HOME}/stp)
+camada_should_download_dependency(_camada_download_stp TRUE)
 
 function(_camada_validate_stp)
   set(_camada_stp_include_dirs "${STP_INCLUDE_DIRS}")
@@ -63,7 +64,7 @@ find_package(STP ${_camada_stp_find_args})
 _camada_normalize_stp_target()
 _camada_validate_stp()
 
-if(NOT STP_FOUND AND CAMADA_DOWNLOAD_DEPENDENCIES)
+if(NOT STP_FOUND AND _camada_download_stp)
   camada_setup_stp()
   find_package(cryptominisat5 CONFIG QUIET HINTS ${_camada_stp_hints})
   find_package(minisat CONFIG QUIET HINTS ${_camada_stp_hints})

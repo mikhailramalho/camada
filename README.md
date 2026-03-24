@@ -44,9 +44,15 @@ make install
 Camada can now download and build missing solver dependencies during CMake
 configure, following the same general approach used in ESBMC:
 ```bash
-cmake -S . -B build -DCAMADA_DOWNLOAD_DEPENDENCIES=ON
+cmake -S . -B build -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL
 cmake --build build
 ```
+
+`CAMADA_DOWNLOAD_DEPENDENCIES` accepts three modes:
+- `OFF`: do not download dependencies.
+- `ALL`: download all supported solver dependencies.
+- `PERMISSIVE-ONLY`: download only solvers with permissive licenses
+  (`Bitwuzla`, `CVC5`, `STP`, and `Z3`).
 
 Downloaded sources and locally installed solver artifacts are stored under
 `<build-dir>/deps/src` and `<build-dir>/deps/install`.

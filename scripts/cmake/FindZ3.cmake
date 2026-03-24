@@ -34,6 +34,7 @@ endfunction(check_z3_version)
 
 set(_camada_z3_hints ${CAMADA_DEPS_INSTALL_DIR} ${CAMADA_SOLVER_Z3_DIR}
                      ${CAMADA_Z3_DIR} $ENV{HOME}/z3)
+camada_should_download_dependency(_camada_download_z3 TRUE)
 
 # Looking for Z3 in CAMADA_Z3_INCLUDE_DIR
 find_path(
@@ -47,7 +48,7 @@ find_library(
   PATH_SUFFIXES lib bin)
 
 if((NOT CAMADA_Z3_INCLUDE_DIR OR NOT CAMADA_Z3_LIB)
-   AND CAMADA_DOWNLOAD_DEPENDENCIES)
+   AND _camada_download_z3)
   camada_setup_z3()
   find_path(
     CAMADA_Z3_INCLUDE_DIR z3.h

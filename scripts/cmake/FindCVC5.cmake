@@ -4,11 +4,12 @@ set(_camada_cvc5_hints ${CAMADA_DEPS_INSTALL_DIR}
                        ${CAMADA_SOLVER_CVC5_DIR}/lib64/cmake
                        ${CAMADA_CVC5_DIR} ${CAMADA_CVC5_DIR}/lib/cmake
                        ${CAMADA_CVC5_DIR}/lib64/cmake $ENV{HOME}/cvc5)
+camada_should_download_dependency(_camada_download_cvc5 TRUE)
 
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
 
-if(NOT CVC5_FOUND AND CAMADA_DOWNLOAD_DEPENDENCIES)
+if(NOT CVC5_FOUND AND _camada_download_cvc5)
   camada_setup_cvc5()
   find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
   set(CVC5_FOUND ${cvc5_FOUND})

@@ -29,6 +29,7 @@ endfunction(check_mathsat_version)
 set(_camada_mathsat_hints ${CAMADA_DEPS_INSTALL_DIR}
                           ${CAMADA_SOLVER_MATHSAT_DIR} ${CAMADA_MATHSAT_DIR}
                           $ENV{HOME}/mathsat)
+camada_should_download_dependency(_camada_download_mathsat FALSE)
 
 # Looking for MATHSAT in CAMADA_MATHSAT_INCLUDE_DIR
 find_path(
@@ -44,7 +45,7 @@ find_library(
 find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
 
 if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
-   AND CAMADA_DOWNLOAD_DEPENDENCIES)
+   AND _camada_download_mathsat)
   camada_setup_mathsat()
   find_path(
     CAMADA_MATHSAT_INCLUDE_DIR mathsat.h

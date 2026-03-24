@@ -235,7 +235,7 @@ endmacro()
 
 config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
-config_info_bool("Download dependencies" "${CAMADA_DOWNLOAD_DEPENDENCIES}")
+config_info("Download dependencies" "${CAMADA_DOWNLOAD_DEPENDENCIES}")
 
 config_info_bool("Solver Bitwuzla" "${CAMADA_SOLVER_BITWUZLA_ENABLE}")
 config_info_bool("Solver CVC5" "${CAMADA_SOLVER_CVC5_ENABLE}")

@@ -1,6 +1,19 @@
-option(CAMADA_DOWNLOAD_DEPENDENCIES
-       "Download and build missing solver dependencies during CMake configure"
-       OFF)
+set(
+  CAMADA_DOWNLOAD_DEPENDENCIES
+  "OFF"
+  CACHE STRING
+        "Download missing solver dependencies during CMake configure: OFF, ALL, or PERMISSIVE-ONLY")
+set_property(CACHE CAMADA_DOWNLOAD_DEPENDENCIES PROPERTY STRINGS OFF ALL
+                                                             PERMISSIVE-ONLY)
+
+if(NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF"
+   AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "ALL"
+   AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE-ONLY")
+  message(
+    FATAL_ERROR
+      "CAMADA_DOWNLOAD_DEPENDENCIES must be one of: OFF, ALL, PERMISSIVE-ONLY"
+  )
+endif()
 
 set(CAMADA_DEPS_DIR
     "${CMAKE_BINARY_DIR}/deps"
@@ -68,6 +81,21 @@ function(camada_ensure_deps_dirs)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_DIR}")
   file(MAKE_DIRECTORY "${CAMADA_DEPS_SRC_DIR}")
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}")
+endfunction()
+
+function(camada_should_download_dependency out_var is_permissive)
+  if(CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "ALL")
+    set(${out_var} TRUE PARENT_SCOPE)
+    return()
+  endif()
+
+  if(CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE-ONLY"
+     AND is_permissive)
+    set(${out_var} TRUE PARENT_SCOPE)
+    return()
+  endif()
+
+  set(${out_var} FALSE PARENT_SCOPE)
 endfunction()
 
 function(camada_include_cpm)

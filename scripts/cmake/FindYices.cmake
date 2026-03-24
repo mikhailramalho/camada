@@ -32,8 +32,9 @@ endfunction(check_yices_version)
 
 set(_camada_yices_hints ${CAMADA_DEPS_INSTALL_DIR} ${CAMADA_SOLVER_YICES_DIR}
                         ${CAMADA_YICES_DIR} $ENV{HOME}/yices)
+camada_should_download_dependency(_camada_download_yices FALSE)
 
-if(CAMADA_DOWNLOAD_DEPENDENCIES)
+if(_camada_download_yices)
   camada_setup_yices()
 endif()
 
@@ -73,7 +74,7 @@ if(NOT CAMADA_YICES_LIB)
 endif()
 
 if((NOT CAMADA_YICES_INCLUDE_DIR OR NOT CAMADA_YICES_LIB)
-   AND CAMADA_DOWNLOAD_DEPENDENCIES)
+   AND _camada_download_yices)
   find_path(
     CAMADA_YICES_INCLUDE_DIR yices.h
     HINTS ${_camada_yices_hints}

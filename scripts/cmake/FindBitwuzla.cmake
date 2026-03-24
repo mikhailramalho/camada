@@ -25,6 +25,7 @@ if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
 endif()
 
 _camada_collect_bitwuzla_pkgconfig_paths(_camada_bitwuzla_pkgconfig_paths)
+camada_should_download_dependency(_camada_download_bitwuzla TRUE)
 
 find_package(PkgConfig QUIET)
 
@@ -45,7 +46,7 @@ if(PkgConfig_FOUND)
   set(ENV{PKG_CONFIG_PATH} "${_camada_bitwuzla_saved_pkg_config_path}")
 endif()
 
-if(NOT Bitwuzla_FOUND AND CAMADA_DOWNLOAD_DEPENDENCIES)
+if(NOT Bitwuzla_FOUND AND _camada_download_bitwuzla)
   camada_setup_bitwuzla()
   _camada_collect_bitwuzla_pkgconfig_paths(_camada_bitwuzla_pkgconfig_paths)
 
