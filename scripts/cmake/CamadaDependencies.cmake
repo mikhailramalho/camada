@@ -618,13 +618,13 @@ function(camada_setup_gmp)
   endif()
 
   camada_find_gmp_header(_camada_system_gmp_include_dir)
-  if(EXISTS "${gmp_lib}" AND NOT EXISTS "${gmp_header}"
+  if(EXISTS "${gmp_lib}"
+     AND NOT EXISTS "${gmp_header}"
      AND _camada_system_gmp_include_dir)
     file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/include")
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E create_symlink
-              "${_camada_system_gmp_include_dir}/gmp.h"
-              "${gmp_header}")
+              "${_camada_system_gmp_include_dir}/gmp.h" "${gmp_header}")
     return()
   endif()
 
@@ -681,8 +681,7 @@ function(camada_setup_gmp)
     file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/include")
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E create_symlink
-              "${_camada_system_gmp_include_dir}/gmp.h"
-              "${gmp_header}")
+              "${_camada_system_gmp_include_dir}/gmp.h" "${gmp_header}")
   endif()
 endfunction()
 
@@ -854,18 +853,19 @@ function(camada_setup_stp)
   file(MAKE_DIRECTORY "${stp_build_dir}")
 
   set(_camada_stp_cmake_args
-    ..
-    -GNinja
-    -DONLY_SIMPLE=ON
-    -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
-    -DCMAKE_BUILD_TYPE=Release
-    -DBUILD_EXECUTABLES=OFF
-    -DSTATICCOMPILE=ON
-    -DBUILD_SHARED_LIBS=OFF
-    -Dminisat_DIR=${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat
-    -Dcryptominisat5_DIR=${cms_config_dir})
+      ..
+      -GNinja
+      -DONLY_SIMPLE=ON
+      -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
+      -DCMAKE_BUILD_TYPE=Release
+      -DBUILD_EXECUTABLES=OFF
+      -DSTATICCOMPILE=ON
+      -DBUILD_SHARED_LIBS=OFF
+      -Dminisat_DIR=${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat
+      -Dcryptominisat5_DIR=${cms_config_dir})
   if(stp_bison_executable)
-    list(APPEND _camada_stp_cmake_args -DBISON_EXECUTABLE=${stp_bison_executable})
+    list(APPEND _camada_stp_cmake_args
+         -DBISON_EXECUTABLE=${stp_bison_executable})
   endif()
   if(stp_flex_executable)
     list(APPEND _camada_stp_cmake_args -DFLEX_EXECUTABLE=${stp_flex_executable})

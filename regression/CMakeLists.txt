@@ -79,8 +79,10 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
   if(EXISTS "${CAMADA_Z3_LIB_DIR}")
     target_link_directories(${REGRESSION_TARGET_NAME} PRIVATE
                             ${CAMADA_Z3_LIB_DIR})
-    set_property(TARGET ${REGRESSION_TARGET_NAME} APPEND PROPERTY BUILD_RPATH
-                                                                  "${CAMADA_Z3_LIB_DIR}")
+    set_property(
+      TARGET ${REGRESSION_TARGET_NAME}
+      APPEND
+      PROPERTY BUILD_RPATH "${CAMADA_Z3_LIB_DIR}")
   endif()
 endif()
 

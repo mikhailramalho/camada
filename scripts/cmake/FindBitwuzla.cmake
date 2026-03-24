@@ -66,9 +66,8 @@ if(PkgConfig_FOUND)
     get_target_property(_camada_bitwuzla_imported_includes PkgConfig::Bitwuzla
                         INTERFACE_INCLUDE_DIRECTORIES)
     if(_camada_bitwuzla_imported_includes)
-      _camada_filter_existing_paths(
-        _camada_bitwuzla_sanitized_includes
-        ${_camada_bitwuzla_imported_includes})
+      _camada_filter_existing_paths(_camada_bitwuzla_sanitized_includes
+                                    ${_camada_bitwuzla_imported_includes})
       set_target_properties(
         PkgConfig::Bitwuzla PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
                                        "${_camada_bitwuzla_sanitized_includes}")
@@ -101,12 +100,12 @@ if(NOT Bitwuzla_FOUND AND _camada_download_bitwuzla)
       get_target_property(_camada_bitwuzla_imported_includes
                           PkgConfig::Bitwuzla INTERFACE_INCLUDE_DIRECTORIES)
       if(_camada_bitwuzla_imported_includes)
-        _camada_filter_existing_paths(
-          _camada_bitwuzla_sanitized_includes
-          ${_camada_bitwuzla_imported_includes})
+        _camada_filter_existing_paths(_camada_bitwuzla_sanitized_includes
+                                      ${_camada_bitwuzla_imported_includes})
         set_target_properties(
-          PkgConfig::Bitwuzla PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
-                                         "${_camada_bitwuzla_sanitized_includes}")
+          PkgConfig::Bitwuzla
+          PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
+                     "${_camada_bitwuzla_sanitized_includes}")
         set(Bitwuzla_INCLUDE_DIRS "${_camada_bitwuzla_sanitized_includes}")
       endif()
     endif()

@@ -140,7 +140,7 @@ if(CAMADA_ENABLE_REGRESSION)
   if(NOT Catch2_FOUND AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF")
     message(STATUS "Catch2 not found locally. Downloading it for regression.")
     camada_include_cpm()
-    CPMAddPackage(
+    cpmaddpackage(
       NAME
       Catch2
       GITHUB_REPOSITORY
