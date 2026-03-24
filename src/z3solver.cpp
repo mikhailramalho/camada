@@ -69,12 +69,21 @@ Z3Solver::Z3Solver(Z3ContextRef C, const z3::solver &S)
   z3::set_param("rewriter.hi_fp_unspecified", true);
 }
 
+Z3Solver::~Z3Solver() { invalidateGeneratedObjects(); }
+
 void Z3Solver::addConstraintImpl(const SMTExprRef &Exp) {
   Solver.add(toSolverExpr<Z3Expr>(*Exp).Expr);
 }
 
 SMTExprRef Z3Solver::newExprRefImpl(const SMTExpr &Exp) const {
-  return std::make_shared<Z3Expr>(toSolverExpr<Z3Expr>(Exp));
+  return storeExprRef(toSolverExpr<Z3Expr>(Exp));
+}
+
+SMTExprRef Z3Solver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                           const SMTSortRef &Sort) const {
+  Z3Expr Retagged = toSolverExpr<Z3Expr>(Exp);
+  Retagged.Sort = Sort;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef Z3Solver::mkBoolSortImpl() {

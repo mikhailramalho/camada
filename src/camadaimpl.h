@@ -871,7 +871,10 @@ public:
 
   checkResult check() override final { return checkImpl(); }
 
-  void reset() override final { return resetImpl(); }
+  void reset() override final {
+    invalidateGeneratedObjects();
+    return resetImpl();
+  }
 
   void dump() override final { return dumpImpl(); }
 
@@ -894,6 +897,9 @@ public:
 
 protected:
   virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) const = 0;
+
+  virtual SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                           const SMTSortRef &Sort) const = 0;
 
   virtual SMTSortRef mkBoolSortImpl() = 0;
 

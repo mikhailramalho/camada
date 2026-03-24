@@ -45,8 +45,14 @@ public:
 
 class STPExpr : public SolverExpr<STPContextRef, STP::Expr> {
 public:
-  using SolverExpr<STPContextRef, STP::Expr>::SolverExpr;
-  virtual ~STPExpr() = default;
+  bool OwnsExpr = false;
+
+  STPExpr(STPContextRef C, const SMTSortRef &S, const STP::Expr &E,
+          bool Owns = false)
+      : SolverExpr<STPContextRef, STP::Expr>(std::move(C), S, E),
+        OwnsExpr(Owns) {}
+
+  virtual ~STPExpr() override;
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -67,6 +73,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                   const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

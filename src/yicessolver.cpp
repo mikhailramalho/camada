@@ -67,6 +67,7 @@ YicesSolver::YicesSolver() : SMTSolverImpl() {
 }
 
 YicesSolver::~YicesSolver() {
+  invalidateGeneratedObjects();
   yices_exit();
   Context = nullptr;
 }
@@ -79,7 +80,16 @@ void YicesSolver::addConstraintImpl(const SMTExprRef &Exp) {
 SMTExprRef YicesSolver::newExprRefImpl(const SMTExpr &Exp) const {
   assert(toSolverExpr<YicesExpr>(Exp).Expr != NULL_TERM &&
          "Error when creating Yices expr.");
-  return std::make_shared<YicesExpr>(toSolverExpr<YicesExpr>(Exp));
+  return storeExprRef(toSolverExpr<YicesExpr>(Exp));
+}
+
+SMTExprRef YicesSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                              const SMTSortRef &Sort) const {
+  assert(toSolverExpr<YicesExpr>(Exp).Expr != NULL_TERM &&
+         "Error when creating Yices expr.");
+  YicesExpr Retagged = toSolverExpr<YicesExpr>(Exp);
+  Retagged.Sort = Sort;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef YicesSolver::mkBoolSortImpl() {

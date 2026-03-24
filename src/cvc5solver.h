@@ -60,11 +60,13 @@ public:
   unsigned int ToBVCounter = 0;
 
   explicit CVC5Solver();
-  ~CVC5Solver() override = default;
+  ~CVC5Solver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                   const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

@@ -1858,8 +1858,7 @@ SMTExprRef SMTSolverImpl::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef SMTSolverImpl::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                            const SMTSortRef &To) {
-  Exp->Sort = To;
-  return Exp;
+  return cloneExprWithSortImpl(*Exp, To);
 }
 
 SMTExprRef SMTSolverImpl::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {

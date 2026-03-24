@@ -60,11 +60,13 @@ public:
 
   explicit Z3Solver();
   explicit Z3Solver(Z3ContextRef C, const z3::solver &S);
-  ~Z3Solver() override = default;
+  ~Z3Solver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                   const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

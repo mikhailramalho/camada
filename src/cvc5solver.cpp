@@ -63,12 +63,21 @@ CVC5Solver::CVC5Solver()
   Context->setOption("produce-assertions", "true");
 }
 
+CVC5Solver::~CVC5Solver() { invalidateGeneratedObjects(); }
+
 void CVC5Solver::addConstraintImpl(const SMTExprRef &Exp) {
   Context->assertFormula(toSolverExpr<CVC5Expr>(*Exp).Expr);
 }
 
 SMTExprRef CVC5Solver::newExprRefImpl(const SMTExpr &Exp) const {
-  return std::make_shared<CVC5Expr>(toSolverExpr<CVC5Expr>(Exp));
+  return storeExprRef(toSolverExpr<CVC5Expr>(Exp));
+}
+
+SMTExprRef CVC5Solver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                             const SMTSortRef &Sort) const {
+  CVC5Expr Retagged = toSolverExpr<CVC5Expr>(Exp);
+  Retagged.Sort = Sort;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef CVC5Solver::mkBoolSortImpl() {

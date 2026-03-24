@@ -14,7 +14,7 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
 
   class myYicesSolver : public camada::YicesSolver {
   public:
-    explicit myYicesSolver() { create(); }
+    myYicesSolver() = default;
 
     void resetImpl() override {
       SymbolTable.clear();
@@ -46,7 +46,7 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
   };
 
   // Create Yices Solver
-  camada::SMTSolverRef yices = std::make_shared<myYicesSolver>();
+  camada::SMTSolverRef yices = std::make_unique<myYicesSolver>();
 
   tests(yices);
 }

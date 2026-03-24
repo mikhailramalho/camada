@@ -26,6 +26,50 @@
 
 namespace camada {
 
+class SMTExpr;
+
+class SMTExprRef {
+public:
+  SMTExprRef() = default;
+
+  const SMTExpr *get() const {
+    validate();
+    return Ptr;
+  }
+
+  const SMTExpr &operator*() const { return *get(); }
+
+  const SMTExpr *operator->() const { return get(); }
+
+  explicit operator bool() const { return isValid(); }
+
+  bool isValid() const {
+    auto locked = State.lock();
+    return Ptr != nullptr && locked && locked->Generation == Generation;
+  }
+
+private:
+  const SMTExpr *Ptr = nullptr;
+  std::weak_ptr<const SMTHandleState> State;
+  uint64_t Generation = 0;
+
+  SMTExprRef(const SMTExpr *ThePtr,
+             std::weak_ptr<const SMTHandleState> TheState,
+             uint64_t TheGeneration)
+      : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
+
+  void validate() const {
+    auto locked = State.lock();
+    assert(Ptr && "Dereferencing null expression handle");
+    assert(locked &&
+           "Dereferencing expression handle after solver destruction");
+    assert(locked->Generation == Generation &&
+           "Dereferencing stale expression handle after solver reset");
+  }
+
+  friend class SMTSolver;
+};
+
 /// Generic base class for SMT exprs
 class SMTExpr {
 public:
@@ -92,9 +136,6 @@ public:
 
   bool equal_to(SMTExpr const &other) const override = 0;
 };
-
-/// Shared pointer for SMTExprs, used by SMTSolver API.
-using SMTExprRef = std::shared_ptr<SMTExpr>;
 
 /// Wrapper to downcast from SMTExpr to Solver specific expr
 template <typename SolverExpr>

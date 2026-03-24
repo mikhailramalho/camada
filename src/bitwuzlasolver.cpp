@@ -80,7 +80,10 @@ void BitwExpr::dump() const {
 
 BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() { initializeContext(); }
 
-BitwuzlaSolver::~BitwuzlaSolver() { destroyContext(); }
+BitwuzlaSolver::~BitwuzlaSolver() {
+  invalidateGeneratedObjects();
+  destroyContext();
+}
 
 void BitwuzlaSolver::initializeContext() {
   TermManager = bitwuzla_term_manager_new();
@@ -111,7 +114,14 @@ void BitwuzlaSolver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef BitwuzlaSolver::newExprRefImpl(const SMTExpr &Exp) const {
-  return std::make_shared<BitwExpr>(toSolverExpr<BitwExpr>(Exp));
+  return storeExprRef(toSolverExpr<BitwExpr>(Exp));
+}
+
+SMTExprRef BitwuzlaSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                                 const SMTSortRef &Sort) const {
+  BitwExpr Retagged = toSolverExpr<BitwExpr>(Exp);
+  Retagged.Sort = Sort;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef BitwuzlaSolver::mkBoolSortImpl() {

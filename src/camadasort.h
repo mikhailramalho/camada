@@ -22,14 +22,57 @@
 #ifndef CAMADASORT_H_
 #define CAMADASORT_H_
 
+#include <cassert>
+#include <cstdint>
 #include <memory>
 
 namespace camada {
 
 class SMTSort;
+struct SMTHandleState {
+  uint64_t Generation = 1;
+};
 
-/// Shared pointer for SMTSorts, used by SMTSolver API.
-using SMTSortRef = std::shared_ptr<SMTSort>;
+class SMTSortRef {
+public:
+  SMTSortRef() = default;
+
+  const SMTSort *get() const {
+    validate();
+    return Ptr;
+  }
+
+  const SMTSort &operator*() const { return *get(); }
+
+  const SMTSort *operator->() const { return get(); }
+
+  explicit operator bool() const { return isValid(); }
+
+  bool isValid() const {
+    auto locked = State.lock();
+    return Ptr != nullptr && locked && locked->Generation == Generation;
+  }
+
+private:
+  const SMTSort *Ptr = nullptr;
+  std::weak_ptr<const SMTHandleState> State;
+  uint64_t Generation = 0;
+
+  SMTSortRef(const SMTSort *ThePtr,
+             std::weak_ptr<const SMTHandleState> TheState,
+             uint64_t TheGeneration)
+      : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
+
+  void validate() const {
+    auto locked = State.lock();
+    assert(Ptr && "Dereferencing null sort handle");
+    assert(locked && "Dereferencing sort handle after solver destruction");
+    assert(locked->Generation == Generation &&
+           "Dereferencing stale sort handle after solver reset");
+  }
+
+  friend class SMTSolver;
+};
 
 /// Generic base class for SMT sorts
 class SMTSort {
@@ -83,7 +126,11 @@ public:
 };
 
 inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {
-  return (*LHS.get() == *RHS.get());
+  return (*LHS == *RHS);
+}
+
+inline bool operator!=(SMTSortRef const &LHS, SMTSortRef const &RHS) {
+  return !(LHS == RHS);
 }
 
 /// Template to hold Solver specific Context and Sort

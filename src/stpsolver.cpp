@@ -30,6 +30,11 @@
 
 namespace camada {
 
+STPExpr::~STPExpr() {
+  if (OwnsExpr && Expr != nullptr)
+    STP::vc_DeleteExpr(Expr);
+}
+
 unsigned STPSort::getWidthFromSolver() const {
   if (isBoolSort())
     return 1;
@@ -70,14 +75,27 @@ STPSolver::STPSolver()
 STPSolver::STPSolver(STPContextRef C)
     : SMTSolverImpl(), Context(std::move(C)) {}
 
-STPSolver::~STPSolver() { STP::vc_Destroy(*Context); }
+STPSolver::~STPSolver() {
+  invalidateGeneratedObjects();
+  STP::vc_Destroy(*Context);
+}
 
 void STPSolver::addConstraintImpl(const SMTExprRef &Exp) {
   STP::vc_assertFormula(*Context, toSolverExpr<STPExpr>(*Exp).Expr);
 }
 
 SMTExprRef STPSolver::newExprRefImpl(const SMTExpr &Exp) const {
-  return std::make_shared<STPExpr>(toSolverExpr<STPExpr>(Exp));
+  auto Stored = std::make_unique<STPExpr>(toSolverExpr<STPExpr>(Exp));
+  Stored->OwnsExpr = true;
+  return storeOwnedExprRef(std::move(Stored));
+}
+
+SMTExprRef STPSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                            const SMTSortRef &Sort) const {
+  STPExpr Retagged = toSolverExpr<STPExpr>(Exp);
+  Retagged.Sort = Sort;
+  Retagged.OwnsExpr = false;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef STPSolver::mkBoolSortImpl() {
@@ -417,7 +435,10 @@ SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
 bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(*Context, toSolverExpr<STPExpr>(*Exp).Expr);
-  return STP::getBVUnsigned(STP::vc_boolToBVExpr(*Context, value)) != 0;
+  const bool result =
+      STP::getBVUnsigned(STP::vc_boolToBVExpr(*Context, value)) != 0;
+  STP::vc_DeleteExpr(value);
+  return result;
 }
 
 std::string STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
@@ -428,6 +449,7 @@ std::string STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   STP::vc_printBVBitStringToBuffer(value, &buf, &len);
   std::string bv(buf);
   free(buf);
+  STP::vc_DeleteExpr(value);
   return bv;
 }
 
@@ -500,7 +522,9 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
 }
 
 checkResult STPSolver::checkImpl() {
-  int res = STP::vc_query(*Context, STP::vc_falseExpr(*Context));
+  STP::Expr query = STP::vc_falseExpr(*Context);
+  int res = STP::vc_query(*Context, query);
+  STP::vc_DeleteExpr(query);
   if (!res)
     return checkResult::SAT;
 

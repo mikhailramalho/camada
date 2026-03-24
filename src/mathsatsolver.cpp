@@ -25,6 +25,7 @@
 #include "mathsatsolver.h"
 
 #include <cassert>
+#include <cstddef>
 #include <gmp.h>
 #include <iostream>
 
@@ -79,6 +80,7 @@ MathSATSolver::MathSATSolver(const msat_config &Config)
       Context(std::make_shared<msat_env>(msat_create_env(Config))) {}
 
 MathSATSolver::~MathSATSolver() {
+  invalidateGeneratedObjects();
   msat_destroy_env(*Context);
   Context = nullptr;
 }
@@ -99,7 +101,15 @@ static inline bool checkExprError(const SMTExpr &Exp) {
 
 SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) const {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
-  return std::make_shared<MathSATExpr>(toSolverExpr<MathSATExpr>(Exp));
+  return storeExprRef(toSolverExpr<MathSATExpr>(Exp));
+}
+
+SMTExprRef MathSATSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                                const SMTSortRef &Sort) const {
+  assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
+  MathSATExpr Retagged = toSolverExpr<MathSATExpr>(Exp);
+  Retagged.Sort = Sort;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
@@ -637,7 +647,11 @@ static inline std::string getGMPVal(const MathSATSolver &S,
   msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context,
                       toSolverExpr<MathSATExpr>(*t).Expr, val);
 
-  std::string bv = mpq_get_str(nullptr, 2, val);
+  char *raw_bv = mpq_get_str(nullptr, 2, val);
+  std::string bv = raw_bv;
+  void (*gmp_free)(void *, std::size_t);
+  mp_get_memory_functions(nullptr, nullptr, &gmp_free);
+  gmp_free(raw_bv, bv.size() + 2);
   mpq_clear(val);
   return bv;
 }
