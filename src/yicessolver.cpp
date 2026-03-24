@@ -504,10 +504,10 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
 
 checkResult YicesSolver::checkImpl() {
   smt_status_t res = yices_check_context(*Context, nullptr);
-  if (res == STATUS_SAT)
+  if (res == YICES_STATUS_SAT)
     return checkResult::SAT;
 
-  if (res == STATUS_UNSAT)
+  if (res == YICES_STATUS_UNSAT)
     return checkResult::UNSAT;
 
   return checkResult::UNKNOWN;

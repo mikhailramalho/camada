@@ -1,2 +1,6 @@
-#define CATCH_CONFIG_MAIN
-#include <catch2/catch.hpp>
+#include <catch2/catch_session.hpp>
+
+int main(int argc, char *argv[]) {
+  Catch::Session session;
+  return session.run(argc, argv);
+}

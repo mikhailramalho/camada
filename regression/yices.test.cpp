@@ -1,7 +1,7 @@
 
 #include "tests.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <yicessolver.h>
 
 TEST_CASE("Simple Yices test", "[YICES]") {

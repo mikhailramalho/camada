@@ -2,7 +2,7 @@
 #include "camada.h"
 
 #include <bitset>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 inline void equal_ten(const camada::SMTSolverRef &solver) {
   // A free variable

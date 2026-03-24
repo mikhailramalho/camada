@@ -28,7 +28,7 @@ set(${LIBRARY_TARGET_NAME}_SRC
     camadaexpr.cpp
     camadasort.cpp
     camadaimpl.cpp
-    boolectorsolver.cpp
+    bitwuzlasolver.cpp
     cvc5solver.cpp
     mathsatsolver.cpp
     stpsolver.cpp
@@ -41,7 +41,7 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadasort.h camadaexpr.h
                                    camadaimpl.h)
 
 # add each solver specific header, if it is enabled
-add_header_to_install("Boolector;CVC5;MathSAT;STP;Yices;Z3")
+add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
 set(${LIBRARY_TARGET_NAME}_HDR camadaimpl.h)
 
@@ -63,14 +63,21 @@ add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS
             ${LIBRARY_TARGET_NAME})
 
 # Solvers
-if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC Boolector::boolector)
+if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
+  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC PkgConfig::Bitwuzla)
   target_compile_definitions(${LIBRARY_TARGET_NAME}
-                             PRIVATE SOLVER_BOOLECTOR_ENABLED)
+                             PRIVATE SOLVER_BITWUZLA_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_CVC5_ENABLE})
+  target_link_directories(
+    ${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
+    ${CAMADA_DEPS_INSTALL_DIR}/lib64)
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC cvc5::cvc5)
+  if(CAMADA_CVC5_EXTRA_LIBS)
+    target_link_libraries(${LIBRARY_TARGET_NAME}
+                          PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
+  endif()
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC5_ENABLED)
 endif()
 
@@ -100,6 +107,14 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
+  get_filename_component(CAMADA_Z3_LIB_DIR "${CAMADA_Z3_LIB}" DIRECTORY)
+  if(EXISTS "${CAMADA_Z3_LIB_DIR}")
+    target_link_directories(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB_DIR})
+    set_property(
+      TARGET ${LIBRARY_TARGET_NAME}
+      APPEND
+      PROPERTY BUILD_RPATH "${CAMADA_Z3_LIB_DIR}")
+  endif()
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
 endif()
 
@@ -110,6 +125,7 @@ endif()
 set_target_properties(
   ${LIBRARY_TARGET_NAME}
   PROPERTIES VERSION ${${PROJECT_NAME}_VERSION}
+             SOVERSION ${CAMADA_VER_MAJOR}
              PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_PUB_HDR}")
 
 # Specify include directories for both compilation and installation process. The
@@ -120,27 +136,6 @@ target_include_directories(
   ${LIBRARY_TARGET_NAME}
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
          "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>")
-
-if(${RELEASE_MODE})
-  add_custom_target(
-    repack-btor-static-lib ALL
-    COMMAND
-      rm -rf btor && mkdir btor && cd btor && ar -x
-      "../../../deps/install/lib/libboolector.a" && cd ../ && rm -rf ling &&
-      mkdir ling && cd ling && ar -x
-      "../../../deps/src/boolector-3.2.3/deps/lingeling/liblgl.a" && cd ../ &&
-      rm -rf btor2tool && mkdir btor2tool && cd btor2tool && ar -x
-      "../../../deps/src/boolector-3.2.3/deps/btor2tools/build/libbtor2parser.a"
-      && cd ../ && rm -rf cms && mkdir cms && cd cms && ar -x
-      "../../../deps/install/lib/libcryptominisat5.a" && cd ../ && rm -rf cad
-      && mkdir cad && cd cad && ar -x "../../../deps/install/lib/libcadical.a"
-      && cd ../ && rm -rf z3 && mkdir z3 && cd z3 && ar -x
-      "../../../deps/install/lib/libz3.a" && cd ../ && rm -rf main && mkdir
-      main && cd main && ar -x
-      "../../lib/$<TARGET_FILE_NAME:${LIBRARY_TARGET_NAME}>" && cd ../ && rm
-      "../lib/$<TARGET_FILE_NAME:${LIBRARY_TARGET_NAME}>" && ar -qc
-      "../lib/$<TARGET_FILE_NAME:${LIBRARY_TARGET_NAME}>" ./*/*.o)
-endif()
 
 # Specify installation targets, typology and destination folders.
 install(

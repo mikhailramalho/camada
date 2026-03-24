@@ -12,7 +12,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install clang-tools && pip install cmake_format
     - name: Run clang-format
       run: find src -iname *.h -o -iname *.c -o -iname *.cpp -o -iname *.hpp -iname *.hh | xargs clang-format -style=llvm -i
-    - name: Run clang-format
+    - name: Run cmake-format
       run: find ./ -iname '*.cmake' -o -iname CMakeLists.txt | xargs cmake-format -i
     - name: Throws error if changes were made
       run: git diff --exit-code

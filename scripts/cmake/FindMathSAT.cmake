@@ -5,41 +5,82 @@ function(check_mathsat_version mathsat_include mathsat_lib)
   # Get lib path
   get_filename_component(mathsat_lib_path ${mathsat_lib} PATH)
 
+  set(_camada_mathsat_compile_definitions -I"${mathsat_include}")
+  if(CAMADA_MATHSAT_GMP_INCLUDE_DIR)
+    list(APPEND _camada_mathsat_compile_definitions
+         -I"${CAMADA_MATHSAT_GMP_INCLUDE_DIR}")
+  endif()
+
   try_run(
     MATHSAT_RETURNCODE MATHSAT_COMPILED ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/scripts/cmake/try_mathsat.cpp
-    COMPILE_DEFINITIONS -I"${mathsat_include}" LINK_LIBRARIES
+    COMPILE_DEFINITIONS ${_camada_mathsat_compile_definitions} LINK_LIBRARIES
                         -L${mathsat_lib_path} ${mathsat_lib} ${gmp}
-    COMPILE_OUTPUT_VARIABLE SRC_OUTPUT)
+    COMPILE_OUTPUT_VARIABLE MATHSAT_COMPILE_OUTPUT
+    RUN_OUTPUT_VARIABLE MATHSAT_RUN_OUTPUT)
 
   if(NOT MATHSAT_COMPILED)
     message(
       FATAL_ERROR
-        "MathSAT lib found in ${mathsat_lib_path} but test compilation failed: ${SRC_OUTPUT}"
+        "MathSAT lib found in ${mathsat_lib_path} but test compilation failed: ${MATHSAT_COMPILE_OUTPUT}"
+    )
+  endif()
+
+  if(NOT MATHSAT_RETURNCODE EQUAL 0)
+    message(
+      FATAL_ERROR
+        "MathSAT version probe built successfully but failed when executed (exit code ${MATHSAT_RETURNCODE}). Output:\n${MATHSAT_RUN_OUTPUT}"
     )
   endif()
 
   string(REGEX MATCH "([0-9]*\\.[0-9]*\\.[0-9]*)" mathsat_version
-               "${SRC_OUTPUT}")
+               "${MATHSAT_RUN_OUTPUT}")
   set(MATHSAT_VERSION_STRING
       ${mathsat_version}
       PARENT_SCOPE)
 endfunction(check_mathsat_version)
 
+set(_camada_mathsat_hints
+    ${CAMADA_DEPS_INSTALL_DIR} ${CAMADA_SOLVER_MATHSAT_DIR}
+    ${CAMADA_MATHSAT_DIR} $ENV{HOME}/mathsat)
+set(_camada_mathsat_gmp_hints ${CAMADA_DEPS_INSTALL_DIR} ${CMAKE_PREFIX_PATH}
+                              /opt/homebrew /usr/local)
+camada_should_download_dependency(_camada_download_mathsat FALSE)
+
 # Looking for MATHSAT in CAMADA_MATHSAT_INCLUDE_DIR
 find_path(
   CAMADA_MATHSAT_INCLUDE_DIR mathsat.h
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_MATHSAT_DIR}
-        $ENV{HOME}/mathsat
+  HINTS ${_camada_mathsat_hints}
   PATH_SUFFIXES include)
 
 find_library(
   CAMADA_MATHSAT_LIB mathsat
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_MATHSAT_DIR}
-        $ENV{HOME}/mathsat
+  HINTS ${_camada_mathsat_hints}
   PATH_SUFFIXES lib bin)
 
-find_library(gmp gmp PATHS ${CMAKE_SOURCE_DIR}/deps/install/)
+find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+find_path(
+  CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
+  HINTS ${_camada_mathsat_gmp_hints}
+  PATH_SUFFIXES include)
+
+if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
+   AND _camada_download_mathsat)
+  camada_setup_mathsat()
+  find_path(
+    CAMADA_MATHSAT_INCLUDE_DIR mathsat.h
+    HINTS ${_camada_mathsat_hints}
+    PATH_SUFFIXES include)
+  find_library(
+    CAMADA_MATHSAT_LIB mathsat
+    HINTS ${_camada_mathsat_hints}
+    PATH_SUFFIXES lib bin)
+  find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+  find_path(
+    CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
+    HINTS ${_camada_mathsat_gmp_hints}
+    PATH_SUFFIXES include)
+endif()
 
 # Try to check it dynamically, by compiling a small program that prints
 # MATHSAT's version

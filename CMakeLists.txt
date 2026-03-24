@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.10)
 
 set(CAMADA_VER_MAJOR 0)
-set(CAMADA_VER_MINOR 0)
+set(CAMADA_VER_MINOR 3)
 
 project(
   camada
@@ -103,6 +103,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Adds custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/scripts/cmake/")
+include(CamadaDependencies)
 
 # Add option to build using sanitizers
 include(Sanitizers)
@@ -135,7 +136,25 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(CAMADA_ENABLE_REGRESSION "Enable regression testing" OFF)
 if(CAMADA_ENABLE_REGRESSION)
   include(CTest)
-  find_package(Catch2 REQUIRED)
+  find_package(Catch2 3 QUIET)
+  if(NOT Catch2_FOUND AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF")
+    message(STATUS "Catch2 not found locally. Downloading it for regression.")
+    camada_include_cpm()
+    cpmaddpackage(
+      NAME
+      Catch2
+      GITHUB_REPOSITORY
+      catchorg/Catch2
+      VERSION
+      3.8.1
+      OPTIONS
+      "CATCH_INSTALL_DOCS OFF"
+      "CATCH_INSTALL_EXTRAS ON")
+    list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
+  endif()
+  if(NOT TARGET Catch2::Catch2)
+    find_package(Catch2 3 REQUIRED)
+  endif()
   enable_testing()
 endif()
 
@@ -171,10 +190,10 @@ set(RELEASE_MODE
     CACHE INTERNAL "Force release mode")
 
 # Find solvers
-config_solver(Boolector 3.2.1)
+config_solver(Bitwuzla 0.9.0)
 config_solver(CVC5 1.0.8)
 config_solver(MathSAT 5.6.3)
-config_solver(STP 2.3.3)
+config_solver(STP 2.3.4)
 config_solver(Yices 2.6.1)
 config_solver(Z3 4.8.8)
 
@@ -234,8 +253,9 @@ endmacro()
 
 config_info("Build type" "${CMAKE_BUILD_TYPE}")
 config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
+config_info("Download dependencies" "${CAMADA_DOWNLOAD_DEPENDENCIES}")
 
-config_info_bool("Solver Boolector" "${CAMADA_SOLVER_BOOLECTOR_ENABLE}")
+config_info_bool("Solver Bitwuzla" "${CAMADA_SOLVER_BITWUZLA_ENABLE}")
 config_info_bool("Solver CVC5" "${CAMADA_SOLVER_CVC5_ENABLE}")
 config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_MATHSAT_ENABLE}")
 config_info_bool("Solver STP" "${CAMADA_SOLVER_STP_ENABLE}")

@@ -1,7 +1,7 @@
 
 #include "camada.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 inline void fp_arithmetics(const camada::SMTSolverRef &solver) {
   auto x = solver->mkFP32(0.750000059604644775390625f);
