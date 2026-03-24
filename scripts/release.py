@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     run_command(["cmake", "..", "-GNinja", "-DBUILD_SHARED_LIBS=OFF",
                  "-DCAMADA_ENABLE_REGRESSION=OFF",
-                 "-DCAMADA_SOLVER_BOOLECTOR_ENABLE=ON",
+                 "-DCAMADA_SOLVER_BITWUZLA_ENABLE=ON",
                  "-DCAMADA_SOLVER_CVC5_ENABLE=OFF",
                  "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",
                  "-DCAMADA_SOLVER_STP_ENABLE=OFF",
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     os.chdir(curr_dir)
 
     # Now we are going to manually edit camadaTargets.cmake and replace the
-    # boolector dependency with only -phtread
+    # Bitwuzla dependency with only -pthread and -ldl
     fin = open('release/lib/cmake/camada/camadaTargets.cmake', 'rt')
     data = fin.read()
     fin.close()
@@ -59,15 +59,7 @@ if __name__ == '__main__':
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
     run_command(["cp", "LICENSE", "./release/license/"])
-    run_command(
-        ["cp", "-r", "./scripts/licenses/BOOLECTOR_LICENSE.txt", "./release/license/"])
-    run_command(
-        ["cp", "-r", "./scripts/licenses/BTOR2TOOLS_LICENSE.txt", "./release/license/"])
-    run_command(
-        ["cp", "-r", "./scripts/licenses/CADICAL_LICENSE.txt", "./release/license/"])
-    run_command(
-        ["cp", "-r", "./scripts/licenses/CRYPTOMINISAT_LICENSE.txt", "./release/license/"])
-    run_command(
-        ["cp", "-r", "./scripts/licenses/LINGELING_LICENSE", "./release/license/"])
+    if os.path.exists("./deps/install/COPYING"):
+        run_command(["cp", "-r", "./deps/install/COPYING", "./release/license/BITWUZLA_LICENSE.txt"])
     run_command(
         ["cp", "-r", "./scripts/licenses/Z3_LICENSE.txt", "./release/license/"])

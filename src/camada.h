@@ -455,8 +455,8 @@ SMTSolverRef createMathSATSolver();
 /// Convenience method to create a CVC5Solver object
 SMTSolverRef createCVC5Solver();
 
-/// Convenience method to create a BoolectorSolver object
-SMTSolverRef createBoolectorSolver();
+/// Convenience method to create a BitwuzlaSolver object
+SMTSolverRef createBitwuzlaSolver();
 
 /// Convenience method to create a YicesSolver object
 SMTSolverRef createYicesSolver();

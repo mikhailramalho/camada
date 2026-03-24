@@ -26,20 +26,36 @@ function(check_mathsat_version mathsat_include mathsat_lib)
       PARENT_SCOPE)
 endfunction(check_mathsat_version)
 
+set(_camada_mathsat_hints ${CAMADA_DEPS_INSTALL_DIR}
+                          ${CAMADA_SOLVER_MATHSAT_DIR} ${CAMADA_MATHSAT_DIR}
+                          $ENV{HOME}/mathsat)
+
 # Looking for MATHSAT in CAMADA_MATHSAT_INCLUDE_DIR
 find_path(
   CAMADA_MATHSAT_INCLUDE_DIR mathsat.h
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_MATHSAT_DIR}
-        $ENV{HOME}/mathsat
+  HINTS ${_camada_mathsat_hints}
   PATH_SUFFIXES include)
 
 find_library(
   CAMADA_MATHSAT_LIB mathsat
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_MATHSAT_DIR}
-        $ENV{HOME}/mathsat
+  HINTS ${_camada_mathsat_hints}
   PATH_SUFFIXES lib bin)
 
-find_library(gmp gmp PATHS ${CMAKE_SOURCE_DIR}/deps/install/)
+find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+
+if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
+   AND CAMADA_DOWNLOAD_DEPENDENCIES)
+  camada_setup_mathsat()
+  find_path(
+    CAMADA_MATHSAT_INCLUDE_DIR mathsat.h
+    HINTS ${_camada_mathsat_hints}
+    PATH_SUFFIXES include)
+  find_library(
+    CAMADA_MATHSAT_LIB mathsat
+    HINTS ${_camada_mathsat_hints}
+    PATH_SUFFIXES lib bin)
+  find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+endif()
 
 # Try to check it dynamically, by compiling a small program that prints
 # MATHSAT's version

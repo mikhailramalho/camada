@@ -28,19 +28,25 @@ endfunction()
 find_package(Catch2 3 REQUIRED)
 
 # add each solver specific implementation, if it is enabled
-compile_test("Boolector;CVC5;MathSAT;STP;Yices;Z3")
+compile_test("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
 add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME}
                                                         Catch2::Catch2)
 
 # Solvers
-if(${CAMADA_SOLVER_BOOLECTOR_ENABLE})
-  target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE Boolector::boolector)
+if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
+  target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE PkgConfig::Bitwuzla)
 endif()
 
 if(${CAMADA_SOLVER_CVC5_ENABLE})
+  target_link_directories(${REGRESSION_TARGET_NAME}
+                          PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
+                                  ${CAMADA_DEPS_INSTALL_DIR}/lib64)
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC cvc5::cvc5)
+  if(CAMADA_CVC5_EXTRA_LIBS)
+    target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
+  endif()
 endif()
 
 if(${CAMADA_SOLVER_MATHSAT_ENABLE})

@@ -36,8 +36,8 @@
 #include "cvc5solver.h"
 #endif
 
-#if SOLVER_BOOLECTOR_ENABLED
-#include "boolectorsolver.h"
+#if SOLVER_BITWUZLA_ENABLED
+#include "bitwuzlasolver.h"
 #endif
 
 #if SOLVER_YICES_ENABLED
@@ -80,12 +80,12 @@ camada::SMTSolverRef camada::createCVC5Solver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createBoolectorSolver() {
-#if SOLVER_BOOLECTOR_ENABLED
-  return std::make_shared<BtorSolver>();
+camada::SMTSolverRef camada::createBitwuzlaSolver() {
+#if SOLVER_BITWUZLA_ENABLED
+  return std::make_shared<BitwuzlaSolver>();
 #else
-  std::cerr << "Camada was not compiled with Boolector support, rebuild "
-               "with -DCAMADA_ENABLE_SOLVER_BOOLECTOR=ON\n";
+  std::cerr << "Camada was not compiled with Bitwuzla support, rebuild "
+               "with -DCAMADA_ENABLE_SOLVER_BITWUZLA=ON\n";
   abort();
 #endif
 }

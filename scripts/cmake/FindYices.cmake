@@ -4,12 +4,17 @@ include(CheckCXXSourceRuns)
 function(check_yices_version yices_include yices_lib)
   # Get lib path
   get_filename_component(yices_lib_path ${yices_lib} PATH)
+  set(_camada_yices_probe_libs "${yices_lib}")
+  find_library(_camada_yices_probe_gmp gmp)
+  if(_camada_yices_probe_gmp)
+    list(APPEND _camada_yices_probe_libs "${_camada_yices_probe_gmp}")
+  endif()
 
   try_run(
     YICES_RETURNCODE YICES_COMPILED ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/scripts/cmake/try_yices.cpp
     COMPILE_DEFINITIONS -I"${yices_include}" LINK_LIBRARIES -L${yices_lib_path}
-                        ${yices_lib}
+                        ${_camada_yices_probe_libs}
     RUN_OUTPUT_VARIABLE SRC_OUTPUT)
 
   if(NOT YICES_COMPILED)
@@ -25,16 +30,59 @@ function(check_yices_version yices_include yices_lib)
       PARENT_SCOPE)
 endfunction(check_yices_version)
 
+set(_camada_yices_hints ${CAMADA_DEPS_INSTALL_DIR} ${CAMADA_SOLVER_YICES_DIR}
+                        ${CAMADA_YICES_DIR} $ENV{HOME}/yices)
+
+if(CAMADA_DOWNLOAD_DEPENDENCIES)
+  camada_setup_yices()
+endif()
+
+if(BUILD_SHARED_LIBS
+   AND CAMADA_YICES_LIB
+   AND CAMADA_YICES_LIB MATCHES "\\.a$")
+  unset(CAMADA_YICES_LIB CACHE)
+endif()
+
+if(NOT BUILD_SHARED_LIBS)
+  foreach(_camada_yices_hint IN LISTS _camada_yices_hints)
+    if(EXISTS "${_camada_yices_hint}/lib/libyices.a")
+      set(CAMADA_YICES_LIB "${_camada_yices_hint}/lib/libyices.a")
+      break()
+    endif()
+  endforeach()
+endif()
+
 # Looking for YICES in CAMADA_YICES_INCLUDE_DIR
 find_path(
   CAMADA_YICES_INCLUDE_DIR yices.h
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_YICES_DIR} $ENV{HOME}/yices
+  HINTS ${_camada_yices_hints}
   PATH_SUFFIXES include)
 
-find_library(
-  CAMADA_YICES_LIB yices
-  HINTS ${CMAKE_SOURCE_DIR}/deps/install/ ${CAMADA_YICES_DIR} $ENV{HOME}/yices
-  PATH_SUFFIXES lib bin)
+if(BUILD_SHARED_LIBS)
+  find_library(
+    CAMADA_YICES_LIB yices
+    HINTS ${_camada_yices_hints}
+    PATH_SUFFIXES lib bin)
+endif()
+
+if(NOT CAMADA_YICES_LIB)
+  find_library(
+    CAMADA_YICES_LIB yices
+    HINTS ${_camada_yices_hints}
+    PATH_SUFFIXES lib bin)
+endif()
+
+if((NOT CAMADA_YICES_INCLUDE_DIR OR NOT CAMADA_YICES_LIB)
+   AND CAMADA_DOWNLOAD_DEPENDENCIES)
+  find_path(
+    CAMADA_YICES_INCLUDE_DIR yices.h
+    HINTS ${_camada_yices_hints}
+    PATH_SUFFIXES include)
+  find_library(
+    CAMADA_YICES_LIB yices
+    HINTS ${_camada_yices_hints}
+    PATH_SUFFIXES lib bin)
+endif()
 
 # Try to check it dynamically, by compiling a small program that prints YICES's
 # version
