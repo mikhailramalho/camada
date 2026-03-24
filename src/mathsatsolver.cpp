@@ -581,7 +581,7 @@ SMTExprRef MathSATSolver::mkFPtoFPImpl(const SMTExprRef &From,
   return newExprRef(
       MathSATExpr(Context, To,
                   msat_make_fp_cast(*Context, To->getFPExponentWidth(),
-                                    To->getFPSignificandWidth() + 1,
+                                    To->getFPSignificandWidth(),
                                     toSolverExpr<MathSATExpr>(*R).Expr,
                                     toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -592,7 +592,7 @@ SMTExprRef MathSATSolver::mkSBVtoFPImpl(const SMTExprRef &From,
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_sbv(*Context, To->getFPExponentWidth(),
-                            To->getFPSignificandWidth() + 1,
+                            To->getFPSignificandWidth(),
                             toSolverExpr<MathSATExpr>(*R).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -603,7 +603,7 @@ SMTExprRef MathSATSolver::mkUBVtoFPImpl(const SMTExprRef &From,
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_ubv(*Context, To->getFPExponentWidth(),
-                            To->getFPSignificandWidth() + 1,
+                            To->getFPSignificandWidth(),
                             toSolverExpr<MathSATExpr>(*R).Expr,
                             toSolverExpr<MathSATExpr>(*From).Expr)));
 }
@@ -786,7 +786,7 @@ SMTExprRef MathSATSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
   return newExprRef(MathSATExpr(
       Context, To,
       msat_make_fp_from_ieeebv(*Context, To->getFPExponentWidth(),
-                               To->getFPSignificandWidth() + 1,
+                               To->getFPSignificandWidth(),
                                toSolverExpr<MathSATExpr>(*Exp).Expr)));
 }
 
