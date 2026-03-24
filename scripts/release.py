@@ -4,6 +4,8 @@ import os
 import re
 import shutil
 import subprocess
+import sys
+from pathlib import Path
 
 
 def check_root_dir():
@@ -14,6 +16,43 @@ def check_root_dir():
 def run_command(cmd):
     print(cmd)
     subprocess.run(cmd, check=True)
+
+
+def copy_release_dependency(pattern, deps_install_dir, release_lib_dir):
+    matches = sorted(Path(deps_install_dir).glob(pattern))
+    if not matches:
+        raise FileNotFoundError(
+            f"Could not find a release dependency matching '{pattern}' in "
+            f"{deps_install_dir}")
+
+    copied = []
+    for source in matches:
+        destination = Path(release_lib_dir) / source.name
+        shutil.copy2(source, destination)
+        copied.append(destination.name)
+    return copied
+
+
+def rewrite_release_link_interface(targets_file, solver_archives):
+    packaged_solver_libs = [f"${{_IMPORT_PREFIX}}/lib/{name}"
+                            for name in solver_archives]
+    system_libs = ["-lmpfr", "-lgmp"]
+
+    if sys.platform.startswith("linux"):
+        system_libs.extend(["-lpthread", "-ldl"])
+    elif sys.platform == "darwin":
+        system_libs.append("-lpthread")
+
+    replacement = 'INTERFACE_LINK_LIBRARIES "{}"'.format(
+        ";".join(packaged_solver_libs + system_libs))
+
+    with open(targets_file, 'rt') as fin:
+        data = fin.read()
+
+    data = re.sub(r'INTERFACE_LINK_LIBRARIES ".*"', replacement, data)
+
+    with open(targets_file, 'wt') as fout:
+        fout.write(data)
 
 
 if __name__ == '__main__':
@@ -49,22 +88,22 @@ if __name__ == '__main__':
 
     os.chdir(curr_dir)
 
-    # Now we are going to manually edit camadaTargets.cmake and replace the
-    # Bitwuzla dependency with only -pthread and -ldl
-    fin = open('release/lib/cmake/camada/camadaTargets.cmake', 'rt')
-    data = fin.read()
-    fin.close()
+    release_lib_dir = "./release/lib"
+    deps_install_dir = "./build/deps/install"
 
-    data = re.sub(r'INTERFACE_LINK_LIBRARIES ".*"',
-                  'INTERFACE_LINK_LIBRARIES "-lpthread;-ldl"', data)
-
-    fin = open('release/lib/cmake/camada/camadaTargets.cmake', 'wt')
-    fin.write(data)
-    fin.close()
+    solver_archives = []
+    solver_archives.extend(
+        copy_release_dependency("**/libbitwuzla*.a", deps_install_dir,
+                                release_lib_dir))
+    solver_archives.extend(
+        copy_release_dependency("**/libz3.a", deps_install_dir,
+                                release_lib_dir))
+    rewrite_release_link_interface("./release/lib/cmake/camada/camadaTargets.cmake",
+                                   solver_archives)
 
     # We'll also copy solver's headers, in case the user
     # wants to override the solver
-    run_command(["cp", "-r", "./build/deps/install/include/", "./release/"])
+    run_command(["cp", "-r", f"{deps_install_dir}/include/", "./release/"])
 
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
