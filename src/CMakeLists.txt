@@ -107,6 +107,12 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
+  get_filename_component(CAMADA_Z3_LIB_DIR "${CAMADA_Z3_LIB}" DIRECTORY)
+  if(EXISTS "${CAMADA_Z3_LIB_DIR}")
+    target_link_directories(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB_DIR})
+    set_property(TARGET ${LIBRARY_TARGET_NAME} APPEND PROPERTY BUILD_RPATH
+                                                             "${CAMADA_Z3_LIB_DIR}")
+  endif()
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
 endif()
 

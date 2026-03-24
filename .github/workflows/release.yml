@@ -33,7 +33,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install Dependencies
-      run: brew install gmp cmake ninja automake boost zlib bison flex doxygen libtool pkg-config gettext texinfo python3
+      run: brew install gmp cmake ninja automake boost zlib bison flex doxygen libtool pkg-config gettext texinfo python3 z3
 
     - name: Configure Homebrew Environment
       run: |

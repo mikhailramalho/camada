@@ -1000,6 +1000,25 @@ function(camada_setup_z3)
     SOURCE_DIR
     "${z3_root_dir}")
   camada_stage_prebuilt_tree("${z3_root_dir}")
+
+  if(APPLE)
+    set(z3_shared_lib
+        "${CAMADA_DEPS_INSTALL_DIR}/bin/libz3${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    if(EXISTS "${z3_shared_lib}")
+      execute_process(
+        COMMAND install_name_tool -id
+                "@rpath/libz3${CMAKE_SHARED_LIBRARY_SUFFIX}" "${z3_shared_lib}"
+        RESULT_VARIABLE z3_install_name_result
+        OUTPUT_VARIABLE z3_install_name_stdout
+        ERROR_VARIABLE z3_install_name_stderr)
+      if(NOT z3_install_name_result EQUAL 0)
+        message(
+          FATAL_ERROR
+            "Failed to normalize the Z3 install name for ${z3_shared_lib}\nstdout:\n${z3_install_name_stdout}\nstderr:\n${z3_install_name_stderr}"
+        )
+      endif()
+    endif()
+  endif()
 endfunction()
 
 function(camada_setup_mathsat)
