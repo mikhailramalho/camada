@@ -621,8 +621,14 @@ SMTExprRef MathSATSolver::mkFPtoSBVImpl(const SMTExprRef &From,
 
 SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
-  // We just need to call mkFPtoSBV
-  return mkFPtoSBV(From, ToWidth);
+  // Conversion from float to integers always truncate, so we assume
+  // the round mode to be toward zero
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  return newExprRef(MathSATExpr(
+      Context, mkBVSort(ToWidth),
+      msat_make_fp_to_ubv(*Context, ToWidth,
+                          toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+                          toSolverExpr<MathSATExpr>(*From).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
