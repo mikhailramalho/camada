@@ -55,10 +55,10 @@ void STPSort::dump() const {
 }
 
 bool STPExpr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
   return (STP::getExprID(Expr) ==
-          STP::getExprID(dynamic_cast<const STPExpr &>(Other).Expr));
+          STP::getExprID(static_cast<const STPExpr &>(Other).Expr));
 }
 
 void STPExpr::dump() const {

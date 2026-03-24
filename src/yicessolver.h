@@ -42,8 +42,11 @@ using YicesContextOwner = std::unique_ptr<context_t, YicesContextDeleter>;
 /// Wrapper for Yices Sort
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
   using SolverSort<YicesContextRef, type_t>::SolverSort;
   ~YicesSort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 
@@ -52,8 +55,11 @@ public:
 
 class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
   using SolverExpr<YicesContextRef, term_t>::SolverExpr;
   ~YicesExpr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;

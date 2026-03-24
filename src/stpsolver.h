@@ -77,8 +77,11 @@ private:
 /// Wrapper for STP Sort
 class STPSort : public SolverSort<STPContextRef, STP::Type> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
   using SolverSort<STPContextRef, STP::Type>::SolverSort;
   virtual ~STPSort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 
@@ -87,6 +90,7 @@ public:
 
 class STPExpr : public SolverExpr<STPContextRef, STP::Expr> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
   bool OwnsExpr = false;
 
   STPExpr(STPContextRef C, const SMTSortRef &S, const STP::Expr &E,
@@ -95,6 +99,8 @@ public:
         OwnsExpr(Owns) {}
 
   virtual ~STPExpr() override;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;

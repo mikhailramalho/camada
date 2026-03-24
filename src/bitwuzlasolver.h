@@ -43,16 +43,22 @@ using BitwuzlaContextOwner = std::unique_ptr<Bitwuzla, BitwuzlaContextDeleter>;
 
 class BitwSort : public SolverSort<BitwuzlaContextRef, BitwuzlaSort> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Bitwuzla;
   using SolverSort<BitwuzlaContextRef, BitwuzlaSort>::SolverSort;
   ~BitwSort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 };
 
 class BitwExpr : public SolverExpr<BitwuzlaContextRef, BitwuzlaTerm> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Bitwuzla;
   using SolverExpr<BitwuzlaContextRef, BitwuzlaTerm>::SolverExpr;
   ~BitwExpr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   bool equal_to(SMTExpr const &Other) const override;
   void dump() const override;

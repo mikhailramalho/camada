@@ -33,8 +33,11 @@ using CVC5ContextRef = cvc5::Solver *;
 /// Wrapper for CVC5 Sort
 class CVC5Sort : public SolverSort<CVC5ContextRef, cvc5::Sort> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
   using SolverSort<CVC5ContextRef, cvc5::Sort>::SolverSort;
   ~CVC5Sort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 
@@ -43,8 +46,11 @@ public:
 
 class CVC5Expr : public SolverExpr<CVC5ContextRef, cvc5::Term> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
   using SolverExpr<CVC5ContextRef, cvc5::Term>::SolverExpr;
   ~CVC5Expr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;

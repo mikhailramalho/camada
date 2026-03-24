@@ -47,9 +47,9 @@ void Z3Sort::dump() const {
 }
 
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
-  return z3::eq(Expr, dynamic_cast<const Z3Expr &>(Other).Expr);
+  return z3::eq(Expr, static_cast<const Z3Expr &>(Other).Expr);
 }
 
 void Z3Expr::dump() const {

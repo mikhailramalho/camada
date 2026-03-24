@@ -48,9 +48,9 @@ unsigned CVC5Sort::getWidthFromSolver() const {
 void CVC5Sort::dump() const { std::cerr << Sort.toString() << '\n'; }
 
 bool CVC5Expr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
-  return (Expr == dynamic_cast<const CVC5Expr &>(Other).Expr);
+  return (Expr == static_cast<const CVC5Expr &>(Other).Expr);
 }
 
 void CVC5Expr::dump() const { std::cerr << Expr.toString() << '\n'; }

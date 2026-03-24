@@ -63,10 +63,10 @@ void MathSATSort::dump() const {
 }
 
 bool MathSATExpr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
   return (msat_term_id(Expr) ==
-          msat_term_id(dynamic_cast<const MathSATExpr &>(Other).Expr));
+          msat_term_id(static_cast<const MathSATExpr &>(Other).Expr));
 }
 
 void MathSATExpr::dump() const {

@@ -74,9 +74,9 @@ BitwuzlaTerm mkTerm4(BitwuzlaTermManager *tm, BitwuzlaKind kind,
 unsigned BitwSort::getWidthFromSolver() const { return getWidth(); }
 
 bool BitwExpr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
-  return Expr == dynamic_cast<const BitwExpr &>(Other).Expr;
+  return Expr == static_cast<const BitwExpr &>(Other).Expr;
 }
 
 void BitwExpr::dump() const {

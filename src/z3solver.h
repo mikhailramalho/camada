@@ -33,8 +33,11 @@ using Z3ContextRef = z3::context *;
 /// Wrapper for Z3 Sort
 class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
   virtual ~Z3Sort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 
@@ -43,8 +46,11 @@ public:
 
 class Z3Expr : public SolverExpr<Z3ContextRef, z3::expr> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
   using SolverExpr<Z3ContextRef, z3::expr>::SolverExpr;
   virtual ~Z3Expr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;

@@ -27,6 +27,85 @@
 namespace camada {
 
 class SMTExpr;
+class SMTSolverImpl;
+
+enum class SMTExprKind {
+  Unknown,
+  Symbol,
+  BoolConst,
+  BVConst,
+  FPConst,
+  RMConst,
+  ArrayConst,
+  BVAdd,
+  BVSub,
+  BVMul,
+  BVSRem,
+  BVURem,
+  BVSDiv,
+  BVUDiv,
+  BVShl,
+  BVAshr,
+  BVLshr,
+  BVNeg,
+  BVNot,
+  BVXor,
+  BVOr,
+  BVAnd,
+  BVXnor,
+  BVNor,
+  BVNand,
+  BVUlt,
+  BVSlt,
+  BVUgt,
+  BVSgt,
+  BVUle,
+  BVSle,
+  BVUge,
+  BVSge,
+  Not,
+  Equal,
+  Implies,
+  And,
+  Or,
+  Xor,
+  Ite,
+  BVSignExt,
+  BVZeroExt,
+  BVExtract,
+  BVConcat,
+  BVRedOr,
+  BVRedAnd,
+  FPAbs,
+  FPNeg,
+  FPIsInfinite,
+  FPIsNaN,
+  FPIsDenormal,
+  FPIsNormal,
+  FPIsZero,
+  FPMul,
+  FPDiv,
+  FPRem,
+  FPAdd,
+  FPSub,
+  FPSqrt,
+  FPFMA,
+  FPLt,
+  FPGt,
+  FPLe,
+  FPGe,
+  FPEqual,
+  FPtoFP,
+  SBVtoFP,
+  UBVtoFP,
+  FPtoSBV,
+  FPtoUBV,
+  FPtoIntegral,
+  ArraySelect,
+  ArrayStore,
+  BVToIEEEFP,
+  IEEEFPToBV,
+};
 
 class SMTExprRef {
 public:
@@ -78,6 +157,8 @@ public:
   explicit SMTExpr(SMTSortRef S) : Sort(std::move(S)) {}
   virtual ~SMTExpr() = default;
 
+  virtual SMTBackendKind getBackendKind() const = 0;
+
   friend bool operator==(SMTExpr const &LHS, SMTExpr const &RHS) {
     return LHS.equal_to(RHS);
   }
@@ -100,12 +181,21 @@ public:
   /// Returns this expr's sort width
   unsigned getWidth() const { return Sort->getWidth(); }
 
+  SMTExprKind getKind() const { return Kind; }
+
   virtual void dump() const;
 
 protected:
   /// Query the SMT solver and returns true if two Exprs are equal (same kind
   /// and bit width). This does not check if the two Exprs are the same objects.
   virtual bool equal_to(SMTExpr const &other) const = 0;
+
+private:
+  void setKind(SMTExprKind TheKind) { Kind = TheKind; }
+
+  SMTExprKind Kind = SMTExprKind::Unknown;
+
+  friend class SMTSolverImpl;
 };
 
 /// Template to hold Solver specific Context and Expr
@@ -140,7 +230,9 @@ public:
 /// Wrapper to downcast from SMTExpr to Solver specific expr
 template <typename SolverExpr>
 static inline const SolverExpr &toSolverExpr(const SMTExpr &S) {
-  return dynamic_cast<const SolverExpr &>(S);
+  assert(S.getBackendKind() == SolverExpr::BackendKindValue &&
+         "Invalid backend expression cast");
+  return static_cast<const SolverExpr &>(S);
 }
 
 } // namespace camada

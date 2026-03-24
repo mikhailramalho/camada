@@ -28,6 +28,8 @@
 
 namespace camada {
 
+enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3 };
+
 class SMTSort;
 struct SMTHandleState {
   uint64_t Generation = 1;
@@ -79,6 +81,8 @@ class SMTSort {
 public:
   SMTSort() = default;
   virtual ~SMTSort() = default;
+
+  virtual SMTBackendKind getBackendKind() const = 0;
 
   /// Returns true if the sort is a bitvector.
   virtual bool isBVSort() const { return false; }
@@ -269,7 +273,9 @@ public:
 /// Wrapper to downcast from SMTSort to Solver specific sort
 template <typename SolverSort>
 static inline const SolverSort &toSolverSort(const SMTSort &S) {
-  return dynamic_cast<const SolverSort &>(S);
+  assert(S.getBackendKind() == SolverSort::BackendKindValue &&
+         "Invalid backend sort cast");
+  return static_cast<const SolverSort &>(S);
 }
 
 } // namespace camada

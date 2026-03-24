@@ -49,9 +49,9 @@ void YicesSort::dump() const {
 }
 
 bool YicesExpr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
-  return (Expr == dynamic_cast<const YicesExpr &>(Other).Expr);
+  return (Expr == static_cast<const YicesExpr &>(Other).Expr);
 }
 
 void YicesExpr::dump() const {
