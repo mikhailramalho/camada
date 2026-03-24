@@ -3,12 +3,12 @@
 
 # Camada
 
-Camada (“layer” in Portuguese) is a permissively licensed open-source C++11 library that serves as a wrapper for six popular SMT (Satisfiability Modulo Theories) solvers: Bitwuzla, STP, Yices, MathSAT, CVC5, and Z3. It provides a unified interface for interacting with these solvers, making it easier for developers to work with SMT in their projects.
+Camada ("layer" in Portuguese) is a permissively licensed open-source C++17 library that serves as a wrapper for six popular SMT (Satisfiability Modulo Theories) solvers: Bitwuzla, STP, Yices, MathSAT, CVC5, and Z3. It provides a unified interface for interacting with these solvers, making it easier for developers to work with SMT in their projects.
 
 Camada aims to provide a unified API for several SMT solvers while also adding some missing features to all supported solvers:
 - [x] A floating-point encoding layer using bit-vectors.
 - [ ] A tuple encoding layer.
-- [ ] A array encoding layer.
+- [ ] An array encoding layer.
 
 ## Building and Installing
 
@@ -26,17 +26,14 @@ Camada uses CMake as its build system. Follow these steps to build and install t
 git clone https://github.com/mikhailramalho/camada.git
 cd camada
 
-# Create a build directory and navigate into it
-mkdir build && cd build
-
 # Run CMake to configure the project
-cmake ..
+cmake -S . -B build
 
 # Build the library
-make
+cmake --build build
 
 # Install Camada
-make install
+cmake --install build
 ```
 
 ### Downloading Supported Solvers
@@ -69,22 +66,25 @@ When CMake downloads dependencies itself:
 - `STP`, `CryptoMiniSat`, `GMP`, and `Minisat` still build from
   source.
 
-The `<build-dir>/deps/install` directory will contain the binaries for the supported solvers, and Camada will use them from this location during execution.
+The `<build-dir>/deps/install` directory will contain the staged solver headers,
+libraries, and auxiliary artifacts, and Camada will use them from this
+location during the build.
 
 ## Supported backends
 
 | Backend    | Minimum version | Native floating-point support |
 | ---------- | :-------------: | :-------------: |
-| [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.0          |   |
+| [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.0          | ✔️ |
 | [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️ |
-| [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>2</sup> |
+| [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
 | [STP](https://stp.github.io/)              |  2.3.4          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
 | [Z3](https://github.com/Z3Prover/z3)       |  4.8.8          | ✔️ |
 
-<sup>1</sup> At least commit [9a59a72e](https://github.com/stp/stp/commit/9a59a72e82d67cefeb88d8baa34965f70acb5d1c)
-
-<sup>2</sup> `fp.fma` and `fp.rem` are bit-blast when using MathSAT and it doesn't support these operations natively. 
+<sup>1</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
+it does not support these operations natively. `ROUND_TO_AWAY` is also not
+supported by the native MathSAT floating-point API and aborts with an error if
+requested.
 
 ## Implementation Details
 
@@ -92,6 +92,10 @@ Camada is designed as a wrapper library to simplify the usage of multiple SMT so
 
 Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbmc) so some of the implementation decisions were geared towards the verification of C programs, in particular, camada diverges from the SMT standard in:
 - `fp.neg` supports negative `NaN`s. See https://github.com/Z3Prover/z3/issues/4466 for a more detailed discussion.
+
+Expression and sort handles are solver-owned. Any `SMTExprRef` or `SMTSortRef`
+obtained from a solver becomes invalid after `solver->reset()` or after the
+solver is destroyed, and should not be reused across those boundaries.
 
 ### Usage Example
 
