@@ -50,3 +50,36 @@ inline void fp_equal(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getFP32(fx) == 0.06f);
   REQUIRE(solver->getFP64(fy) == -7.0);
 }
+
+inline void implies_semantics(const camada::SMTSolverRef &solver) {
+  auto f1 = solver->mkBool(false);
+  auto implication = solver->mkImplies(f1, f1);
+  REQUIRE(f1->getKind() == camada::SMTExprKind::BoolConst);
+  REQUIRE(implication->getKind() == camada::SMTExprKind::Implies);
+  solver->addConstraint(solver->mkNot(implication));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
+  auto t = solver->mkBool(true);
+  auto f = solver->mkBool(false);
+  REQUIRE(t->getKind() == camada::SMTExprKind::BoolConst);
+  REQUIRE(f->getKind() == camada::SMTExprKind::BoolConst);
+  auto implication = solver->mkImplies(t, f);
+  REQUIRE(implication->getKind() == camada::SMTExprKind::Implies);
+  solver->addConstraint(implication);
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
+  auto value = solver->mkBVFromBin("1000", 4);
+  auto shift = solver->mkBVFromDec(1, 4);
+  auto result = solver->mkBVLshr(value, shift);
+  REQUIRE(value->getKind() == camada::SMTExprKind::BVConst);
+  REQUIRE(shift->getKind() == camada::SMTExprKind::BVConst);
+  REQUIRE(result->getKind() == camada::SMTExprKind::BVLshr);
+
+  solver->addConstraint(
+      solver->mkEqual(result, solver->mkBVFromBin("0100", 4)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
