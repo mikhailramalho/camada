@@ -90,7 +90,7 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./camada-linux-x64.tar.gz
         asset_name: camada-linux-x64.tar.gz
-        asset_content_type: text/x-shellscript
+        asset_content_type: application/gzip
 
     - name: Upload Release Asset (MacOS)
       id: upload-release-asset-macos
@@ -101,4 +101,4 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./camada-macos-arm64.tar.gz
         asset_name: camada-macos-arm64.tar.gz
-        asset_content_type: text/x-shellscript
+        asset_content_type: application/gzip

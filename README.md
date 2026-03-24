@@ -80,7 +80,7 @@ The `<build-dir>/deps/install` directory will contain the binaries for the suppo
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>2</sup> |
 | [STP](https://stp.github.io/)              |  2.3.4          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
-| [Z3](https://github.com/Z3Prover/z3)       |  4.8.9          | ✔️ |
+| [Z3](https://github.com/Z3Prover/z3)       |  4.8.8          | ✔️ |
 
 <sup>1</sup> At least commit [9a59a72e](https://github.com/stp/stp/commit/9a59a72e82d67cefeb88d8baa34965f70acb5d1c)
 
