@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 set(CAMADA_VER_MAJOR 0)
-set(CAMADA_VER_MINOR 0)
+set(CAMADA_VER_MINOR 3)
 
 project(
   camada

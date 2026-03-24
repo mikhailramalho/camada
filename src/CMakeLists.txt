@@ -116,6 +116,7 @@ endif()
 set_target_properties(
   ${LIBRARY_TARGET_NAME}
   PROPERTIES VERSION ${${PROJECT_NAME}_VERSION}
+             SOVERSION ${CAMADA_VER_MAJOR}
              PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_PUB_HDR}")
 
 # Specify include directories for both compilation and installation process. The
