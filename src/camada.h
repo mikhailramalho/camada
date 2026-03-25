@@ -56,6 +56,10 @@ public:
   template <typename SolverSort>
   SMTSortRef newSortRef(const SolverSort &Sort) const {
     auto OwnedSort = std::make_unique<SolverSort>(Sort);
+#ifndef NDEBUG
+    assert(OwnedSort->validateSortWidth());
+    OwnedSort->markWidthValidated();
+#endif
     const SMTSort *SortPtr = OwnedSort.get();
     SortArena.emplace_back(std::move(OwnedSort));
     return SMTSortRef(SortPtr, HandleState, HandleState->Generation);

@@ -139,6 +139,11 @@ public:
   /// Returns whether the solver width matches our internal representation.
   bool validateSortWidth() const;
 
+#ifndef NDEBUG
+  bool isWidthValidated() const { return WidthValidated; }
+  void markWidthValidated() { WidthValidated = true; }
+#endif
+
   virtual void dump() const;
 
 protected:
@@ -148,6 +153,9 @@ protected:
   unsigned SigWidth = 0;
   SMTSortRef IndexSort;
   SMTSortRef ElementSort;
+#ifndef NDEBUG
+  bool WidthValidated = false;
+#endif
 };
 
 inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {

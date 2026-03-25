@@ -41,7 +41,9 @@ public:
 
   SMTExprRef newExprRef(const SMTExpr &Exp) const final {
     SMTExprRef theExp = newExprRefImpl(Exp);
-    assert(theExp->Sort->validateSortWidth());
+#ifndef NDEBUG
+    assert(theExp->Sort->isWidthValidated());
+#endif
     return theExp;
   }
 
