@@ -22,6 +22,6 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
     }
   };
 
-  camada::SMTSolverRef bitwuzla = std::make_shared<myBitwuzlaSolver>();
+  camada::SMTSolverRef bitwuzla = std::make_unique<myBitwuzlaSolver>();
   tests(bitwuzla);
 }

@@ -26,6 +26,129 @@
 
 namespace camada {
 
+class SMTExpr;
+class SMTSolverImpl;
+
+enum class SMTExprKind {
+  Unknown,
+  Symbol,
+  BoolConst,
+  BVConst,
+  FPConst,
+  RMConst,
+  ArrayConst,
+  BVAdd,
+  BVSub,
+  BVMul,
+  BVSRem,
+  BVURem,
+  BVSDiv,
+  BVUDiv,
+  BVShl,
+  BVAshr,
+  BVLshr,
+  BVNeg,
+  BVNot,
+  BVXor,
+  BVOr,
+  BVAnd,
+  BVXnor,
+  BVNor,
+  BVNand,
+  BVUlt,
+  BVSlt,
+  BVUgt,
+  BVSgt,
+  BVUle,
+  BVSle,
+  BVUge,
+  BVSge,
+  Not,
+  Equal,
+  Implies,
+  And,
+  Or,
+  Xor,
+  Ite,
+  BVSignExt,
+  BVZeroExt,
+  BVExtract,
+  BVConcat,
+  BVRedOr,
+  BVRedAnd,
+  FPAbs,
+  FPNeg,
+  FPIsInfinite,
+  FPIsNaN,
+  FPIsDenormal,
+  FPIsNormal,
+  FPIsZero,
+  FPMul,
+  FPDiv,
+  FPRem,
+  FPAdd,
+  FPSub,
+  FPSqrt,
+  FPFMA,
+  FPLt,
+  FPGt,
+  FPLe,
+  FPGe,
+  FPEqual,
+  FPtoFP,
+  SBVtoFP,
+  UBVtoFP,
+  FPtoSBV,
+  FPtoUBV,
+  FPtoIntegral,
+  ArraySelect,
+  ArrayStore,
+  BVToIEEEFP,
+  IEEEFPToBV,
+};
+
+class SMTExprRef {
+public:
+  SMTExprRef() = default;
+
+  const SMTExpr *get() const {
+    validate();
+    return Ptr;
+  }
+
+  const SMTExpr &operator*() const { return *get(); }
+
+  const SMTExpr *operator->() const { return get(); }
+
+  explicit operator bool() const { return isValid(); }
+
+  bool isValid() const {
+    auto locked = State.lock();
+    return Ptr != nullptr && locked && locked->Generation == Generation;
+  }
+
+private:
+  const SMTExpr *Ptr = nullptr;
+  std::weak_ptr<const SMTHandleState> State;
+  uint64_t Generation = 0;
+
+  SMTExprRef(const SMTExpr *ThePtr,
+             std::weak_ptr<const SMTHandleState> TheState,
+             uint64_t TheGeneration)
+      : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
+
+  void validate() const {
+    auto locked = State.lock();
+    assert(Ptr && "Dereferencing null expression handle");
+    assert(locked &&
+           "Dereferencing expression handle after solver destruction");
+    assert(locked->Generation == Generation &&
+           "Dereferencing stale expression handle after solver reset");
+  }
+
+  friend class SMTSolver;
+};
+
 /// Generic base class for SMT exprs
 class SMTExpr {
 public:
@@ -33,6 +156,8 @@ public:
 
   explicit SMTExpr(SMTSortRef S) : Sort(std::move(S)) {}
   virtual ~SMTExpr() = default;
+
+  virtual SMTBackendKind getBackendKind() const = 0;
 
   friend bool operator==(SMTExpr const &LHS, SMTExpr const &RHS) {
     return LHS.equal_to(RHS);
@@ -56,12 +181,21 @@ public:
   /// Returns this expr's sort width
   unsigned getWidth() const { return Sort->getWidth(); }
 
+  SMTExprKind getKind() const { return Kind; }
+
   virtual void dump() const;
 
 protected:
   /// Query the SMT solver and returns true if two Exprs are equal (same kind
   /// and bit width). This does not check if the two Exprs are the same objects.
   virtual bool equal_to(SMTExpr const &other) const = 0;
+
+private:
+  void setKind(SMTExprKind TheKind) { Kind = TheKind; }
+
+  SMTExprKind Kind = SMTExprKind::Unknown;
+
+  friend class SMTSolverImpl;
 };
 
 /// Template to hold Solver specific Context and Expr
@@ -93,13 +227,12 @@ public:
   bool equal_to(SMTExpr const &other) const override = 0;
 };
 
-/// Shared pointer for SMTExprs, used by SMTSolver API.
-using SMTExprRef = std::shared_ptr<SMTExpr>;
-
 /// Wrapper to downcast from SMTExpr to Solver specific expr
 template <typename SolverExpr>
 static inline const SolverExpr &toSolverExpr(const SMTExpr &S) {
-  return dynamic_cast<const SolverExpr &>(S);
+  assert(S.getBackendKind() == SolverExpr::BackendKindValue &&
+         "Invalid backend expression cast");
+  return static_cast<const SolverExpr &>(S);
 }
 
 } // namespace camada

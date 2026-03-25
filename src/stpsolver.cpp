@@ -30,6 +30,18 @@
 
 namespace camada {
 
+void STPContextOwner::reset() {
+  if (Valid) {
+    STP::vc_Destroy(Context);
+    Valid = false;
+  }
+}
+
+STPExpr::~STPExpr() {
+  if (OwnsExpr && Expr != nullptr)
+    STP::vc_DeleteExpr(Expr);
+}
+
 unsigned STPSort::getWidthFromSolver() const {
   if (isBoolSort())
     return 1;
@@ -43,10 +55,10 @@ void STPSort::dump() const {
 }
 
 bool STPExpr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
   return (STP::getExprID(Expr) ==
-          STP::getExprID(dynamic_cast<const STPExpr &>(Other).Expr));
+          STP::getExprID(static_cast<const STPExpr &>(Other).Expr));
 }
 
 void STPExpr::dump() const {
@@ -62,52 +74,67 @@ void STPErrorHandler(const char *msg) {
 }
 
 STPSolver::STPSolver()
-    : SMTSolverImpl(),
-      Context(std::make_shared<STP::VC>(STP::vc_createValidityChecker())) {
+    : SMTSolverImpl(), OwnedContext(STP::vc_createValidityChecker()),
+      Context(OwnedContext.get()) {
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 
 STPSolver::STPSolver(STPContextRef C)
-    : SMTSolverImpl(), Context(std::move(C)) {}
+    : SMTSolverImpl(), OwnedContext(*C), Context(OwnedContext.get()) {}
 
-STPSolver::~STPSolver() { STP::vc_Destroy(*Context); }
+STPSolver::~STPSolver() {
+  invalidateGeneratedObjects();
+  OwnedContext.reset();
+}
 
 void STPSolver::addConstraintImpl(const SMTExprRef &Exp) {
   STP::vc_assertFormula(*Context, toSolverExpr<STPExpr>(*Exp).Expr);
 }
 
 SMTExprRef STPSolver::newExprRefImpl(const SMTExpr &Exp) const {
-  return std::make_shared<STPExpr>(toSolverExpr<STPExpr>(Exp));
+  auto Stored = std::make_unique<STPExpr>(toSolverExpr<STPExpr>(Exp));
+  Stored->OwnsExpr = true;
+  return storeOwnedExprRef(std::move(Stored));
+}
+
+SMTExprRef STPSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                            const SMTSortRef &Sort) const {
+  STPExpr Retagged = toSolverExpr<STPExpr>(Exp);
+  Retagged.Sort = Sort;
+  Retagged.OwnsExpr = false;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef STPSolver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<STPSort>>(
-      {Context, STP::vc_boolType(*Context)});
+  return newSortRef<STPSort>(
+      STPSort(SMTSortKind::Bool, Context, STP::vc_boolType(*Context), 1));
 }
 
 SMTSortRef STPSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<SolverBVSort<STPSort>>(
-      {BitWidth, Context, STP::vc_bvType(*Context, BitWidth)});
+  return newSortRef<STPSort>(STPSort(
+      SMTSortKind::BV, Context, STP::vc_bvType(*Context, BitWidth), BitWidth));
 }
 
 SMTSortRef STPSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                      const unsigned SigWidth) {
-  return newSortRef<SolverBVFPSort<STPSort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       STP::vc_bvType(*Context, ExpWidth + SigWidth + 1)});
+  return newSortRef<STPSort>(
+      STPSort(SMTSortKind::BVFP, Context,
+              STP::vc_bvType(*Context, ExpWidth + SigWidth + 1),
+              ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
 }
 
 SMTSortRef STPSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverBVRMSort<STPSort>>(
-      {Context, STP::vc_bvType(*Context, 3)});
+  return newSortRef<STPSort>(
+      STPSort(SMTSortKind::BVRM, Context, STP::vc_bvType(*Context, 3), 3));
 }
 
 SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
-  return newSortRef<SolverArraySort<STPSort>>(
-      {IndexSort, ElemSort, Context,
-       STP::vc_arrayType(*Context, toSolverSort<STPSort>(*IndexSort).Sort,
-                         toSolverSort<STPSort>(*ElemSort).Sort)});
+  return newSortRef<STPSort>(STPSort(
+      SMTSortKind::Array, Context,
+      STP::vc_arrayType(*Context, toSolverSort<STPSort>(*IndexSort).Sort,
+                        toSolverSort<STPSort>(*ElemSort).Sort),
+      0, 0, 0, IndexSort, ElemSort));
 }
 
 SMTExprRef STPSolver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -213,9 +240,9 @@ SMTExprRef STPSolver::mkBVLshrImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
       STPExpr(Context, LHS->Sort,
-              STP::vc_bvLeftShiftExprExpr(*Context, LHS->getWidth(),
-                                          toSolverExpr<STPExpr>(*LHS).Expr,
-                                          toSolverExpr<STPExpr>(*RHS).Expr)));
+              STP::vc_bvRightShiftExprExpr(*Context, LHS->getWidth(),
+                                           toSolverExpr<STPExpr>(*LHS).Expr,
+                                           toSolverExpr<STPExpr>(*RHS).Expr)));
 }
 
 SMTExprRef STPSolver::mkBVXorImpl(const SMTExprRef &LHS,
@@ -417,7 +444,10 @@ SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
 bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(*Context, toSolverExpr<STPExpr>(*Exp).Expr);
-  return STP::getBVUnsigned(STP::vc_boolToBVExpr(*Context, value)) != 0;
+  const bool result =
+      STP::getBVUnsigned(STP::vc_boolToBVExpr(*Context, value)) != 0;
+  STP::vc_DeleteExpr(value);
+  return result;
 }
 
 std::string STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
@@ -428,6 +458,7 @@ std::string STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   STP::vc_printBVBitStringToBuffer(value, &buf, &len);
   std::string bv(buf);
   free(buf);
+  STP::vc_DeleteExpr(value);
   return bv;
 }
 
@@ -500,7 +531,9 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
 }
 
 checkResult STPSolver::checkImpl() {
-  int res = STP::vc_query(*Context, STP::vc_falseExpr(*Context));
+  STP::Expr query = STP::vc_falseExpr(*Context);
+  int res = STP::vc_query(*Context, query);
+  STP::vc_DeleteExpr(query);
   if (!res)
     return checkResult::SAT;
 
@@ -511,8 +544,8 @@ checkResult STPSolver::checkImpl() {
 }
 
 void STPSolver::resetImpl() {
-  STP::vc_Destroy(*Context);
-  Context = std::make_shared<STP::VC>(STP::vc_createValidityChecker());
+  OwnedContext.reset(STP::vc_createValidityChecker());
+  Context = OwnedContext.get();
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 

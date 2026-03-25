@@ -25,10 +25,19 @@
 #include "mathsatsolver.h"
 
 #include <cassert>
+#include <cstddef>
+#include <cstdlib>
 #include <gmp.h>
 #include <iostream>
 
 namespace camada {
+
+void MathSATContextOwner::reset() {
+  if (Valid) {
+    msat_destroy_env(Context);
+    Valid = false;
+  }
+}
 
 unsigned MathSATSort::getWidthFromSolver() const {
   std::size_t w;
@@ -55,10 +64,10 @@ void MathSATSort::dump() const {
 }
 
 bool MathSATExpr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
   return (msat_term_id(Expr) ==
-          msat_term_id(dynamic_cast<const MathSATExpr &>(Other).Expr));
+          msat_term_id(static_cast<const MathSATExpr &>(Other).Expr));
 }
 
 void MathSATExpr::dump() const {
@@ -70,16 +79,19 @@ void MathSATExpr::dump() const {
 MathSATSolver::MathSATSolver() : SMTSolverImpl() {
   msat_config cfg = msat_create_config();
   msat_set_option(cfg, "model_generation", "true");
-  Context = std::make_shared<msat_env>(msat_create_env(cfg));
+  OwnedContext.reset(msat_create_env(cfg));
   msat_destroy_config(cfg);
+  Context = OwnedContext.get();
 }
 
-MathSATSolver::MathSATSolver(const msat_config &Config)
-    : SMTSolverImpl(),
-      Context(std::make_shared<msat_env>(msat_create_env(Config))) {}
+MathSATSolver::MathSATSolver(const msat_config &Config) : SMTSolverImpl() {
+  OwnedContext.reset(msat_create_env(Config));
+  Context = OwnedContext.get();
+}
 
 MathSATSolver::~MathSATSolver() {
-  msat_destroy_env(*Context);
+  invalidateGeneratedObjects();
+  OwnedContext.reset();
   Context = nullptr;
 }
 
@@ -99,49 +111,60 @@ static inline bool checkExprError(const SMTExpr &Exp) {
 
 SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) const {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
-  return std::make_shared<MathSATExpr>(toSolverExpr<MathSATExpr>(Exp));
+  return storeExprRef(toSolverExpr<MathSATExpr>(Exp));
+}
+
+SMTExprRef MathSATSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                                const SMTSortRef &Sort) const {
+  assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
+  MathSATExpr Retagged = toSolverExpr<MathSATExpr>(Exp);
+  Retagged.Sort = Sort;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<MathSATSort>>(
-      {Context, msat_get_bool_type(*Context)});
+  return newSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::Bool, Context, msat_get_bool_type(*Context), 1));
 }
 
 SMTSortRef MathSATSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<SolverBVSort<MathSATSort>>(
-      {BitWidth, Context, msat_get_bv_type(*Context, BitWidth)});
+  return newSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::BV, Context,
+                  msat_get_bv_type(*Context, BitWidth), BitWidth));
 }
 
 SMTSortRef MathSATSolver::mkRMSortImpl() {
-  return newSortRef<SolverRMSort<MathSATSort>>(
-      {Context, msat_get_fp_roundingmode_type(*Context)});
+  return newSortRef<MathSATSort>(MathSATSort(
+      SMTSortKind::RM, Context, msat_get_fp_roundingmode_type(*Context), 3));
 }
 
 SMTSortRef MathSATSolver::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return newSortRef<SolverFPSort<MathSATSort>>(
-      {ExpWidth, SigWidth, Context,
-       msat_get_fp_type(*Context, ExpWidth, SigWidth)});
+  return newSortRef<MathSATSort>(MathSATSort(
+      SMTSortKind::FP, Context, msat_get_fp_type(*Context, ExpWidth, SigWidth),
+      1 + ExpWidth + SigWidth, ExpWidth, SigWidth));
 }
 
 SMTSortRef MathSATSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                          const unsigned SigWidth) {
-  return newSortRef<SolverBVFPSort<MathSATSort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       msat_get_bv_type(*Context, ExpWidth + SigWidth + 1)});
+  return newSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::BVFP, Context,
+                  msat_get_bv_type(*Context, ExpWidth + SigWidth + 1),
+                  ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
 }
 
 SMTSortRef MathSATSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverBVRMSort<MathSATSort>>(
-      {Context, msat_get_bv_type(*Context, 3)});
+  return newSortRef<MathSATSort>(MathSATSort(SMTSortKind::BVRM, Context,
+                                             msat_get_bv_type(*Context, 3), 3));
 }
 
 SMTSortRef MathSATSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                           const SMTSortRef &ElemSort) {
-  return newSortRef<SolverArraySort<MathSATSort>>(
-      {IndexSort, ElemSort, Context,
-       msat_get_array_type(*Context, toSolverSort<MathSATSort>(*IndexSort).Sort,
-                           toSolverSort<MathSATSort>(*ElemSort).Sort)});
+  return newSortRef<MathSATSort>(MathSATSort(
+      SMTSortKind::Array, Context,
+      msat_get_array_type(*Context, toSolverSort<MathSATSort>(*IndexSort).Sort,
+                          toSolverSort<MathSATSort>(*ElemSort).Sort),
+      0, 0, 0, IndexSort, ElemSort));
 }
 
 SMTExprRef MathSATSolver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -602,8 +625,14 @@ SMTExprRef MathSATSolver::mkFPtoSBVImpl(const SMTExprRef &From,
 
 SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
-  // We just need to call mkFPtoSBV
-  return mkFPtoSBV(From, ToWidth);
+  // Conversion from float to integers always truncate, so we assume
+  // the round mode to be toward zero
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  return newExprRef(MathSATExpr(
+      Context, mkBVSort(ToWidth),
+      msat_make_fp_to_ubv(*Context, ToWidth,
+                          toSolverExpr<MathSATExpr>(*roundingMode).Expr,
+                          toSolverExpr<MathSATExpr>(*From).Expr)));
 }
 
 SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
@@ -637,7 +666,11 @@ static inline std::string getGMPVal(const MathSATSolver &S,
   msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context,
                       toSolverExpr<MathSATExpr>(*t).Expr, val);
 
-  std::string bv = mpq_get_str(nullptr, 2, val);
+  char *raw_bv = mpq_get_str(nullptr, 2, val);
+  std::string bv = raw_bv;
+  void (*gmp_free)(void *, std::size_t);
+  mp_get_memory_functions(nullptr, nullptr, &gmp_free);
+  gmp_free(raw_bv, bv.size() + 2);
   mpq_clear(val);
   return bv;
 }
@@ -712,11 +745,14 @@ SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
   msat_term e;
   switch (R) {
   default:
-    assert(0 && "Unsupported floating-point semantics.");
-    __builtin_unreachable();
+    std::cerr << "MathSAT Error unsupported floating-point rounding mode.\n";
+    std::abort();
   case RM::ROUND_TO_EVEN:
     e = msat_make_fp_roundingmode_nearest_even(*Context);
     break;
+  case RM::ROUND_TO_AWAY:
+    std::cerr << "MathSAT Error ROUND_TO_AWAY is not supported.\n";
+    std::abort();
   case RM::ROUND_TO_PLUS_INF:
     e = msat_make_fp_roundingmode_plus_inf(*Context);
     break;
@@ -791,7 +827,7 @@ std::string MathSATSolver::getSolverNameAndVersion() const {
   char *tmp = msat_get_version();
   std::string ver = tmp;
   msat_free(tmp);
-  return ver;
+  return std::string("MathSAT v").append(ver);
 }
 
 void MathSATSolver::dumpImpl() {

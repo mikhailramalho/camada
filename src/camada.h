@@ -23,6 +23,8 @@
 #define CAMADA_H_
 
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 #include "camadaexpr.h"
 
@@ -53,7 +55,10 @@ public:
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
   SMTSortRef newSortRef(const SolverSort &Sort) const {
-    return std::make_shared<SolverSort>(Sort);
+    auto OwnedSort = std::make_unique<SolverSort>(Sort);
+    const SMTSort *SortPtr = OwnedSort.get();
+    SortArena.emplace_back(std::move(OwnedSort));
+    return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
   }
 
   /// Wrapper to create new SMTExpr
@@ -435,6 +440,32 @@ public:
   bool useCamadaFP = false;
 
 protected:
+  template <typename SolverExpr>
+  SMTExprRef storeExprRef(const SolverExpr &Exp) const {
+    auto OwnedExpr = std::make_unique<SolverExpr>(Exp);
+    const SMTExpr *ExprPtr = OwnedExpr.get();
+    ExprArena.emplace_back(std::move(OwnedExpr));
+    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
+  }
+
+  template <typename SolverExpr>
+  SMTExprRef storeOwnedExprRef(std::unique_ptr<SolverExpr> Exp) const {
+    const SMTExpr *ExprPtr = Exp.get();
+    ExprArena.emplace_back(std::move(Exp));
+    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
+  }
+
+  void invalidateGeneratedObjects() {
+    ++HandleState->Generation;
+    ExprArena.clear();
+    SortArena.clear();
+  }
+
+  mutable std::vector<std::unique_ptr<SMTSort>> SortArena;
+  mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
+  std::shared_ptr<SMTHandleState> HandleState =
+      std::make_shared<SMTHandleState>();
+
   /// Returns an appropriate floating-point sort, encoded as a bitvector.
   virtual SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                                 const unsigned SigWidth) = 0;
@@ -443,8 +474,8 @@ protected:
   virtual SMTSortRef mkBVRMSort() = 0;
 };
 
-/// Shared pointer for SMTSolvers.
-using SMTSolverRef = std::shared_ptr<SMTSolver>;
+/// Unique pointer for SMTSolvers.
+using SMTSolverRef = std::unique_ptr<SMTSolver>;
 
 /// Convenience method to create a Z3Solver object
 SMTSolverRef createZ3Solver();

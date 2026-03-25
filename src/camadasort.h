@@ -22,68 +22,140 @@
 #ifndef CAMADASORT_H_
 #define CAMADASORT_H_
 
+#include <cassert>
+#include <cstdint>
 #include <memory>
 
 namespace camada {
 
-class SMTSort;
+enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3 };
+enum class SMTSortKind { Bool, BV, FP, RM, BVFP, BVRM, Array };
 
-/// Shared pointer for SMTSorts, used by SMTSolver API.
-using SMTSortRef = std::shared_ptr<SMTSort>;
+class SMTSort;
+struct SMTHandleState {
+  uint64_t Generation = 1;
+};
+
+class SMTSortRef {
+public:
+  SMTSortRef() = default;
+
+  const SMTSort *get() const {
+    validate();
+    return Ptr;
+  }
+
+  const SMTSort &operator*() const { return *get(); }
+
+  const SMTSort *operator->() const { return get(); }
+
+  explicit operator bool() const { return isValid(); }
+
+  bool isValid() const {
+    auto locked = State.lock();
+    return Ptr != nullptr && locked && locked->Generation == Generation;
+  }
+
+private:
+  const SMTSort *Ptr = nullptr;
+  std::weak_ptr<const SMTHandleState> State;
+  uint64_t Generation = 0;
+
+  SMTSortRef(const SMTSort *ThePtr,
+             std::weak_ptr<const SMTHandleState> TheState,
+             uint64_t TheGeneration)
+      : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
+
+  void validate() const {
+    auto locked = State.lock();
+    assert(Ptr && "Dereferencing null sort handle");
+    assert(locked && "Dereferencing sort handle after solver destruction");
+    assert(locked->Generation == Generation &&
+           "Dereferencing stale sort handle after solver reset");
+  }
+
+  friend class SMTSolver;
+};
 
 /// Generic base class for SMT sorts
 class SMTSort {
 public:
-  SMTSort() = default;
+  explicit SMTSort(SMTSortKind K, unsigned W = 0, unsigned EW = 0,
+                   unsigned SW = 0, SMTSortRef I = {}, SMTSortRef E = {})
+      : Kind(K), Width(W), ExpWidth(EW), SigWidth(SW), IndexSort(std::move(I)),
+        ElementSort(std::move(E)) {}
   virtual ~SMTSort() = default;
 
+  virtual SMTBackendKind getBackendKind() const = 0;
+
+  SMTSortKind getSortKind() const { return Kind; }
+
   /// Returns true if the sort is a bitvector.
-  virtual bool isBVSort() const { return false; }
+  bool isBVSort() const {
+    return Kind == SMTSortKind::BV || Kind == SMTSortKind::BVFP ||
+           Kind == SMTSortKind::BVRM;
+  }
 
   /// Returns true if the sort is a boolean.
-  virtual bool isBoolSort() const { return false; }
+  bool isBoolSort() const { return Kind == SMTSortKind::Bool; }
 
   /// Returns true if the sort is a floating-point.
-  virtual bool isFPSort() const { return false; }
+  bool isFPSort() const {
+    return Kind == SMTSortKind::FP || Kind == SMTSortKind::BVFP;
+  }
 
   /// Returns true if the sort is a rounding mode.
-  virtual bool isRMSort() const { return false; }
+  bool isRMSort() const {
+    return Kind == SMTSortKind::RM || Kind == SMTSortKind::BVRM;
+  }
 
   /// Returns true if the sort is an array.
-  virtual bool isArraySort() const { return false; }
+  bool isArraySort() const { return Kind == SMTSortKind::Array; }
 
   /// Returns the sort width.
-  virtual unsigned getWidth() const;
+  unsigned getWidth() const;
 
   /// Returns the sort width from the Solver.
   virtual unsigned getWidthFromSolver() const;
 
   /// Returns the floating-point significand width, fails if the sort is not a
   /// floating-point.
-  virtual unsigned getFPSignificandWidth() const;
+  unsigned getFPSignificandWidth() const;
 
   /// Returns the floating-point exponent width, fails if the sort is not a
   /// floating-point.
-  virtual unsigned getFPExponentWidth() const;
+  unsigned getFPExponentWidth() const;
 
   /// Returns the array's index sort, fails if the sort is not an array.
-  virtual SMTSortRef getIndexSort() const;
+  SMTSortRef getIndexSort() const;
 
   /// Returns the array's element sort, fails if the sort is not an array.
-  virtual SMTSortRef getElementSort() const;
+  SMTSortRef getElementSort() const;
 
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
   bool operator==(SMTSort const &Other) const;
 
-  /// Validate if the width from solve matches our internal representation
-  void validateSortWidth() const;
+  /// Returns whether the solver width matches our internal representation.
+  bool validateSortWidth() const;
 
   virtual void dump() const;
+
+protected:
+  SMTSortKind Kind;
+  unsigned Width = 0;
+  unsigned ExpWidth = 0;
+  unsigned SigWidth = 0;
+  SMTSortRef IndexSort;
+  SMTSortRef ElementSort;
 };
 
 inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {
-  return (*LHS.get() == *RHS.get());
+  return (*LHS == *RHS);
+}
+
+inline bool operator!=(SMTSortRef const &LHS, SMTSortRef const &RHS) {
+  return !(LHS == RHS);
 }
 
 /// Template to hold Solver specific Context and Sort
@@ -97,132 +169,21 @@ public:
 
   TheSort Sort;
 
-  SolverSort(SolverContextRef C, const TheSort &SS)
-      : Context(std::move(C)), Sort(SS) {}
+  SolverSort(SMTSortKind K, SolverContextRef C, const TheSort &SS,
+             unsigned W = 0, unsigned EW = 0, unsigned SW = 0,
+             SMTSortRef I = {}, SMTSortRef E = {})
+      : SMTSort(K, W, EW, SW, std::move(I), std::move(E)),
+        Context(std::move(C)), Sort(SS) {}
 
   virtual ~SolverSort() override = default;
-};
-
-template <typename SolverSortBase> class SolverBVSort : public SolverSortBase {
-public:
-  unsigned Width;
-
-  SolverBVSort(unsigned W, typename SolverSortBase::ContextType C,
-               typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S), Width(W) {}
-  virtual ~SolverBVSort() override = default;
-
-  bool isBVSort() const override { return true; }
-
-  unsigned getWidth() const override { return Width; }
-};
-
-template <typename SolverSortBase>
-class SolverBoolSort : public SolverSortBase {
-public:
-  SolverBoolSort(typename SolverSortBase::ContextType C,
-                 typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S) {}
-  virtual ~SolverBoolSort() override = default;
-
-  bool isBoolSort() const override { return true; }
-
-  unsigned getWidth() const override { return 1; }
-};
-
-template <typename SolverSortBase> class SolverFPSort : public SolverSortBase {
-public:
-  unsigned ExpWidth;
-  unsigned SigWidth;
-
-  SolverFPSort(unsigned EW, unsigned SW, typename SolverSortBase::ContextType C,
-               typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
-  virtual ~SolverFPSort() override = default;
-
-  bool isFPSort() const override { return true; }
-
-  unsigned getWidth() const override { return 1 + ExpWidth + SigWidth; }
-
-  unsigned getFPSignificandWidth() const override { return SigWidth; }
-
-  unsigned getFPExponentWidth() const override { return ExpWidth; }
-};
-
-template <typename SolverSortBase> class SolverRMSort : public SolverSortBase {
-public:
-  SolverRMSort(typename SolverSortBase::ContextType C,
-               typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S) {}
-  virtual ~SolverRMSort() override = default;
-
-  unsigned getWidth() const override { return 3; }
-
-  bool isRMSort() const override { return true; }
-};
-
-template <typename SolverSortBase>
-class SolverBVFPSort : public SolverSortBase {
-public:
-  unsigned ExpWidth;
-  unsigned SigWidth;
-
-  SolverBVFPSort(unsigned EW, unsigned SW,
-                 typename SolverSortBase::ContextType C,
-                 typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S), ExpWidth(EW), SigWidth(SW) {}
-  virtual ~SolverBVFPSort() override = default;
-
-  bool isFPSort() const override { return true; }
-
-  bool isBVSort() const override { return true; }
-
-  unsigned getWidth() const override { return ExpWidth + SigWidth; }
-
-  unsigned getFPSignificandWidth() const override { return SigWidth; }
-
-  unsigned getFPExponentWidth() const override { return ExpWidth; }
-};
-
-template <typename SolverSortBase>
-class SolverBVRMSort : public SolverSortBase {
-public:
-  SolverBVRMSort(typename SolverSortBase::ContextType C,
-                 typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S) {}
-  virtual ~SolverBVRMSort() override = default;
-
-  unsigned getWidth() const override { return 3; }
-
-  bool isBVSort() const override { return true; }
-
-  bool isRMSort() const override { return true; }
-};
-
-template <typename SolverSortBase>
-class SolverArraySort : public SolverSortBase {
-public:
-  SMTSortRef IndexSort;
-  SMTSortRef ElementSort;
-
-  SolverArraySort(SMTSortRef I, SMTSortRef E,
-                  typename SolverSortBase::ContextType C,
-                  typename SolverSortBase::SortType S)
-      : SolverSortBase(C, S), IndexSort(std::move(I)),
-        ElementSort(std::move(E)) {}
-  virtual ~SolverArraySort() override = default;
-
-  bool isArraySort() const override { return true; }
-
-  SMTSortRef getIndexSort() const override { return IndexSort; }
-
-  SMTSortRef getElementSort() const override { return ElementSort; }
 };
 
 /// Wrapper to downcast from SMTSort to Solver specific sort
 template <typename SolverSort>
 static inline const SolverSort &toSolverSort(const SMTSort &S) {
-  return dynamic_cast<const SolverSort &>(S);
+  assert(S.getBackendKind() == SolverSort::BackendKindValue &&
+         "Invalid backend sort cast");
+  return static_cast<const SolverSort &>(S);
 }
 
 } // namespace camada

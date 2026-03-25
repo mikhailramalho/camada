@@ -11,7 +11,12 @@
 
 inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(equal_ten);
+  RESETANDTEST(implies_semantics);
+  RESETANDTEST(implies_true_implies_false);
+  RESETANDTEST(bv_lshr_semantics);
   RESETANDTEST(fp_equal);
   RESETANDTEST(array);
   RESETANDTEST(fp_arithmetics);
+  RESETANDTEST(fp_round_to_away);
+  RESETANDTEST(fp_bv_conversions);
 }

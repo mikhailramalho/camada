@@ -25,16 +25,63 @@
 #include "camadaimpl.h"
 
 #include <mathsat.h>
+#include <utility>
 
 namespace camada {
 
-using MathSATContextRef = std::shared_ptr<msat_env>;
+using MathSATContextRef = msat_env *;
+
+class MathSATContextOwner {
+public:
+  MathSATContextOwner() = default;
+
+  explicit MathSATContextOwner(const msat_env &Env)
+      : Context(Env), Valid(true) {}
+
+  ~MathSATContextOwner() { reset(); }
+
+  MathSATContextOwner(MathSATContextOwner &&Other) noexcept
+      : Context(Other.Context), Valid(Other.Valid) {
+    Other.Valid = false;
+  }
+
+  MathSATContextOwner &operator=(MathSATContextOwner &&Other) noexcept {
+    if (this != &Other) {
+      reset();
+      Context = Other.Context;
+      Valid = Other.Valid;
+      Other.Valid = false;
+    }
+    return *this;
+  }
+
+  MathSATContextOwner(const MathSATContextOwner &) = delete;
+  MathSATContextOwner &operator=(const MathSATContextOwner &) = delete;
+
+  void reset();
+
+  void reset(const msat_env &Env) {
+    reset();
+    Context = Env;
+    Valid = true;
+  }
+
+  MathSATContextRef get() { return Valid ? &Context : nullptr; }
+  const msat_env *get() const { return Valid ? &Context : nullptr; }
+
+private:
+  msat_env Context{};
+  bool Valid = false;
+};
 
 /// Wrapper for MathSAT Sort
 class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
   using SolverSort<MathSATContextRef, msat_type>::SolverSort;
   virtual ~MathSATSort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 
@@ -43,8 +90,11 @@ public:
 
 class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
   using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
   virtual ~MathSATExpr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -54,7 +104,8 @@ public:
 
 class MathSATSolver : public SMTSolverImpl {
 public:
-  MathSATContextRef Context;
+  MathSATContextOwner OwnedContext;
+  MathSATContextRef Context{};
 
   explicit MathSATSolver();
 
@@ -66,6 +117,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                   const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

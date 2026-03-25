@@ -42,7 +42,7 @@ TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
   msat_set_option(Config, "theory.arr.enable_witness", "true");
 
   // Create custom MathSAT Solver
-  camada::SMTSolverRef mathsat = std::make_shared<mySolver>(Config);
+  camada::SMTSolverRef mathsat = std::make_unique<mySolver>(Config);
   msat_destroy_config(Config);
 
   tests(mathsat);

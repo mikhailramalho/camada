@@ -28,13 +28,16 @@
 
 namespace camada {
 
-using Z3ContextRef = std::shared_ptr<z3::context>;
+using Z3ContextRef = z3::context *;
 
 /// Wrapper for Z3 Sort
 class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
   virtual ~Z3Sort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 
@@ -43,8 +46,11 @@ public:
 
 class Z3Expr : public SolverExpr<Z3ContextRef, z3::expr> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
   using SolverExpr<Z3ContextRef, z3::expr>::SolverExpr;
   virtual ~Z3Expr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -54,17 +60,21 @@ public:
 
 class Z3Solver : public SMTSolverImpl {
 public:
-  Z3ContextRef Context;
+  std::unique_ptr<z3::context> OwnedContext;
+  Z3ContextRef Context = nullptr;
 
   z3::solver Solver;
 
   explicit Z3Solver();
-  explicit Z3Solver(Z3ContextRef C, const z3::solver &S);
-  ~Z3Solver() override = default;
+  explicit Z3Solver(std::unique_ptr<z3::context> C);
+  explicit Z3Solver(std::unique_ptr<z3::context> C, z3::solver S);
+  ~Z3Solver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                   const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

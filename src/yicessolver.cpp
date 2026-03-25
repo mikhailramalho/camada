@@ -29,6 +29,11 @@
 
 namespace camada {
 
+void YicesContextDeleter::operator()(context_t *Ctx) const {
+  if (Ctx)
+    yices_free_context(Ctx);
+}
+
 unsigned YicesSort::getWidthFromSolver() const {
   if (yices_type_is_bool(Sort))
     return 1;
@@ -44,9 +49,9 @@ void YicesSort::dump() const {
 }
 
 bool YicesExpr::equal_to(SMTExpr const &Other) const {
-  if (Sort != Other.Sort)
+  if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
-  return (Expr == dynamic_cast<const YicesExpr &>(Other).Expr);
+  return (Expr == static_cast<const YicesExpr &>(Other).Expr);
 }
 
 void YicesExpr::dump() const {
@@ -62,52 +67,67 @@ YicesSolver::YicesSolver() : SMTSolverImpl() {
   ctx_config_t *config = yices_new_config();
   yices_default_config_for_logic(config, "QF_AUFBV");
 
-  Context = std::make_shared<context_t *>(yices_new_context(config));
+  OwnedContext.reset(yices_new_context(config));
+  Context = OwnedContext.get();
   yices_free_config(config);
 }
 
 YicesSolver::~YicesSolver() {
-  yices_exit();
+  invalidateGeneratedObjects();
+  OwnedContext.reset();
   Context = nullptr;
+  yices_exit();
 }
 
 void YicesSolver::addConstraintImpl(const SMTExprRef &Exp) {
   Assertions.push_back(Exp);
-  yices_assert_formula(*Context, toSolverExpr<YicesExpr>(*Exp).Expr);
+  yices_assert_formula(Context, toSolverExpr<YicesExpr>(*Exp).Expr);
 }
 
 SMTExprRef YicesSolver::newExprRefImpl(const SMTExpr &Exp) const {
   assert(toSolverExpr<YicesExpr>(Exp).Expr != NULL_TERM &&
          "Error when creating Yices expr.");
-  return std::make_shared<YicesExpr>(toSolverExpr<YicesExpr>(Exp));
+  return storeExprRef(toSolverExpr<YicesExpr>(Exp));
+}
+
+SMTExprRef YicesSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
+                                              const SMTSortRef &Sort) const {
+  assert(toSolverExpr<YicesExpr>(Exp).Expr != NULL_TERM &&
+         "Error when creating Yices expr.");
+  YicesExpr Retagged = toSolverExpr<YicesExpr>(Exp);
+  Retagged.Sort = Sort;
+  return storeExprRef(Retagged);
 }
 
 SMTSortRef YicesSolver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<YicesSort>>({Context, yices_bool_type()});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::Bool, Context, yices_bool_type(), 1));
 }
 
 SMTSortRef YicesSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<SolverBVSort<YicesSort>>(
-      {BitWidth, Context, yices_bv_type(BitWidth)});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::BV, Context, yices_bv_type(BitWidth), BitWidth));
 }
 
 SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return newSortRef<SolverBVFPSort<YicesSort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       yices_bv_type(ExpWidth + SigWidth + 1)});
+  return newSortRef<YicesSort>(YicesSort(
+      SMTSortKind::BVFP, Context, yices_bv_type(ExpWidth + SigWidth + 1),
+      ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
 }
 
 SMTSortRef YicesSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverBVRMSort<YicesSort>>({Context, yices_bv_type(3)});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::BVRM, Context, yices_bv_type(3), 3));
 }
 
 SMTSortRef YicesSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                         const SMTSortRef &ElemSort) {
-  return newSortRef<SolverArraySort<YicesSort>>(
-      {IndexSort, ElemSort, Context,
-       yices_function_type1(toSolverSort<YicesSort>(*IndexSort).Sort,
-                            toSolverSort<YicesSort>(*ElemSort).Sort)});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::Array, Context,
+                yices_function_type1(toSolverSort<YicesSort>(*IndexSort).Sort,
+                                     toSolverSort<YicesSort>(*ElemSort).Sort),
+                0, 0, 0, IndexSort, ElemSort));
 }
 
 SMTExprRef YicesSolver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -409,7 +429,7 @@ SMTExprRef YicesSolver::mkArrayStoreImpl(const SMTExprRef &Array,
 
 bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   int32_t val;
-  auto res = yices_get_bool_value(yices_get_model(*Context, 1),
+  auto res = yices_get_bool_value(yices_get_model(Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
   (void)res;
   assert(!res && "Can't get boolean value from Yices");
@@ -420,7 +440,7 @@ std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
   int32_t *data = new int32_t[width];
-  auto res = yices_get_bv_value(yices_get_model(*Context, 1),
+  auto res = yices_get_bv_value(yices_get_model(Context, 1),
                                 toSolverExpr<YicesExpr>(*Exp).Expr, data);
   (void)res;
   assert(!res && "Can't get boolean value from Yices");
@@ -503,7 +523,7 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
 }
 
 checkResult YicesSolver::checkImpl() {
-  smt_status_t res = yices_check_context(*Context, nullptr);
+  smt_status_t res = yices_check_context(Context, nullptr);
   if (res == YICES_STATUS_SAT)
     return checkResult::SAT;
 
@@ -518,6 +538,8 @@ void YicesSolver::resetImpl() {
   Assertions.clear();
 
   // Delete
+  OwnedContext.reset();
+  Context = nullptr;
   yices_exit();
 
   // and recreate
@@ -527,7 +549,8 @@ void YicesSolver::resetImpl() {
   ctx_config_t *config = yices_new_config();
   yices_default_config_for_logic(config, "QF_AUFBV");
 
-  Context = std::make_shared<context_t *>(yices_new_context(config));
+  OwnedContext.reset(yices_new_context(config));
+  Context = OwnedContext.get();
   yices_free_config(config);
 }
 
@@ -542,7 +565,7 @@ void YicesSolver::dumpImpl() {
 
 void YicesSolver::dumpModelImpl() {
   char *model_str =
-      yices_model_to_string(yices_get_model(*Context, 1), 160, 80, 0);
+      yices_model_to_string(yices_get_model(Context, 1), 160, 80, 0);
   std::cerr << model_str << '\n';
   yices_free_string(model_str);
 }

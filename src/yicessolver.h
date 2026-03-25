@@ -24,19 +24,29 @@
 
 #include "camadaimpl.h"
 
+#include <memory>
 #include <unordered_map>
 #include <vector>
 #include <yices.h>
 
 namespace camada {
 
-using YicesContextRef = std::shared_ptr<context_t *>;
+using YicesContextRef = context_t *;
+
+struct YicesContextDeleter {
+  void operator()(context_t *Ctx) const;
+};
+
+using YicesContextOwner = std::unique_ptr<context_t, YicesContextDeleter>;
 
 /// Wrapper for Yices Sort
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
   using SolverSort<YicesContextRef, type_t>::SolverSort;
   ~YicesSort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 
@@ -45,8 +55,11 @@ public:
 
 class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
   using SolverExpr<YicesContextRef, term_t>::SolverExpr;
   ~YicesExpr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
@@ -56,7 +69,8 @@ public:
 
 class YicesSolver : public SMTSolverImpl {
 public:
-  YicesContextRef Context;
+  YicesContextOwner OwnedContext;
+  YicesContextRef Context = nullptr;
 
   unsigned int ConstArrayCounter = 0;
 
@@ -66,6 +80,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                   const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
 

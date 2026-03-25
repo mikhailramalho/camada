@@ -24,6 +24,7 @@
 
 #include "camadaimpl.h"
 
+#include <memory>
 #include <unordered_map>
 
 extern "C" {
@@ -32,20 +33,32 @@ extern "C" {
 
 namespace camada {
 
-using BitwuzlaContextRef = std::shared_ptr<Bitwuzla *>;
+using BitwuzlaContextRef = Bitwuzla *;
+
+struct BitwuzlaContextDeleter {
+  void operator()(Bitwuzla *Ctx) const;
+};
+
+using BitwuzlaContextOwner = std::unique_ptr<Bitwuzla, BitwuzlaContextDeleter>;
 
 class BitwSort : public SolverSort<BitwuzlaContextRef, BitwuzlaSort> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Bitwuzla;
   using SolverSort<BitwuzlaContextRef, BitwuzlaSort>::SolverSort;
   ~BitwSort() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
 };
 
 class BitwExpr : public SolverExpr<BitwuzlaContextRef, BitwuzlaTerm> {
 public:
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Bitwuzla;
   using SolverExpr<BitwuzlaContextRef, BitwuzlaTerm>::SolverExpr;
   ~BitwExpr() override = default;
+
+  SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   bool equal_to(SMTExpr const &Other) const override;
   void dump() const override;
@@ -55,7 +68,8 @@ class BitwuzlaSolver : public SMTSolverImpl {
 public:
   using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
 
-  BitwuzlaContextRef Context;
+  BitwuzlaContextOwner OwnedContext;
+  BitwuzlaContextRef Context = nullptr;
   BitwuzlaOptions *Options = nullptr;
   BitwuzlaTermManager *TermManager = nullptr;
   SymbolTablet SymbolTable;
@@ -70,6 +84,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
+  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
+                                   const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
