@@ -48,7 +48,7 @@ cmake --build build
 `CAMADA_DOWNLOAD_DEPENDENCIES` accepts three modes:
 - `OFF`: do not download dependencies.
 - `ALL`: download all supported solver dependencies.
-- `PERMISSIVE-ONLY`: download only solvers with permissive licenses
+- `PERMISSIVE`: download only solvers with permissive licenses
   (`Bitwuzla`, `CVC5`, `STP`, and `Z3`).
 
 Downloaded sources and locally installed solver artifacts are stored under
