@@ -779,6 +779,38 @@ public:
   SMTExprRef mkBVFromDec(const int64_t Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
+
+    if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
+      std::vector<SMTExprRef> *Cache = nullptr;
+      switch (Int) {
+      case -1:
+        Cache = &CachedBVNegOneExprs;
+        break;
+      case 0:
+        Cache = &CachedBVZeroExprs;
+        break;
+      case 1:
+        Cache = &CachedBVOneExprs;
+        break;
+      default:
+        break;
+      }
+
+      assert(Cache);
+      if (Cache->size() <= Sort->getWidth())
+        Cache->resize(Sort->getWidth() + 1);
+
+      SMTExprRef &CachedExpr = (*Cache)[Sort->getWidth()];
+      if (CachedExpr)
+        return CachedExpr;
+
+      SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
+      assert(theExp->isBVSort());
+      assert(theExp->getWidth() == Sort->getWidth());
+      CachedExpr = tagExprKind(theExp, SMTExprKind::BVConst);
+      return CachedExpr;
+    }
+
     SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());

@@ -476,6 +476,11 @@ protected:
   mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
   mutable SMTExprRef CachedTrueExpr;
   mutable SMTExprRef CachedFalseExpr;
+  mutable SMTExprRef CachedRMToEvenExpr;
+  mutable SMTExprRef CachedRMToAwayExpr;
+  mutable SMTExprRef CachedRMToPosExpr;
+  mutable SMTExprRef CachedRMToNegExpr;
+  mutable SMTExprRef CachedRMToZeroExpr;
   mutable std::vector<SMTExprRef> CachedBVNegOneExprs;
   mutable std::vector<SMTExprRef> CachedBVZeroExprs;
   mutable std::vector<SMTExprRef> CachedBVOneExprs;

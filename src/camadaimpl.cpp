@@ -297,20 +297,47 @@ static inline SMTExprRef mkRoundingDecision(SMTSolver &S, const SMTExprRef &R,
   SMTExprRef inc_neg = S.mkBVNot(S.mkBVOr(not_sgn, not_rors));
 
   SMTExprRef nil_1 = S.mkBVFromDec(0, 1);
-
-  SMTExprRef rm_neg =
-      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_MINUS_INF), 3);
-  SMTExprRef rm_pos =
-      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_PLUS_INF), 3);
-  SMTExprRef rm_away =
-      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_AWAY), 3);
-  SMTExprRef rm_even =
-      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_EVEN), 3);
+  SMTExprRef rm_neg = S.mkBVFromBin("011", 3);
+  SMTExprRef rm_pos = S.mkBVFromBin("010", 3);
+  SMTExprRef rm_away = S.mkBVFromBin("001", 3);
+  SMTExprRef rm_even = S.mkBVFromBin("000", 3);
 
   SMTExprRef rm_is_to_neg = S.mkEqual(R, rm_neg);
   SMTExprRef rm_is_to_pos = S.mkEqual(R, rm_pos);
   SMTExprRef rm_is_away = S.mkEqual(R, rm_away);
   SMTExprRef rm_is_even = S.mkEqual(R, rm_even);
+
+  SMTExprRef inc_c4 = S.mkIte(rm_is_to_neg, inc_neg, nil_1);
+  SMTExprRef inc_c3 = S.mkIte(rm_is_to_pos, inc_pos, inc_c4);
+  SMTExprRef inc_c2 = S.mkIte(rm_is_away, inc_taway, inc_c3);
+  return S.mkIte(rm_is_even, inc_teven, inc_c2);
+}
+
+static inline SMTExprRef
+mkRoundingDecision(SMTSolver &S, const SMTExprRef &R, const SMTExprRef &RMNeg,
+                   const SMTExprRef &RMPos, const SMTExprRef &RMAway,
+                   const SMTExprRef &RMEven, const SMTExprRef &Sgn,
+                   const SMTExprRef &Last, const SMTExprRef &Round,
+                   const SMTExprRef &Sticky) {
+  SMTExprRef last_or_sticky = S.mkBVOr(Last, Sticky);
+  SMTExprRef round_or_sticky = S.mkBVOr(Round, Sticky);
+
+  SMTExprRef not_round = S.mkBVNot(Round);
+  SMTExprRef not_lors = S.mkBVNot(last_or_sticky);
+  SMTExprRef not_rors = S.mkBVNot(round_or_sticky);
+  SMTExprRef not_sgn = S.mkBVNot(Sgn);
+
+  SMTExprRef inc_teven = S.mkBVNot(S.mkBVOr(not_round, not_lors));
+  const SMTExprRef &inc_taway = Round;
+  SMTExprRef inc_pos = S.mkBVNot(S.mkBVOr(Sgn, not_rors));
+  SMTExprRef inc_neg = S.mkBVNot(S.mkBVOr(not_sgn, not_rors));
+
+  SMTExprRef nil_1 = S.mkBVFromDec(0, 1);
+
+  SMTExprRef rm_is_to_neg = S.mkEqual(R, RMNeg);
+  SMTExprRef rm_is_to_pos = S.mkEqual(R, RMPos);
+  SMTExprRef rm_is_away = S.mkEqual(R, RMAway);
+  SMTExprRef rm_is_even = S.mkEqual(R, RMEven);
 
   SMTExprRef inc_c4 = S.mkIte(rm_is_to_neg, inc_neg, nil_1);
   SMTExprRef inc_c3 = S.mkIte(rm_is_to_pos, inc_pos, inc_c4);
@@ -2229,7 +2256,21 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
 
   Sig = mkBVExtract(SWidth + 1, 2, Sig);
 
-  SMTExprRef inc = mkRoundingDecision(*this, R, Sgn, last, round, sticky);
+  if (!CachedRMToNegExpr)
+    CachedRMToNegExpr = mkBVFromBin("011", 3);
+  if (!CachedRMToPosExpr)
+    CachedRMToPosExpr = mkBVFromBin("010", 3);
+  if (!CachedRMToAwayExpr)
+    CachedRMToAwayExpr = mkBVFromBin("001", 3);
+  if (!CachedRMToEvenExpr)
+    CachedRMToEvenExpr = mkBVFromBin("000", 3);
+  SMTExprRef rm_neg = CachedRMToNegExpr;
+  SMTExprRef rm_pos = CachedRMToPosExpr;
+  SMTExprRef rm_away = CachedRMToAwayExpr;
+  SMTExprRef rm_even = CachedRMToEvenExpr;
+
+  SMTExprRef inc = mkRoundingDecision(*this, R, rm_neg, rm_pos, rm_away,
+                                      rm_even, Sgn, last, round, sticky);
   assert(inc->getWidth() == 1);
 
   Sig = mkBVAdd(mkBVZeroExt(1, Sig), mkBVZeroExt(SWidth, inc));
@@ -2273,15 +2314,16 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
   SMTExprRef bot_exp = mkBotExp(*this, EWidth);
 
   SMTExprRef nil_1 = mkBVFromDec(0, 1);
-
-  SMTExprRef rm_is_to_zero = mkIsRM(*this, R, RM::ROUND_TO_ZERO);
-  SMTExprRef rm_is_to_neg = mkIsRM(*this, R, RM::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_is_to_pos = mkIsRM(*this, R, RM::ROUND_TO_PLUS_INF);
+  if (!CachedRMToZeroExpr)
+    CachedRMToZeroExpr = mkBVFromBin("100", 3);
+  SMTExprRef rm_zero = CachedRMToZeroExpr;
+  SMTExprRef rm_is_to_zero = mkEqual(R, rm_zero);
+  SMTExprRef rm_is_to_neg = mkEqual(R, rm_neg);
+  SMTExprRef rm_is_to_pos = mkEqual(R, rm_pos);
   SMTExprRef rm_zero_or_neg = mkOr(rm_is_to_zero, rm_is_to_neg);
   SMTExprRef rm_zero_or_pos = mkOr(rm_is_to_zero, rm_is_to_pos);
 
-  SMTExprRef zero1 = mkBVFromDec(0, 1);
-  SMTExprRef sgn_is_zero = mkEqual(Sgn, zero1);
+  SMTExprRef sgn_is_zero = mkEqual(Sgn, nil_1);
 
   SMTExprRef max_sig = mkBVFromDec(power2m1(SWidth - 1, false), SWidth - 1);
   SMTExprRef max_exp = mkBVConcat(
