@@ -177,8 +177,7 @@ void benchmarkFPConstruct(camada::SMTSolver &solver, std::size_t iterations) {
     auto b = solver.mkUBVtoFP(b_bv, fp32, rm);
     auto sum = solver.mkFPAdd(a, b, rm);
     auto div = solver.mkFPDiv(sum, solver.mkFP32(3.5f), rm);
-    auto rem = solver.mkFPRem(div, solver.mkFP32(1.25f));
-    auto integral = solver.mkFPtoIntegral(rem, rm);
+    auto integral = solver.mkFPtoIntegral(div, rm);
     sink += solver.mkIEEEFPToBV(integral)->getWidth();
   }
 
@@ -243,26 +242,6 @@ void benchmarkFPDivOnly(camada::SMTSolver &solver, std::size_t iterations) {
   (void)sink;
 }
 
-void benchmarkFPRemOnly(camada::SMTSolver &solver, std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
-  auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
-  auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
-  auto sum = solver.mkFPAdd(a, b, rm);
-  auto div = solver.mkFPDiv(sum, solver.mkFP32(3.5f), rm);
-  auto rhs = solver.mkFP32(1.25f);
-  volatile std::size_t sink = 0;
-
-  for (std::size_t i = 0; i < iterations; ++i)
-    sink += solver.mkFPRem(div, rhs)->getWidth();
-
-  solver.useCamadaFP = old_use_camada_fp;
-  (void)sink;
-}
-
 void benchmarkFPIntegralOnly(camada::SMTSolver &solver,
                              std::size_t iterations) {
   bool old_use_camada_fp = solver.useCamadaFP;
@@ -274,11 +253,10 @@ void benchmarkFPIntegralOnly(camada::SMTSolver &solver,
   auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
   auto div = solver.mkFPDiv(sum, solver.mkFP32(3.5f), rm);
-  auto rem = solver.mkFPRem(div, solver.mkFP32(1.25f));
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
-    sink += solver.mkFPtoIntegral(rem, rm)->getWidth();
+    sink += solver.mkFPtoIntegral(div, rm)->getWidth();
 
   solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
@@ -295,8 +273,7 @@ void benchmarkFPIEEEToBVOnly(camada::SMTSolver &solver,
   auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
   auto div = solver.mkFPDiv(sum, solver.mkFP32(3.5f), rm);
-  auto rem = solver.mkFPRem(div, solver.mkFP32(1.25f));
-  auto integral = solver.mkFPtoIntegral(rem, rm);
+  auto integral = solver.mkFPtoIntegral(div, rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
@@ -366,7 +343,6 @@ int main(int argc, char **argv) {
     runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
     runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
     runCase(backend, "fp_div_only", iterations, benchmarkFPDivOnly);
-    runCase(backend, "fp_rem_only", iterations, benchmarkFPRemOnly);
     runCase(backend, "fp_integral_only", iterations, benchmarkFPIntegralOnly);
     runCase(backend, "fp_ieee_to_bv_only", iterations, benchmarkFPIEEEToBVOnly);
     runCase(backend, "fp_sqrt_only", iterations, benchmarkFPSqrtOnly);

@@ -476,15 +476,12 @@ protected:
   mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
   mutable SMTExprRef CachedTrueExpr;
   mutable SMTExprRef CachedFalseExpr;
+  mutable std::vector<SMTExprRef> CachedBVNegOneExprs;
+  mutable std::vector<SMTExprRef> CachedBVZeroExprs;
+  mutable std::vector<SMTExprRef> CachedBVOneExprs;
   mutable SMTSortRef CachedBoolSort;
   mutable SMTSortRef CachedNativeRMSort;
   mutable SMTSortRef CachedEncodedRMSort;
-  mutable std::unordered_map<BVDecExprCacheKey, SMTExprRef,
-                             BVDecExprCacheKeyHash>
-      BVDecExprCache;
-  mutable std::unordered_map<BVBinExprCacheKey, SMTExprRef,
-                             BVBinExprCacheKeyHash>
-      BVBinExprCache;
   mutable std::unordered_map<SymbolExprCacheKey, SMTExprRef,
                              SymbolExprCacheKeyHash>
       SymbolExprCache;

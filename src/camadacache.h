@@ -63,40 +63,6 @@ struct ArraySortCacheKeyHash {
   }
 };
 
-struct BVDecExprCacheKey {
-  const SMTSort *Sort;
-  int64_t Value;
-
-  bool operator==(const BVDecExprCacheKey &Other) const {
-    return Sort == Other.Sort && Value == Other.Value;
-  }
-};
-
-struct BVDecExprCacheKeyHash {
-  std::size_t operator()(const BVDecExprCacheKey &Key) const {
-    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
-    auto ValueHash = std::hash<int64_t>{}(Key.Value);
-    return static_cast<std::size_t>(SortPtr ^ (ValueHash << 1));
-  }
-};
-
-struct BVBinExprCacheKey {
-  const SMTSort *Sort;
-  std::string Value;
-
-  bool operator==(const BVBinExprCacheKey &Other) const {
-    return Sort == Other.Sort && Value == Other.Value;
-  }
-};
-
-struct BVBinExprCacheKeyHash {
-  std::size_t operator()(const BVBinExprCacheKey &Key) const {
-    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
-    auto ValueHash = std::hash<std::string>{}(Key.Value);
-    return static_cast<std::size_t>(SortPtr ^ (ValueHash << 1));
-  }
-};
-
 struct SymbolExprCacheKey {
   const SMTSort *Sort;
   std::string Name;

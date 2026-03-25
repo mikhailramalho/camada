@@ -71,8 +71,9 @@ void camada::SMTSolver::clearSortCaches() {
 void camada::SMTSolver::clearExprCaches() {
   CachedTrueExpr = {};
   CachedFalseExpr = {};
-  BVDecExprCache.clear();
-  BVBinExprCache.clear();
+  CachedBVNegOneExprs.clear();
+  CachedBVZeroExprs.clear();
+  CachedBVOneExprs.clear();
   SymbolExprCache.clear();
   FPSpecialExprCache.clear();
 }

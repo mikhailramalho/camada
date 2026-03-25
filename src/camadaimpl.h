@@ -46,7 +46,6 @@ public:
 #endif
     return theExp;
   }
-
   SMTSortRef mkBoolSort() override final {
     if (CachedBoolSort)
       return CachedBoolSort;
@@ -780,15 +779,9 @@ public:
   SMTExprRef mkBVFromDec(const int64_t Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
-    BVDecExprCacheKey Key{Sort.get(), Int};
-    auto Cached = BVDecExprCache.find(Key);
-    if (Cached != BVDecExprCache.end())
-      return Cached->second;
-
     SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());
-    BVDecExprCache.emplace(Key, theExp);
     return tagExprKind(theExp, SMTExprKind::BVConst);
   }
 
@@ -799,15 +792,9 @@ public:
   SMTExprRef mkBVFromBin(const std::string &Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
-    BVBinExprCacheKey Key{Sort.get(), Int};
-    auto Cached = BVBinExprCache.find(Key);
-    if (Cached != BVBinExprCache.end())
-      return Cached->second;
-
     SMTExprRef theExp = mkBVFromBinImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());
-    BVBinExprCache.emplace(Key, theExp);
     return tagExprKind(theExp, SMTExprKind::BVConst);
   }
 
