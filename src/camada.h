@@ -33,6 +33,8 @@
 
 namespace camada {
 
+class FPEncodingContext;
+
 /// Return camada version
 std::string getCamadaVersion();
 
@@ -434,6 +436,8 @@ public:
   bool useCamadaFP = false;
 
 protected:
+  friend class FPEncodingContext;
+
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
   SMTSortRef newSortRef(const SolverSort &Sort) const {
@@ -484,6 +488,9 @@ protected:
   mutable std::unordered_map<SymbolExprCacheKey, SMTExprRef,
                              SymbolExprCacheKeyHash>
       SymbolExprCache;
+  mutable std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
+                             FPSpecialExprCacheKeyHash>
+      FPSpecialExprCache;
   mutable std::unordered_map<unsigned, SMTSortRef> BVSortCache;
   mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
       NativeFPSortCache;

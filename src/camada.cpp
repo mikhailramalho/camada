@@ -74,6 +74,7 @@ void camada::SMTSolver::clearExprCaches() {
   BVDecExprCache.clear();
   BVBinExprCache.clear();
   SymbolExprCache.clear();
+  FPSpecialExprCache.clear();
 }
 
 camada::SMTSolverRef camada::createZ3Solver() {

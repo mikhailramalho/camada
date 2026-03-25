@@ -73,31 +73,30 @@ public:
       : S(Solver), EWidth(EBits), SWidth(SBits) {}
 
   SMTExprRef nan(bool Sign) {
-    SMTExprRef &Cached = NaNCache[Sign ? 1 : 0];
-    if (!Cached)
-      Cached = S.mkNaN(Sign, EWidth, SWidth);
-    return Cached;
+    return getOrCreateSpecial(FPSpecialValueKind::NaN, Sign, [this, Sign]() {
+      return S.mkNaN(Sign, EWidth, SWidth);
+    });
   }
 
   SMTExprRef zero(bool Sign) {
-    SMTExprRef &Cached = ZeroCache[Sign ? 1 : 0];
-    if (!Cached)
-      Cached = Sign ? mkNZero(S, EWidth, SWidth) : mkPZero(S, EWidth, SWidth);
-    return Cached;
+    return getOrCreateSpecial(
+        FPSpecialValueKind::Zero, Sign, [this, Sign]() -> SMTExprRef {
+          return Sign ? mkNZero(S, EWidth, SWidth) : mkPZero(S, EWidth, SWidth);
+        });
   }
 
   SMTExprRef inf(bool Sign) {
-    SMTExprRef &Cached = InfCache[Sign ? 1 : 0];
-    if (!Cached)
-      Cached = Sign ? mkNInf(S, EWidth, SWidth) : mkPInf(S, EWidth, SWidth);
-    return Cached;
+    return getOrCreateSpecial(
+        FPSpecialValueKind::Inf, Sign, [this, Sign]() -> SMTExprRef {
+          return Sign ? mkNInf(S, EWidth, SWidth) : mkPInf(S, EWidth, SWidth);
+        });
   }
 
   SMTExprRef one(bool Sign) {
-    SMTExprRef &Cached = OneCache[Sign ? 1 : 0];
-    if (!Cached)
-      Cached = mkOne(S, S.mkBVFromDec(Sign ? 1 : 0, 1), EWidth, SWidth);
-    return Cached;
+    return getOrCreateSpecial(FPSpecialValueKind::One, Sign, [this, Sign]() {
+      return mkOne(S, S.mkBVFromDec(static_cast<int64_t>(Sign), 1), EWidth,
+                   SWidth);
+    });
   }
 
   FPUnpackedExpr unpackCached(const SMTExprRef &Expr, bool Normalize) {
@@ -113,13 +112,22 @@ public:
   }
 
 private:
+  template <typename Builder>
+  SMTExprRef getOrCreateSpecial(FPSpecialValueKind Kind, bool Sign,
+                                Builder &&Build) {
+    FPSpecialExprCacheKey Key{EWidth, SWidth, Kind, Sign};
+    auto Cached = S.FPSpecialExprCache.find(Key);
+    if (Cached != S.FPSpecialExprCache.end())
+      return Cached->second;
+
+    SMTExprRef Created = Build();
+    S.FPSpecialExprCache.emplace(Key, Created);
+    return Created;
+  }
+
   SMTSolver &S;
   unsigned EWidth;
   unsigned SWidth;
-  SMTExprRef NaNCache[2];
-  SMTExprRef ZeroCache[2];
-  SMTExprRef InfCache[2];
-  SMTExprRef OneCache[2];
   std::unordered_map<FPUnpackCacheKey, FPUnpackedExpr, FPUnpackCacheKeyHash>
       UnpackCache;
 };

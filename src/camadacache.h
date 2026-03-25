@@ -29,6 +29,7 @@
 namespace camada {
 
 class SMTSort;
+enum class FPSpecialValueKind : uint8_t { NaN, Zero, Inf, One };
 
 struct FPSortCacheKey {
   unsigned ExpWidth;
@@ -102,6 +103,28 @@ struct SymbolExprCacheKey {
 
   bool operator==(const SymbolExprCacheKey &Other) const {
     return Sort == Other.Sort && Name == Other.Name;
+  }
+};
+
+struct FPSpecialExprCacheKey {
+  unsigned ExpWidth;
+  unsigned SigWidth;
+  FPSpecialValueKind Kind;
+  bool Sign;
+
+  bool operator==(const FPSpecialExprCacheKey &Other) const {
+    return ExpWidth == Other.ExpWidth && SigWidth == Other.SigWidth &&
+           Kind == Other.Kind && Sign == Other.Sign;
+  }
+};
+
+struct FPSpecialExprCacheKeyHash {
+  std::size_t operator()(const FPSpecialExprCacheKey &Key) const {
+    std::size_t Hash = static_cast<std::size_t>(Key.ExpWidth);
+    Hash ^= static_cast<std::size_t>(Key.SigWidth) << 8;
+    Hash ^= static_cast<std::size_t>(Key.Kind) << 16;
+    Hash ^= static_cast<std::size_t>(Key.Sign) << 24;
+    return Hash;
   }
 };
 

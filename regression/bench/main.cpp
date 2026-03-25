@@ -306,6 +306,40 @@ void benchmarkFPIEEEToBVOnly(camada::SMTSolver &solver,
   (void)sink;
 }
 
+void benchmarkFPSqrtOnly(camada::SMTSolver &solver, std::size_t iterations) {
+  bool old_use_camada_fp = solver.useCamadaFP;
+  solver.useCamadaFP = true;
+
+  auto fp32 = solver.mkFP32Sort();
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto a = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkFPSqrt(a, rm)->getWidth();
+
+  solver.useCamadaFP = old_use_camada_fp;
+  (void)sink;
+}
+
+void benchmarkFPFMAOnly(camada::SMTSolver &solver, std::size_t iterations) {
+  bool old_use_camada_fp = solver.useCamadaFP;
+  solver.useCamadaFP = true;
+
+  auto fp32 = solver.mkFP32Sort();
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto x = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto y = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto z = solver.mkFP32(1.25f);
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkFPFMA(x, y, z, rm)->getWidth();
+
+  solver.useCamadaFP = old_use_camada_fp;
+  (void)sink;
+}
+
 void printUsage(const char *argv0) {
   std::cerr << "Usage: " << argv0
             << " [backend] [iterations]\n"
@@ -335,6 +369,8 @@ int main(int argc, char **argv) {
     runCase(backend, "fp_rem_only", iterations, benchmarkFPRemOnly);
     runCase(backend, "fp_integral_only", iterations, benchmarkFPIntegralOnly);
     runCase(backend, "fp_ieee_to_bv_only", iterations, benchmarkFPIEEEToBVOnly);
+    runCase(backend, "fp_sqrt_only", iterations, benchmarkFPSqrtOnly);
+    runCase(backend, "fp_fma_only", iterations, benchmarkFPFMAOnly);
     runCase(backend, "fp_construct", iterations, benchmarkFPConstruct);
     return 0;
   } catch (const std::exception &Exn) {
