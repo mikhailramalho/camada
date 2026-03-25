@@ -123,45 +123,48 @@ SMTExprRef MathSATSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<MathSATSort>>(
-      {Context, msat_get_bool_type(*Context)});
+  return newSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::Bool, Context, msat_get_bool_type(*Context), 1));
 }
 
 SMTSortRef MathSATSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<SolverBVSort<MathSATSort>>(
-      {BitWidth, Context, msat_get_bv_type(*Context, BitWidth)});
+  return newSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::BV, Context,
+                  msat_get_bv_type(*Context, BitWidth), BitWidth));
 }
 
 SMTSortRef MathSATSolver::mkRMSortImpl() {
-  return newSortRef<SolverRMSort<MathSATSort>>(
-      {Context, msat_get_fp_roundingmode_type(*Context)});
+  return newSortRef<MathSATSort>(MathSATSort(
+      SMTSortKind::RM, Context, msat_get_fp_roundingmode_type(*Context), 3));
 }
 
 SMTSortRef MathSATSolver::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return newSortRef<SolverFPSort<MathSATSort>>(
-      {ExpWidth, SigWidth, Context,
-       msat_get_fp_type(*Context, ExpWidth, SigWidth)});
+  return newSortRef<MathSATSort>(MathSATSort(
+      SMTSortKind::FP, Context, msat_get_fp_type(*Context, ExpWidth, SigWidth),
+      1 + ExpWidth + SigWidth, ExpWidth, SigWidth));
 }
 
 SMTSortRef MathSATSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                          const unsigned SigWidth) {
-  return newSortRef<SolverBVFPSort<MathSATSort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       msat_get_bv_type(*Context, ExpWidth + SigWidth + 1)});
+  return newSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::BVFP, Context,
+                  msat_get_bv_type(*Context, ExpWidth + SigWidth + 1),
+                  ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
 }
 
 SMTSortRef MathSATSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverBVRMSort<MathSATSort>>(
-      {Context, msat_get_bv_type(*Context, 3)});
+  return newSortRef<MathSATSort>(MathSATSort(SMTSortKind::BVRM, Context,
+                                             msat_get_bv_type(*Context, 3), 3));
 }
 
 SMTSortRef MathSATSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                           const SMTSortRef &ElemSort) {
-  return newSortRef<SolverArraySort<MathSATSort>>(
-      {IndexSort, ElemSort, Context,
-       msat_get_array_type(*Context, toSolverSort<MathSATSort>(*IndexSort).Sort,
-                           toSolverSort<MathSATSort>(*ElemSort).Sort)});
+  return newSortRef<MathSATSort>(MathSATSort(
+      SMTSortKind::Array, Context,
+      msat_get_array_type(*Context, toSolverSort<MathSATSort>(*IndexSort).Sort,
+                          toSolverSort<MathSATSort>(*ElemSort).Sort),
+      0, 0, 0, IndexSort, ElemSort));
 }
 
 SMTExprRef MathSATSolver::mkBVNegImpl(const SMTExprRef &Exp) {

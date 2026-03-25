@@ -106,33 +106,35 @@ SMTExprRef STPSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef STPSolver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<STPSort>>(
-      {Context, STP::vc_boolType(*Context)});
+  return newSortRef<STPSort>(
+      STPSort(SMTSortKind::Bool, Context, STP::vc_boolType(*Context), 1));
 }
 
 SMTSortRef STPSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<SolverBVSort<STPSort>>(
-      {BitWidth, Context, STP::vc_bvType(*Context, BitWidth)});
+  return newSortRef<STPSort>(STPSort(
+      SMTSortKind::BV, Context, STP::vc_bvType(*Context, BitWidth), BitWidth));
 }
 
 SMTSortRef STPSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                      const unsigned SigWidth) {
-  return newSortRef<SolverBVFPSort<STPSort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       STP::vc_bvType(*Context, ExpWidth + SigWidth + 1)});
+  return newSortRef<STPSort>(
+      STPSort(SMTSortKind::BVFP, Context,
+              STP::vc_bvType(*Context, ExpWidth + SigWidth + 1),
+              ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
 }
 
 SMTSortRef STPSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverBVRMSort<STPSort>>(
-      {Context, STP::vc_bvType(*Context, 3)});
+  return newSortRef<STPSort>(
+      STPSort(SMTSortKind::BVRM, Context, STP::vc_bvType(*Context, 3), 3));
 }
 
 SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
-  return newSortRef<SolverArraySort<STPSort>>(
-      {IndexSort, ElemSort, Context,
-       STP::vc_arrayType(*Context, toSolverSort<STPSort>(*IndexSort).Sort,
-                         toSolverSort<STPSort>(*ElemSort).Sort)});
+  return newSortRef<STPSort>(STPSort(
+      SMTSortKind::Array, Context,
+      STP::vc_arrayType(*Context, toSolverSort<STPSort>(*IndexSort).Sort,
+                        toSolverSort<STPSort>(*ElemSort).Sort),
+      0, 0, 0, IndexSort, ElemSort));
 }
 
 SMTExprRef STPSolver::mkBVNegImpl(const SMTExprRef &Exp) {

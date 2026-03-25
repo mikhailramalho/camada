@@ -60,8 +60,8 @@ void camada::SMTSort::dump() const {
 }
 
 unsigned camada::SMTSort::getWidth() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
+  assert(!isArraySort() && "Width is not defined for array sorts");
+  return Width;
 }
 
 unsigned camada::SMTSort::getWidthFromSolver() const {
@@ -70,31 +70,31 @@ unsigned camada::SMTSort::getWidthFromSolver() const {
 }
 
 unsigned camada::SMTSort::getFPSignificandWidth() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
+  assert(isFPSort() && "Significand width is only defined for FP sorts");
+  return SigWidth;
 }
 
 unsigned camada::SMTSort::getFPExponentWidth() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
+  assert(isFPSort() && "Exponent width is only defined for FP sorts");
+  return ExpWidth;
 }
 
 camada::SMTSortRef camada::SMTSort::getIndexSort() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
+  assert(isArraySort() && "Index sort is only defined for array sorts");
+  return IndexSort;
 }
 
 camada::SMTSortRef camada::SMTSort::getElementSort() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
+  assert(isArraySort() && "Element sort is only defined for array sorts");
+  return ElementSort;
 }
 
-void camada::SMTSort::validateSortWidth() const {
+bool camada::SMTSort::validateSortWidth() const {
   // Don't check array sort for now
   if (isArraySort())
-    return;
+    return true;
 
-  assert(getWidthFromSolver() == getWidth());
+  return getWidthFromSolver() == getWidth();
 }
 
 bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
@@ -104,23 +104,22 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
   if (isRMSort() && Other.isRMSort())
     return true;
 
-  if (isArraySort() && Other.isArraySort())
-    return (getIndexSort() == Other.getIndexSort()) &&
+  if (isArraySort())
+    return Other.isArraySort() && (getIndexSort() == Other.getIndexSort()) &&
            (getElementSort() == Other.getElementSort());
 
-  if (getWidth() != Other.getWidth())
+  if (Width != Other.Width)
     return false;
 
   if (getWidthFromSolver() != Other.getWidthFromSolver())
     return false;
 
   if (isFPSort() && Other.isFPSort())
-    return !(isBVSort() ^ Other.isBVSort()) &&
-           (getFPSignificandWidth() == Other.getFPSignificandWidth()) &&
-           (getFPExponentWidth() == Other.getFPExponentWidth());
+    return !(isBVSort() ^ Other.isBVSort()) && ExpWidth == Other.ExpWidth &&
+           SigWidth == Other.SigWidth;
 
   if (isBVSort() && Other.isBVSort())
-    return true; // Width was already checked
+    return true;
 
   return false;
 }

@@ -1862,8 +1862,10 @@ SMTExprRef SMTSolverImpl::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  // Do nothing, it's already a bitvector
-  return Exp;
+  // In the encoded-FP fallback, FP values are represented as bitvectors.
+  // Retag the expression to a plain BV sort so downstream BV operations and
+  // equality checks do not see a distinct BVFP sort kind.
+  return cloneExprWithSortImpl(*Exp, mkBVSort(Exp->getWidth()));
 }
 
 SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,

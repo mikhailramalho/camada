@@ -100,31 +100,34 @@ SMTExprRef YicesSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef YicesSolver::mkBoolSortImpl() {
-  return newSortRef<SolverBoolSort<YicesSort>>({Context, yices_bool_type()});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::Bool, Context, yices_bool_type(), 1));
 }
 
 SMTSortRef YicesSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<SolverBVSort<YicesSort>>(
-      {BitWidth, Context, yices_bv_type(BitWidth)});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::BV, Context, yices_bv_type(BitWidth), BitWidth));
 }
 
 SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return newSortRef<SolverBVFPSort<YicesSort>>(
-      {ExpWidth, SigWidth + 1, Context,
-       yices_bv_type(ExpWidth + SigWidth + 1)});
+  return newSortRef<YicesSort>(YicesSort(
+      SMTSortKind::BVFP, Context, yices_bv_type(ExpWidth + SigWidth + 1),
+      ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
 }
 
 SMTSortRef YicesSolver::mkBVRMSortImpl() {
-  return newSortRef<SolverBVRMSort<YicesSort>>({Context, yices_bv_type(3)});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::BVRM, Context, yices_bv_type(3), 3));
 }
 
 SMTSortRef YicesSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                         const SMTSortRef &ElemSort) {
-  return newSortRef<SolverArraySort<YicesSort>>(
-      {IndexSort, ElemSort, Context,
-       yices_function_type1(toSolverSort<YicesSort>(*IndexSort).Sort,
-                            toSolverSort<YicesSort>(*ElemSort).Sort)});
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::Array, Context,
+                yices_function_type1(toSolverSort<YicesSort>(*IndexSort).Sort,
+                                     toSolverSort<YicesSort>(*ElemSort).Sort),
+                0, 0, 0, IndexSort, ElemSort));
 }
 
 SMTExprRef YicesSolver::mkBVNegImpl(const SMTExprRef &Exp) {
