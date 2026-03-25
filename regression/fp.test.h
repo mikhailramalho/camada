@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <limits>
 
 inline void fp_arithmetics(const camada::SMTSolverRef &solver) {
   auto x = solver->mkFP32(0.750000059604644775390625f);
@@ -130,6 +131,63 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkEqual(signed_bv, all_ones));
   solver->addConstraint(solver->mkEqual(unsigned_bv, all_ones));
+
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void fp_denormal_round_to_integral(const camada::SMTSolverRef &solver) {
+  auto pos_denorm = solver->mkFP32(std::numeric_limits<float>::denorm_min());
+  auto neg_denorm = solver->mkFP32(-std::numeric_limits<float>::denorm_min());
+  auto rtp = solver->mkRM(camada::RM::ROUND_TO_PLUS_INF);
+  auto rtn = solver->mkRM(camada::RM::ROUND_TO_MINUS_INF);
+
+  auto pos_rounded = solver->mkFPtoIntegral(pos_denorm, rtp);
+  auto neg_rounded = solver->mkFPtoIntegral(neg_denorm, rtn);
+
+  REQUIRE(pos_denorm->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(neg_denorm->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(rtp->getKind() == camada::SMTExprKind::RMConst);
+  REQUIRE(rtn->getKind() == camada::SMTExprKind::RMConst);
+  REQUIRE(pos_rounded->getKind() == camada::SMTExprKind::FPtoIntegral);
+  REQUIRE(neg_rounded->getKind() == camada::SMTExprKind::FPtoIntegral);
+
+  solver->addConstraint(solver->mkEqual(pos_rounded, solver->mkFP32(1.0f)));
+  solver->addConstraint(solver->mkEqual(neg_rounded, solver->mkFP32(-1.0f)));
+
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void fp_div_overflow_to_inf(const camada::SMTSolverRef &solver) {
+  auto max_finite = solver->mkFP32(std::numeric_limits<float>::max());
+  auto tiny = solver->mkFP32(std::numeric_limits<float>::denorm_min());
+  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN);
+
+  auto div = solver->mkFPDiv(max_finite, tiny, rne);
+
+  REQUIRE(max_finite->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(tiny->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(rne->getKind() == camada::SMTExprKind::RMConst);
+  REQUIRE(div->getKind() == camada::SMTExprKind::FPDiv);
+
+  solver->addConstraint(solver->mkEqual(
+      div, solver->mkFP32(std::numeric_limits<float>::infinity())));
+
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void fp_remainder_semantics(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkFP32(7.0f);
+  auto y = solver->mkFP32(2.0f);
+  auto expected = solver->mkFP32(-1.0f);
+
+  auto rem = solver->mkFPRem(x, y);
+
+  REQUIRE(x->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(y->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(expected->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(rem->getKind() == camada::SMTExprKind::FPRem);
+
+  solver->addConstraint(solver->mkEqual(rem, expected));
 
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }

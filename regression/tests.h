@@ -19,4 +19,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_arithmetics);
   RESETANDTEST(fp_round_to_away);
   RESETANDTEST(fp_bv_conversions);
+  RESETANDTEST(fp_denormal_round_to_integral);
+  RESETANDTEST(fp_div_overflow_to_inf);
+  RESETANDTEST(fp_remainder_semantics);
 }
