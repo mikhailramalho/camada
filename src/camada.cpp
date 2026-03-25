@@ -50,6 +50,32 @@
 
 std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
 
+void camada::SMTSolver::invalidateGeneratedObjects() {
+  clearSortCaches();
+  clearExprCaches();
+  ++HandleState->Generation;
+  ExprArena.clear();
+  SortArena.clear();
+}
+
+void camada::SMTSolver::clearSortCaches() {
+  CachedBoolSort = {};
+  CachedNativeRMSort = {};
+  CachedEncodedRMSort = {};
+  BVSortCache.clear();
+  NativeFPSortCache.clear();
+  EncodedFPSortCache.clear();
+  ArraySortCache.clear();
+}
+
+void camada::SMTSolver::clearExprCaches() {
+  CachedTrueExpr = {};
+  CachedFalseExpr = {};
+  BVDecExprCache.clear();
+  BVBinExprCache.clear();
+  SymbolExprCache.clear();
+}
+
 camada::SMTSolverRef camada::createZ3Solver() {
 #if SOLVER_Z3_ENABLED
   return std::make_unique<Z3Solver>();

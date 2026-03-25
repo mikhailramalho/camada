@@ -24,9 +24,11 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "camadacache.h"
 #include "camadaexpr.h"
 
 namespace camada {
@@ -44,38 +46,6 @@ enum class RM {
   ROUND_TO_ZERO = 4,
 };
 
-struct FPSortCacheKey {
-  unsigned ExpWidth;
-  unsigned SigWidth;
-
-  bool operator==(const FPSortCacheKey &Other) const {
-    return ExpWidth == Other.ExpWidth && SigWidth == Other.SigWidth;
-  }
-};
-
-struct FPSortCacheKeyHash {
-  std::size_t operator()(const FPSortCacheKey &Key) const {
-    return (static_cast<std::size_t>(Key.ExpWidth) << 32) ^ Key.SigWidth;
-  }
-};
-
-struct ArraySortCacheKey {
-  const SMTSort *IndexSort;
-  const SMTSort *ElementSort;
-
-  bool operator==(const ArraySortCacheKey &Other) const {
-    return IndexSort == Other.IndexSort && ElementSort == Other.ElementSort;
-  }
-};
-
-struct ArraySortCacheKeyHash {
-  std::size_t operator()(const ArraySortCacheKey &Key) const {
-    auto Index = reinterpret_cast<std::uintptr_t>(Key.IndexSort);
-    auto Element = reinterpret_cast<std::uintptr_t>(Key.ElementSort);
-    return static_cast<std::size_t>(Index ^ (Element << 1));
-  }
-};
-
 /// Generic base class for SMT Solvers
 ///
 /// This class is responsible for wrapping all sorts and expression generation,
@@ -84,19 +54,6 @@ class SMTSolver {
 public:
   SMTSolver() = default;
   virtual ~SMTSolver() = default;
-
-  /// Wrapper to create new SMTSort
-  template <typename SolverSort>
-  SMTSortRef newSortRef(const SolverSort &Sort) const {
-    auto OwnedSort = std::make_unique<SolverSort>(Sort);
-#ifndef NDEBUG
-    assert(OwnedSort->validateSortWidth());
-    OwnedSort->markWidthValidated();
-#endif
-    const SMTSort *SortPtr = OwnedSort.get();
-    SortArena.emplace_back(std::move(OwnedSort));
-    return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
-  }
 
   /// Wrapper to create new SMTExpr
   virtual SMTExprRef newExprRef(const SMTExpr &Exp) const = 0;
@@ -477,6 +434,19 @@ public:
   bool useCamadaFP = false;
 
 protected:
+  /// Wrapper to create new SMTSort
+  template <typename SolverSort>
+  SMTSortRef newSortRef(const SolverSort &Sort) const {
+    auto OwnedSort = std::make_unique<SolverSort>(Sort);
+#ifndef NDEBUG
+    assert(OwnedSort->validateSortWidth());
+    OwnedSort->markWidthValidated();
+#endif
+    const SMTSort *SortPtr = OwnedSort.get();
+    SortArena.emplace_back(std::move(OwnedSort));
+    return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
+  }
+
   template <typename SolverExpr>
   SMTExprRef storeExprRef(const SolverExpr &Exp) const {
     auto OwnedExpr = std::make_unique<SolverExpr>(Exp);
@@ -492,28 +462,28 @@ protected:
     return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
   }
 
-  void invalidateGeneratedObjects() {
-    clearSortCaches();
-    ++HandleState->Generation;
-    ExprArena.clear();
-    SortArena.clear();
-  }
+  void invalidateGeneratedObjects();
 
-  void clearSortCaches() {
-    CachedBoolSort = {};
-    CachedNativeRMSort = {};
-    CachedEncodedRMSort = {};
-    BVSortCache.clear();
-    NativeFPSortCache.clear();
-    EncodedFPSortCache.clear();
-    ArraySortCache.clear();
-  }
+  void clearSortCaches();
+
+  void clearExprCaches();
 
   mutable std::vector<std::unique_ptr<SMTSort>> SortArena;
   mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
+  mutable SMTExprRef CachedTrueExpr;
+  mutable SMTExprRef CachedFalseExpr;
   mutable SMTSortRef CachedBoolSort;
   mutable SMTSortRef CachedNativeRMSort;
   mutable SMTSortRef CachedEncodedRMSort;
+  mutable std::unordered_map<BVDecExprCacheKey, SMTExprRef,
+                             BVDecExprCacheKeyHash>
+      BVDecExprCache;
+  mutable std::unordered_map<BVBinExprCacheKey, SMTExprRef,
+                             BVBinExprCacheKeyHash>
+      BVBinExprCache;
+  mutable std::unordered_map<SymbolExprCacheKey, SMTExprRef,
+                             SymbolExprCacheKeyHash>
+      SymbolExprCache;
   mutable std::unordered_map<unsigned, SMTSortRef> BVSortCache;
   mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
       NativeFPSortCache;

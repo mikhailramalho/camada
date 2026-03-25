@@ -1,0 +1,118 @@
+/**************************************************************************
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ **************************************************************************/
+
+#ifndef CAMADACACHE_H_
+#define CAMADACACHE_H_
+
+#include <cstdint>
+#include <functional>
+#include <string>
+
+namespace camada {
+
+class SMTSort;
+
+struct FPSortCacheKey {
+  unsigned ExpWidth;
+  unsigned SigWidth;
+
+  bool operator==(const FPSortCacheKey &Other) const {
+    return ExpWidth == Other.ExpWidth && SigWidth == Other.SigWidth;
+  }
+};
+
+struct FPSortCacheKeyHash {
+  std::size_t operator()(const FPSortCacheKey &Key) const {
+    return (static_cast<std::size_t>(Key.ExpWidth) << 32) ^ Key.SigWidth;
+  }
+};
+
+struct ArraySortCacheKey {
+  const SMTSort *IndexSort;
+  const SMTSort *ElementSort;
+
+  bool operator==(const ArraySortCacheKey &Other) const {
+    return IndexSort == Other.IndexSort && ElementSort == Other.ElementSort;
+  }
+};
+
+struct ArraySortCacheKeyHash {
+  std::size_t operator()(const ArraySortCacheKey &Key) const {
+    auto Index = reinterpret_cast<std::uintptr_t>(Key.IndexSort);
+    auto Element = reinterpret_cast<std::uintptr_t>(Key.ElementSort);
+    return static_cast<std::size_t>(Index ^ (Element << 1));
+  }
+};
+
+struct BVDecExprCacheKey {
+  const SMTSort *Sort;
+  int64_t Value;
+
+  bool operator==(const BVDecExprCacheKey &Other) const {
+    return Sort == Other.Sort && Value == Other.Value;
+  }
+};
+
+struct BVDecExprCacheKeyHash {
+  std::size_t operator()(const BVDecExprCacheKey &Key) const {
+    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
+    auto ValueHash = std::hash<int64_t>{}(Key.Value);
+    return static_cast<std::size_t>(SortPtr ^ (ValueHash << 1));
+  }
+};
+
+struct BVBinExprCacheKey {
+  const SMTSort *Sort;
+  std::string Value;
+
+  bool operator==(const BVBinExprCacheKey &Other) const {
+    return Sort == Other.Sort && Value == Other.Value;
+  }
+};
+
+struct BVBinExprCacheKeyHash {
+  std::size_t operator()(const BVBinExprCacheKey &Key) const {
+    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
+    auto ValueHash = std::hash<std::string>{}(Key.Value);
+    return static_cast<std::size_t>(SortPtr ^ (ValueHash << 1));
+  }
+};
+
+struct SymbolExprCacheKey {
+  const SMTSort *Sort;
+  std::string Name;
+
+  bool operator==(const SymbolExprCacheKey &Other) const {
+    return Sort == Other.Sort && Name == Other.Name;
+  }
+};
+
+struct SymbolExprCacheKeyHash {
+  std::size_t operator()(const SymbolExprCacheKey &Key) const {
+    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
+    auto NameHash = std::hash<std::string>{}(Key.Name);
+    return static_cast<std::size_t>(SortPtr ^ (NameHash << 1));
+  }
+};
+
+} // namespace camada
+
+#endif

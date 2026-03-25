@@ -767,17 +767,28 @@ public:
   }
 
   SMTExprRef mkBool(const bool b) override final {
+    SMTExprRef &CachedExpr = b ? CachedTrueExpr : CachedFalseExpr;
+    if (CachedExpr)
+      return CachedExpr;
+
     SMTExprRef theExp = mkBoolImpl(b);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BoolConst);
+    CachedExpr = theExp;
+    return tagExprKind(CachedExpr, SMTExprKind::BoolConst);
   }
 
   SMTExprRef mkBVFromDec(const int64_t Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
+    BVDecExprCacheKey Key{Sort.get(), Int};
+    auto Cached = BVDecExprCache.find(Key);
+    if (Cached != BVDecExprCache.end())
+      return Cached->second;
+
     SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());
+    BVDecExprCache.emplace(Key, theExp);
     return tagExprKind(theExp, SMTExprKind::BVConst);
   }
 
@@ -788,9 +799,15 @@ public:
   SMTExprRef mkBVFromBin(const std::string &Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
+    BVBinExprCacheKey Key{Sort.get(), Int};
+    auto Cached = BVBinExprCache.find(Key);
+    if (Cached != BVBinExprCache.end())
+      return Cached->second;
+
     SMTExprRef theExp = mkBVFromBinImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());
+    BVBinExprCache.emplace(Key, theExp);
     return tagExprKind(theExp, SMTExprKind::BVConst);
   }
 
@@ -805,8 +822,14 @@ public:
 
   SMTExprRef mkSymbol(const std::string &Name,
                       const SMTSortRef &Sort) override final {
+    SymbolExprCacheKey Key{Sort.get(), Name};
+    auto Cached = SymbolExprCache.find(Key);
+    if (Cached != SymbolExprCache.end())
+      return Cached->second;
+
     SMTExprRef theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
+    SymbolExprCache.emplace(Key, theExp);
     return tagExprKind(theExp, SMTExprKind::Symbol);
   }
 
