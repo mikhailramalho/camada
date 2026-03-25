@@ -48,36 +48,58 @@ public:
   }
 
   SMTSortRef mkBoolSort() override final {
+    if (CachedBoolSort)
+      return CachedBoolSort;
+
     SMTSortRef theSort = mkBoolSortImpl();
     assert(theSort->isBoolSort());
+    CachedBoolSort = theSort;
     return theSort;
   }
 
   SMTSortRef mkBVSort(const unsigned BitWidth) override final {
     assert(BitWidth);
+    auto It = BVSortCache.find(BitWidth);
+    if (It != BVSortCache.end())
+      return It->second;
+
     SMTSortRef theSort = mkBVSortImpl(BitWidth);
     assert(theSort->isBVSort());
     assert(theSort->getWidth() == BitWidth);
     assert(theSort->getWidth() == theSort->getWidthFromSolver());
+    BVSortCache.emplace(BitWidth, theSort);
     return theSort;
   }
 
   SMTSortRef mkRMSort() override final {
+    SMTSortRef &CachedSort =
+        useCamadaFP ? CachedEncodedRMSort : CachedNativeRMSort;
+    if (CachedSort)
+      return CachedSort;
+
     SMTSortRef theSort =
         useCamadaFP ? SMTSolverImpl::mkRMSortImpl() : mkRMSortImpl();
     assert(theSort->isRMSort());
+    CachedSort = theSort;
     return theSort;
   }
 
   SMTSortRef mkFPSort(const unsigned ExpWidth,
                       const unsigned SigWidth) override final {
     assert(ExpWidth && SigWidth);
+    auto &Cache = useCamadaFP ? EncodedFPSortCache : NativeFPSortCache;
+    FPSortCacheKey Key{ExpWidth, SigWidth};
+    auto It = Cache.find(Key);
+    if (It != Cache.end())
+      return It->second;
+
     SMTSortRef theSort = useCamadaFP
                              ? SMTSolverImpl::mkFPSortImpl(ExpWidth, SigWidth)
                              : mkFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
     assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
     assert(theSort->getWidth() == theSort->getWidthFromSolver());
+    Cache.emplace(Key, theSort);
     return theSort;
   }
 
@@ -87,10 +109,16 @@ public:
 
   SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
                          const SMTSortRef &ElemSort) override final {
+    ArraySortCacheKey Key{IndexSort.get(), ElemSort.get()};
+    auto It = ArraySortCache.find(Key);
+    if (It != ArraySortCache.end())
+      return It->second;
+
     SMTSortRef theSort = mkArraySortImpl(IndexSort, ElemSort);
     assert(theSort->isArraySort());
     assert(theSort->getIndexSort() == IndexSort);
     assert(theSort->getElementSort() == ElemSort);
+    ArraySortCache.emplace(Key, theSort);
     return theSort;
   }
 
@@ -889,16 +917,26 @@ public:
 
   SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                         const unsigned SigWidth) override final {
+    FPSortCacheKey Key{ExpWidth, SigWidth};
+    auto It = EncodedFPSortCache.find(Key);
+    if (It != EncodedFPSortCache.end())
+      return It->second;
+
     SMTSortRef theSort = mkBVFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
     assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
     assert(theSort->getWidth() == theSort->getWidthFromSolver());
+    EncodedFPSortCache.emplace(Key, theSort);
     return theSort;
   }
 
   SMTSortRef mkBVRMSort() override final {
+    if (CachedEncodedRMSort)
+      return CachedEncodedRMSort;
+
     SMTSortRef theSort = mkBVRMSortImpl();
     assert(theSort->isRMSort());
+    CachedEncodedRMSort = theSort;
     return theSort;
   }
 

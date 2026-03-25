@@ -24,6 +24,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include "camadaexpr.h"
@@ -41,6 +42,38 @@ enum class RM {
   ROUND_TO_PLUS_INF = 2,
   ROUND_TO_MINUS_INF = 3,
   ROUND_TO_ZERO = 4,
+};
+
+struct FPSortCacheKey {
+  unsigned ExpWidth;
+  unsigned SigWidth;
+
+  bool operator==(const FPSortCacheKey &Other) const {
+    return ExpWidth == Other.ExpWidth && SigWidth == Other.SigWidth;
+  }
+};
+
+struct FPSortCacheKeyHash {
+  std::size_t operator()(const FPSortCacheKey &Key) const {
+    return (static_cast<std::size_t>(Key.ExpWidth) << 32) ^ Key.SigWidth;
+  }
+};
+
+struct ArraySortCacheKey {
+  const SMTSort *IndexSort;
+  const SMTSort *ElementSort;
+
+  bool operator==(const ArraySortCacheKey &Other) const {
+    return IndexSort == Other.IndexSort && ElementSort == Other.ElementSort;
+  }
+};
+
+struct ArraySortCacheKeyHash {
+  std::size_t operator()(const ArraySortCacheKey &Key) const {
+    auto Index = reinterpret_cast<std::uintptr_t>(Key.IndexSort);
+    auto Element = reinterpret_cast<std::uintptr_t>(Key.ElementSort);
+    return static_cast<std::size_t>(Index ^ (Element << 1));
+  }
 };
 
 /// Generic base class for SMT Solvers
@@ -460,13 +493,35 @@ protected:
   }
 
   void invalidateGeneratedObjects() {
+    clearSortCaches();
     ++HandleState->Generation;
     ExprArena.clear();
     SortArena.clear();
   }
 
+  void clearSortCaches() {
+    CachedBoolSort = {};
+    CachedNativeRMSort = {};
+    CachedEncodedRMSort = {};
+    BVSortCache.clear();
+    NativeFPSortCache.clear();
+    EncodedFPSortCache.clear();
+    ArraySortCache.clear();
+  }
+
   mutable std::vector<std::unique_ptr<SMTSort>> SortArena;
   mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
+  mutable SMTSortRef CachedBoolSort;
+  mutable SMTSortRef CachedNativeRMSort;
+  mutable SMTSortRef CachedEncodedRMSort;
+  mutable std::unordered_map<unsigned, SMTSortRef> BVSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      NativeFPSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      EncodedFPSortCache;
+  mutable std::unordered_map<ArraySortCacheKey, SMTSortRef,
+                             ArraySortCacheKeyHash>
+      ArraySortCache;
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 
