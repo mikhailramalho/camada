@@ -220,15 +220,10 @@ static inline SMTExprRef mkBias(SMTSolver &S, const SMTExprRef &e) {
   return S.mkBVAdd(e, bias);
 }
 
-static inline SMTExprRef mkUnbias(SMTSolver &S, SMTExprRef &Src) {
+static inline SMTExprRef mkUnbias(SMTSolver &S, const SMTExprRef &Src) {
   unsigned EWidth = Src->getWidth();
-
-  SMTExprRef e_plus_one = S.mkBVAdd(Src, S.mkBVFromDec(1, EWidth));
-
-  SMTExprRef leading = S.mkBVExtract(EWidth - 1, EWidth - 1, e_plus_one);
-  SMTExprRef n_leading = S.mkBVNot(leading);
-  SMTExprRef rest = S.mkBVExtract(EWidth - 2, 0, e_plus_one);
-  return S.mkBVConcat(n_leading, rest);
+  SMTExprRef bias = S.mkBVFromDec(power2m1(EWidth - 1, false), EWidth);
+  return S.mkBVSub(Src, bias);
 }
 
 static inline SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
@@ -303,10 +298,19 @@ static inline SMTExprRef mkRoundingDecision(SMTSolver &S, const SMTExprRef &R,
 
   SMTExprRef nil_1 = S.mkBVFromDec(0, 1);
 
-  SMTExprRef rm_is_to_neg = mkIsRM(S, R, RM::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_is_to_pos = mkIsRM(S, R, RM::ROUND_TO_PLUS_INF);
-  SMTExprRef rm_is_away = mkIsRM(S, R, RM::ROUND_TO_AWAY);
-  SMTExprRef rm_is_even = mkIsRM(S, R, RM::ROUND_TO_EVEN);
+  SMTExprRef rm_neg =
+      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_MINUS_INF), 3);
+  SMTExprRef rm_pos =
+      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_PLUS_INF), 3);
+  SMTExprRef rm_away =
+      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_AWAY), 3);
+  SMTExprRef rm_even =
+      S.mkBVFromDec(static_cast<int64_t>(RM::ROUND_TO_EVEN), 3);
+
+  SMTExprRef rm_is_to_neg = S.mkEqual(R, rm_neg);
+  SMTExprRef rm_is_to_pos = S.mkEqual(R, rm_pos);
+  SMTExprRef rm_is_away = S.mkEqual(R, rm_away);
+  SMTExprRef rm_is_even = S.mkEqual(R, rm_even);
 
   SMTExprRef inc_c4 = S.mkIte(rm_is_to_neg, inc_neg, nil_1);
   SMTExprRef inc_c3 = S.mkIte(rm_is_to_pos, inc_pos, inc_c4);
@@ -329,15 +333,17 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
   assert(Exp->getWidth() == EWidth);
   assert(Sig->getWidth() == SWidth - 1);
 
-  SMTExprRef is_normal = S.mkFPIsNormal(Src);
+  SMTExprRef zero_e = S.mkBVFromDec(0, EWidth);
+  SMTExprRef top_e = mkTopExp(S, EWidth);
+  SMTExprRef exp_is_zero = S.mkEqual(Exp, zero_e);
+  SMTExprRef exp_is_top = S.mkEqual(Exp, top_e);
+  SMTExprRef is_normal = S.mkNot(S.mkOr(exp_is_zero, exp_is_top));
+
   SMTExprRef normal_sig = S.mkBVConcat(S.mkBVFromDec(1, 1), Sig);
   SMTExprRef normal_exp = mkUnbias(S, Exp);
 
   SMTExprRef denormal_sig = S.mkBVZeroExt(1, Sig);
-  SMTExprRef denormal_exp = S.mkBVFromDec(1, EWidth);
-  denormal_exp = mkUnbias(S, denormal_exp);
-
-  SMTExprRef zero_e = S.mkBVFromDec(0, EWidth);
+  SMTExprRef denormal_exp = mkMinExp(S, EWidth);
   if (Normalize) {
     SMTExprRef zero_s = S.mkBVFromDec(0, SWidth);
     SMTExprRef is_sig_zero = S.mkEqual(zero_s, denormal_sig);
