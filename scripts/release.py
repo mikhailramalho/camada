@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
     run_command(["cmake", "..", "-GNinja", "-DBUILD_SHARED_LIBS=OFF",
                  "-DCAMADA_ENABLE_REGRESSION=OFF",
-                 "-DCAMADA_DOWNLOAD_DEPENDENCIES=PERMISSIVE-ONLY",
+                 "-DCAMADA_DOWNLOAD_DEPENDENCIES=PERMISSIVE",
                  "-DCAMADA_SOLVER_BITWUZLA_ENABLE=ON",
                  "-DCAMADA_SOLVER_CVC5_ENABLE=OFF",
                  "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",

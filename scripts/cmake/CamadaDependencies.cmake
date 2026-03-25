@@ -2,17 +2,17 @@ set(CAMADA_DOWNLOAD_DEPENDENCIES
     "OFF"
     CACHE
       STRING
-      "Download missing solver dependencies during CMake configure: OFF, ALL, or PERMISSIVE-ONLY"
+      "Download missing solver dependencies during CMake configure: OFF, ALL, or PERMISSIVE"
 )
 set_property(CACHE CAMADA_DOWNLOAD_DEPENDENCIES PROPERTY STRINGS OFF ALL
-                                                         PERMISSIVE-ONLY)
+                                                         PERMISSIVE)
 
 if(NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF"
    AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "ALL"
-   AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE-ONLY")
+   AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE")
   message(
     FATAL_ERROR
-      "CAMADA_DOWNLOAD_DEPENDENCIES must be one of: OFF, ALL, PERMISSIVE-ONLY")
+      "CAMADA_DOWNLOAD_DEPENDENCIES must be one of: OFF, ALL, PERMISSIVE")
 endif()
 
 set(CAMADA_DEPS_DIR
@@ -99,7 +99,7 @@ function(camada_should_download_dependency out_var is_permissive)
     return()
   endif()
 
-  if(CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE-ONLY" AND is_permissive)
+  if(CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "PERMISSIVE" AND is_permissive)
     set(${out_var}
         TRUE
         PARENT_SCOPE)
