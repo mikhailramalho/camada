@@ -1,0 +1,66 @@
+name: Benchmark Master Baseline
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark-master:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgmp-dev \
+            libmpfr-dev \
+            schedtool
+
+      - name: Cache deps
+        id: cache-deps-bench-v1
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/deps
+            build/_deps
+          key: ${{ runner.os }}-bench-deps-v1
+
+      - name: Configure Camada
+        run: >
+          cmake -S . -B build -GNinja
+          -DCAMADA_ENABLE_REGRESSION=ON
+          -DBUILD_SHARED_LIBS=OFF
+          -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL
+          -DCAMADA_SOLVER_BITWUZLA_ENABLE=ON
+          -DCAMADA_SOLVER_CVC5_ENABLE=OFF
+          -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF
+          -DCAMADA_SOLVER_STP_ENABLE=OFF
+          -DCAMADA_SOLVER_YICES_ENABLE=OFF
+          -DCAMADA_SOLVER_Z3_ENABLE=OFF
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Benchmark
+        run: cmake --build build --target camada-bench
+
+      - name: Generate baseline-master.txt
+        run: >
+          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
+          --baseline scripts/baseline-master.txt
+          --write-baseline
+
+      - name: Upload baseline-master artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-master
+          path: scripts/baseline-master.txt
+          if-no-files-found: error
