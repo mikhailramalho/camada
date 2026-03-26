@@ -24,6 +24,7 @@
 
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -471,8 +472,8 @@ protected:
 
   void initializeCommonSingletons();
 
-  mutable std::vector<std::unique_ptr<SMTSort>> SortArena;
-  mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
+  mutable std::deque<std::unique_ptr<SMTSort>> SortArena;
+  mutable std::deque<std::unique_ptr<SMTExpr>> ExprArena;
   mutable std::array<SMTExprRef, 2> CachedBoolExprs;
   mutable SMTExprRef CachedBVOne1Expr;
   mutable std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
