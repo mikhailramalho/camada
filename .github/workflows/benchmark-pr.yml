@@ -21,6 +21,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
 
       - name: Install Dependencies
         run: |
@@ -52,6 +55,13 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           if_no_artifact_found: fail
 
+      - name: Determine previous commit
+        id: previous
+        run: |
+          prev_sha="$(git rev-parse HEAD^)"
+          echo "sha=${prev_sha}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${prev_sha:0:12}" >> "$GITHUB_OUTPUT"
+
       - name: Configure Camada
         run: >
           cmake -S . -B build -GNinja
@@ -69,11 +79,46 @@ jobs:
       - name: Build Benchmark
         run: cmake --build build --target camada-bench
 
-      - name: Run benchmark comparison
+      - name: Compare current against master baseline
         run: >
           python3 scripts/compare-bench.py ./build/bin/camada-bench 200
           --baseline scripts/baseline-master.txt
-          > benchmark-pr-comment.txt
+          > benchmark-master-comment.txt
+
+      - name: Create previous-commit worktree
+        run: git worktree add ../camada-prev ${{ steps.previous.outputs.sha }}
+
+      - name: Configure previous commit
+        working-directory: ../camada-prev
+        run: >
+          cmake -S . -B build -GNinja
+          -DCAMADA_ENABLE_REGRESSION=ON
+          -DBUILD_SHARED_LIBS=OFF
+          -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL
+          -DCAMADA_SOLVER_BITWUZLA_ENABLE=ON
+          -DCAMADA_SOLVER_CVC5_ENABLE=OFF
+          -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF
+          -DCAMADA_SOLVER_STP_ENABLE=OFF
+          -DCAMADA_SOLVER_YICES_ENABLE=OFF
+          -DCAMADA_SOLVER_Z3_ENABLE=OFF
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build previous commit benchmark
+        working-directory: ../camada-prev
+        run: cmake --build build --target camada-bench
+
+      - name: Generate previous-commit baseline
+        working-directory: ../camada-prev
+        run: >
+          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
+          --baseline scripts/baseline-prev.txt
+          --write-baseline
+
+      - name: Compare current against previous commit
+        run: >
+          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
+          --baseline ../camada-prev/scripts/baseline-prev.txt
+          > benchmark-prev-comment.txt
 
       - name: Update PR comment
         uses: actions/github-script@v7
@@ -81,19 +126,29 @@ jobs:
           script: |
             const fs = require('fs');
             const marker = '<!-- camada-benchmark-comment -->';
-            const result = fs.readFileSync('benchmark-pr-comment.txt', 'utf8').trim();
-            const sha = context.payload.pull_request.head.sha;
-            const shortSha = sha.slice(0, 12);
+            const masterResult = fs.readFileSync('benchmark-master-comment.txt', 'utf8').trim();
+            const prevResult = fs.readFileSync('benchmark-prev-comment.txt', 'utf8').trim();
+            const currentSha = context.payload.pull_request.head.sha;
+            const currentShortSha = currentSha.slice(0, 12);
+            const prevShortSha = '${{ steps.previous.outputs.short_sha }}';
             const body = [
               marker,
               '## Benchmark Comparison',
               '',
-              `Commit: \`${shortSha}\``,
+              `Commit: \`${currentShortSha}\``,
+              '',
+              '### Against master baseline',
               '',
               'Compared against `baseline-master.txt` generated from the latest successful `master` benchmark run.',
               '',
               '```text',
-              result,
+              masterResult,
+              '```',
+              '',
+              `### Against previous commit (\`${prevShortSha}\`)`,
+              '',
+              '```text',
+              prevResult,
               '```',
             ].join('\n');
 

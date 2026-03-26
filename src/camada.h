@@ -22,10 +22,15 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
+#include <array>
 #include <cstdint>
+#include <deque>
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
+#include "camadacache.h"
 #include "camadaexpr.h"
 
 namespace camada {
@@ -51,15 +56,6 @@ class SMTSolver {
 public:
   SMTSolver() = default;
   virtual ~SMTSolver() = default;
-
-  /// Wrapper to create new SMTSort
-  template <typename SolverSort>
-  SMTSortRef newSortRef(const SolverSort &Sort) const {
-    auto OwnedSort = std::make_unique<SolverSort>(Sort);
-    const SMTSort *SortPtr = OwnedSort.get();
-    SortArena.emplace_back(std::move(OwnedSort));
-    return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
-  }
 
   /// Wrapper to create new SMTExpr
   virtual SMTExprRef newExprRef(const SMTExpr &Exp) const = 0;
@@ -440,6 +436,19 @@ public:
   bool useCamadaFP = false;
 
 protected:
+  /// Wrapper to create new SMTSort
+  template <typename SolverSort>
+  SMTSortRef newSortRef(const SolverSort &Sort) const {
+    auto OwnedSort = std::make_unique<SolverSort>(Sort);
+#ifndef NDEBUG
+    assert(OwnedSort->validateSortWidth());
+    OwnedSort->markWidthValidated();
+#endif
+    const SMTSort *SortPtr = OwnedSort.get();
+    SortArena.emplace_back(std::move(OwnedSort));
+    return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
+  }
+
   template <typename SolverExpr>
   SMTExprRef storeExprRef(const SolverExpr &Exp) const {
     auto OwnedExpr = std::make_unique<SolverExpr>(Exp);
@@ -455,14 +464,40 @@ protected:
     return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
   }
 
-  void invalidateGeneratedObjects() {
-    ++HandleState->Generation;
-    ExprArena.clear();
-    SortArena.clear();
-  }
+  void invalidateGeneratedObjects();
 
-  mutable std::vector<std::unique_ptr<SMTSort>> SortArena;
-  mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
+  void clearSortCaches();
+
+  void clearExprCaches();
+
+  void initializeCommonSingletons();
+
+  mutable std::deque<std::unique_ptr<SMTSort>> SortArena;
+  mutable std::deque<std::unique_ptr<SMTExpr>> ExprArena;
+  mutable std::array<SMTExprRef, 2> CachedBoolExprs;
+  mutable SMTExprRef CachedBVOne1Expr;
+  mutable std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
+  mutable std::array<SMTExprRef, 5> CachedRMBVExprs;
+  mutable std::vector<SMTExprRef> CachedBVNegOneExprs;
+  mutable std::vector<SMTExprRef> CachedBVZeroExprs;
+  mutable std::vector<SMTExprRef> CachedBVOneExprs;
+  mutable SMTSortRef CachedBoolSort;
+  mutable SMTSortRef CachedNativeRMSort;
+  mutable SMTSortRef CachedEncodedRMSort;
+  mutable std::unordered_map<SymbolExprCacheKey, SMTExprRef,
+                             SymbolExprCacheKeyHash>
+      SymbolExprCache;
+  mutable std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
+                             FPSpecialExprCacheKeyHash>
+      FPSpecialExprCache;
+  mutable std::unordered_map<unsigned, SMTSortRef> BVSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      NativeFPSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      EncodedFPSortCache;
+  mutable std::unordered_map<ArraySortCacheKey, SMTSortRef,
+                             ArraySortCacheKeyHash>
+      ArraySortCache;
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 

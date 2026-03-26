@@ -63,6 +63,7 @@ CVC5Solver::CVC5Solver()
   Context->setOption("arrays-exp", "true");
   Context->setOption("produce-models", "true");
   Context->setOption("produce-assertions", "true");
+  initializeCommonSingletons();
 }
 
 CVC5Solver::~CVC5Solver() { invalidateGeneratedObjects(); }

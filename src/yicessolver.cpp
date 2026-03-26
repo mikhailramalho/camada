@@ -70,6 +70,7 @@ YicesSolver::YicesSolver() : SMTSolverImpl() {
   OwnedContext.reset(yices_new_context(config));
   Context = OwnedContext.get();
   yices_free_config(config);
+  initializeCommonSingletons();
 }
 
 YicesSolver::~YicesSolver() {

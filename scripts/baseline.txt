@@ -1,0 +1,13 @@
+benchmark=array_store_chain backend=bitwuzla iterations=200 total_ns=2826875 ns_per_iter=14134.38
+benchmark=bv_const_same backend=bitwuzla iterations=200 total_ns=216092 ns_per_iter=1080.46
+benchmark=bv_const_varied backend=bitwuzla iterations=200 total_ns=977071 ns_per_iter=4885.36
+benchmark=bv_expr_chain backend=bitwuzla iterations=200 total_ns=5123368 ns_per_iter=25616.84
+benchmark=bv_sort_same backend=bitwuzla iterations=200 total_ns=92624 ns_per_iter=463.12
+benchmark=fp_add_only backend=bitwuzla iterations=200 total_ns=265949385 ns_per_iter=1329746.93
+benchmark=fp_construct backend=bitwuzla iterations=200 total_ns=1539372927 ns_per_iter=7696864.63
+benchmark=fp_div_only backend=bitwuzla iterations=200 total_ns=385394851 ns_per_iter=1926974.25
+benchmark=fp_fma_only backend=bitwuzla iterations=200 total_ns=525546568 ns_per_iter=2627732.83
+benchmark=fp_from_bv backend=bitwuzla iterations=200 total_ns=472476717 ns_per_iter=2362383.58
+benchmark=fp_ieee_to_bv_only backend=bitwuzla iterations=200 total_ns=8199526 ns_per_iter=40997.62
+benchmark=fp_integral_only backend=bitwuzla iterations=200 total_ns=195499852 ns_per_iter=977499.27
+benchmark=fp_sqrt_only backend=bitwuzla iterations=200 total_ns=612436360 ns_per_iter=3062181.80

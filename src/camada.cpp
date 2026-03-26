@@ -50,6 +50,65 @@
 
 std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
 
+void camada::SMTSolver::invalidateGeneratedObjects() {
+  clearSortCaches();
+  clearExprCaches();
+  ++HandleState->Generation;
+  ExprArena.clear();
+  SortArena.clear();
+}
+
+void camada::SMTSolver::clearSortCaches() {
+  CachedBoolSort = {};
+  CachedNativeRMSort = {};
+  CachedEncodedRMSort = {};
+  BVSortCache.clear();
+  NativeFPSortCache.clear();
+  EncodedFPSortCache.clear();
+  ArraySortCache.clear();
+}
+
+void camada::SMTSolver::clearExprCaches() {
+  CachedBoolExprs.fill({});
+  CachedBVOne1Expr = {};
+  CachedSmallBVZeroExprs.fill({});
+  CachedRMBVExprs.fill({});
+  CachedBVNegOneExprs.clear();
+  CachedBVZeroExprs.clear();
+  CachedBVOneExprs.clear();
+  SymbolExprCache.clear();
+  FPSpecialExprCache.clear();
+}
+
+void camada::SMTSolver::initializeCommonSingletons() {
+  CachedBoolExprs[0] = mkBool(false);
+  CachedBoolExprs[1] = mkBool(true);
+  CachedBVOne1Expr = mkBVFromBin("1", 1);
+  CachedSmallBVZeroExprs[1] = mkBVFromBin("0", 1);
+  CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
+  CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
+  CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
+  CachedBVZeroExprs.resize(5);
+  CachedBVZeroExprs[1] = CachedSmallBVZeroExprs[1];
+  CachedBVZeroExprs[2] = CachedSmallBVZeroExprs[2];
+  CachedBVZeroExprs[3] = CachedSmallBVZeroExprs[3];
+  CachedBVZeroExprs[4] = CachedSmallBVZeroExprs[4];
+  CachedBVOneExprs.resize(2);
+  CachedBVOneExprs[1] = CachedBVOne1Expr;
+  CachedBVNegOneExprs.resize(2);
+  CachedBVNegOneExprs[1] = CachedBVOne1Expr;
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
+      mkBVFromBin("000", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
+      mkBVFromBin("001", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
+      mkBVFromBin("010", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
+      mkBVFromBin("011", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
+      mkBVFromBin("100", 3);
+}
+
 camada::SMTSolverRef camada::createZ3Solver() {
 #if SOLVER_Z3_ENABLED
   return std::make_unique<Z3Solver>();

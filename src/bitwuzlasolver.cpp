@@ -83,7 +83,10 @@ void BitwExpr::dump() const {
   fprintf(stderr, "%s", bitwuzla_term_to_string(Expr));
 }
 
-BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() { initializeContext(); }
+BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() {
+  initializeContext();
+  initializeCommonSingletons();
+}
 
 BitwuzlaSolver::~BitwuzlaSolver() {
   invalidateGeneratedObjects();

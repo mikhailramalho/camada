@@ -52,25 +52,23 @@ public:
   explicit operator bool() const { return isValid(); }
 
   bool isValid() const {
-    auto locked = State.lock();
-    return Ptr != nullptr && locked && locked->Generation == Generation;
+    return Ptr != nullptr && State && State->Generation == Generation;
   }
 
 private:
   const SMTSort *Ptr = nullptr;
-  std::weak_ptr<const SMTHandleState> State;
+  std::shared_ptr<const SMTHandleState> State;
   uint64_t Generation = 0;
 
   SMTSortRef(const SMTSort *ThePtr,
-             std::weak_ptr<const SMTHandleState> TheState,
+             std::shared_ptr<const SMTHandleState> TheState,
              uint64_t TheGeneration)
       : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
 
   void validate() const {
-    auto locked = State.lock();
     assert(Ptr && "Dereferencing null sort handle");
-    assert(locked && "Dereferencing sort handle after solver destruction");
-    assert(locked->Generation == Generation &&
+    assert(State && "Dereferencing sort handle after solver destruction");
+    assert(State->Generation == Generation &&
            "Dereferencing stale sort handle after solver reset");
   }
 
@@ -139,6 +137,11 @@ public:
   /// Returns whether the solver width matches our internal representation.
   bool validateSortWidth() const;
 
+#ifndef NDEBUG
+  bool isWidthValidated() const { return WidthValidated; }
+  void markWidthValidated() { WidthValidated = true; }
+#endif
+
   virtual void dump() const;
 
 protected:
@@ -148,6 +151,9 @@ protected:
   unsigned SigWidth = 0;
   SMTSortRef IndexSort;
   SMTSortRef ElementSort;
+#ifndef NDEBUG
+  bool WidthValidated = false;
+#endif
 };
 
 inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {

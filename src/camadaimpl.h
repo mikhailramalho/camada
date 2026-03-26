@@ -34,6 +34,17 @@ public:
   SMTSolverImpl() = default;
   virtual ~SMTSolverImpl() override = default;
 
+  SMTExprRef getBVZero1Expr() const { return CachedSmallBVZeroExprs[1]; }
+  SMTExprRef getBVOne1Expr() const { return CachedBVOne1Expr; }
+  SMTExprRef getBVZero2Expr() const { return CachedSmallBVZeroExprs[2]; }
+  SMTExprRef getBVZero3Expr() const { return CachedSmallBVZeroExprs[3]; }
+  SMTExprRef getBVZero4Expr() const { return CachedSmallBVZeroExprs[4]; }
+  SMTExprRef getRMExpr(RM R) const {
+    return CachedRMBVExprs[static_cast<std::size_t>(R)];
+  }
+  SMTExprRef getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
+                              FPSpecialValueKind Kind, bool Sign);
+
   static SMTExprRef tagExprKind(const SMTExprRef &Exp, SMTExprKind Kind) {
     const_cast<SMTExpr &>(*Exp).setKind(Kind);
     return Exp;
@@ -41,41 +52,64 @@ public:
 
   SMTExprRef newExprRef(const SMTExpr &Exp) const final {
     SMTExprRef theExp = newExprRefImpl(Exp);
-    assert(theExp->Sort->validateSortWidth());
+#ifndef NDEBUG
+    assert(theExp->Sort->isWidthValidated());
+#endif
     return theExp;
   }
-
   SMTSortRef mkBoolSort() override final {
+    if (CachedBoolSort)
+      return CachedBoolSort;
+
     SMTSortRef theSort = mkBoolSortImpl();
     assert(theSort->isBoolSort());
+    CachedBoolSort = theSort;
     return theSort;
   }
 
   SMTSortRef mkBVSort(const unsigned BitWidth) override final {
     assert(BitWidth);
+    auto It = BVSortCache.find(BitWidth);
+    if (It != BVSortCache.end())
+      return It->second;
+
     SMTSortRef theSort = mkBVSortImpl(BitWidth);
     assert(theSort->isBVSort());
     assert(theSort->getWidth() == BitWidth);
     assert(theSort->getWidth() == theSort->getWidthFromSolver());
+    BVSortCache.emplace(BitWidth, theSort);
     return theSort;
   }
 
   SMTSortRef mkRMSort() override final {
+    SMTSortRef &CachedSort =
+        useCamadaFP ? CachedEncodedRMSort : CachedNativeRMSort;
+    if (CachedSort)
+      return CachedSort;
+
     SMTSortRef theSort =
         useCamadaFP ? SMTSolverImpl::mkRMSortImpl() : mkRMSortImpl();
     assert(theSort->isRMSort());
+    CachedSort = theSort;
     return theSort;
   }
 
   SMTSortRef mkFPSort(const unsigned ExpWidth,
                       const unsigned SigWidth) override final {
     assert(ExpWidth && SigWidth);
+    auto &Cache = useCamadaFP ? EncodedFPSortCache : NativeFPSortCache;
+    FPSortCacheKey Key{ExpWidth, SigWidth};
+    auto It = Cache.find(Key);
+    if (It != Cache.end())
+      return It->second;
+
     SMTSortRef theSort = useCamadaFP
                              ? SMTSolverImpl::mkFPSortImpl(ExpWidth, SigWidth)
                              : mkFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
     assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
     assert(theSort->getWidth() == theSort->getWidthFromSolver());
+    Cache.emplace(Key, theSort);
     return theSort;
   }
 
@@ -85,10 +119,16 @@ public:
 
   SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
                          const SMTSortRef &ElemSort) override final {
+    ArraySortCacheKey Key{IndexSort.get(), ElemSort.get()};
+    auto It = ArraySortCache.find(Key);
+    if (It != ArraySortCache.end())
+      return It->second;
+
     SMTSortRef theSort = mkArraySortImpl(IndexSort, ElemSort);
     assert(theSort->isArraySort());
     assert(theSort->getIndexSort() == IndexSort);
     assert(theSort->getElementSort() == ElemSort);
+    ArraySortCache.emplace(Key, theSort);
     return theSort;
   }
 
@@ -737,14 +777,58 @@ public:
   }
 
   SMTExprRef mkBool(const bool b) override final {
+    SMTExprRef &CachedExpr = CachedBoolExprs[b ? 1 : 0];
+    if (CachedExpr)
+      return CachedExpr;
+
     SMTExprRef theExp = mkBoolImpl(b);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BoolConst);
+    CachedExpr = theExp;
+    return tagExprKind(CachedExpr, SMTExprKind::BoolConst);
   }
 
   SMTExprRef mkBVFromDec(const int64_t Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
+    if (Sort->getSortKind() == SMTSortKind::BV) {
+      const unsigned Width = Sort->getWidth();
+      if (Int == 0 && Width < CachedSmallBVZeroExprs.size())
+        return CachedSmallBVZeroExprs[Width];
+      if (Int == 1 && Width == 1)
+        return CachedBVOne1Expr;
+    }
+
+    if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
+      std::vector<SMTExprRef> *Cache = nullptr;
+      switch (Int) {
+      case -1:
+        Cache = &CachedBVNegOneExprs;
+        break;
+      case 0:
+        Cache = &CachedBVZeroExprs;
+        break;
+      case 1:
+        Cache = &CachedBVOneExprs;
+        break;
+      default:
+        break;
+      }
+
+      assert(Cache);
+      if (Cache->size() <= Sort->getWidth())
+        Cache->resize(Sort->getWidth() + 1);
+
+      SMTExprRef &CachedExpr = (*Cache)[Sort->getWidth()];
+      if (CachedExpr)
+        return CachedExpr;
+
+      SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
+      assert(theExp->isBVSort());
+      assert(theExp->getWidth() == Sort->getWidth());
+      CachedExpr = tagExprKind(theExp, SMTExprKind::BVConst);
+      return CachedExpr;
+    }
+
     SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());
@@ -775,8 +859,14 @@ public:
 
   SMTExprRef mkSymbol(const std::string &Name,
                       const SMTSortRef &Sort) override final {
+    SymbolExprCacheKey Key{Sort.get(), Name};
+    auto Cached = SymbolExprCache.find(Key);
+    if (Cached != SymbolExprCache.end())
+      return Cached->second;
+
     SMTExprRef theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
+    SymbolExprCache.emplace(Key, theExp);
     return tagExprKind(theExp, SMTExprKind::Symbol);
   }
 
@@ -878,7 +968,8 @@ public:
 
   void reset() override final {
     invalidateGeneratedObjects();
-    return resetImpl();
+    resetImpl();
+    initializeCommonSingletons();
   }
 
   void dump() override final { return dumpImpl(); }
@@ -887,16 +978,26 @@ public:
 
   SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                         const unsigned SigWidth) override final {
+    FPSortCacheKey Key{ExpWidth, SigWidth};
+    auto It = EncodedFPSortCache.find(Key);
+    if (It != EncodedFPSortCache.end())
+      return It->second;
+
     SMTSortRef theSort = mkBVFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
     assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
     assert(theSort->getWidth() == theSort->getWidthFromSolver());
+    EncodedFPSortCache.emplace(Key, theSort);
     return theSort;
   }
 
   SMTSortRef mkBVRMSort() override final {
+    if (CachedEncodedRMSort)
+      return CachedEncodedRMSort;
+
     SMTSortRef theSort = mkBVRMSortImpl();
     assert(theSort->isRMSort());
+    CachedEncodedRMSort = theSort;
     return theSort;
   }
 
@@ -1041,13 +1142,13 @@ protected:
   virtual SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) {
     // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
-    return mkIte(mkNot(comp), mkBVFromDec(1, 1), mkBVFromDec(0, 1));
+    return mkIte(mkNot(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
   }
 
   virtual SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
-    return mkIte(comp, mkBVFromDec(1, 1), mkBVFromDec(0, 1));
+    return mkIte(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
   }
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
