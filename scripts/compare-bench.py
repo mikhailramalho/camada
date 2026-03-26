@@ -2,6 +2,7 @@
 
 import argparse
 import math
+import os
 import re
 import statistics
 import subprocess
@@ -43,11 +44,13 @@ def parse_file(path: Path) -> dict[str, dict[str, object]]:
     return parse_lines(path.read_text().splitlines(), str(path))
 
 
-def run_benchmark(binary: Path, iterations: int) -> dict[str, dict[str, object]]:
+def run_benchmark(
+    binary: Path, iterations: int, cpu: int
+) -> dict[str, dict[str, object]]:
     cmd = [
         "schedtool",
         "-a",
-        "5",
+        str(cpu),
         "-n",
         "20",
         "-e",
@@ -56,7 +59,52 @@ def run_benchmark(binary: Path, iterations: int) -> dict[str, dict[str, object]]
         str(iterations),
     ]
     proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
-    return parse_lines(proc.stdout.splitlines(), "stdout")
+    return parse_lines(proc.stdout.splitlines(), f"cpu{cpu}")
+
+
+def run_benchmarks(binary: Path, iterations: int, runs: int) -> list[dict[str, dict[str, object]]]:
+    cpu_count = os.cpu_count() or 1
+    results: list[dict[str, dict[str, object]]] = []
+    launched = 0
+
+    while launched < runs:
+        batch_size = min(cpu_count, runs - launched)
+        procs: list[tuple[int, subprocess.Popen[str]]] = []
+        for cpu in range(batch_size):
+            cmd = [
+                "schedtool",
+                "-a",
+                str(cpu),
+                "-n",
+                "20",
+                "-e",
+                str(binary),
+                "bitwuzla",
+                str(iterations),
+            ]
+            procs.append(
+                (
+                    cpu,
+                    subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    ),
+                )
+            )
+
+        for cpu, proc in procs:
+            stdout, stderr = proc.communicate()
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    proc.returncode, proc.args, output=stdout, stderr=stderr
+                )
+            results.append(parse_lines(stdout.splitlines(), f"cpu{cpu}"))
+            launched += 1
+            print(f"Completed benchmark {launched}/{runs} on cpu {cpu}", file=sys.stderr)
+
+    return results
 
 
 def compute_medians(
@@ -129,8 +177,9 @@ def format_change(name: str, baseline: float, new: float, p_value: float) -> str
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Run camada-bench 10 times with schedtool, compute median per "
-            "benchmark, and compare against scripts/baseline.txt."
+            "Run camada-bench 10 times with schedtool in parallel across "
+            "available CPUs, compute median per benchmark, and compare "
+            "against scripts/baseline.txt."
         )
     )
     parser.add_argument("binary", type=Path, help="Path to camada-bench binary")
@@ -144,10 +193,11 @@ def main() -> int:
 
     baseline_path = Path(__file__).with_name("baseline.txt")
 
-    runs: list[dict[str, dict[str, object]]] = []
-    for i in range(RUNS):
-        print(f"Running benchmark {i + 1}/{RUNS}...", file=sys.stderr)
-        runs.append(run_benchmark(args.binary, args.iterations))
+    print(
+        f"Running {RUNS} benchmarks across up to {os.cpu_count() or 1} CPUs...",
+        file=sys.stderr,
+    )
+    runs = run_benchmarks(args.binary, args.iterations, RUNS)
 
     medians = compute_medians(runs)
     if not medians:
