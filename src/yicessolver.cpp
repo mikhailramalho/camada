@@ -513,14 +513,12 @@ SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
 
 SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                          const SMTExprRef &InitValue) {
-  const std::string name = "__CAMADA_arr" + std::to_string(ConstArrayCounter++);
-  SMTExprRef arr = mkSymbol(name, mkArraySort(IndexSort, InitValue->Sort));
-
-  uint64_t size = 1ULL << IndexSort->getWidth();
-  for (uint64_t i = 0; i < size; i++)
-    arr = mkArrayStore(arr, mkBVFromDec(i, IndexSort), InitValue);
-
-  return arr;
+  const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
+  term_t index_var =
+      yices_new_variable(toSolverSort<YicesSort>(*IndexSort).Sort);
+  return newExprRef(YicesExpr(
+      Context, sort,
+      yices_lambda(1, &index_var, toSolverExpr<YicesExpr>(*InitValue).Expr)));
 }
 
 checkResult YicesSolver::checkImpl() {
