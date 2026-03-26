@@ -450,17 +450,11 @@ SMTExprRef SMTSolverImpl::mkFPNegImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef SMTSolverImpl::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
-  // Extract the exponent and significand
-  SMTExprRef exp = extractExp(*this, Exp);
-  SMTExprRef sig = extractSig(*this, Exp);
-
-  // exp == 1^n , sig == 0
-  SMTExprRef topExp = mkTopExp(*this, exp->getWidth());
-
-  SMTExprRef zero = mkBVFromDec(0, sig->getWidth());
-  SMTExprRef sigIsZero = mkEqual(sig, zero);
-  SMTExprRef expIsTop = mkEqual(exp, topExp);
-  return mkAnd(expIsTop, sigIsZero);
+  unsigned eWidth = Exp->Sort->getFPExponentWidth();
+  unsigned sWidth = Exp->Sort->getFPSignificandWidth();
+  SMTExprRef pInf = mkFPInf(*this, eWidth, sWidth, false);
+  SMTExprRef nInf = mkFPInf(*this, eWidth, sWidth, true);
+  return mkOr(mkEqual(Exp, pInf), mkEqual(Exp, nInf));
 }
 
 SMTExprRef SMTSolverImpl::mkFPIsNaNImpl(const SMTExprRef &Exp) {
