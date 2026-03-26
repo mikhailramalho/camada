@@ -118,3 +118,20 @@ inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, three)));
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
+
+inline void uf_semantics(const camada::SMTSolverRef &solver) {
+  auto bv4 = solver->mkBVSort(4);
+  auto fsort = solver->mkFunctionSort({bv4}, bv4);
+  auto f = solver->mkSymbol("f", fsort);
+  auto x = solver->mkSymbol("x", bv4);
+  auto y = solver->mkSymbol("y", bv4);
+  auto fx = solver->mkApply(f, {x});
+  auto fy = solver->mkApply(f, {y});
+  REQUIRE(f->getKind() == camada::SMTExprKind::Symbol);
+  REQUIRE(fx->getKind() == camada::SMTExprKind::Apply);
+  REQUIRE(fy->getKind() == camada::SMTExprKind::Apply);
+
+  solver->addConstraint(solver->mkEqual(x, y));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(fx, fy)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}

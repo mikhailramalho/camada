@@ -142,6 +142,15 @@ SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
       0, 0, 0, IndexSort, ElemSort));
 }
 
+SMTSortRef
+STPSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                              const SMTSortRef &CodomainSort) {
+  (void)DomainSorts;
+  (void)CodomainSort;
+  std::cerr << "Uninterpreted functions are not supported by the STP backend\n";
+  std::abort();
+}
+
 SMTExprRef STPSolver::mkBVNegImpl(const SMTExprRef &Exp) {
   return newExprRef(STPExpr(
       Context, Exp->Sort,
@@ -456,6 +465,14 @@ SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
       Context, Array->Sort,
       STP::vc_writeExpr(*Context, toSolverExpr<STPExpr>(*Array).Expr,
                         toSolverExpr<STPExpr>(*Index).Expr, backend_element)));
+}
+
+SMTExprRef STPSolver::mkApplyImpl(const SMTExprRef &Function,
+                                  const std::vector<SMTExprRef> &Args) {
+  (void)Function;
+  (void)Args;
+  std::cerr << "Uninterpreted functions are not supported by the STP backend\n";
+  std::abort();
 }
 
 bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {

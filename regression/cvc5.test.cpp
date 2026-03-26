@@ -14,3 +14,8 @@ TEST_CASE("Quantifiers CVC5 test", "[CVC5]") {
   auto cvc5 = camada::createCVC5Solver();
   quantifier_semantics(cvc5);
 }
+
+TEST_CASE("UF CVC5 test", "[CVC5]") {
+  auto cvc5 = camada::createCVC5Solver();
+  uf_semantics(cvc5);
+}

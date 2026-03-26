@@ -132,6 +132,26 @@ public:
     return theSort;
   }
 
+  SMTSortRef mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
+                            const SMTSortRef &CodomainSort) override final {
+    assert(!DomainSorts.empty());
+    FunctionSortCacheKey Key{};
+    Key.CodomainSort = CodomainSort.get();
+    Key.DomainSorts.reserve(DomainSorts.size());
+    for (const auto &Sort : DomainSorts)
+      Key.DomainSorts.push_back(Sort.get());
+    auto It = FunctionSortCache.find(Key);
+    if (It != FunctionSortCache.end())
+      return It->second;
+
+    SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
+    assert(theSort->isFunctionSort());
+    assert(theSort->getDomainSorts() == DomainSorts);
+    assert(theSort->getCodomainSort() == CodomainSort);
+    FunctionSortCache.emplace(std::move(Key), theSort);
+    return theSort;
+  }
+
   void addConstraint(const SMTExprRef &Exp) override final {
     return addConstraintImpl(Exp);
   }
@@ -728,6 +748,17 @@ public:
     return tagExprKind(theExp, SMTExprKind::ArrayStore);
   }
 
+  SMTExprRef mkApply(const SMTExprRef &Function,
+                     const std::vector<SMTExprRef> &Args) override final {
+    assert(Function->isFunctionSort());
+    assert(Function->Sort->getDomainSorts().size() == Args.size());
+    for (std::size_t i = 0; i < Args.size(); ++i)
+      assert(Function->Sort->getDomainSorts()[i] == Args[i]->Sort);
+    SMTExprRef theExp = mkApplyImpl(Function, Args);
+    assert(theExp->Sort == Function->Sort->getCodomainSort());
+    return tagExprKind(theExp, SMTExprKind::Apply);
+  }
+
   SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
                       const SMTExprRef &Body) override final {
     assert(Body->isBoolSort());
@@ -1039,6 +1070,10 @@ protected:
   virtual SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                                      const SMTSortRef &ElemSort) = 0;
 
+  virtual SMTSortRef
+  mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                     const SMTSortRef &CodomainSort) = 0;
+
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 
   virtual SMTExprRef mkBVAddImpl(const SMTExprRef &LHS,
@@ -1242,6 +1277,9 @@ protected:
   virtual SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array,
                                       const SMTExprRef &Index,
                                       const SMTExprRef &Element) = 0;
+
+  virtual SMTExprRef mkApplyImpl(const SMTExprRef &Function,
+                                 const std::vector<SMTExprRef> &Args) = 0;
 
   virtual SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
                                   const SMTExprRef &Body) = 0;

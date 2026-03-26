@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace camada {
 
@@ -60,6 +61,29 @@ struct ArraySortCacheKeyHash {
     auto Index = reinterpret_cast<std::uintptr_t>(Key.IndexSort);
     auto Element = reinterpret_cast<std::uintptr_t>(Key.ElementSort);
     return static_cast<std::size_t>(Index ^ (Element << 1));
+  }
+};
+
+struct FunctionSortCacheKey {
+  std::vector<const SMTSort *> DomainSorts;
+  const SMTSort *CodomainSort;
+
+  bool operator==(const FunctionSortCacheKey &Other) const {
+    return CodomainSort == Other.CodomainSort &&
+           DomainSorts == Other.DomainSorts;
+  }
+};
+
+struct FunctionSortCacheKeyHash {
+  std::size_t operator()(const FunctionSortCacheKey &Key) const {
+    std::size_t Hash = reinterpret_cast<std::uintptr_t>(Key.CodomainSort) *
+                       1469598103934665603ULL;
+    for (const SMTSort *Sort : Key.DomainSorts) {
+      auto Ptr = reinterpret_cast<std::uintptr_t>(Sort);
+      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
+                                       (Hash << 6) + (Hash >> 2));
+    }
+    return Hash;
   }
 };
 

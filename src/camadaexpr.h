@@ -103,6 +103,7 @@ enum class SMTExprKind {
   FPtoIntegral,
   ArraySelect,
   ArrayStore,
+  Apply,
   Forall,
   Exists,
   BVToIEEEFP,
@@ -177,6 +178,9 @@ public:
   /// Returns true if the expr sort is array
   virtual bool isArraySort() const = 0;
 
+  /// Returns true if the expr sort is function
+  virtual bool isFunctionSort() const = 0;
+
   /// Returns this expr's sort width
   unsigned getWidth() const { return Sort->getWidth(); }
 
@@ -222,6 +226,8 @@ public:
   bool isRMSort() const override { return Sort->isRMSort(); }
 
   bool isArraySort() const override { return Sort->isArraySort(); }
+
+  bool isFunctionSort() const override { return Sort->isFunctionSort(); }
 
   bool equal_to(SMTExpr const &other) const override = 0;
 };

@@ -131,6 +131,20 @@ SMTSortRef YicesSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                 0, 0, 0, IndexSort, ElemSort));
 }
 
+SMTSortRef
+YicesSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                                const SMTSortRef &CodomainSort) {
+  std::vector<type_t> Domain;
+  Domain.reserve(DomainSorts.size());
+  for (const auto &Sort : DomainSorts)
+    Domain.push_back(toSolverSort<YicesSort>(*Sort).Sort);
+  return newSortRef<YicesSort>(YicesSort(
+      SMTSortKind::Function, Context,
+      yices_function_type(Domain.size(), Domain.data(),
+                          toSolverSort<YicesSort>(*CodomainSort).Sort),
+      0, 0, 0, {}, {}, DomainSorts, CodomainSort));
+}
+
 SMTExprRef YicesSolver::mkBVNegImpl(const SMTExprRef &Exp) {
   return newExprRef(YicesExpr(Context, Exp->Sort,
                               yices_bvneg(toSolverExpr<YicesExpr>(*Exp).Expr)));
@@ -426,6 +440,18 @@ SMTExprRef YicesSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                 yices_update1(toSolverExpr<YicesExpr>(*Array).Expr,
                               toSolverExpr<YicesExpr>(*Index).Expr,
                               toSolverExpr<YicesExpr>(*Element).Expr)));
+}
+
+SMTExprRef YicesSolver::mkApplyImpl(const SMTExprRef &Function,
+                                    const std::vector<SMTExprRef> &Args) {
+  std::vector<term_t> ApplyArgs;
+  ApplyArgs.reserve(Args.size());
+  for (const auto &Arg : Args)
+    ApplyArgs.push_back(toSolverExpr<YicesExpr>(*Arg).Expr);
+  return newExprRef(
+      YicesExpr(Context, Function->Sort->getCodomainSort(),
+                yices_application(toSolverExpr<YicesExpr>(*Function).Expr,
+                                  ApplyArgs.size(), ApplyArgs.data())));
 }
 
 bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {

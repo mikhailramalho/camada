@@ -11,6 +11,22 @@ TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   tests(mathsat);
 }
 
+// Known bug: this MathSAT build constructs quantified terms, but solving the
+// resulting AUFBV formulas still returns UNKNOWN for trivial tautologies.
+TEST_CASE("Quantifiers MathSAT test", "[MathSAT][.]") {
+  msat_config Config = msat_create_default_config("AUFBV");
+  msat_set_option(Config, "model_generation", "true");
+  camada::SMTSolverRef mathsat =
+      std::make_unique<camada::MathSATSolver>(Config);
+  msat_destroy_config(Config);
+  quantifier_semantics(mathsat);
+}
+
+TEST_CASE("UF MathSAT test", "[MathSAT]") {
+  auto mathsat = camada::createMathSATSolver();
+  uf_semantics(mathsat);
+}
+
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
 
   class mySolver : public camada::MathSATSolver {
@@ -19,7 +35,7 @@ TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
         : camada::MathSATSolver(Config) {}
   };
 
-  msat_config Config = msat_create_config();
+  msat_config Config = msat_create_default_config("AUFBV");
 
   // Enable model finding
   msat_set_option(Config, "model_generation", "true");
@@ -40,6 +56,8 @@ TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
   msat_set_option(Config, "theory.fp.bit_blast_mode", "2");
   msat_set_option(Config, "theory.fp.bv_combination_enabled", "true");
   msat_set_option(Config, "theory.arr.enable_witness", "true");
+
+  msat_set_option(Config, "model_generation", "true");
 
   // Create custom MathSAT Solver
   camada::SMTSolverRef mathsat = std::make_unique<mySolver>(Config);

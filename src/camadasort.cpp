@@ -38,6 +38,8 @@ void camada::SMTSort::dump() const {
     k = "Floating-point";
   else if (isArraySort())
     k = "Array";
+  else if (isFunctionSort())
+    k = "Function";
   else {
     std::cerr << "Unknown sort.\n";
     abort();
@@ -52,6 +54,15 @@ void camada::SMTSort::dump() const {
     return;
   }
 
+  if (isFunctionSort()) {
+    std::cerr << "Domain:\n";
+    for (const auto &Sort : getDomainSorts())
+      Sort->dump();
+    std::cerr << "Codomain: ";
+    getCodomainSort()->dump();
+    return;
+  }
+
   std::cerr << "width: " << getWidth() << ", solver: " << getWidthFromSolver();
   if (isFPSort())
     std::cerr << " (exp: " << getFPExponentWidth()
@@ -60,7 +71,8 @@ void camada::SMTSort::dump() const {
 }
 
 unsigned camada::SMTSort::getWidth() const {
-  assert(!isArraySort() && "Width is not defined for array sorts");
+  assert(!isArraySort() && !isFunctionSort() &&
+         "Width is not defined for array or function sorts");
   return Width;
 }
 
@@ -89,9 +101,21 @@ camada::SMTSortRef camada::SMTSort::getElementSort() const {
   return ElementSort;
 }
 
+const std::vector<camada::SMTSortRef> &camada::SMTSort::getDomainSorts() const {
+  assert(isFunctionSort() &&
+         "Domain sorts are only defined for function sorts");
+  return DomainSorts;
+}
+
+camada::SMTSortRef camada::SMTSort::getCodomainSort() const {
+  assert(isFunctionSort() &&
+         "Codomain sort is only defined for function sorts");
+  return CodomainSort;
+}
+
 bool camada::SMTSort::validateSortWidth() const {
-  // Don't check array sort for now
-  if (isArraySort())
+  // Don't check array/function sort widths for now
+  if (isArraySort() || isFunctionSort())
     return true;
 
   return getWidthFromSolver() == getWidth();
@@ -107,6 +131,12 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
   if (isArraySort())
     return Other.isArraySort() && (getIndexSort() == Other.getIndexSort()) &&
            (getElementSort() == Other.getElementSort());
+
+  if (isFunctionSort()) {
+    return Other.isFunctionSort() &&
+           getDomainSorts() == Other.getDomainSorts() &&
+           getCodomainSort() == Other.getCodomainSort();
+  }
 
   if (Width != Other.Width)
     return false;

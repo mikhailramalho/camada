@@ -14,6 +14,11 @@ TEST_CASE("Quantifiers Bitwuzla test", "[Bitwuzla]") {
   quantifier_semantics(bitwuzla);
 }
 
+TEST_CASE("UF Bitwuzla test", "[Bitwuzla]") {
+  auto bitwuzla = camada::createBitwuzlaSolver();
+  uf_semantics(bitwuzla);
+}
+
 TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 
   class myBitwuzlaSolver : public camada::BitwuzlaSolver {

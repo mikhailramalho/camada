@@ -15,6 +15,11 @@ TEST_CASE("Quantifiers Z3 test", "[Z3]") {
   quantifier_semantics(z3);
 }
 
+TEST_CASE("UF Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver();
+  uf_semantics(z3);
+}
+
 TEST_CASE("Override Z3 Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
