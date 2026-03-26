@@ -848,6 +848,10 @@ checkResult CVC5Solver::checkImpl() {
 
 void CVC5Solver::resetImpl() { Context->resetAssertions(); }
 
+void CVC5Solver::pushImpl(unsigned nscopes) { Context->push(nscopes); }
+
+void CVC5Solver::popImpl(unsigned nscopes) { Context->pop(nscopes); }
+
 std::string CVC5Solver::getSolverNameAndVersion() const {
   return std::string("CVC5 v").append(Context->getVersion());
 }

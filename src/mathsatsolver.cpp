@@ -853,6 +853,16 @@ checkResult MathSATSolver::checkImpl() {
 
 void MathSATSolver::resetImpl() { msat_reset_env(*Context); }
 
+void MathSATSolver::pushImpl(unsigned nscopes) {
+  for (unsigned i = 0; i < nscopes; ++i)
+    msat_push_backtrack_point(*Context);
+}
+
+void MathSATSolver::popImpl(unsigned nscopes) {
+  for (unsigned i = 0; i < nscopes; ++i)
+    msat_pop_backtrack_point(*Context);
+}
+
 std::string MathSATSolver::getSolverNameAndVersion() const {
   char *tmp = msat_get_version();
   std::string ver = tmp;

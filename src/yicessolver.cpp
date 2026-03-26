@@ -535,6 +535,7 @@ checkResult YicesSolver::checkImpl() {
 void YicesSolver::resetImpl() {
   SymbolTable.clear();
   Assertions.clear();
+  AssertionScopeSizes.clear();
 
   // Delete
   OwnedContext.reset();
@@ -551,6 +552,24 @@ void YicesSolver::resetImpl() {
   OwnedContext.reset(yices_new_context(config));
   Context = OwnedContext.get();
   yices_free_config(config);
+}
+
+void YicesSolver::pushImpl(unsigned nscopes) {
+  for (unsigned i = 0; i < nscopes; ++i) {
+    AssertionScopeSizes.push_back(Assertions.size());
+    int32_t res = yices_push(Context);
+    assert(!res && "Could not push Yices context");
+  }
+}
+
+void YicesSolver::popImpl(unsigned nscopes) {
+  for (unsigned i = 0; i < nscopes; ++i) {
+    assert(!AssertionScopeSizes.empty() && "Could not pop empty Yices scope");
+    int32_t res = yices_pop(Context);
+    assert(!res && "Could not pop Yices context");
+    Assertions.resize(AssertionScopeSizes.back());
+    AssertionScopeSizes.pop_back();
+  }
 }
 
 std::string YicesSolver::getSolverNameAndVersion() const {

@@ -34,7 +34,7 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
 
       ctx_config_t *config = yices_new_config();
       yices_default_config_for_logic(config, "QF_BV");
-      yices_set_config(config, "mode", "one-shot");
+      yices_set_config(config, "mode", "push-pop");
       yices_set_config(config, "solver-type", "dpllt");
       yices_set_config(config, "uf-solver", "none");
       yices_set_config(config, "bv-solver", "default");

@@ -972,6 +972,10 @@ public:
     initializeCommonSingletons();
   }
 
+  void push(unsigned nscopes = 1) override final { pushImpl(nscopes); }
+
+  void pop(unsigned nscopes = 1) override final { popImpl(nscopes); }
+
   void dump() override final { return dumpImpl(); }
 
   void dumpModel() override final { return dumpModelImpl(); }
@@ -1281,6 +1285,10 @@ protected:
   virtual checkResult checkImpl() = 0;
 
   virtual void resetImpl() = 0;
+
+  virtual void pushImpl(unsigned nscopes) = 0;
+
+  virtual void popImpl(unsigned nscopes) = 0;
 
   virtual void dumpImpl();
 
