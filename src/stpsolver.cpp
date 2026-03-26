@@ -133,10 +133,12 @@ SMTSortRef STPSolver::mkBVRMSortImpl() {
 
 SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
+  const SMTSortRef &backend_elem_sort =
+      ElemSort->isBoolSort() ? mkBVSort(1) : ElemSort;
   return newSortRef<STPSort>(STPSort(
       SMTSortKind::Array, Context,
       STP::vc_arrayType(*Context, toSolverSort<STPSort>(*IndexSort).Sort,
-                        toSolverSort<STPSort>(*ElemSort).Sort),
+                        toSolverSort<STPSort>(*backend_elem_sort).Sort),
       0, 0, 0, IndexSort, ElemSort));
 }
 
@@ -428,20 +430,32 @@ SMTExprRef STPSolver::mkBVConcatImpl(const SMTExprRef &LHS,
 
 SMTExprRef STPSolver::mkArraySelectImpl(const SMTExprRef &Array,
                                         const SMTExprRef &Index) {
-  return newExprRef(
-      STPExpr(Context, Array->Sort->getElementSort(),
-              STP::vc_readExpr(*Context, toSolverExpr<STPExpr>(*Array).Expr,
-                               toSolverExpr<STPExpr>(*Index).Expr)));
+  STP::Expr read =
+      STP::vc_readExpr(*Context, toSolverExpr<STPExpr>(*Array).Expr,
+                       toSolverExpr<STPExpr>(*Index).Expr);
+  if (Array->Sort->getElementSort()->isBoolSort())
+    return newExprRef(
+        STPExpr(Context, mkBoolSort(),
+                STP::vc_eqExpr(*Context, read,
+                               STP::vc_bvConstExprFromInt(*Context, 1, 1))));
+
+  return newExprRef(STPExpr(Context, Array->Sort->getElementSort(), read));
 }
 
 SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                                        const SMTExprRef &Index,
                                        const SMTExprRef &Element) {
-  return newExprRef(
-      STPExpr(Context, Array->Sort,
-              STP::vc_writeExpr(*Context, toSolverExpr<STPExpr>(*Array).Expr,
-                                toSolverExpr<STPExpr>(*Index).Expr,
-                                toSolverExpr<STPExpr>(*Element).Expr)));
+  STP::Expr backend_element = toSolverExpr<STPExpr>(*Element).Expr;
+  if (Array->Sort->getElementSort()->isBoolSort())
+    backend_element =
+        STP::vc_iteExpr(*Context, toSolverExpr<STPExpr>(*Element).Expr,
+                        STP::vc_bvConstExprFromInt(*Context, 1, 1),
+                        STP::vc_bvConstExprFromInt(*Context, 1, 0));
+
+  return newExprRef(STPExpr(
+      Context, Array->Sort,
+      STP::vc_writeExpr(*Context, toSolverExpr<STPExpr>(*Array).Expr,
+                        toSolverExpr<STPExpr>(*Index).Expr, backend_element)));
 }
 
 bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {

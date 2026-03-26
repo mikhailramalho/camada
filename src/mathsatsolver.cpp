@@ -162,10 +162,12 @@ SMTSortRef MathSATSolver::mkBVRMSortImpl() {
 
 SMTSortRef MathSATSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                           const SMTSortRef &ElemSort) {
+  const SMTSortRef &backend_elem_sort =
+      ElemSort->isBoolSort() ? mkBVSort(1) : ElemSort;
   return newSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::Array, Context,
       msat_get_array_type(*Context, toSolverSort<MathSATSort>(*IndexSort).Sort,
-                          toSolverSort<MathSATSort>(*ElemSort).Sort),
+                          toSolverSort<MathSATSort>(*backend_elem_sort).Sort),
       0, 0, 0, IndexSort, ElemSort));
 }
 
@@ -389,20 +391,37 @@ SMTExprRef MathSATSolver::mkBVConcatImpl(const SMTExprRef &LHS,
 
 SMTExprRef MathSATSolver::mkArraySelectImpl(const SMTExprRef &Array,
                                             const SMTExprRef &Index) {
-  return newExprRef(MathSATExpr(
-      Context, Array->Sort->getElementSort(),
+  msat_term read =
       msat_make_array_read(*Context, toSolverExpr<MathSATExpr>(*Array).Expr,
-                           toSolverExpr<MathSATExpr>(*Index).Expr)));
+                           toSolverExpr<MathSATExpr>(*Index).Expr);
+  if (Array->Sort->getElementSort()->isBoolSort()) {
+    const SMTExprRef &one = mkBVFromDec(1, mkBVSort(1));
+    return newExprRef(MathSATExpr(
+        Context, mkBoolSort(),
+        msat_make_eq(*Context, read, toSolverExpr<MathSATExpr>(*one).Expr)));
+  }
+
+  return newExprRef(MathSATExpr(Context, Array->Sort->getElementSort(), read));
 }
 
 SMTExprRef MathSATSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                                            const SMTExprRef &Index,
                                            const SMTExprRef &Element) {
+  msat_term backend_element = toSolverExpr<MathSATExpr>(*Element).Expr;
+  if (Array->Sort->getElementSort()->isBoolSort()) {
+    const SMTExprRef &zero = mkBVFromDec(0, mkBVSort(1));
+    const SMTExprRef &one = mkBVFromDec(1, mkBVSort(1));
+    backend_element =
+        msat_make_term_ite(*Context, toSolverExpr<MathSATExpr>(*Element).Expr,
+                           toSolverExpr<MathSATExpr>(*one).Expr,
+                           toSolverExpr<MathSATExpr>(*zero).Expr);
+  }
+
   return newExprRef(MathSATExpr(
       Context, Array->Sort,
       msat_make_array_write(*Context, toSolverExpr<MathSATExpr>(*Array).Expr,
                             toSolverExpr<MathSATExpr>(*Index).Expr,
-                            toSolverExpr<MathSATExpr>(*Element).Expr)));
+                            backend_element)));
 }
 
 SMTExprRef MathSATSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
@@ -806,10 +825,19 @@ SMTExprRef MathSATSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                            const SMTExprRef &InitValue) {
   const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
+  msat_term backend_init = toSolverExpr<MathSATExpr>(*InitValue).Expr;
+  if (InitValue->isBoolSort()) {
+    const SMTExprRef &zero = mkBVFromDec(0, mkBVSort(1));
+    const SMTExprRef &one = mkBVFromDec(1, mkBVSort(1));
+    backend_init =
+        msat_make_term_ite(*Context, toSolverExpr<MathSATExpr>(*InitValue).Expr,
+                           toSolverExpr<MathSATExpr>(*one).Expr,
+                           toSolverExpr<MathSATExpr>(*zero).Expr);
+  }
   return newExprRef(MathSATExpr(
       Context, sort,
       msat_make_array_const(*Context, toSolverSort<MathSATSort>(*sort).Sort,
-                            toSolverExpr<MathSATExpr>(*InitValue).Expr)));
+                            backend_init)));
 }
 
 checkResult MathSATSolver::checkImpl() {
