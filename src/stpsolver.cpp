@@ -547,6 +547,22 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   return arr;
 }
 
+SMTExprRef STPSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                   const SMTExprRef &Body) {
+  (void)Vars;
+  (void)Body;
+  std::cerr << "Quantifiers are not supported by the STP backend\n";
+  std::abort();
+}
+
+SMTExprRef STPSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                   const SMTExprRef &Body) {
+  (void)Vars;
+  (void)Body;
+  std::cerr << "Quantifiers are not supported by the STP backend\n";
+  std::abort();
+}
+
 checkResult STPSolver::checkImpl() {
   STP::Expr query = STP::vc_falseExpr(*Context);
   int res = STP::vc_query(*Context, query);

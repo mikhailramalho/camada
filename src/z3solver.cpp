@@ -740,6 +740,26 @@ SMTExprRef Z3Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                              toSolverExpr<Z3Expr>(*InitValue).Expr)));
 }
 
+SMTExprRef Z3Solver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                  const SMTExprRef &Body) {
+  z3::expr_vector bound_vars(*Context);
+  for (auto const &Var : Vars)
+    bound_vars.push_back(toSolverExpr<Z3Expr>(*Var).Expr);
+  return newExprRef(
+      Z3Expr(Context, mkBoolSort(),
+             z3::forall(bound_vars, toSolverExpr<Z3Expr>(*Body).Expr)));
+}
+
+SMTExprRef Z3Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                  const SMTExprRef &Body) {
+  z3::expr_vector bound_vars(*Context);
+  for (auto const &Var : Vars)
+    bound_vars.push_back(toSolverExpr<Z3Expr>(*Var).Expr);
+  return newExprRef(
+      Z3Expr(Context, mkBoolSort(),
+             z3::exists(bound_vars, toSolverExpr<Z3Expr>(*Body).Expr)));
+}
+
 checkResult Z3Solver::checkImpl() {
   z3::check_result res = Solver.check();
   if (res == z3::check_result::sat)

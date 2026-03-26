@@ -840,6 +840,24 @@ SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                             backend_init)));
 }
 
+SMTExprRef MathSATSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                       const SMTExprRef &Body) {
+  (void)Vars;
+  (void)Body;
+  std::cerr
+      << "Quantifiers are not currently supported by the MathSAT backend\n";
+  std::abort();
+}
+
+SMTExprRef MathSATSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                       const SMTExprRef &Body) {
+  (void)Vars;
+  (void)Body;
+  std::cerr
+      << "Quantifiers are not currently supported by the MathSAT backend\n";
+  std::abort();
+}
+
 checkResult MathSATSolver::checkImpl() {
   msat_result res = msat_solve(*Context);
   if (res == MSAT_SAT)

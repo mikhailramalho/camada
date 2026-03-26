@@ -521,6 +521,22 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
       yices_lambda(1, &index_var, toSolverExpr<YicesExpr>(*InitValue).Expr)));
 }
 
+SMTExprRef YicesSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                     const SMTExprRef &Body) {
+  (void)Vars;
+  (void)Body;
+  std::cerr << "Quantifiers are not supported by the Yices backend\n";
+  std::abort();
+}
+
+SMTExprRef YicesSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                     const SMTExprRef &Body) {
+  (void)Vars;
+  (void)Body;
+  std::cerr << "Quantifiers are not supported by the Yices backend\n";
+  std::abort();
+}
+
 checkResult YicesSolver::checkImpl() {
   smt_status_t res = yices_check_context(Context, nullptr);
   if (res == YICES_STATUS_SAT)

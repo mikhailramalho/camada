@@ -623,6 +623,56 @@ SMTExprRef BitwuzlaSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                               toSolverExpr<BitwExpr>(*InitValue).Expr)));
 }
 
+SMTExprRef BitwuzlaSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                        const SMTExprRef &Body) {
+  std::vector<BitwuzlaTerm> old_terms;
+  std::vector<BitwuzlaTerm> bound_vars;
+  old_terms.reserve(Vars.size());
+  bound_vars.reserve(Vars.size());
+
+  for (std::size_t i = 0; i < Vars.size(); ++i) {
+    const SMTExprRef &Var = Vars[i];
+    old_terms.push_back(toSolverExpr<BitwExpr>(*Var).Expr);
+    bound_vars.push_back(
+        bitwuzla_mk_var(TermManager, toSolverSort<BitwSort>(*Var->Sort).Sort,
+                        ("__CAMADA_qvar" + std::to_string(i)).c_str()));
+  }
+
+  BitwuzlaTerm substituted_body = bitwuzla_substitute_term(
+      toSolverExpr<BitwExpr>(*Body).Expr, old_terms.size(), old_terms.data(),
+      bound_vars.data());
+  std::vector<BitwuzlaTerm> args = bound_vars;
+  args.push_back(substituted_body);
+  return newExprRef(BitwExpr(Context, mkBoolSort(),
+                             bitwuzla_mk_term(TermManager, BITWUZLA_KIND_FORALL,
+                                              args.size(), args.data())));
+}
+
+SMTExprRef BitwuzlaSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                        const SMTExprRef &Body) {
+  std::vector<BitwuzlaTerm> old_terms;
+  std::vector<BitwuzlaTerm> bound_vars;
+  old_terms.reserve(Vars.size());
+  bound_vars.reserve(Vars.size());
+
+  for (std::size_t i = 0; i < Vars.size(); ++i) {
+    const SMTExprRef &Var = Vars[i];
+    old_terms.push_back(toSolverExpr<BitwExpr>(*Var).Expr);
+    bound_vars.push_back(
+        bitwuzla_mk_var(TermManager, toSolverSort<BitwSort>(*Var->Sort).Sort,
+                        ("__CAMADA_qvar" + std::to_string(i)).c_str()));
+  }
+
+  BitwuzlaTerm substituted_body = bitwuzla_substitute_term(
+      toSolverExpr<BitwExpr>(*Body).Expr, old_terms.size(), old_terms.data(),
+      bound_vars.data());
+  std::vector<BitwuzlaTerm> args = bound_vars;
+  args.push_back(substituted_body);
+  return newExprRef(BitwExpr(Context, mkBoolSort(),
+                             bitwuzla_mk_term(TermManager, BITWUZLA_KIND_EXISTS,
+                                              args.size(), args.data())));
+}
+
 SMTExprRef BitwuzlaSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                             const SMTSortRef &To) {
   return newExprRef(BitwExpr(

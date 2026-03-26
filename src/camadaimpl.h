@@ -728,6 +728,22 @@ public:
     return tagExprKind(theExp, SMTExprKind::ArrayStore);
   }
 
+  SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
+                      const SMTExprRef &Body) override final {
+    assert(Body->isBoolSort());
+    SMTExprRef theExp = mkForallImpl(Vars, Body);
+    assert(theExp->isBoolSort());
+    return tagExprKind(theExp, SMTExprKind::Forall);
+  }
+
+  SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
+                      const SMTExprRef &Body) override final {
+    assert(Body->isBoolSort());
+    SMTExprRef theExp = mkExistsImpl(Vars, Body);
+    assert(theExp->isBoolSort());
+    return tagExprKind(theExp, SMTExprKind::Exists);
+  }
+
   bool getBool(const SMTExprRef &Exp) override final {
     assert(Exp->isBoolSort());
     return getBoolImpl(Exp);
@@ -1226,6 +1242,12 @@ protected:
   virtual SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array,
                                       const SMTExprRef &Index,
                                       const SMTExprRef &Element) = 0;
+
+  virtual SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                  const SMTExprRef &Body) = 0;
+
+  virtual SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                  const SMTExprRef &Body) = 0;
 
   virtual bool getBoolImpl(const SMTExprRef &Exp) = 0;
 
