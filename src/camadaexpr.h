@@ -123,26 +123,23 @@ public:
   explicit operator bool() const { return isValid(); }
 
   bool isValid() const {
-    auto locked = State.lock();
-    return Ptr != nullptr && locked && locked->Generation == Generation;
+    return Ptr != nullptr && State && State->Generation == Generation;
   }
 
 private:
   const SMTExpr *Ptr = nullptr;
-  std::weak_ptr<const SMTHandleState> State;
+  std::shared_ptr<const SMTHandleState> State;
   uint64_t Generation = 0;
 
   SMTExprRef(const SMTExpr *ThePtr,
-             std::weak_ptr<const SMTHandleState> TheState,
+             std::shared_ptr<const SMTHandleState> TheState,
              uint64_t TheGeneration)
       : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
 
   void validate() const {
-    auto locked = State.lock();
     assert(Ptr && "Dereferencing null expression handle");
-    assert(locked &&
-           "Dereferencing expression handle after solver destruction");
-    assert(locked->Generation == Generation &&
+    assert(State && "Dereferencing expression handle after solver destruction");
+    assert(State->Generation == Generation &&
            "Dereferencing stale expression handle after solver reset");
   }
 
