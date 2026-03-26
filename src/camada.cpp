@@ -88,6 +88,15 @@ void camada::SMTSolver::initializeCommonSingletons() {
   CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
   CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
   CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
+  CachedBVZeroExprs.resize(5);
+  CachedBVZeroExprs[1] = CachedSmallBVZeroExprs[1];
+  CachedBVZeroExprs[2] = CachedSmallBVZeroExprs[2];
+  CachedBVZeroExprs[3] = CachedSmallBVZeroExprs[3];
+  CachedBVZeroExprs[4] = CachedSmallBVZeroExprs[4];
+  CachedBVOneExprs.resize(2);
+  CachedBVOneExprs[1] = CachedBVOne1Expr;
+  CachedBVNegOneExprs.resize(2);
+  CachedBVNegOneExprs[1] = CachedBVOne1Expr;
   CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
       mkBVFromBin("000", 3);
   CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
