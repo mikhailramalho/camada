@@ -105,7 +105,6 @@ def run_benchmarks(
                 )
             results.append(parse_lines(stdout.splitlines(), f"cpu{cpu}"))
             launched += 1
-            print(f"Completed benchmark {launched}/{runs} on cpu {cpu}", file=sys.stderr)
 
     return results
 
@@ -177,6 +176,24 @@ def format_change(name: str, baseline: float, new: float, p_value: float) -> str
     )
 
 
+def format_overall_change(
+    baseline_total: float, current_total: float, p_value: float
+) -> str:
+    delta = pct_change(baseline_total, current_total)
+    word = (
+        "improved"
+        if current_total < baseline_total
+        else "regressed"
+        if current_total > baseline_total
+        else "unchanged"
+    )
+    return (
+        f"Overall: {word} "
+        f"({baseline_total:.2f} -> {current_total:.2f} total ns/iter, "
+        f"{delta:+.2f}%, p={p_value:.4f})"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -228,10 +245,14 @@ def main() -> int:
     improved: list[str] = []
     regressed: list[str] = []
     unchanged: list[str] = []
+    baseline_total = 0.0
+    current_total = 0.0
 
     for name in common_names:
         old = float(baseline[name]["ns_per_iter"])
         cur = float(medians[name]["ns_per_iter"])
+        baseline_total += old
+        current_total += cur
         samples = [
             float(run[name]["ns_per_iter"]) for run in runs if name in run
         ]
@@ -247,6 +268,12 @@ def main() -> int:
         f"Compared baseline against medians from {runs_to_execute} runs "
         f"(two-sided sign-test p-values)."
     )
+    total_samples = [
+        sum(float(run[name]["ns_per_iter"]) for name in common_names if name in run)
+        for run in runs
+    ]
+    overall_p_value = sign_test_p_value(total_samples, baseline_total)
+    print(format_overall_change(baseline_total, current_total, overall_p_value))
 
     if regressed:
         print("Regressed:")
