@@ -16,7 +16,8 @@ LINE_RE = re.compile(
     r"(?P<ns_per_iter>\d+(?:\.\d+)?)$"
 )
 
-RUNS = 10
+DEFAULT_MIN_RUNS = 10
+RUNS_PER_CPU = 5
 
 
 def parse_lines(lines: list[str], source: str) -> dict[str, dict[str, object]]:
@@ -62,7 +63,9 @@ def run_benchmark(
     return parse_lines(proc.stdout.splitlines(), f"cpu{cpu}")
 
 
-def run_benchmarks(binary: Path, iterations: int, runs: int) -> list[dict[str, dict[str, object]]]:
+def run_benchmarks(
+    binary: Path, iterations: int, runs: int
+) -> list[dict[str, dict[str, object]]]:
     cpu_count = os.cpu_count() or 1
     results: list[dict[str, dict[str, object]]] = []
     launched = 0
@@ -177,9 +180,9 @@ def format_change(name: str, baseline: float, new: float, p_value: float) -> str
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Run camada-bench 10 times with schedtool in parallel across "
-            "available CPUs, compute median per benchmark, and compare "
-            "against scripts/baseline.txt."
+            "Run camada-bench with schedtool in parallel across available "
+            "CPUs, compute median per benchmark, and compare against "
+            "scripts/baseline.txt."
         )
     )
     parser.add_argument("binary", type=Path, help="Path to camada-bench binary")
@@ -193,11 +196,13 @@ def main() -> int:
 
     baseline_path = Path(__file__).with_name("baseline.txt")
 
+    cpu_count = os.cpu_count() or 1
+    runs_to_execute = max(DEFAULT_MIN_RUNS, cpu_count * RUNS_PER_CPU)
     print(
-        f"Running {RUNS} benchmarks across up to {os.cpu_count() or 1} CPUs...",
+        f"Running {runs_to_execute} benchmarks across up to {cpu_count} CPUs...",
         file=sys.stderr,
     )
-    runs = run_benchmarks(args.binary, args.iterations, RUNS)
+    runs = run_benchmarks(args.binary, args.iterations, runs_to_execute)
 
     medians = compute_medians(runs)
     if not medians:
@@ -207,7 +212,7 @@ def main() -> int:
     if args.write_baseline:
         write_baseline(baseline_path, medians)
         print(
-            f"Wrote baseline medians from {RUNS} runs to {baseline_path}"
+            f"Wrote baseline medians from {runs_to_execute} runs to {baseline_path}"
         )
         return 0
 
@@ -239,7 +244,7 @@ def main() -> int:
             unchanged.append(format_change(name, old, cur, p_value))
 
     print(
-        f"Compared baseline against medians from {RUNS} runs "
+        f"Compared baseline against medians from {runs_to_execute} runs "
         f"(two-sided sign-test p-values)."
     )
 
