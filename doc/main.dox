@@ -4,14 +4,48 @@
  * \copyright Released under the terms of the Apache License.
  *
  * \section description Description
- * Camada (“layer” in Portuguese) is a permissively licensed open-source C++ library written in modern C++11 for SMT solving.
+ * Camada (“layer” in Portuguese) is a permissively licensed open-source C++17
+ * library for SMT solving.
  *
- * Camada aims to provide a unified API for several SMT solvers while also adding some missing features to all supported solvers:
+ * Camada provides a unified API across multiple SMT backends while also
+ * filling some solver feature gaps in the common layer.
  *
- * [x] floating-point encoding layer using bit-vectors.
+ * Supported backends include:
+ * - Bitwuzla
+ * - CVC5
+ * - MathSAT
+ * - STP
+ * - Yices
+ * - Z3
  *
- * [ ] tuple encoding layer.
+ * Currently available common-layer features include:
+ * - floating-point fallback using bit-vectors
+ * - partial array support
  *
- * [ ] array encoding layer.
+ * Planned future extensions include:
+ * - tuples
+ * - full tuple-aware array support
+ * - integers/reals
+ * - further structured common-layer encodings
+ *
+ * \section design Design Notes
+ *
+ * Expression and sort handles are solver-owned. Any handle obtained from a
+ * solver becomes invalid after \c reset() or solver destruction.
+ *
+ * When a backend lacks native support for a feature, Camada may encode that
+ * feature in the common layer. The main current example is floating-point
+ * fallback via bit-vectors.
+ *
+ * \section examples Examples
+ *
+ * Small usage examples can be found in the regression tests:
+ * - regression/simple.test.h
+ * - regression/array.test.h
+ * - regression/fp.test.h
+ *
+ * Additional design notes live in:
+ * - doc/tuple-plan.md
+ * - doc/overhead-reduction-plan.md
  *
  */

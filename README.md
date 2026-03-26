@@ -3,12 +3,38 @@
 
 # Camada
 
-Camada ("layer" in Portuguese) is a permissively licensed open-source C++17 library that serves as a wrapper for six popular SMT (Satisfiability Modulo Theories) solvers: Bitwuzla, STP, Yices, MathSAT, CVC5, and Z3. It provides a unified interface for interacting with these solvers, making it easier for developers to work with SMT in their projects.
+Camada ("layer" in Portuguese) is a permissively licensed C++17 wrapper for
+multiple SMT solvers. It exposes a unified API across:
 
-Camada aims to provide a unified API for several SMT solvers while also adding some missing features to all supported solvers:
-- [x] A floating-point encoding layer using bit-vectors.
-- [ ] A tuple encoding layer.
-- [ ] An array encoding layer.
+- Bitwuzla
+- CVC5
+- MathSAT
+- STP
+- Yices
+- Z3
+
+The library is designed to make solver switching cheap while still filling
+feature gaps in backends that are missing parts of the SMT-LIB surface.
+
+Current encoded/common-layer features:
+
+- [x] floating-point fallback via bit-vector encoding
+- [~] partial array API
+- [ ] tuple encoding layer
+
+## What Camada Is
+
+Camada is intentionally a thin common layer:
+
+- solver-specific wrappers live in the backend classes
+- common behavior and missing-feature encodings live in the shared layer
+- expressions and sorts are solver-owned handles
+
+This makes it practical to:
+
+- switch solvers without rewriting the calling code
+- route unsupported features through common-layer encodings
+- keep backend-specific quirks contained in one place
 
 ## Building and Installing
 
@@ -35,6 +61,12 @@ cmake --build build
 # Install Camada
 cmake --install build
 ```
+
+Useful configure options:
+
+- `-DCMAKE_BUILD_TYPE=Release`
+- `-DCAMADA_DOWNLOAD_DEPENDENCIES=ALL`
+- `-DCAMADA_SOLVER_<NAME>_ENABLE=ON/OFF` to control enabled backends
 
 ### Downloading Supported Solvers
 
@@ -86,6 +118,70 @@ it does not support these operations natively. `ROUND_TO_AWAY` is also not
 supported by the native MathSAT floating-point API and aborts with an error if
 requested.
 
+## API Overview
+
+Camada currently provides public APIs for:
+
+- booleans
+- bit-vectors
+- floating-point
+- rounding modes
+- arrays
+- model queries for supported value kinds
+
+Not implemented yet:
+
+- tuples
+- integers/reals
+- uninterpreted functions
+- incremental solving API
+
+Array support is currently partial in the larger structured-data sense:
+
+- plain SMT arrays are supported
+- backend-specific array gaps such as `Array<Idx, Bool>` are handled
+- arrays of tuples remain part of the unfinished tuple work
+
+## Design Notes
+
+### Handle Lifetime
+
+Expression and sort handles are solver-owned. Any `SMTExprRef` or `SMTSortRef`
+obtained from a solver becomes invalid after:
+
+- `solver->reset()`
+- solver destruction
+
+Handles must not be reused across those boundaries.
+
+### Floating-Point Fallback
+
+If a backend lacks native floating-point support, Camada can encode FP
+operations through bit-vectors in the common layer.
+
+This behavior can also be forced on supported solvers through:
+
+```cpp
+solver->useCamadaFP = true;
+```
+
+This is useful for:
+
+- backend parity testing
+- benchmarking the common FP encoding layer
+- working around backend-specific native-FP gaps
+
+### Backend-Specific Adaptation
+
+Camada also smooths over backend quirks where practical. For example:
+
+- MathSAT and STP now lower `Array<Idx, Bool>` through backend `Array<Idx, BV1>`
+  representations internally
+- Yices constant arrays use a backend-native lambda encoding instead of a full
+  store chain
+- MathSAT native FP still falls back for unsupported operations such as
+  `fp.rem`
+
 ## Implementation Details
 
 Camada is designed as a wrapper library to simplify the usage of multiple SMT solvers. It provides a common interface for interacting with these solvers, allowing developers to switch between them seamlessly without changing their codebase.
@@ -97,7 +193,7 @@ Expression and sort handles are solver-owned. Any `SMTExprRef` or `SMTSortRef`
 obtained from a solver becomes invalid after `solver->reset()` or after the
 solver is destroyed, and should not be reused across those boundaries.
 
-### Usage Example
+## Usage Example
 
 ```cpp
 #include <camada/camada.h>
@@ -153,3 +249,37 @@ int main() {
     /* Something went wrong when checking the formula, timeouts, etc. */
   }
 }
+```
+
+## More Examples
+
+The regression tests are also a good source of small usage examples:
+
+- [`regression/simple.test.h`](/home/mgadelha/tools/camada/regression/simple.test.h)
+- [`regression/array.test.h`](/home/mgadelha/tools/camada/regression/array.test.h)
+- [`regression/fp.test.h`](/home/mgadelha/tools/camada/regression/fp.test.h)
+
+## Benchmarking
+
+Camada includes a standalone benchmark driver:
+
+- [`regression/bench/main.cpp`](/home/mgadelha/tools/camada/regression/bench/main.cpp)
+- [`scripts/compare-bench.py`](/home/mgadelha/tools/camada/scripts/compare-bench.py)
+
+Typical local workflow:
+
+```bash
+python3 scripts/compare-bench.py ./build/bin/camada-bench 200
+```
+
+This runs repeated pinned benchmark samples, computes medians, and compares the
+result against [`scripts/baseline.txt`](/home/mgadelha/tools/camada/scripts/baseline.txt).
+
+## Additional Documentation
+
+- Tuple work plan:
+  [`doc/tuple-plan.md`](/home/mgadelha/tools/camada/doc/tuple-plan.md)
+- Overhead/performance work plan:
+  [`doc/overhead-reduction-plan.md`](/home/mgadelha/tools/camada/doc/overhead-reduction-plan.md)
+- Generated API docs:
+  [`doc/main.dox`](/home/mgadelha/tools/camada/doc/main.dox)
