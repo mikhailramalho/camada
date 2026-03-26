@@ -177,6 +177,20 @@ SMTSortRef BitwuzlaSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                0, 0, 0, IndexSort, ElemSort));
 }
 
+SMTSortRef
+BitwuzlaSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                                   const SMTSortRef &CodomainSort) {
+  std::vector<BitwuzlaSort> Domain;
+  Domain.reserve(DomainSorts.size());
+  for (const auto &Sort : DomainSorts)
+    Domain.push_back(toSolverSort<BitwSort>(*Sort).Sort);
+  return newSortRef<BitwSort>(
+      BitwSort(SMTSortKind::Function, Context,
+               bitwuzla_mk_fun_sort(TermManager, Domain.size(), Domain.data(),
+                                    toSolverSort<BitwSort>(*CodomainSort).Sort),
+               0, 0, 0, {}, {}, DomainSorts, CodomainSort));
+}
+
 SMTExprRef BitwuzlaSolver::mkBVNegImpl(const SMTExprRef &Exp) {
   return newExprRef(BitwExpr(Context, Exp->Sort,
                              mkTerm1(TermManager, BITWUZLA_KIND_BV_NEG, Exp)));
@@ -479,6 +493,19 @@ SMTExprRef BitwuzlaSolver::mkArrayStoreImpl(const SMTExprRef &Array,
   return newExprRef(BitwExpr(
       Context, Array->Sort,
       mkTerm3(TermManager, BITWUZLA_KIND_ARRAY_STORE, Array, Index, Element)));
+}
+
+SMTExprRef BitwuzlaSolver::mkApplyImpl(const SMTExprRef &Function,
+                                       const std::vector<SMTExprRef> &Args) {
+  std::vector<BitwuzlaTerm> ApplyArgs;
+  ApplyArgs.reserve(Args.size() + 1);
+  ApplyArgs.push_back(toSolverExpr<BitwExpr>(*Function).Expr);
+  for (const auto &Arg : Args)
+    ApplyArgs.push_back(toSolverExpr<BitwExpr>(*Arg).Expr);
+  return newExprRef(
+      BitwExpr(Context, Function->Sort->getCodomainSort(),
+               bitwuzla_mk_term(TermManager, BITWUZLA_KIND_APPLY,
+                                ApplyArgs.size(), ApplyArgs.data())));
 }
 
 bool BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {

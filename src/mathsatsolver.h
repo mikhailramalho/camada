@@ -92,6 +92,11 @@ class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
   using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
+  MathSATExpr(MathSATContextRef C, const SMTSortRef &S, const msat_term &T)
+      : SolverExpr<MathSATContextRef, msat_term>(C, S, T) {}
+  MathSATExpr(MathSATContextRef C, const SMTSortRef &S, const msat_decl &D)
+      : SolverExpr<MathSATContextRef, msat_term>(C, S, msat_term{}),
+        IsDecl(true), Decl(D) {}
   virtual ~MathSATExpr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
@@ -100,6 +105,9 @@ public:
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;
+
+  bool IsDecl = false;
+  msat_decl Decl{};
 }; // end class MathSATExpr
 
 class MathSATSolver : public SMTSolverImpl {
@@ -136,6 +144,9 @@ public:
 
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;
+
+  SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                                const SMTSortRef &CodomainSort) override;
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
@@ -207,6 +218,8 @@ public:
 
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
+  SMTExprRef mkApplyImpl(const SMTExprRef &Function,
+                         const std::vector<SMTExprRef> &Args) override;
   SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
                           const SMTExprRef &Body) override;
   SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,

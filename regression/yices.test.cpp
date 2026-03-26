@@ -10,6 +10,11 @@ TEST_CASE("Simple Yices test", "[YICES]") {
   tests(yices);
 }
 
+TEST_CASE("UF Yices test", "[YICES]") {
+  auto yices = camada::createYicesSolver();
+  uf_semantics(yices);
+}
+
 TEST_CASE("Override Yices Solver", "[YICES]") {
 
   class myYicesSolver : public camada::YicesSolver {

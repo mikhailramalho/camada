@@ -44,10 +44,10 @@ public:
   void dump() const override;
 }; // end class Z3Sort
 
-class Z3Expr : public SolverExpr<Z3ContextRef, z3::expr> {
+class Z3Expr : public SolverExpr<Z3ContextRef, z3::ast> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
-  using SolverExpr<Z3ContextRef, z3::expr>::SolverExpr;
+  using SolverExpr<Z3ContextRef, z3::ast>::SolverExpr;
   virtual ~Z3Expr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
@@ -92,6 +92,9 @@ public:
 
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;
+
+  SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                                const SMTSortRef &CodomainSort) override;
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
@@ -188,6 +191,8 @@ public:
 
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
+  SMTExprRef mkApplyImpl(const SMTExprRef &Function,
+                         const std::vector<SMTExprRef> &Args) override;
   SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
                           const SMTExprRef &Body) override;
   SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,

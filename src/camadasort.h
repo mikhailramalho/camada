@@ -25,11 +25,12 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace camada {
 
 enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3 };
-enum class SMTSortKind { Bool, BV, FP, RM, BVFP, BVRM, Array };
+enum class SMTSortKind { Bool, BV, FP, RM, BVFP, BVRM, Array, Function };
 
 class SMTSort;
 struct SMTHandleState {
@@ -79,9 +80,11 @@ private:
 class SMTSort {
 public:
   explicit SMTSort(SMTSortKind K, unsigned W = 0, unsigned EW = 0,
-                   unsigned SW = 0, SMTSortRef I = {}, SMTSortRef E = {})
+                   unsigned SW = 0, SMTSortRef I = {}, SMTSortRef E = {},
+                   std::vector<SMTSortRef> D = {}, SMTSortRef C = {})
       : Kind(K), Width(W), ExpWidth(EW), SigWidth(SW), IndexSort(std::move(I)),
-        ElementSort(std::move(E)) {}
+        ElementSort(std::move(E)), DomainSorts(std::move(D)),
+        CodomainSort(std::move(C)) {}
   virtual ~SMTSort() = default;
 
   virtual SMTBackendKind getBackendKind() const = 0;
@@ -110,6 +113,9 @@ public:
   /// Returns true if the sort is an array.
   bool isArraySort() const { return Kind == SMTSortKind::Array; }
 
+  /// Returns true if the sort is a function.
+  bool isFunctionSort() const { return Kind == SMTSortKind::Function; }
+
   /// Returns the sort width.
   unsigned getWidth() const;
 
@@ -129,6 +135,12 @@ public:
 
   /// Returns the array's element sort, fails if the sort is not an array.
   SMTSortRef getElementSort() const;
+
+  /// Returns the function's domain sorts, fails if the sort is not a function.
+  const std::vector<SMTSortRef> &getDomainSorts() const;
+
+  /// Returns the function's codomain sort, fails if the sort is not a function.
+  SMTSortRef getCodomainSort() const;
 
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
@@ -151,6 +163,8 @@ protected:
   unsigned SigWidth = 0;
   SMTSortRef IndexSort;
   SMTSortRef ElementSort;
+  std::vector<SMTSortRef> DomainSorts;
+  SMTSortRef CodomainSort;
 #ifndef NDEBUG
   bool WidthValidated = false;
 #endif
@@ -177,8 +191,10 @@ public:
 
   SolverSort(SMTSortKind K, SolverContextRef C, const TheSort &SS,
              unsigned W = 0, unsigned EW = 0, unsigned SW = 0,
-             SMTSortRef I = {}, SMTSortRef E = {})
-      : SMTSort(K, W, EW, SW, std::move(I), std::move(E)),
+             SMTSortRef I = {}, SMTSortRef E = {},
+             std::vector<SMTSortRef> D = {}, SMTSortRef Co = {})
+      : SMTSort(K, W, EW, SW, std::move(I), std::move(E), std::move(D),
+                std::move(Co)),
         Context(std::move(C)), Sort(SS) {}
 
   virtual ~SolverSort() override = default;

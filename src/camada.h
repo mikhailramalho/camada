@@ -83,6 +83,10 @@ public:
   virtual SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
                                  const SMTSortRef &ElemSort) = 0;
 
+  /// Returns an appropriate function sort.
+  virtual SMTSortRef mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
+                                    const SMTSortRef &CodomainSort) = 0;
+
   /// Given a constraint, adds it to the solver
   virtual void addConstraint(const SMTExprRef &Exp) = 0;
 
@@ -309,6 +313,10 @@ public:
                                   const SMTExprRef &Index,
                                   const SMTExprRef &Element) = 0;
 
+  /// Applies a function symbol to arguments.
+  virtual SMTExprRef mkApply(const SMTExprRef &Function,
+                             const std::vector<SMTExprRef> &Args) = 0;
+
   /// Creates a universally quantified formula over Vars with Body.
   virtual SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
                               const SMTExprRef &Body) = 0;
@@ -512,6 +520,9 @@ protected:
   mutable std::unordered_map<ArraySortCacheKey, SMTSortRef,
                              ArraySortCacheKeyHash>
       ArraySortCache;
+  mutable std::unordered_map<FunctionSortCacheKey, SMTSortRef,
+                             FunctionSortCacheKeyHash>
+      FunctionSortCache;
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 

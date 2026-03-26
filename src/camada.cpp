@@ -66,6 +66,7 @@ void camada::SMTSolver::clearSortCaches() {
   NativeFPSortCache.clear();
   EncodedFPSortCache.clear();
   ArraySortCache.clear();
+  FunctionSortCache.clear();
 }
 
 void camada::SMTSolver::clearExprCaches() {

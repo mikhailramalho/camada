@@ -128,6 +128,19 @@ SMTSortRef CVC5Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
                0, 0, 0, IndexSort, ElemSort));
 }
 
+SMTSortRef
+CVC5Solver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                               const SMTSortRef &CodomainSort) {
+  std::vector<cvc5::Sort> Domain;
+  Domain.reserve(DomainSorts.size());
+  for (const auto &Sort : DomainSorts)
+    Domain.push_back(toSolverSort<CVC5Sort>(*Sort).Sort);
+  return newSortRef<CVC5Sort>(CVC5Sort(
+      SMTSortKind::Function, Context,
+      Terms->mkFunctionSort(Domain, toSolverSort<CVC5Sort>(*CodomainSort).Sort),
+      0, 0, 0, {}, {}, DomainSorts, CodomainSort));
+}
+
 SMTExprRef CVC5Solver::mkBVNegImpl(const SMTExprRef &Exp) {
   return newExprRef(
       CVC5Expr(Context, Exp->Sort,
@@ -459,6 +472,17 @@ SMTExprRef CVC5Solver::mkArrayStoreImpl(const SMTExprRef &Array,
                              {toSolverExpr<CVC5Expr>(*Array).Expr,
                               toSolverExpr<CVC5Expr>(*Index).Expr,
                               toSolverExpr<CVC5Expr>(*Element).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkApplyImpl(const SMTExprRef &Function,
+                                   const std::vector<SMTExprRef> &Args) {
+  std::vector<cvc5::Term> ApplyArgs;
+  ApplyArgs.reserve(Args.size() + 1);
+  ApplyArgs.push_back(toSolverExpr<CVC5Expr>(*Function).Expr);
+  for (const auto &Arg : Args)
+    ApplyArgs.push_back(toSolverExpr<CVC5Expr>(*Arg).Expr);
+  return newExprRef(CVC5Expr(Context, Function->Sort->getCodomainSort(),
+                             Terms->mkTerm(cvc5::Kind::APPLY_UF, ApplyArgs)));
 }
 
 SMTExprRef CVC5Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
