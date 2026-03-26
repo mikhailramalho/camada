@@ -88,10 +88,7 @@ BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() {
   initializeCommonSingletons();
 }
 
-BitwuzlaSolver::~BitwuzlaSolver() {
-  invalidateGeneratedObjects();
-  destroyContext();
-}
+BitwuzlaSolver::~BitwuzlaSolver() { destroyContext(); }
 
 void BitwuzlaSolver::initializeContext() {
   TermManager = bitwuzla_term_manager_new();
