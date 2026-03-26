@@ -996,14 +996,14 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
   SMTExprRef c1 = mkOr(x_is_nan, y_is_nan);
   const SMTExprRef &v1 = nan;
 
-  SMTExprRef c2 = mkFPIsInfinite(LHS);
-  SMTExprRef nx = mkIsNeg(*this, LHS);
-  SMTExprRef ny = mkIsNeg(*this, RHS);
+  const SMTExprRef &c2 = x_is_inf;
+  const SMTExprRef &nx = x_is_neg;
+  const SMTExprRef &ny = y_is_neg;
   SMTExprRef nx_xor_ny = mkXor(nx, ny);
   SMTExprRef inf_xor = mkAnd(y_is_inf, nx_xor_ny);
   SMTExprRef v2 = mkIte(inf_xor, nan, LHS);
 
-  SMTExprRef c3 = mkFPIsInfinite(RHS);
+  const SMTExprRef &c3 = y_is_inf;
   SMTExprRef xy_is_neg = mkXor(x_is_neg, y_is_neg);
   SMTExprRef v3_and = mkAnd(x_is_inf, xy_is_neg);
   SMTExprRef v3 = mkIte(v3_and, nan, RHS);
@@ -1186,10 +1186,12 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef x_is_zero = mkFPIsZero(X);
   SMTExprRef x_is_pos = mkIsPos(*this, X);
   SMTExprRef x_is_neg = mkIsNeg(*this, X);
+  SMTExprRef x_is_inf = mkFPIsInfinite(X);
   SMTExprRef y_is_nan = mkFPIsNaN(Y);
   SMTExprRef y_is_zero = mkFPIsZero(Y);
   SMTExprRef y_is_pos = mkIsPos(*this, Y);
   SMTExprRef y_is_neg = mkIsNeg(*this, Y);
+  SMTExprRef y_is_inf = mkFPIsInfinite(Y);
   SMTExprRef z_is_nan = mkFPIsNaN(Z);
   SMTExprRef z_is_zero = mkFPIsZero(Z);
   SMTExprRef z_is_neg = mkIsNeg(*this, Z);
@@ -1206,25 +1208,25 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   const SMTExprRef &v1 = nan;
 
   // (x is +oo) -> if (y is 0) then NaN else inf with y's sign.
-  SMTExprRef c2 = mkIsPInf(*this, X);
+  SMTExprRef c2 = mkAnd(x_is_inf, x_is_pos);
   SMTExprRef y_sgn_inf = mkIte(y_is_pos, pinf, ninf);
   SMTExprRef inf_or = mkOr(y_is_zero, inf_cond);
   SMTExprRef v2 = mkIte(inf_or, nan, y_sgn_inf);
 
   // (y is +oo) -> if (x is 0) then NaN else inf with x's sign.
-  SMTExprRef c3 = mkIsPInf(*this, Y);
+  SMTExprRef c3 = mkAnd(y_is_inf, y_is_pos);
   SMTExprRef x_sgn_inf = mkIte(x_is_pos, pinf, ninf);
   inf_or = mkOr(x_is_zero, inf_cond);
   SMTExprRef v3 = mkIte(inf_or, nan, x_sgn_inf);
 
   // (x is -oo) -> if (y is 0) then NaN else inf with -y's sign.
-  SMTExprRef c4 = mkIsNInf(*this, X);
+  SMTExprRef c4 = mkAnd(x_is_inf, x_is_neg);
   SMTExprRef neg_y_sgn_inf = mkIte(y_is_pos, ninf, pinf);
   inf_or = mkOr(y_is_zero, inf_cond);
   SMTExprRef v4 = mkIte(inf_or, nan, neg_y_sgn_inf);
 
   // (y is -oo) -> if (x is 0) then NaN else inf with -x's sign.
-  SMTExprRef c5 = mkIsNInf(*this, Y);
+  SMTExprRef c5 = mkAnd(y_is_inf, y_is_neg);
   SMTExprRef neg_x_sgn_inf = mkIte(x_is_pos, ninf, pinf);
   inf_or = mkOr(x_is_zero, inf_cond);
   SMTExprRef v5 = mkIte(inf_or, nan, neg_x_sgn_inf);
