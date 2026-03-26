@@ -1975,8 +1975,8 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   unpack(*this, From, a_sgn, a_sig, a_exp, a_lz, true);
 
-  SMTExprRef x_is_neg = mkIsNeg(*this, From);
   SMTExprRef sgn_eq_1 = mkEqual(a_sgn, one_1);
+  const SMTExprRef &x_is_neg = sgn_eq_1;
   SMTExprRef xzero = mkIte(sgn_eq_1, nzero, pzero);
 
   // exponent < 0 -> 0/1
@@ -2051,7 +2051,7 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
   SMTExprRef tie2_c = mkIte(tie2, rte_and_dl_eq_1_or_rta, tie_pttrn_ule_rem);
   SMTExprRef v51 = mkIte(tie2_c, div_p1, div);
 
-  SMTExprRef rem_eq_0 = mkEqual(rem, mkBVFromDec(0, sbits));
+  SMTExprRef rem_eq_0 = mkEqual(rem, zero_s);
   SMTExprRef sgn_eq_zero = mkEqual(res_sgn, zero_1);
   SMTExprRef c521 = mkNot(rem_eq_0);
   c521 = mkAnd(c521, sgn_eq_zero);
