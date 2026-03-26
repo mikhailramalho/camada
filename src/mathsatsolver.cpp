@@ -82,11 +82,13 @@ MathSATSolver::MathSATSolver() : SMTSolverImpl() {
   OwnedContext.reset(msat_create_env(cfg));
   msat_destroy_config(cfg);
   Context = OwnedContext.get();
+  initializeCommonSingletons();
 }
 
 MathSATSolver::MathSATSolver(const msat_config &Config) : SMTSolverImpl() {
   OwnedContext.reset(msat_create_env(Config));
   Context = OwnedContext.get();
+  initializeCommonSingletons();
 }
 
 MathSATSolver::~MathSATSolver() {

@@ -57,12 +57,14 @@ Z3Solver::Z3Solver()
       Context(OwnedContext.get()), Solver(*Context) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
+  initializeCommonSingletons();
 }
 
 Z3Solver::Z3Solver(std::unique_ptr<z3::context> C)
     : SMTSolverImpl(), OwnedContext(std::move(C)), Context(OwnedContext.get()),
       Solver(*Context) {
   z3::set_param("rewriter.hi_fp_unspecified", true);
+  initializeCommonSingletons();
 }
 
 Z3Solver::Z3Solver(std::unique_ptr<z3::context> C, z3::solver S)
@@ -70,6 +72,7 @@ Z3Solver::Z3Solver(std::unique_ptr<z3::context> C, z3::solver S)
       Solver(std::move(S)) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
+  initializeCommonSingletons();
 }
 
 Z3Solver::~Z3Solver() { invalidateGeneratedObjects(); }

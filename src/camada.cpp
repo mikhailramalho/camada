@@ -69,18 +69,35 @@ void camada::SMTSolver::clearSortCaches() {
 }
 
 void camada::SMTSolver::clearExprCaches() {
-  CachedTrueExpr = {};
-  CachedFalseExpr = {};
-  CachedRMToEvenExpr = {};
-  CachedRMToAwayExpr = {};
-  CachedRMToPosExpr = {};
-  CachedRMToNegExpr = {};
-  CachedRMToZeroExpr = {};
+  CachedBoolExprs.fill({});
+  CachedBVOne1Expr = {};
+  CachedSmallBVZeroExprs.fill({});
+  CachedRMBVExprs.fill({});
   CachedBVNegOneExprs.clear();
   CachedBVZeroExprs.clear();
   CachedBVOneExprs.clear();
   SymbolExprCache.clear();
   FPSpecialExprCache.clear();
+}
+
+void camada::SMTSolver::initializeCommonSingletons() {
+  CachedBoolExprs[0] = mkBool(false);
+  CachedBoolExprs[1] = mkBool(true);
+  CachedBVOne1Expr = mkBVFromBin("1", 1);
+  CachedSmallBVZeroExprs[1] = mkBVFromBin("0", 1);
+  CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
+  CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
+  CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
+      mkBVFromBin("000", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
+      mkBVFromBin("001", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
+      mkBVFromBin("010", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
+      mkBVFromBin("011", 3);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
+      mkBVFromBin("100", 3);
 }
 
 camada::SMTSolverRef camada::createZ3Solver() {

@@ -34,6 +34,17 @@ public:
   SMTSolverImpl() = default;
   virtual ~SMTSolverImpl() override = default;
 
+  SMTExprRef getBVZero1Expr() const { return CachedSmallBVZeroExprs[1]; }
+  SMTExprRef getBVOne1Expr() const { return CachedBVOne1Expr; }
+  SMTExprRef getBVZero2Expr() const { return CachedSmallBVZeroExprs[2]; }
+  SMTExprRef getBVZero3Expr() const { return CachedSmallBVZeroExprs[3]; }
+  SMTExprRef getBVZero4Expr() const { return CachedSmallBVZeroExprs[4]; }
+  SMTExprRef getRMExpr(RM R) const {
+    return CachedRMBVExprs[static_cast<std::size_t>(R)];
+  }
+  SMTExprRef getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
+                              FPSpecialValueKind Kind, bool Sign);
+
   static SMTExprRef tagExprKind(const SMTExprRef &Exp, SMTExprKind Kind) {
     const_cast<SMTExpr &>(*Exp).setKind(Kind);
     return Exp;
@@ -766,7 +777,7 @@ public:
   }
 
   SMTExprRef mkBool(const bool b) override final {
-    SMTExprRef &CachedExpr = b ? CachedTrueExpr : CachedFalseExpr;
+    SMTExprRef &CachedExpr = CachedBoolExprs[b ? 1 : 0];
     if (CachedExpr)
       return CachedExpr;
 
@@ -779,6 +790,13 @@ public:
   SMTExprRef mkBVFromDec(const int64_t Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
+    if (Sort->getSortKind() == SMTSortKind::BV) {
+      const unsigned Width = Sort->getWidth();
+      if (Int == 0 && Width < CachedSmallBVZeroExprs.size())
+        return CachedSmallBVZeroExprs[Width];
+      if (Int == 1 && Width == 1)
+        return CachedBVOne1Expr;
+    }
 
     if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
       std::vector<SMTExprRef> *Cache = nullptr;
@@ -950,7 +968,8 @@ public:
 
   void reset() override final {
     invalidateGeneratedObjects();
-    return resetImpl();
+    resetImpl();
+    initializeCommonSingletons();
   }
 
   void dump() override final { return dumpImpl(); }
@@ -1123,13 +1142,13 @@ protected:
   virtual SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) {
     // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
-    return mkIte(mkNot(comp), mkBVFromDec(1, 1), mkBVFromDec(0, 1));
+    return mkIte(mkNot(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
   }
 
   virtual SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
-    return mkIte(comp, mkBVFromDec(1, 1), mkBVFromDec(0, 1));
+    return mkIte(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
   }
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);

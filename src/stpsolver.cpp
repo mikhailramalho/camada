@@ -77,10 +77,13 @@ STPSolver::STPSolver()
     : SMTSolverImpl(), OwnedContext(STP::vc_createValidityChecker()),
       Context(OwnedContext.get()) {
   STP::vc_registerErrorHandler(STPErrorHandler);
+  initializeCommonSingletons();
 }
 
 STPSolver::STPSolver(STPContextRef C)
-    : SMTSolverImpl(), OwnedContext(*C), Context(OwnedContext.get()) {}
+    : SMTSolverImpl(), OwnedContext(*C), Context(OwnedContext.get()) {
+  initializeCommonSingletons();
+}
 
 STPSolver::~STPSolver() {
   invalidateGeneratedObjects();

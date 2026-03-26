@@ -22,6 +22,7 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -32,8 +33,6 @@
 #include "camadaexpr.h"
 
 namespace camada {
-
-class FPEncodingContext;
 
 /// Return camada version
 std::string getCamadaVersion();
@@ -436,8 +435,6 @@ public:
   bool useCamadaFP = false;
 
 protected:
-  friend class FPEncodingContext;
-
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
   SMTSortRef newSortRef(const SolverSort &Sort) const {
@@ -472,15 +469,14 @@ protected:
 
   void clearExprCaches();
 
+  void initializeCommonSingletons();
+
   mutable std::vector<std::unique_ptr<SMTSort>> SortArena;
   mutable std::vector<std::unique_ptr<SMTExpr>> ExprArena;
-  mutable SMTExprRef CachedTrueExpr;
-  mutable SMTExprRef CachedFalseExpr;
-  mutable SMTExprRef CachedRMToEvenExpr;
-  mutable SMTExprRef CachedRMToAwayExpr;
-  mutable SMTExprRef CachedRMToPosExpr;
-  mutable SMTExprRef CachedRMToNegExpr;
-  mutable SMTExprRef CachedRMToZeroExpr;
+  mutable std::array<SMTExprRef, 2> CachedBoolExprs;
+  mutable SMTExprRef CachedBVOne1Expr;
+  mutable std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
+  mutable std::array<SMTExprRef, 5> CachedRMBVExprs;
   mutable std::vector<SMTExprRef> CachedBVNegOneExprs;
   mutable std::vector<SMTExprRef> CachedBVZeroExprs;
   mutable std::vector<SMTExprRef> CachedBVOneExprs;
