@@ -207,6 +207,10 @@ public:
 
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
+  SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
+  SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
 
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 

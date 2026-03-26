@@ -835,6 +835,46 @@ SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                    toSolverExpr<CVC5Expr>(*InitValue).Expr)));
 }
 
+SMTExprRef CVC5Solver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                    const SMTExprRef &Body) {
+  std::vector<cvc5::Term> old_terms;
+  std::vector<cvc5::Term> bound_vars;
+  old_terms.reserve(Vars.size());
+  bound_vars.reserve(Vars.size());
+  for (std::size_t i = 0; i < Vars.size(); ++i) {
+    const SMTExprRef &Var = Vars[i];
+    old_terms.push_back(toSolverExpr<CVC5Expr>(*Var).Expr);
+    bound_vars.push_back(Terms->mkVar(toSolverSort<CVC5Sort>(*Var->Sort).Sort,
+                                      "__CAMADA_qvar" + std::to_string(i)));
+  }
+  cvc5::Term bound_list = Terms->mkTerm(cvc5::Kind::VARIABLE_LIST, bound_vars);
+  cvc5::Term substituted_body =
+      toSolverExpr<CVC5Expr>(*Body).Expr.substitute(old_terms, bound_vars);
+  return newExprRef(CVC5Expr(
+      Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FORALL, {bound_list, substituted_body})));
+}
+
+SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                    const SMTExprRef &Body) {
+  std::vector<cvc5::Term> old_terms;
+  std::vector<cvc5::Term> bound_vars;
+  old_terms.reserve(Vars.size());
+  bound_vars.reserve(Vars.size());
+  for (std::size_t i = 0; i < Vars.size(); ++i) {
+    const SMTExprRef &Var = Vars[i];
+    old_terms.push_back(toSolverExpr<CVC5Expr>(*Var).Expr);
+    bound_vars.push_back(Terms->mkVar(toSolverSort<CVC5Sort>(*Var->Sort).Sort,
+                                      "__CAMADA_qvar" + std::to_string(i)));
+  }
+  cvc5::Term bound_list = Terms->mkTerm(cvc5::Kind::VARIABLE_LIST, bound_vars);
+  cvc5::Term substituted_body =
+      toSolverExpr<CVC5Expr>(*Body).Expr.substitute(old_terms, bound_vars);
+  return newExprRef(CVC5Expr(
+      Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body})));
+}
+
 checkResult CVC5Solver::checkImpl() {
   cvc5::Result res = Context->checkSat();
   if (res.isSat())
@@ -846,7 +886,10 @@ checkResult CVC5Solver::checkImpl() {
   return checkResult::UNSAT;
 }
 
-void CVC5Solver::resetImpl() { Context->resetAssertions(); }
+void CVC5Solver::resetImpl() {
+  SymbolTable.clear();
+  Context->resetAssertions();
+}
 
 void CVC5Solver::pushImpl(unsigned nscopes) { Context->push(nscopes); }
 

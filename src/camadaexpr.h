@@ -103,6 +103,8 @@ enum class SMTExprKind {
   FPtoIntegral,
   ArraySelect,
   ArrayStore,
+  Forall,
+  Exists,
   BVToIEEEFP,
   IEEEFPToBV,
 };

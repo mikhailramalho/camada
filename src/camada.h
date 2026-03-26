@@ -309,6 +309,14 @@ public:
                                   const SMTExprRef &Index,
                                   const SMTExprRef &Element) = 0;
 
+  /// Creates a universally quantified formula over Vars with Body.
+  virtual SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
+                              const SMTExprRef &Body) = 0;
+
+  /// Creates an existentially quantified formula over Vars with Body.
+  virtual SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
+                              const SMTExprRef &Body) = 0;
+
   /// If a model is available, returns the value of a given boolean symbol
   virtual bool getBool(const SMTExprRef &Exp) = 0;
 

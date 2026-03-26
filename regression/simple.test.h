@@ -100,3 +100,21 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
   REQUIRE(solver->getBV(x) == 1);
 }
+
+inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("x", solver->mkBVSort(4));
+  solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, x)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+  x = solver->mkSymbol("x", solver->mkBVSort(4));
+  auto three = solver->mkBVFromDec(3, 4);
+  solver->addConstraint(solver->mkExists({x}, solver->mkEqual(x, three)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+  x = solver->mkSymbol("x", solver->mkBVSort(4));
+  three = solver->mkBVFromDec(3, 4);
+  solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, three)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
