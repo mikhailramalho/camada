@@ -286,6 +286,8 @@ public:
   checkResult checkImpl() override;
 
   void resetImpl() override;
+  void pushImpl(unsigned nscopes) override;
+  void popImpl(unsigned nscopes) override;
 
   std::string getSolverNameAndVersion() const override;
 

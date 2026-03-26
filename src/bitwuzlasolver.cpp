@@ -657,6 +657,14 @@ void BitwuzlaSolver::resetImpl() {
   initializeContext();
 }
 
+void BitwuzlaSolver::pushImpl(unsigned nscopes) {
+  bitwuzla_push(Context, nscopes);
+}
+
+void BitwuzlaSolver::popImpl(unsigned nscopes) {
+  bitwuzla_pop(Context, nscopes);
+}
+
 std::string BitwuzlaSolver::getSolverNameAndVersion() const {
   return std::string("Bitwuzla v").append(bitwuzla_version());
 }

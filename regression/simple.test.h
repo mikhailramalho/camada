@@ -83,3 +83,20 @@ inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
       solver->mkEqual(result, solver->mkBVFromBin("0100", 4)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
+
+inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("x", solver->mkBVSort(8));
+  auto one = solver->mkBVFromDec(1, 8);
+  auto two = solver->mkBVFromDec(2, 8);
+
+  solver->addConstraint(solver->mkEqual(x, one));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->push();
+  solver->addConstraint(solver->mkEqual(x, two));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  solver->pop();
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->getBV(x) == 1);
+}

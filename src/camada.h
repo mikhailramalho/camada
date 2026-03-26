@@ -420,6 +420,12 @@ public:
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
 
+  /// Create a new assertion scope.
+  virtual void push(unsigned nscopes = 1) = 0;
+
+  /// Pop one or more assertion scopes.
+  virtual void pop(unsigned nscopes = 1) = 0;
+
   /// Returns the solver name and version
   virtual std::string getSolverNameAndVersion() const = 0;
 

@@ -753,6 +753,13 @@ checkResult Z3Solver::checkImpl() {
 
 void Z3Solver::resetImpl() { Solver.reset(); }
 
+void Z3Solver::pushImpl(unsigned nscopes) {
+  for (unsigned i = 0; i < nscopes; ++i)
+    Solver.push();
+}
+
+void Z3Solver::popImpl(unsigned nscopes) { Solver.pop(nscopes); }
+
 std::string Z3Solver::getSolverNameAndVersion() const {
   unsigned int major, minor, build, revision;
   Z3_get_version(&major, &minor, &build, &revision);

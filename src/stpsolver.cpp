@@ -566,6 +566,16 @@ void STPSolver::resetImpl() {
   STP::vc_registerErrorHandler(STPErrorHandler);
 }
 
+void STPSolver::pushImpl(unsigned nscopes) {
+  for (unsigned i = 0; i < nscopes; ++i)
+    STP::vc_push(*Context);
+}
+
+void STPSolver::popImpl(unsigned nscopes) {
+  for (unsigned i = 0; i < nscopes; ++i)
+    STP::vc_pop(*Context);
+}
+
 std::string STPSolver::getSolverNameAndVersion() const {
   return std::string("STP v").append(STP::get_git_version_tag());
 }
