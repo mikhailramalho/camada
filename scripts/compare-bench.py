@@ -205,13 +205,19 @@ def main() -> int:
     parser.add_argument("binary", type=Path, help="Path to camada-bench binary")
     parser.add_argument("iterations", type=int, help="Benchmark iteration count")
     parser.add_argument(
+        "--baseline",
+        type=Path,
+        default=Path(__file__).with_name("baseline.txt"),
+        help="Path to the baseline benchmark file",
+    )
+    parser.add_argument(
         "--write-baseline",
         action="store_true",
         help="Write the 10-run medians to scripts/baseline.txt instead of comparing",
     )
     args = parser.parse_args()
 
-    baseline_path = Path(__file__).with_name("baseline.txt")
+    baseline_path = args.baseline
 
     cpu_count = os.cpu_count() or 1
     runs_to_execute = max(DEFAULT_MIN_RUNS, cpu_count * RUNS_PER_CPU)
