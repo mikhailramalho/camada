@@ -18,9 +18,9 @@ feature gaps in backends that are missing parts of the SMT-LIB surface.
 
 Current encoded/common-layer features:
 
-- [x] floating-point fallback via bit-vector encoding
-- [~] partial array API
-- [ ] tuple encoding layer
+- floating-point fallback via bit-vector encoding
+- partial array API
+- tuple encoding layer: planned
 
 ## What Camada Is
 
