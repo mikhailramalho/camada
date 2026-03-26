@@ -580,7 +580,16 @@ SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
 }
 
 bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
-  return toSolverExpr<Z3Expr>(*Exp).Expr.bool_value();
+  switch (toSolverExpr<Z3Expr>(*Exp).Expr.bool_value()) {
+  case Z3_L_TRUE:
+    return true;
+  case Z3_L_FALSE:
+    return false;
+  case Z3_L_UNDEF:
+    break;
+  }
+  assert(0 && "Bool is neither true nor false");
+  __builtin_unreachable();
 }
 
 static inline bool hasZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
@@ -621,12 +630,9 @@ std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
 SMTExprRef Z3Solver::getArrayElementImpl(const SMTExprRef &Array,
                                          const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
-  const SMTExprRef &value =
-      hasZ3Interp(*this, sel) ? getZ3Interp(*this, sel) : sel;
-
   return newExprRef(
       Z3Expr(Context, sel->Sort,
-             Solver.get_model().eval(toSolverExpr<Z3Expr>(*value).Expr)));
+             Solver.get_model().eval(toSolverExpr<Z3Expr>(*sel).Expr, true)));
 }
 
 SMTExprRef Z3Solver::mkBoolImpl(const bool b) {

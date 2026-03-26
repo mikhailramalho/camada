@@ -61,3 +61,39 @@ inline void array_const_store_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getBVInBin(read_written) == "00010001");
   REQUIRE(solver->getBVInBin(read_other) == "10101010");
 }
+
+inline void
+bool_array_const_store_semantics(const camada::SMTSolverRef &solver) {
+  auto indexsort = solver->mkBVSort(2);
+  auto boolsort = solver->mkBoolSort();
+
+  auto init = solver->mkBool(false);
+  auto stored = solver->mkBool(true);
+  auto idx_written = solver->mkBVFromDec(1, indexsort);
+  auto idx_other = solver->mkBVFromDec(2, indexsort);
+
+  auto arr = solver->mkArrayConst(indexsort, init);
+  REQUIRE(arr->getKind() == camada::SMTExprKind::ArrayConst);
+  REQUIRE(arr->Sort->getElementSort() == boolsort);
+
+  auto updated = solver->mkArrayStore(arr, idx_written, stored);
+  REQUIRE(updated->getKind() == camada::SMTExprKind::ArrayStore);
+  REQUIRE(updated->Sort->getElementSort() == boolsort);
+
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(updated, idx_written), stored));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(updated, idx_other), init));
+
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto read_written = solver->getArrayElement(updated, idx_written);
+  auto read_other = solver->getArrayElement(updated, idx_other);
+
+  REQUIRE(read_written->getKind() == camada::SMTExprKind::ArraySelect);
+  REQUIRE(read_other->getKind() == camada::SMTExprKind::ArraySelect);
+  REQUIRE(read_written->Sort == boolsort);
+  REQUIRE(read_other->Sort == boolsort);
+  REQUIRE(solver->getBool(read_written));
+  REQUIRE(!solver->getBool(read_other));
+}
