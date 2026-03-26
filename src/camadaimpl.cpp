@@ -1230,7 +1230,7 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef v5 = mkIte(inf_or, nan, neg_x_sgn_inf);
 
   // z is +-INF -> z.
-  SMTExprRef c6 = mkFPIsInfinite(Z);
+  const SMTExprRef &c6 = z_is_inf;
   const SMTExprRef &v6 = Z;
 
   // (x is 0) || (y is 0) -> z
