@@ -37,8 +37,8 @@ set(${LIBRARY_TARGET_NAME}_SRC
 
 # List of HPP (header) library files, the public ones will be installed on the
 # system
-set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadasort.h camadaexpr.h
-                                   camadaimpl.h)
+set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadacache.h camadasort.h
+                                   camadaexpr.h camadaimpl.h)
 
 # add each solver specific header, if it is enabled
 add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
