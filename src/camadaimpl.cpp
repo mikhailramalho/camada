@@ -121,8 +121,8 @@ SMTExprRef mkMaxExp(SMTSolver &S, unsigned int ExpWidth) {
   return S.mkBVFromDec(power2m1(ExpWidth - 1, false), ExpWidth);
 }
 
-[[noreturn]] void SMTSolverImpl::unsupportedFeatureImpl(
-    const char *Feature) const {
+[[noreturn]] void
+SMTSolverImpl::unsupportedFeatureImpl(const char *Feature) const {
   std::cerr << Feature << " is not supported by this backend\n";
   std::abort();
 }

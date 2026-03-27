@@ -677,7 +677,8 @@ SMTExprRef Z3Solver::mkIntImpl(int64_t v) {
 }
 
 SMTExprRef Z3Solver::mkRealImpl(const std::string &v) {
-  return newExprRef(Z3Expr(Context, mkRealSort(), Context->real_val(v.c_str())));
+  return newExprRef(
+      Z3Expr(Context, mkRealSort(), Context->real_val(v.c_str())));
 }
 
 SMTExprRef Z3Solver::mkRealImpl(int64_t v) {
@@ -685,8 +686,7 @@ SMTExprRef Z3Solver::mkRealImpl(int64_t v) {
 }
 
 SMTExprRef Z3Solver::mkRealImpl(int64_t num, int64_t den) {
-  return newExprRef(
-      Z3Expr(Context, mkRealSort(), Context->real_val(num, den)));
+  return newExprRef(Z3Expr(Context, mkRealSort(), Context->real_val(num, den)));
 }
 
 SMTExprRef Z3Solver::mkBVFromDecImpl(const int64_t Int,

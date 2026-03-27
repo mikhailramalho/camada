@@ -451,10 +451,11 @@ SMTExprRef CVC5Solver::mkArithMulImpl(const SMTExprRef &LHS,
 
 SMTExprRef CVC5Solver::mkArithDivImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, LHS->Sort,
-      Terms->mkTerm(cvc5::Kind::DIVISION, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                           toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return newExprRef(
+      CVC5Expr(Context, LHS->Sort,
+               Terms->mkTerm(cvc5::Kind::DIVISION,
+                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkArithLtImpl(const SMTExprRef &LHS,
@@ -837,8 +838,7 @@ SMTExprRef CVC5Solver::mkRealImpl(int64_t v) {
 }
 
 SMTExprRef CVC5Solver::mkRealImpl(int64_t num, int64_t den) {
-  return newExprRef(
-      CVC5Expr(Context, mkRealSort(), Terms->mkReal(num, den)));
+  return newExprRef(CVC5Expr(Context, mkRealSort(), Terms->mkReal(num, den)));
 }
 
 SMTExprRef CVC5Solver::mkBVFromDecImpl(const int64_t Int,

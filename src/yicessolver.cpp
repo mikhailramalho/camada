@@ -386,72 +386,69 @@ SMTExprRef YicesSolver::mkXorImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef YicesSolver::mkArithNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      YicesExpr(Context, Exp->Sort, yices_neg(toSolverExpr<YicesExpr>(*Exp).Expr)));
+  return newExprRef(YicesExpr(Context, Exp->Sort,
+                              yices_neg(toSolverExpr<YicesExpr>(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithAddImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, LHS->Sort,
-      yices_add(toSolverExpr<YicesExpr>(*LHS).Expr,
-                toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_add(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                        toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithSubImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, LHS->Sort,
-      yices_sub(toSolverExpr<YicesExpr>(*LHS).Expr,
-                toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_sub(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                        toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithMulImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, LHS->Sort,
-      yices_mul(toSolverExpr<YicesExpr>(*LHS).Expr,
-                toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(YicesExpr(Context, LHS->Sort,
+                              yices_mul(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                        toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithDivImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, LHS->Sort,
-      yices_division(toSolverExpr<YicesExpr>(*LHS).Expr,
-                     toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, LHS->Sort,
+                yices_division(toSolverExpr<YicesExpr>(*LHS).Expr,
+                               toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithLtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, mkBoolSort(),
-      yices_arith_lt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
-                          toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, mkBoolSort(),
+                yices_arith_lt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                    toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithGtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, mkBoolSort(),
-      yices_arith_gt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
-                          toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, mkBoolSort(),
+                yices_arith_gt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                    toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithLeImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, mkBoolSort(),
-      yices_arith_leq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
-                           toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, mkBoolSort(),
+                yices_arith_leq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                     toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkArithGeImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(YicesExpr(
-      Context, mkBoolSort(),
-      yices_arith_geq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
-                           toSolverExpr<YicesExpr>(*RHS).Expr)));
+  return newExprRef(
+      YicesExpr(Context, mkBoolSort(),
+                yices_arith_geq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                     toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
 SMTExprRef YicesSolver::mkEqualImpl(const SMTExprRef &LHS,

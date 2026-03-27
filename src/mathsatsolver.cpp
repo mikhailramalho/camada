@@ -67,7 +67,8 @@ unsigned MathSATSort::getWidthFromSolver() const {
   if (msat_is_bool_type(*Context, Sort))
     return 1;
 
-  if (msat_is_integer_type(*Context, Sort) || msat_is_rational_type(*Context, Sort))
+  if (msat_is_integer_type(*Context, Sort) ||
+      msat_is_rational_type(*Context, Sort))
     return 0;
 
   if (msat_is_fp_roundingmode_type(*Context, Sort))
@@ -798,17 +799,18 @@ SMTExprRef MathSATSolver::mkBoolImpl(const bool Bool) {
 }
 
 SMTExprRef MathSATSolver::mkIntImpl(int64_t v) {
-  return newExprRef(MathSATExpr(
-      Context, mkIntSort(),
-      msat_make_number(*Context, std::to_string(v).c_str())));
+  return newExprRef(
+      MathSATExpr(Context, mkIntSort(),
+                  msat_make_number(*Context, std::to_string(v).c_str())));
 }
 
 SMTExprRef MathSATSolver::mkRealImpl(const std::string &v) {
   std::string repr = v;
-  if (repr.find('/') == std::string::npos && repr.find('.') == std::string::npos)
+  if (repr.find('/') == std::string::npos &&
+      repr.find('.') == std::string::npos)
     repr.append("/1");
-  return newExprRef(MathSATExpr(
-      Context, mkRealSort(), msat_make_number(*Context, repr.c_str())));
+  return newExprRef(MathSATExpr(Context, mkRealSort(),
+                                msat_make_number(*Context, repr.c_str())));
 }
 
 SMTExprRef MathSATSolver::mkRealImpl(int64_t v) {
