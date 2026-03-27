@@ -378,6 +378,21 @@ public:
   /// symbol as a 2-complement form binary string
   virtual std::string getBVInBin(const SMTExprRef &Exp) = 0;
 
+  /// If a model is available, returns the value of a given integer expression
+  /// as a decimal string.
+  virtual std::string getInt(const SMTExprRef &Exp) = 0;
+
+  /// If a model is available, returns the value of a given real expression
+  /// as a rational numerator/denominator in decimal string form.
+  virtual void getRational(const SMTExprRef &Exp, std::string &Num,
+                           std::string &Den) = 0;
+
+  /// Convenience method to get the numerator of a real expression value.
+  virtual std::string getRealNumerator(const SMTExprRef &Exp) = 0;
+
+  /// Convenience method to get the denominator of a real expression value.
+  virtual std::string getRealDenominator(const SMTExprRef &Exp) = 0;
+
   /// If a model is available, returns the value of a given floating-point
   /// symbol as a binary string in the IEEE-754 format: 1 bit for the sign + N
   /// bits for the exponent + M bits for the significand

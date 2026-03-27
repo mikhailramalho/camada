@@ -24,6 +24,7 @@
 
 #include "camadaimpl.h"
 
+#include <gmp.h>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -219,6 +220,11 @@ public:
   bool getBoolImpl(const SMTExprRef &Exp) override;
 
   std::string getBVInBinImpl(const SMTExprRef &Exp) override;
+
+  std::string getIntImpl(const SMTExprRef &Exp) override;
+
+  void getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                       std::string &Den) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;

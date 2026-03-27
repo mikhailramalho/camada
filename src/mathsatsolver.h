@@ -305,6 +305,11 @@ public:
 
   std::string getBVInBinImpl(const SMTExprRef &Exp) override;
 
+  std::string getIntImpl(const SMTExprRef &Exp) override;
+
+  void getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                       std::string &Den) override;
+
   std::string getFPInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,

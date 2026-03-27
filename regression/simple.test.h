@@ -188,3 +188,30 @@ inline void real_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkArithLt(r, one));
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
+
+inline void arith_model_queries(const camada::SMTSolverRef &solver) {
+  auto int_sort = solver->mkIntSort();
+  auto real_sort = solver->mkRealSort();
+
+  auto x = solver->mkSymbol("x", int_sort);
+  auto r = solver->mkSymbol("r", real_sort);
+  auto x_plus_two = solver->mkArithAdd(x, solver->mkInt(2));
+  auto r_plus_half = solver->mkArithAdd(r, solver->mkReal(1, 2));
+
+  solver->addConstraint(solver->mkEqual(x, solver->mkInt(5)));
+  solver->addConstraint(solver->mkEqual(r, solver->mkReal(3, 2)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  REQUIRE(solver->getInt(x) == "5");
+  REQUIRE(solver->getInt(x_plus_two) == "7");
+
+  std::string num;
+  std::string den;
+  solver->getRational(r, num, den);
+  REQUIRE(num == "3");
+  REQUIRE(den == "2");
+  REQUIRE(solver->getRealNumerator(r) == "3");
+  REQUIRE(solver->getRealDenominator(r) == "2");
+
+  REQUIRE(solver->getInt(r_plus_half) == "2");
+}

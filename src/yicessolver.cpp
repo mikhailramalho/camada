@@ -26,6 +26,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <gmp.h>
 
 namespace camada {
 
@@ -542,6 +543,13 @@ bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   return val ? true : false;
 }
 
+static inline void getYicesMPQValue(context_t *Context, term_t Expr,
+                                    mpq_t Val) {
+  auto res = yices_get_mpq_value(yices_get_model(Context, 1), Expr, Val);
+  (void)res;
+  assert(!res && "Can't get rational value from Yices");
+}
+
 std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
@@ -557,6 +565,38 @@ std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
 
   delete[] data;
   return val;
+}
+
+std::string YicesSolver::getIntImpl(const SMTExprRef &Exp) {
+  if (Exp->isRealSort()) {
+    std::string Num, Den;
+    getRationalImpl(Exp, Num, Den);
+    assert(Den == "1" && "Real value is not integral");
+    return Num;
+  }
+
+  int64_t val;
+  auto res = yices_get_int64_value(yices_get_model(Context, 1),
+                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
+  (void)res;
+  assert(!res && "Can't get integer value from Yices");
+  return std::to_string(val);
+}
+
+void YicesSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                                  std::string &Den) {
+  mpq_t val;
+  mpq_init(val);
+  getYicesMPQValue(Context, toSolverExpr<YicesExpr>(*Exp).Expr, val);
+  char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
+  char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
+  Num = raw_num;
+  Den = raw_den;
+  void (*gmp_free)(void *, std::size_t);
+  mp_get_memory_functions(nullptr, nullptr, &gmp_free);
+  gmp_free(raw_num, Num.size() + 1);
+  gmp_free(raw_den, Den.size() + 1);
+  mpq_clear(val);
 }
 
 SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,

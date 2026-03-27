@@ -777,8 +777,54 @@ static inline std::string getGMPVal(const MathSATSolver &S,
   return bv;
 }
 
+static inline void getMathSATModelRational(const MathSATSolver &S,
+                                           const SMTExprRef &Exp, mpq_t val) {
+  const SMTExprRef &t = S.newExprRef(
+      MathSATExpr(S.Context, Exp->Sort,
+                  msat_get_model_value(*S.Context, toMathSATTerm(Exp))));
+  msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context, toMathSATTerm(t),
+                      val);
+}
+
 std::string MathSATSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   return getGMPVal(*this, Exp);
+}
+
+std::string MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
+  if (Exp->isRealSort()) {
+    std::string Num, Den;
+    getRationalImpl(Exp, Num, Den);
+    assert(Den == "1" && "Real value is not integral");
+    return Num;
+  }
+
+  mpq_t val;
+  mpq_init(val);
+  getMathSATModelRational(*this, Exp, val);
+  assert(mpz_cmp_ui(mpq_denref(val), 1) == 0 && "Expected integer value");
+  char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
+  std::string num = raw_num;
+  void (*gmp_free)(void *, std::size_t);
+  mp_get_memory_functions(nullptr, nullptr, &gmp_free);
+  gmp_free(raw_num, num.size() + 1);
+  mpq_clear(val);
+  return num;
+}
+
+void MathSATSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                                    std::string &Den) {
+  mpq_t val;
+  mpq_init(val);
+  getMathSATModelRational(*this, Exp, val);
+  char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
+  char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
+  Num = raw_num;
+  Den = raw_den;
+  void (*gmp_free)(void *, std::size_t);
+  mp_get_memory_functions(nullptr, nullptr, &gmp_free);
+  gmp_free(raw_num, Num.size() + 1);
+  gmp_free(raw_den, Den.size() + 1);
+  mpq_clear(val);
 }
 
 std::string MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {

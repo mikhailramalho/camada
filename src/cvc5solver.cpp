@@ -27,6 +27,18 @@
 
 namespace camada {
 
+static inline void parseCVC5RationalValue(const std::string &Value,
+                                          std::string &Num, std::string &Den) {
+  const auto slash = Value.find('/');
+  if (slash == std::string::npos) {
+    Num = Value;
+    Den = "1";
+    return;
+  }
+  Num = Value.substr(0, slash);
+  Den = Value.substr(slash + 1);
+}
+
 unsigned CVC5Sort::getWidthFromSolver() const {
   if (Sort.isBitVector()) {
     cvc5::Sort bvType = static_cast<cvc5::Sort>(Sort);
@@ -810,6 +822,25 @@ bool CVC5Solver::getBoolImpl(const SMTExprRef &Exp) {
 std::string CVC5Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   return Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr)
       .getBitVectorValue();
+}
+
+std::string CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
+  cvc5::Term value = Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
+  if (Exp->isRealSort()) {
+    std::string num, den;
+    getRationalImpl(Exp, num, den);
+    assert(den == "1" && "Real value is not integral");
+    return num;
+  }
+  assert(value.isIntegerValue() && "Expected integer model value");
+  return value.getIntegerValue();
+}
+
+void CVC5Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                                 std::string &Den) {
+  cvc5::Term value = Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
+  assert(value.isRealValue() && "Expected rational model value");
+  parseCVC5RationalValue(value.getRealValue(), Num, Den);
 }
 
 std::string CVC5Solver::getFPInBinImpl(const SMTExprRef &Exp) {

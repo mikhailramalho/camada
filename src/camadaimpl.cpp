@@ -2213,6 +2213,15 @@ std::string SMTSolverImpl::getFPInBinImpl(const SMTExprRef &Exp) {
   return getBVInBin(Exp);
 }
 
+std::string SMTSolverImpl::getIntImpl(const SMTExprRef &) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
+void SMTSolverImpl::getRationalImpl(const SMTExprRef &, std::string &,
+                                    std::string &) {
+  unsupportedFeatureImpl("Real arithmetic");
+}
+
 SMTExprRef SMTSolverImpl::mkFPFromBinImpl(const std::string &FP,
                                           unsigned EWidth) {
   return mkBVFromBin(FP, mkFPSort(EWidth, FP.length() - EWidth - 1));

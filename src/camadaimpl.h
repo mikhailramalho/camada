@@ -896,6 +896,31 @@ public:
     return addLeadingZeroes(getBVInBinImpl(Exp), Exp->getWidth());
   }
 
+  std::string getInt(const SMTExprRef &Exp) override final {
+    assert(Exp->isIntSort() || Exp->isRealSort());
+    return getIntImpl(Exp);
+  }
+
+  void getRational(const SMTExprRef &Exp, std::string &Num,
+                   std::string &Den) override final {
+    assert(Exp->isRealSort());
+    getRationalImpl(Exp, Num, Den);
+  }
+
+  std::string getRealNumerator(const SMTExprRef &Exp) override final {
+    assert(Exp->isRealSort());
+    std::string Num, Den;
+    getRationalImpl(Exp, Num, Den);
+    return Num;
+  }
+
+  std::string getRealDenominator(const SMTExprRef &Exp) override final {
+    assert(Exp->isRealSort());
+    std::string Num, Den;
+    getRationalImpl(Exp, Num, Den);
+    return Den;
+  }
+
   std::string getFPInBin(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
     return addLeadingZeroes(useCamadaFP ? SMTSolverImpl::getFPInBinImpl(Exp)
@@ -1447,6 +1472,11 @@ protected:
   int64_t getBVImpl(const SMTExprRef &Exp);
 
   virtual std::string getBVInBinImpl(const SMTExprRef &Exp) = 0;
+
+  virtual std::string getIntImpl(const SMTExprRef &Exp);
+
+  virtual void getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                               std::string &Den);
 
   virtual std::string getFPInBinImpl(const SMTExprRef &Exp);
 

@@ -25,4 +25,6 @@ TEST_CASE("Arith CVC5 test", "[CVC5]") {
   int_arithmetic_semantics(cvc5);
   cvc5->reset();
   real_arithmetic_semantics(cvc5);
+  cvc5->reset();
+  arith_model_queries(cvc5);
 }
