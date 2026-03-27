@@ -25,7 +25,7 @@
 #include "yicessolver.h"
 
 #include <cassert>
-#include <iostream>
+#include <cstdio>
 
 namespace camada {
 
@@ -47,7 +47,7 @@ unsigned YicesSort::getWidthFromSolver() const {
 
 void YicesSort::dump() const {
   char *ty_str = yices_type_to_string(Sort, 160, 80, 0);
-  std::cerr << ty_str << '\n';
+  std::fprintf(stderr, "%s\n", ty_str);
   yices_free_string(ty_str);
 }
 
@@ -59,7 +59,7 @@ bool YicesExpr::equal_to(SMTExpr const &Other) const {
 
 void YicesExpr::dump() const {
   char *term_str = yices_term_to_string(Expr, 160, 80, 0);
-  std::cerr << term_str << '\n';
+  std::fprintf(stderr, "%s\n", term_str);
   yices_free_string(term_str);
 }
 
@@ -643,22 +643,6 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
       yices_lambda(1, &index_var, toSolverExpr<YicesExpr>(*InitValue).Expr)));
 }
 
-SMTExprRef YicesSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                                     const SMTExprRef &Body) {
-  (void)Vars;
-  (void)Body;
-  std::cerr << "Quantifiers are not supported by the Yices backend\n";
-  std::abort();
-}
-
-SMTExprRef YicesSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                                     const SMTExprRef &Body) {
-  (void)Vars;
-  (void)Body;
-  std::cerr << "Quantifiers are not supported by the Yices backend\n";
-  std::abort();
-}
-
 checkResult YicesSolver::checkImpl() {
   smt_status_t res = yices_check_context(Context, nullptr);
   if (res == YICES_STATUS_SAT)
@@ -722,7 +706,7 @@ void YicesSolver::dumpImpl() {
 void YicesSolver::dumpModelImpl() {
   char *model_str =
       yices_model_to_string(yices_get_model(Context, 1), 160, 80, 0);
-  std::cerr << model_str << '\n';
+  std::fprintf(stderr, "%s\n", model_str);
   yices_free_string(model_str);
 }
 

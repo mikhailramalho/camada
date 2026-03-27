@@ -26,7 +26,7 @@
 
 #include <algorithm>
 #include <cassert>
-#include <iostream>
+#include <cstdio>
 
 namespace camada {
 
@@ -50,7 +50,7 @@ unsigned STPSort::getWidthFromSolver() const {
 
 void STPSort::dump() const {
   char *s = STP::typeString(Sort);
-  std::cerr << s << '\n';
+  std::fprintf(stderr, "%s\n", s);
   free(s);
 }
 
@@ -63,7 +63,7 @@ bool STPExpr::equal_to(SMTExpr const &Other) const {
 
 void STPExpr::dump() const {
   char *s = STP::exprString(Expr);
-  std::cerr << s << '\n';
+  std::fprintf(stderr, "%s\n", s);
   free(s);
 }
 
@@ -140,15 +140,6 @@ SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
       STP::vc_arrayType(*Context, toSolverSort<STPSort>(*IndexSort).Sort,
                         toSolverSort<STPSort>(*backend_elem_sort).Sort),
       0, 0, 0, IndexSort, ElemSort));
-}
-
-SMTSortRef
-STPSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
-                              const SMTSortRef &CodomainSort) {
-  (void)DomainSorts;
-  (void)CodomainSort;
-  std::cerr << "Uninterpreted functions are not supported by the STP backend\n";
-  std::abort();
 }
 
 SMTExprRef STPSolver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -467,14 +458,6 @@ SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                         toSolverExpr<STPExpr>(*Index).Expr, backend_element)));
 }
 
-SMTExprRef STPSolver::mkApplyImpl(const SMTExprRef &Function,
-                                  const std::vector<SMTExprRef> &Args) {
-  (void)Function;
-  (void)Args;
-  std::cerr << "Uninterpreted functions are not supported by the STP backend\n";
-  std::abort();
-}
-
 bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(*Context, toSolverExpr<STPExpr>(*Exp).Expr);
@@ -564,22 +547,6 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   return arr;
 }
 
-SMTExprRef STPSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                                   const SMTExprRef &Body) {
-  (void)Vars;
-  (void)Body;
-  std::cerr << "Quantifiers are not supported by the STP backend\n";
-  std::abort();
-}
-
-SMTExprRef STPSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                                   const SMTExprRef &Body) {
-  (void)Vars;
-  (void)Body;
-  std::cerr << "Quantifiers are not supported by the STP backend\n";
-  std::abort();
-}
-
 checkResult STPSolver::checkImpl() {
   STP::Expr query = STP::vc_falseExpr(*Context);
   int res = STP::vc_query(*Context, query);
@@ -619,7 +586,7 @@ void STPSolver::dumpModelImpl() {
   char *buf;
   unsigned long len;
   STP::vc_printCounterExampleToBuffer(*Context, &buf, &len);
-  std::cerr << buf << '\n';
+  std::fprintf(stderr, "%s\n", buf);
   free(buf);
 }
 

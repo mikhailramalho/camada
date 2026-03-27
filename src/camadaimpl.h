@@ -1201,7 +1201,7 @@ protected:
 
   virtual SMTSortRef
   mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
-                     const SMTSortRef &CodomainSort) = 0;
+                     const SMTSortRef &CodomainSort);
 
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 
@@ -1434,13 +1434,13 @@ protected:
                                       const SMTExprRef &Element) = 0;
 
   virtual SMTExprRef mkApplyImpl(const SMTExprRef &Function,
-                                 const std::vector<SMTExprRef> &Args) = 0;
+                                 const std::vector<SMTExprRef> &Args);
 
   virtual SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                                  const SMTExprRef &Body) = 0;
+                                  const SMTExprRef &Body);
 
   virtual SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                                  const SMTExprRef &Body) = 0;
+                                  const SMTExprRef &Body);
 
   virtual bool getBoolImpl(const SMTExprRef &Exp) = 0;
 

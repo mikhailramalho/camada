@@ -23,7 +23,7 @@
 
 #include "cvc5solver.h"
 
-#include <iostream>
+#include <cstdio>
 
 namespace camada {
 
@@ -48,7 +48,10 @@ unsigned CVC5Sort::getWidthFromSolver() const {
          fpType.getFloatingPointSignificandSize();
 }
 
-void CVC5Sort::dump() const { std::cerr << Sort.toString() << '\n'; }
+void CVC5Sort::dump() const {
+  const auto s = Sort.toString();
+  std::fprintf(stderr, "%s\n", s.c_str());
+}
 
 bool CVC5Expr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
@@ -56,7 +59,10 @@ bool CVC5Expr::equal_to(SMTExpr const &Other) const {
   return (Expr == static_cast<const CVC5Expr &>(Other).Expr);
 }
 
-void CVC5Expr::dump() const { std::cerr << Expr.toString() << '\n'; }
+void CVC5Expr::dump() const {
+  const auto s = Expr.toString();
+  std::fprintf(stderr, "%s\n", s.c_str());
+}
 
 CVC5Solver::CVC5Solver()
     : SMTSolverImpl(), OwnedTerms(std::make_unique<cvc5::TermManager>()),
@@ -1025,14 +1031,18 @@ std::string CVC5Solver::getSolverNameAndVersion() const {
 
 void CVC5Solver::dumpImpl() {
   auto const &assertions = Context->getAssertions();
-  for (auto const &a : assertions)
-    std::cerr << a << '\n';
+  for (auto const &a : assertions) {
+    const auto s = a.toString();
+    std::fprintf(stderr, "%s\n", s.c_str());
+  }
 }
 
 void CVC5Solver::dumpModelImpl() {
   auto const &assertions = Context->getAssertions();
-  for (auto const &a : assertions)
-    std::cerr << Context->getValue(a) << '\n';
+  for (auto const &a : assertions) {
+    const auto s = Context->getValue(a).toString();
+    std::fprintf(stderr, "%s\n", s.c_str());
+  }
 }
 
 } // namespace camada

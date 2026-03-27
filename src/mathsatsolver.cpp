@@ -26,9 +26,9 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <gmp.h>
-#include <iostream>
 
 namespace camada {
 
@@ -83,7 +83,7 @@ unsigned MathSATSort::getWidthFromSolver() const {
 
 void MathSATSort::dump() const {
   char *s = msat_type_repr(Sort);
-  std::cerr << s << '\n';
+  std::fprintf(stderr, "%s\n", s);
   msat_free(s);
 }
 
@@ -101,12 +101,12 @@ bool MathSATExpr::equal_to(SMTExpr const &Other) const {
 void MathSATExpr::dump() const {
   if (IsDecl) {
     char *name = msat_decl_get_name(Decl);
-    std::cerr << "(declare-fun " << name << " ...)\n";
+    std::fprintf(stderr, "(declare-fun %s ...)\n", name);
     msat_free(name);
     return;
   }
   char *ast = msat_to_smtlib2(*Context, Expr);
-  std::cerr << ast << '\n';
+  std::fprintf(stderr, "%s\n", ast);
   msat_free(ast);
 }
 
@@ -140,8 +140,8 @@ static inline bool checkExprError(const SMTExpr &Exp) {
   if (exp.IsDecl)
     return false;
   if (MSAT_ERROR_TERM(exp.Expr)) {
-    std::cerr << "MathSAT Error " << msat_last_error_message(*exp.Context)
-              << '\n';
+    std::fprintf(stderr, "MathSAT Error %s\n",
+                 msat_last_error_message(*exp.Context));
     return true;
   }
   return false;
@@ -870,14 +870,11 @@ SMTExprRef MathSATSolver::mkFPFromBinImpl(const std::string &FP,
 SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
   msat_term e;
   switch (R) {
-  default:
-    std::cerr << "MathSAT Error unsupported floating-point rounding mode.\n";
-    std::abort();
   case RM::ROUND_TO_EVEN:
     e = msat_make_fp_roundingmode_nearest_even(*Context);
     break;
   case RM::ROUND_TO_AWAY:
-    std::cerr << "MathSAT Error ROUND_TO_AWAY is not supported.\n";
+    std::fprintf(stderr, "MathSAT Error ROUND_TO_AWAY is not supported.\n");
     std::abort();
   case RM::ROUND_TO_PLUS_INF:
     e = msat_make_fp_roundingmode_plus_inf(*Context);
@@ -1038,7 +1035,8 @@ void MathSATSolver::dumpImpl() {
       msat_get_asserted_formulas(*Context, &num_of_asserted);
 
   for (unsigned i = 0; i < num_of_asserted; i++)
-    std::cerr << msat_to_smtlib2(*Context, asserted_formulas[i]) << '\n';
+    std::fprintf(stderr, "%s\n",
+                 msat_to_smtlib2(*Context, asserted_formulas[i]));
   msat_free(asserted_formulas);
 }
 
@@ -1055,11 +1053,11 @@ void MathSATSolver::dumpModelImpl() {
     msat_model_iterator_next(iter, &t, &v);
     s = msat_term_repr(t);
     assert(s && "Error when getting variable from model");
-    std::cerr << s << " = ";
+    std::fprintf(stderr, "%s = ", s);
     msat_free(s);
     s = msat_term_repr(v);
     assert(s && "Error when getting variable value from model");
-    std::cerr << s << '\n';
+    std::fprintf(stderr, "%s\n", s);
     msat_free(s);
   }
   msat_destroy_model_iterator(iter);
