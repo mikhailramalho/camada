@@ -201,6 +201,16 @@ config_solver(Z3 4.8.8)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/cmake_config.in"
                "${CMAKE_CURRENT_BINARY_DIR}/src/ac_config.h")
 
+set(CAMADA_HAVE_BITWUZLA ${CAMADA_SOLVER_BITWUZLA_ENABLE})
+set(CAMADA_HAVE_CVC5 ${CAMADA_SOLVER_CVC5_ENABLE})
+set(CAMADA_HAVE_MATHSAT ${CAMADA_SOLVER_MATHSAT_ENABLE})
+set(CAMADA_HAVE_STP ${CAMADA_SOLVER_STP_ENABLE})
+set(CAMADA_HAVE_YICES ${CAMADA_SOLVER_YICES_ENABLE})
+set(CAMADA_HAVE_Z3 ${CAMADA_SOLVER_Z3_ENABLE})
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/camadafeatures.in"
+               "${CMAKE_CURRENT_BINARY_DIR}/src/camadafeatures.h")
+
 # Define targets
 add_subdirectory(src)
 

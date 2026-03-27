@@ -1,0 +1,8 @@
+/* Generated backend feature macros for Camada. */
+
+#cmakedefine01 CAMADA_HAVE_BITWUZLA
+#cmakedefine01 CAMADA_HAVE_CVC5
+#cmakedefine01 CAMADA_HAVE_MATHSAT
+#cmakedefine01 CAMADA_HAVE_STP
+#cmakedefine01 CAMADA_HAVE_YICES
+#cmakedefine01 CAMADA_HAVE_Z3

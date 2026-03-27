@@ -32,6 +32,7 @@
 
 #include "camadacache.h"
 #include "camadaexpr.h"
+#include "camadafeatures.h"
 
 namespace camada {
 
