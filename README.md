@@ -312,12 +312,3 @@ python3 scripts/compare-bench.py ./build/bin/camada-bench 200
 
 This runs repeated pinned benchmark samples, computes medians, and compares the
 result against [`scripts/baseline.txt`](/home/mgadelha/tools/camada/scripts/baseline.txt).
-
-## Additional Documentation
-
-- Tuple work plan:
-  [`doc/tuple-plan.md`](/home/mgadelha/tools/camada/doc/tuple-plan.md)
-- Overhead/performance work plan:
-  [`doc/overhead-reduction-plan.md`](/home/mgadelha/tools/camada/doc/overhead-reduction-plan.md)
-- Generated API docs:
-  [`doc/main.dox`](/home/mgadelha/tools/camada/doc/main.dox)
