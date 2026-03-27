@@ -135,3 +135,56 @@ inline void uf_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkNot(solver->mkEqual(fx, fy)));
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
+
+inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
+  auto int_sort = solver->mkIntSort();
+  auto x = solver->mkSymbol("x", int_sort);
+  auto one = solver->mkInt(1);
+  auto two = solver->mkInt(2);
+  auto three = solver->mkInt(3);
+
+  auto x_plus_one = solver->mkArithAdd(x, one);
+  REQUIRE(x_plus_one->getKind() == camada::SMTExprKind::ArithAdd);
+
+  solver->addConstraint(solver->mkEqual(x_plus_one, three));
+  solver->addConstraint(solver->mkArithGt(x, two));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  solver->reset();
+  int_sort = solver->mkIntSort();
+  x = solver->mkSymbol("x", int_sort);
+  one = solver->mkInt(1);
+  two = solver->mkInt(2);
+  three = solver->mkInt(3);
+  x_plus_one = solver->mkArithAdd(x, one);
+  solver->addConstraint(solver->mkEqual(x_plus_one, three));
+  solver->addConstraint(solver->mkArithGt(x, one));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void real_arithmetic_semantics(const camada::SMTSolverRef &solver) {
+  auto real_sort = solver->mkRealSort();
+  auto r = solver->mkSymbol("r", real_sort);
+  auto one = solver->mkReal(1);
+  auto two = solver->mkReal(2);
+  auto three = solver->mkReal(3);
+
+  auto r_plus_one = solver->mkArithAdd(r, one);
+  REQUIRE(r_plus_one->getKind() == camada::SMTExprKind::ArithAdd);
+
+  solver->addConstraint(solver->mkEqual(r_plus_one, three));
+  solver->addConstraint(solver->mkArithGt(r, one));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+  real_sort = solver->mkRealSort();
+  r = solver->mkSymbol("r", real_sort);
+  one = solver->mkReal(1);
+  two = solver->mkReal(2);
+  three = solver->mkReal(3);
+  (void)two;
+  (void)three;
+  solver->addConstraint(solver->mkEqual(r, one));
+  solver->addConstraint(solver->mkArithLt(r, one));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}

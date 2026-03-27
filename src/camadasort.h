@@ -30,7 +30,18 @@
 namespace camada {
 
 enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3 };
-enum class SMTSortKind { Bool, BV, FP, RM, BVFP, BVRM, Array, Function };
+enum class SMTSortKind {
+  Bool,
+  Int,
+  Real,
+  BV,
+  FP,
+  RM,
+  BVFP,
+  BVRM,
+  Array,
+  Function
+};
 
 class SMTSort;
 struct SMTHandleState {
@@ -99,6 +110,15 @@ public:
 
   /// Returns true if the sort is a boolean.
   bool isBoolSort() const { return Kind == SMTSortKind::Bool; }
+
+  /// Returns true if the sort is an integer.
+  bool isIntSort() const { return Kind == SMTSortKind::Int; }
+
+  /// Returns true if the sort is a real.
+  bool isRealSort() const { return Kind == SMTSortKind::Real; }
+
+  /// Returns true if the sort is an arithmetic sort.
+  bool isArithSort() const { return isIntSort() || isRealSort(); }
 
   /// Returns true if the sort is a floating-point.
   bool isFPSort() const {

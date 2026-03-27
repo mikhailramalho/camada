@@ -28,6 +28,10 @@ void camada::SMTSort::dump() const {
   std::string k;
   if (isBoolSort())
     k = "Bool";
+  else if (isIntSort())
+    k = "Int";
+  else if (isRealSort())
+    k = "Real";
   else if (isBVSort() && isFPSort())
     k = "BV Floating-point";
   else if (isBVSort())
@@ -63,6 +67,11 @@ void camada::SMTSort::dump() const {
     return;
   }
 
+  if (isArithSort()) {
+    std::cerr << '\n';
+    return;
+  }
+
   std::cerr << "width: " << getWidth() << ", solver: " << getWidthFromSolver();
   if (isFPSort())
     std::cerr << " (exp: " << getFPExponentWidth()
@@ -71,8 +80,8 @@ void camada::SMTSort::dump() const {
 }
 
 unsigned camada::SMTSort::getWidth() const {
-  assert(!isArraySort() && !isFunctionSort() &&
-         "Width is not defined for array or function sorts");
+  assert(!isArraySort() && !isFunctionSort() && !isArithSort() &&
+         "Width is not defined for array, function, or arithmetic sorts");
   return Width;
 }
 
@@ -114,8 +123,8 @@ camada::SMTSortRef camada::SMTSort::getCodomainSort() const {
 }
 
 bool camada::SMTSort::validateSortWidth() const {
-  // Don't check array/function sort widths for now
-  if (isArraySort() || isFunctionSort())
+  // Don't check array/function/arithmetic sort widths for now
+  if (isArraySort() || isFunctionSort() || isArithSort())
     return true;
 
   return getWidthFromSolver() == getWidth();
@@ -123,6 +132,12 @@ bool camada::SMTSort::validateSortWidth() const {
 
 bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
   if (isBoolSort() && Other.isBoolSort())
+    return true;
+
+  if (isIntSort() && Other.isIntSort())
+    return true;
+
+  if (isRealSort() && Other.isRealSort())
     return true;
 
   if (isRMSort() && Other.isRMSort())

@@ -38,6 +38,9 @@ unsigned YicesSort::getWidthFromSolver() const {
   if (yices_type_is_bool(Sort))
     return 1;
 
+  if (yices_type_is_int(Sort) || yices_type_is_real(Sort))
+    return 0;
+
   assert(yices_type_is_bitvector(Sort));
   return yices_bvtype_size(Sort);
 }
@@ -103,6 +106,16 @@ SMTExprRef YicesSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
 SMTSortRef YicesSolver::mkBoolSortImpl() {
   return newSortRef<YicesSort>(
       YicesSort(SMTSortKind::Bool, Context, yices_bool_type(), 1));
+}
+
+SMTSortRef YicesSolver::mkIntSortImpl() {
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::Int, Context, yices_int_type()));
+}
+
+SMTSortRef YicesSolver::mkRealSortImpl() {
+  return newSortRef<YicesSort>(
+      YicesSort(SMTSortKind::Real, Context, yices_real_type()));
 }
 
 SMTSortRef YicesSolver::mkBVSortImpl(unsigned BitWidth) {
@@ -372,6 +385,75 @@ SMTExprRef YicesSolver::mkXorImpl(const SMTExprRef &LHS,
                                          toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
+SMTExprRef YicesSolver::mkArithNegImpl(const SMTExprRef &Exp) {
+  return newExprRef(
+      YicesExpr(Context, Exp->Sort, yices_neg(toSolverExpr<YicesExpr>(*Exp).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithAddImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, LHS->Sort,
+      yices_add(toSolverExpr<YicesExpr>(*LHS).Expr,
+                toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithSubImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, LHS->Sort,
+      yices_sub(toSolverExpr<YicesExpr>(*LHS).Expr,
+                toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithMulImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, LHS->Sort,
+      yices_mul(toSolverExpr<YicesExpr>(*LHS).Expr,
+                toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithDivImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, LHS->Sort,
+      yices_division(toSolverExpr<YicesExpr>(*LHS).Expr,
+                     toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithLtImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, mkBoolSort(),
+      yices_arith_lt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                          toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithGtImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, mkBoolSort(),
+      yices_arith_gt_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                          toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithLeImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, mkBoolSort(),
+      yices_arith_leq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                           toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkArithGeImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(
+      Context, mkBoolSort(),
+      yices_arith_geq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
+                           toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
 SMTExprRef YicesSolver::mkEqualImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   return newExprRef(YicesExpr(Context, mkBoolSort(),
@@ -499,6 +581,23 @@ SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
 SMTExprRef YicesSolver::mkBoolImpl(const bool b) {
   return newExprRef(
       YicesExpr(Context, mkBoolSort(), b ? yices_true() : yices_false()));
+}
+
+SMTExprRef YicesSolver::mkIntImpl(int64_t v) {
+  return newExprRef(YicesExpr(Context, mkIntSort(), yices_int64(v)));
+}
+
+SMTExprRef YicesSolver::mkRealImpl(const std::string &v) {
+  return newExprRef(
+      YicesExpr(Context, mkRealSort(), yices_parse_rational(v.c_str())));
+}
+
+SMTExprRef YicesSolver::mkRealImpl(int64_t v) {
+  return mkRealImpl(std::to_string(v));
+}
+
+SMTExprRef YicesSolver::mkRealImpl(int64_t num, int64_t den) {
+  return mkRealImpl(std::to_string(num) + "/" + std::to_string(den));
 }
 
 SMTExprRef YicesSolver::mkBVFromDecImpl(const int64_t Int,

@@ -67,6 +67,9 @@ unsigned MathSATSort::getWidthFromSolver() const {
   if (msat_is_bool_type(*Context, Sort))
     return 1;
 
+  if (msat_is_integer_type(*Context, Sort) || msat_is_rational_type(*Context, Sort))
+    return 0;
+
   if (msat_is_fp_roundingmode_type(*Context, Sort))
     return 3;
 
@@ -159,6 +162,16 @@ SMTExprRef MathSATSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
   return newSortRef<MathSATSort>(
       MathSATSort(SMTSortKind::Bool, Context, msat_get_bool_type(*Context), 1));
+}
+
+SMTSortRef MathSATSolver::mkIntSortImpl() {
+  return newSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::Int, Context, msat_get_integer_type(*Context)));
+}
+
+SMTSortRef MathSATSolver::mkRealSortImpl() {
+  return newSortRef<MathSATSort>(MathSATSort(SMTSortKind::Real, Context,
+                                             msat_get_rational_type(*Context)));
 }
 
 SMTSortRef MathSATSolver::mkBVSortImpl(unsigned BitWidth) {
@@ -363,6 +376,63 @@ SMTExprRef MathSATSolver::mkOrImpl(const SMTExprRef &LHS,
   return newExprRef(MathSATExpr(
       Context, mkBoolSort(),
       msat_make_or(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+}
+
+SMTExprRef MathSATSolver::mkArithNegImpl(const SMTExprRef &Exp) {
+  const SMTExprRef &minus_one = Exp->isIntSort() ? mkInt(-1) : mkReal(-1);
+  return newExprRef(MathSATExpr(
+      Context, Exp->Sort,
+      msat_make_times(*Context, toMathSATTerm(minus_one), toMathSATTerm(Exp))));
+}
+
+SMTExprRef MathSATSolver::mkArithAddImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS) {
+  return newExprRef(MathSATExpr(
+      Context, LHS->Sort,
+      msat_make_plus(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+}
+
+SMTExprRef MathSATSolver::mkArithSubImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS) {
+  return mkArithAdd(LHS, mkArithNeg(RHS));
+}
+
+SMTExprRef MathSATSolver::mkArithMulImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS) {
+  return newExprRef(MathSATExpr(
+      Context, LHS->Sort,
+      msat_make_times(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+}
+
+SMTExprRef MathSATSolver::mkArithDivImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS) {
+  return newExprRef(MathSATExpr(
+      Context, LHS->Sort,
+      msat_make_divide(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+}
+
+SMTExprRef MathSATSolver::mkArithLtImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return mkNot(mkArithGe(LHS, RHS));
+}
+
+SMTExprRef MathSATSolver::mkArithGtImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return mkNot(mkArithLe(LHS, RHS));
+}
+
+SMTExprRef MathSATSolver::mkArithLeImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return newExprRef(MathSATExpr(
+      Context, mkBoolSort(),
+      msat_make_leq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+}
+
+SMTExprRef MathSATSolver::mkArithGeImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return newExprRef(MathSATExpr(
+      Context, mkBoolSort(),
+      msat_make_leq(*Context, toMathSATTerm(RHS), toMathSATTerm(LHS))));
 }
 
 SMTExprRef MathSATSolver::mkEqualImpl(const SMTExprRef &LHS,
@@ -725,6 +795,28 @@ SMTExprRef MathSATSolver::mkBoolImpl(const bool Bool) {
   return newExprRef(
       MathSATExpr(Context, mkBoolSort(),
                   Bool ? msat_make_true(*Context) : msat_make_false(*Context)));
+}
+
+SMTExprRef MathSATSolver::mkIntImpl(int64_t v) {
+  return newExprRef(MathSATExpr(
+      Context, mkIntSort(),
+      msat_make_number(*Context, std::to_string(v).c_str())));
+}
+
+SMTExprRef MathSATSolver::mkRealImpl(const std::string &v) {
+  std::string repr = v;
+  if (repr.find('/') == std::string::npos && repr.find('.') == std::string::npos)
+    repr.append("/1");
+  return newExprRef(MathSATExpr(
+      Context, mkRealSort(), msat_make_number(*Context, repr.c_str())));
+}
+
+SMTExprRef MathSATSolver::mkRealImpl(int64_t v) {
+  return mkRealImpl(std::to_string(v));
+}
+
+SMTExprRef MathSATSolver::mkRealImpl(int64_t num, int64_t den) {
+  return mkRealImpl(std::to_string(num) + "/" + std::to_string(den));
 }
 
 SMTExprRef MathSATSolver::mkBVFromDecImpl(const int64_t Int,

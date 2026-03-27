@@ -121,6 +121,12 @@ SMTExprRef mkMaxExp(SMTSolver &S, unsigned int ExpWidth) {
   return S.mkBVFromDec(power2m1(ExpWidth - 1, false), ExpWidth);
 }
 
+[[noreturn]] void SMTSolverImpl::unsupportedFeatureImpl(
+    const char *Feature) const {
+  std::cerr << Feature << " is not supported by this backend\n";
+  std::abort();
+}
+
 static inline SMTExprRef mkTopExp(SMTSolver &S, unsigned int ExpWidth) {
   return S.mkBVFromDec(power2m1(ExpWidth, false), ExpWidth);
 }
@@ -428,9 +434,77 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
 
 SMTSortRef SMTSolverImpl::mkRMSortImpl() { return mkBVRMSort(); }
 
+SMTSortRef SMTSolverImpl::mkIntSortImpl() {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
+SMTSortRef SMTSolverImpl::mkRealSortImpl() {
+  unsupportedFeatureImpl("Real arithmetic");
+}
+
 SMTSortRef SMTSolverImpl::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
   return mkBVFPSort(ExpWidth, SigWidth);
+}
+
+SMTExprRef SMTSolverImpl::mkArithNegImpl(const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithAddImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithSubImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithMulImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithDivImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithLtImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithGtImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithLeImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithGeImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  unsupportedFeatureImpl("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkIntImpl(int64_t) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkRealImpl(const std::string &) {
+  unsupportedFeatureImpl("Real arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkRealImpl(int64_t) {
+  unsupportedFeatureImpl("Real arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkRealImpl(int64_t, int64_t) {
+  unsupportedFeatureImpl("Real arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkFPAbsImpl(const SMTExprRef &Exp) {

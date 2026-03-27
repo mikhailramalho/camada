@@ -36,6 +36,9 @@ unsigned CVC5Sort::getWidthFromSolver() const {
   if (Sort.isBoolean())
     return 1;
 
+  if (Sort.isInteger() || Sort.isReal())
+    return 0;
+
   if (Sort.isRoundingMode())
     return 3;
 
@@ -86,6 +89,16 @@ SMTExprRef CVC5Solver::cloneExprWithSortImpl(const SMTExpr &Exp,
 SMTSortRef CVC5Solver::mkBoolSortImpl() {
   return newSortRef<CVC5Sort>(
       CVC5Sort(SMTSortKind::Bool, Context, Terms->getBooleanSort(), 1));
+}
+
+SMTSortRef CVC5Solver::mkIntSortImpl() {
+  return newSortRef<CVC5Sort>(
+      CVC5Sort(SMTSortKind::Int, Context, Terms->getIntegerSort()));
+}
+
+SMTSortRef CVC5Solver::mkRealSortImpl() {
+  return newSortRef<CVC5Sort>(
+      CVC5Sort(SMTSortKind::Real, Context, Terms->getRealSort()));
 }
 
 SMTSortRef CVC5Solver::mkBVSortImpl(unsigned BitWidth) {
@@ -403,6 +416,76 @@ SMTExprRef CVC5Solver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(CVC5Expr(
       Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::XOR, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithNegImpl(const SMTExprRef &Exp) {
+  return newExprRef(CVC5Expr(
+      Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::NEG, {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithAddImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::ADD, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithSubImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::SUB, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithMulImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::MULT, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                       toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithDivImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::DIVISION, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                           toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithLtImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::LT, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                     toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithGtImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::GT, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                     toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithLeImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::LEQ, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithGeImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::GEQ, {toSolverExpr<CVC5Expr>(*LHS).Expr,
                                       toSolverExpr<CVC5Expr>(*RHS).Expr})));
 }
 
@@ -739,6 +822,23 @@ SMTExprRef CVC5Solver::getArrayElementImpl(const SMTExprRef &Array,
 
 SMTExprRef CVC5Solver::mkBoolImpl(const bool b) {
   return newExprRef(CVC5Expr(Context, mkBoolSort(), Terms->mkBoolean(b)));
+}
+
+SMTExprRef CVC5Solver::mkIntImpl(int64_t v) {
+  return newExprRef(CVC5Expr(Context, mkIntSort(), Terms->mkInteger(v)));
+}
+
+SMTExprRef CVC5Solver::mkRealImpl(const std::string &v) {
+  return newExprRef(CVC5Expr(Context, mkRealSort(), Terms->mkReal(v)));
+}
+
+SMTExprRef CVC5Solver::mkRealImpl(int64_t v) {
+  return newExprRef(CVC5Expr(Context, mkRealSort(), Terms->mkReal(v)));
+}
+
+SMTExprRef CVC5Solver::mkRealImpl(int64_t num, int64_t den) {
+  return newExprRef(
+      CVC5Expr(Context, mkRealSort(), Terms->mkReal(num, den)));
 }
 
 SMTExprRef CVC5Solver::mkBVFromDecImpl(const int64_t Int,

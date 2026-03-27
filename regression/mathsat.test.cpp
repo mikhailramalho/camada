@@ -27,6 +27,18 @@ TEST_CASE("UF MathSAT test", "[MathSAT]") {
   uf_semantics(mathsat);
 }
 
+TEST_CASE("Arith MathSAT test", "[MathSAT]") {
+  msat_config Config = msat_create_default_config("QF_UFLIRA");
+  msat_set_option(Config, "model_generation", "true");
+  camada::SMTSolverRef mathsat =
+      std::make_unique<camada::MathSATSolver>(Config);
+  msat_destroy_config(Config);
+
+  int_arithmetic_semantics(mathsat);
+  mathsat->reset();
+  real_arithmetic_semantics(mathsat);
+}
+
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
 
   class mySolver : public camada::MathSATSolver {
