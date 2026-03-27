@@ -129,12 +129,6 @@ endif()
 # Demand C++17
 set(CMAKE_CXX_STANDARD 17)
 
-if(MSVC)
-  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/GR->)
-else()
-  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
-endif()
-
 # Generate compile commands by default
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
