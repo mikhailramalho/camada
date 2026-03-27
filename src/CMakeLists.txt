@@ -134,8 +134,11 @@ set_target_properties(
 # https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-relocatable-packages
 target_include_directories(
   ${LIBRARY_TARGET_NAME}
-  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-         "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>")
+  PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}>"
+)
 
 # Specify installation targets, typology and destination folders.
 install(
