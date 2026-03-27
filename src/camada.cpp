@@ -60,6 +60,8 @@ void camada::SMTSolver::invalidateGeneratedObjects() {
 
 void camada::SMTSolver::clearSortCaches() {
   CachedBoolSort = {};
+  CachedIntSort = {};
+  CachedRealSort = {};
   CachedNativeRMSort = {};
   CachedEncodedRMSort = {};
   BVSortCache.clear();

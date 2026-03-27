@@ -33,6 +33,8 @@ enum class SMTExprKind {
   Unknown,
   Symbol,
   BoolConst,
+  IntConst,
+  RealConst,
   BVConst,
   FPConst,
   RMConst,
@@ -69,6 +71,15 @@ enum class SMTExprKind {
   And,
   Or,
   Xor,
+  ArithNeg,
+  ArithAdd,
+  ArithSub,
+  ArithMul,
+  ArithDiv,
+  ArithLt,
+  ArithGt,
+  ArithLe,
+  ArithGe,
   Ite,
   BVSignExt,
   BVZeroExt,
@@ -169,6 +180,15 @@ public:
   /// Returns true if the expr sort is boolean
   virtual bool isBoolSort() const = 0;
 
+  /// Returns true if the expr sort is integer
+  virtual bool isIntSort() const = 0;
+
+  /// Returns true if the expr sort is real
+  virtual bool isRealSort() const = 0;
+
+  /// Returns true if the expr sort is arithmetic
+  virtual bool isArithSort() const = 0;
+
   /// Returns true if the expr sort is floating-point
   virtual bool isFPSort() const = 0;
 
@@ -220,6 +240,12 @@ public:
   bool isBVSort() const override { return Sort->isBVSort(); }
 
   bool isBoolSort() const override { return Sort->isBoolSort(); }
+
+  bool isIntSort() const override { return Sort->isIntSort(); }
+
+  bool isRealSort() const override { return Sort->isRealSort(); }
+
+  bool isArithSort() const override { return Sort->isArithSort(); }
 
   bool isFPSort() const override { return Sort->isFPSort(); }
 

@@ -129,6 +129,8 @@ public:
                                    const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
+  SMTSortRef mkIntSortImpl() override;
+  SMTSortRef mkRealSortImpl() override;
 
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
 
@@ -197,6 +199,24 @@ public:
   SMTExprRef mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkArithNegImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkArithAddImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithSubImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithMulImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithDivImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithLtImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithGtImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithLeImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithGeImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
 
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
@@ -291,6 +311,10 @@ public:
                                  const SMTExprRef &Index) override;
 
   SMTExprRef mkBoolImpl(const bool b) override;
+  SMTExprRef mkIntImpl(int64_t v) override;
+  SMTExprRef mkRealImpl(const std::string &v) override;
+  SMTExprRef mkRealImpl(int64_t v) override;
+  SMTExprRef mkRealImpl(int64_t num, int64_t den) override;
 
   SMTExprRef mkBVFromDecImpl(const int64_t Int,
                              const SMTSortRef &Sort) override;

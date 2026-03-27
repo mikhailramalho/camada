@@ -19,3 +19,10 @@ TEST_CASE("UF CVC5 test", "[CVC5]") {
   auto cvc5 = camada::createCVC5Solver();
   uf_semantics(cvc5);
 }
+
+TEST_CASE("Arith CVC5 test", "[CVC5]") {
+  auto cvc5 = camada::createCVC5Solver();
+  int_arithmetic_semantics(cvc5);
+  cvc5->reset();
+  real_arithmetic_semantics(cvc5);
+}

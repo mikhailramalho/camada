@@ -63,6 +63,12 @@ public:
   /// Returns a boolean sort.
   virtual SMTSortRef mkBoolSort() = 0;
 
+  /// Returns an integer sort.
+  virtual SMTSortRef mkIntSort() = 0;
+
+  /// Returns a real sort.
+  virtual SMTSortRef mkRealSort() = 0;
+
   /// Returns an appropriate bitvector sort for the given bitwidth.
   virtual SMTSortRef mkBVSort(const unsigned BitWidth) = 0;
 
@@ -186,6 +192,41 @@ public:
 
   /// Creates a boolean xor operation
   virtual SMTExprRef mkXor(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic unary minus operation.
+  virtual SMTExprRef mkArithNeg(const SMTExprRef &Exp) = 0;
+
+  /// Creates an arithmetic addition operation.
+  virtual SMTExprRef mkArithAdd(const SMTExprRef &LHS,
+                                const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic subtraction operation.
+  virtual SMTExprRef mkArithSub(const SMTExprRef &LHS,
+                                const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic multiplication operation.
+  virtual SMTExprRef mkArithMul(const SMTExprRef &LHS,
+                                const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic division operation.
+  virtual SMTExprRef mkArithDiv(const SMTExprRef &LHS,
+                                const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic less-than operation.
+  virtual SMTExprRef mkArithLt(const SMTExprRef &LHS,
+                               const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic greater-than operation.
+  virtual SMTExprRef mkArithGt(const SMTExprRef &LHS,
+                               const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic less-than-or-equal operation.
+  virtual SMTExprRef mkArithLe(const SMTExprRef &LHS,
+                               const SMTExprRef &RHS) = 0;
+
+  /// Creates an arithmetic greater-than-or-equal operation.
+  virtual SMTExprRef mkArithGe(const SMTExprRef &LHS,
+                               const SMTExprRef &RHS) = 0;
 
   /// Creates a boolean ite operation
   virtual SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -360,6 +401,18 @@ public:
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
 
+  /// Constructs an SMTExprRef from an integer.
+  virtual SMTExprRef mkInt(int64_t v) = 0;
+
+  /// Constructs an SMTExprRef from a real written as SMT-LIB numeral text.
+  virtual SMTExprRef mkReal(const std::string &v) = 0;
+
+  /// Constructs an SMTExprRef from an integral real.
+  virtual SMTExprRef mkReal(int64_t v) = 0;
+
+  /// Constructs an SMTExprRef from a rational real numerator/denominator.
+  virtual SMTExprRef mkReal(int64_t num, int64_t den) = 0;
+
   /// Constructs an SMTExprRef from an integer in base 10 and its sort
   virtual SMTExprRef mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) = 0;
 
@@ -504,6 +557,8 @@ protected:
   mutable std::vector<SMTExprRef> CachedBVZeroExprs;
   mutable std::vector<SMTExprRef> CachedBVOneExprs;
   mutable SMTSortRef CachedBoolSort;
+  mutable SMTSortRef CachedIntSort;
+  mutable SMTSortRef CachedRealSort;
   mutable SMTSortRef CachedNativeRMSort;
   mutable SMTSortRef CachedEncodedRMSort;
   mutable std::unordered_map<SymbolExprCacheKey, SMTExprRef,

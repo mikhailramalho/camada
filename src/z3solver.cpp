@@ -65,6 +65,9 @@ unsigned Z3Sort::getWidthFromSolver() const {
   if (Sort.is_bool())
     return 1;
 
+  if (Sort.is_int() || Sort.is_real())
+    return 0;
+
   if (Sort.is_fpa())
     return Sort.fpa_ebits() + Sort.fpa_sbits();
 
@@ -125,6 +128,16 @@ SMTExprRef Z3Solver::cloneExprWithSortImpl(const SMTExpr &Exp,
 SMTSortRef Z3Solver::mkBoolSortImpl() {
   return newSortRef<Z3Sort>(
       Z3Sort(SMTSortKind::Bool, Context, Context->bool_sort(), 1));
+}
+
+SMTSortRef Z3Solver::mkIntSortImpl() {
+  return newSortRef<Z3Sort>(
+      Z3Sort(SMTSortKind::Int, Context, Context->int_sort()));
+}
+
+SMTSortRef Z3Solver::mkRealSortImpl() {
+  return newSortRef<Z3Sort>(
+      Z3Sort(SMTSortKind::Real, Context, Context->real_sort()));
 }
 
 SMTSortRef Z3Solver::mkBVSortImpl(unsigned BitWidth) {
@@ -324,6 +337,54 @@ SMTExprRef Z3Solver::mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef Z3Solver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
   return newExprRef(Z3Expr(Context, LHS->Sort, toZ3Expr(LHS) ^ toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithNegImpl(const SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(Context, Exp->Sort, -toZ3Expr(Exp)));
+}
+
+SMTExprRef Z3Solver::mkArithAddImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, LHS->Sort, toZ3Expr(LHS) + toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithSubImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, LHS->Sort, toZ3Expr(LHS) - toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithMulImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, LHS->Sort, toZ3Expr(LHS) * toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithDivImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(Z3Expr(Context, LHS->Sort, toZ3Expr(LHS) / toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithLtImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
+  return newExprRef(
+      Z3Expr(Context, mkBoolSort(), toZ3Expr(LHS) < toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithGtImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
+  return newExprRef(
+      Z3Expr(Context, mkBoolSort(), toZ3Expr(LHS) > toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithLeImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
+  return newExprRef(
+      Z3Expr(Context, mkBoolSort(), toZ3Expr(LHS) <= toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkArithGeImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS) {
+  return newExprRef(
+      Z3Expr(Context, mkBoolSort(), toZ3Expr(LHS) >= toZ3Expr(RHS)));
 }
 
 SMTExprRef Z3Solver::mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
@@ -609,6 +670,23 @@ SMTExprRef Z3Solver::getArrayElementImpl(const SMTExprRef &Array,
 
 SMTExprRef Z3Solver::mkBoolImpl(const bool b) {
   return newExprRef(Z3Expr(Context, mkBoolSort(), Context->bool_val(b)));
+}
+
+SMTExprRef Z3Solver::mkIntImpl(int64_t v) {
+  return newExprRef(Z3Expr(Context, mkIntSort(), Context->int_val(v)));
+}
+
+SMTExprRef Z3Solver::mkRealImpl(const std::string &v) {
+  return newExprRef(
+      Z3Expr(Context, mkRealSort(), Context->real_val(v.c_str())));
+}
+
+SMTExprRef Z3Solver::mkRealImpl(int64_t v) {
+  return newExprRef(Z3Expr(Context, mkRealSort(), Context->real_val(v)));
+}
+
+SMTExprRef Z3Solver::mkRealImpl(int64_t num, int64_t den) {
+  return newExprRef(Z3Expr(Context, mkRealSort(), Context->real_val(num, den)));
 }
 
 SMTExprRef Z3Solver::mkBVFromDecImpl(const int64_t Int,

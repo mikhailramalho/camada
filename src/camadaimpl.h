@@ -67,6 +67,26 @@ public:
     return theSort;
   }
 
+  SMTSortRef mkIntSort() override final {
+    if (CachedIntSort)
+      return CachedIntSort;
+
+    SMTSortRef theSort = mkIntSortImpl();
+    assert(theSort->isIntSort());
+    CachedIntSort = theSort;
+    return theSort;
+  }
+
+  SMTSortRef mkRealSort() override final {
+    if (CachedRealSort)
+      return CachedRealSort;
+
+    SMTSortRef theSort = mkRealSortImpl();
+    assert(theSort->isRealSort());
+    CachedRealSort = theSort;
+    return theSort;
+  }
+
   SMTSortRef mkBVSort(const unsigned BitWidth) override final {
     assert(BitWidth);
     auto It = BVSortCache.find(BitWidth);
@@ -434,6 +454,85 @@ public:
     SMTExprRef theExp = mkXorImpl(LHS, RHS);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::Xor);
+  }
+
+  SMTExprRef mkArithNeg(const SMTExprRef &Exp) override final {
+    assert(Exp->isArithSort());
+    SMTExprRef theExp = mkArithNegImpl(Exp);
+    assert(theExp->Sort == Exp->Sort);
+    return tagExprKind(theExp, SMTExprKind::ArithNeg);
+  }
+
+  SMTExprRef mkArithAdd(const SMTExprRef &LHS,
+                        const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithAddImpl(LHS, RHS);
+    assert(theExp->Sort == LHS->Sort);
+    return tagExprKind(theExp, SMTExprKind::ArithAdd);
+  }
+
+  SMTExprRef mkArithSub(const SMTExprRef &LHS,
+                        const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithSubImpl(LHS, RHS);
+    assert(theExp->Sort == LHS->Sort);
+    return tagExprKind(theExp, SMTExprKind::ArithSub);
+  }
+
+  SMTExprRef mkArithMul(const SMTExprRef &LHS,
+                        const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithMulImpl(LHS, RHS);
+    assert(theExp->Sort == LHS->Sort);
+    return tagExprKind(theExp, SMTExprKind::ArithMul);
+  }
+
+  SMTExprRef mkArithDiv(const SMTExprRef &LHS,
+                        const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithDivImpl(LHS, RHS);
+    assert(theExp->Sort == LHS->Sort);
+    return tagExprKind(theExp, SMTExprKind::ArithDiv);
+  }
+
+  SMTExprRef mkArithLt(const SMTExprRef &LHS,
+                       const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithLtImpl(LHS, RHS);
+    assert(theExp->isBoolSort());
+    return tagExprKind(theExp, SMTExprKind::ArithLt);
+  }
+
+  SMTExprRef mkArithGt(const SMTExprRef &LHS,
+                       const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithGtImpl(LHS, RHS);
+    assert(theExp->isBoolSort());
+    return tagExprKind(theExp, SMTExprKind::ArithGt);
+  }
+
+  SMTExprRef mkArithLe(const SMTExprRef &LHS,
+                       const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithLeImpl(LHS, RHS);
+    assert(theExp->isBoolSort());
+    return tagExprKind(theExp, SMTExprKind::ArithLe);
+  }
+
+  SMTExprRef mkArithGe(const SMTExprRef &LHS,
+                       const SMTExprRef &RHS) override final {
+    assert(LHS->isArithSort());
+    assert(LHS->Sort == RHS->Sort);
+    SMTExprRef theExp = mkArithGeImpl(LHS, RHS);
+    assert(theExp->isBoolSort());
+    return tagExprKind(theExp, SMTExprKind::ArithGe);
   }
 
   SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -834,6 +933,30 @@ public:
     return tagExprKind(CachedExpr, SMTExprKind::BoolConst);
   }
 
+  SMTExprRef mkInt(int64_t v) override final {
+    SMTExprRef theExp = mkIntImpl(v);
+    assert(theExp->isIntSort());
+    return tagExprKind(theExp, SMTExprKind::IntConst);
+  }
+
+  SMTExprRef mkReal(const std::string &v) override final {
+    SMTExprRef theExp = mkRealImpl(v);
+    assert(theExp->isRealSort());
+    return tagExprKind(theExp, SMTExprKind::RealConst);
+  }
+
+  SMTExprRef mkReal(int64_t v) override final {
+    SMTExprRef theExp = mkRealImpl(v);
+    assert(theExp->isRealSort());
+    return tagExprKind(theExp, SMTExprKind::RealConst);
+  }
+
+  SMTExprRef mkReal(int64_t num, int64_t den) override final {
+    SMTExprRef theExp = mkRealImpl(num, den);
+    assert(theExp->isRealSort());
+    return tagExprKind(theExp, SMTExprKind::RealConst);
+  }
+
   SMTExprRef mkBVFromDec(const int64_t Int,
                          const SMTSortRef &Sort) override final {
     assert(Sort->isBVSort());
@@ -1053,12 +1176,18 @@ public:
   }
 
 protected:
+  [[noreturn]] void unsupportedFeatureImpl(const char *Feature) const;
+
   virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) const = 0;
 
   virtual SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
                                            const SMTSortRef &Sort) const = 0;
 
   virtual SMTSortRef mkBoolSortImpl() = 0;
+
+  virtual SMTSortRef mkIntSortImpl();
+
+  virtual SMTSortRef mkRealSortImpl();
 
   virtual SMTSortRef mkBVSortImpl(const unsigned BitWidth) = 0;
 
@@ -1180,6 +1309,32 @@ protected:
   virtual SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
     return mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
   }
+
+  virtual SMTExprRef mkArithNegImpl(const SMTExprRef &Exp);
+
+  virtual SMTExprRef mkArithAddImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkArithSubImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkArithMulImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkArithDivImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkArithLtImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkArithGtImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkArithLeImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkArithGeImpl(const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS);
 
   virtual SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                const SMTExprRef &F) = 0;
@@ -1303,6 +1458,14 @@ protected:
                                          const SMTExprRef &Index) = 0;
 
   virtual SMTExprRef mkBoolImpl(const bool b) = 0;
+
+  virtual SMTExprRef mkIntImpl(int64_t v);
+
+  virtual SMTExprRef mkRealImpl(const std::string &v);
+
+  virtual SMTExprRef mkRealImpl(int64_t v);
+
+  virtual SMTExprRef mkRealImpl(int64_t num, int64_t den);
 
   virtual SMTExprRef mkBVFromDecImpl(const int64_t Int,
                                      const SMTSortRef &Sort) = 0;

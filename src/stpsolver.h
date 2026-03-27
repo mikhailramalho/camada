@@ -126,7 +126,6 @@ public:
                                    const SMTSortRef &Sort) const override;
 
   SMTSortRef mkBoolSortImpl() override;
-
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
 
   SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
@@ -202,7 +201,6 @@ public:
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -238,7 +236,6 @@ public:
                                  const SMTExprRef &Index) override;
 
   SMTExprRef mkBoolImpl(const bool b) override;
-
   SMTExprRef mkBVFromDecImpl(const int64_t Int,
                              const SMTSortRef &Sort) override;
 
