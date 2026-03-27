@@ -64,7 +64,10 @@ add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS
 
 # Solvers
 if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC PkgConfig::Bitwuzla)
+  target_link_libraries(${LIBRARY_TARGET_NAME}
+                        PUBLIC ${Bitwuzla_LINK_LIBRARIES})
+  target_include_directories(${LIBRARY_TARGET_NAME}
+                             PRIVATE ${Bitwuzla_INCLUDE_DIRS})
   target_compile_definitions(${LIBRARY_TARGET_NAME}
                              PRIVATE SOLVER_BITWUZLA_ENABLED)
 endif()
