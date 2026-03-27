@@ -76,6 +76,12 @@ TEST_CASE("Arith Yices test", "[YICES]") {
         std::make_unique<myYicesArithSolver>("QF_UFLRA");
     arith_model_queries(yices);
   }
+
+  {
+    camada::SMTSolverRef yices =
+        std::make_unique<myYicesArithSolver>("QF_UFLIRA");
+    arith_conversion_semantics(yices);
+  }
 }
 
 TEST_CASE("Override Yices Solver", "[YICES]") {

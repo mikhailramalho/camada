@@ -420,6 +420,13 @@ SMTExprRef YicesSolver::mkArithDivImpl(const SMTExprRef &LHS,
                                toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
+SMTExprRef YicesSolver::mkArithModImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(Context, mkIntSort(),
+                              yices_imod(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                         toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
 SMTExprRef YicesSolver::mkArithLtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(
@@ -450,6 +457,24 @@ SMTExprRef YicesSolver::mkArithGeImpl(const SMTExprRef &LHS,
       YicesExpr(Context, mkBoolSort(),
                 yices_arith_geq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                      toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkInt2RealImpl(const SMTExprRef &Exp) {
+  return newExprRef(
+      YicesExpr(Context, mkRealSort(),
+                yices_division(toSolverExpr<YicesExpr>(*Exp).Expr,
+                               toSolverExpr<YicesExpr>(*mkReal(1)).Expr)));
+}
+
+SMTExprRef YicesSolver::mkReal2IntImpl(const SMTExprRef &Exp) {
+  return newExprRef(YicesExpr(Context, mkIntSort(),
+                              yices_floor(toSolverExpr<YicesExpr>(*Exp).Expr)));
+}
+
+SMTExprRef YicesSolver::mkIsIntImpl(const SMTExprRef &Exp) {
+  return newExprRef(
+      YicesExpr(Context, mkBoolSort(),
+                yices_is_int_atom(toSolverExpr<YicesExpr>(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkEqualImpl(const SMTExprRef &LHS,
@@ -622,6 +647,14 @@ SMTExprRef YicesSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef YicesSolver::mkIntImpl(int64_t v) {
   return newExprRef(YicesExpr(Context, mkIntSort(), yices_int64(v)));
+}
+
+SMTExprRef YicesSolver::mkIntImpl(const std::string &v) {
+  mpz_t val;
+  mpz_init_set_str(val, v.c_str(), 10);
+  term_t term = yices_mpz(val);
+  mpz_clear(val);
+  return newExprRef(YicesExpr(Context, mkIntSort(), term));
 }
 
 SMTExprRef YicesSolver::mkRealImpl(const std::string &v) {

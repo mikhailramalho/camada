@@ -181,6 +181,8 @@ public:
                             const SMTExprRef &RHS) override;
   SMTExprRef mkArithDivImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
+  SMTExprRef mkArithModImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
   SMTExprRef mkArithLtImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
   SMTExprRef mkArithGtImpl(const SMTExprRef &LHS,
@@ -189,6 +191,9 @@ public:
                            const SMTExprRef &RHS) override;
   SMTExprRef mkArithGeImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
+  SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
@@ -231,6 +236,7 @@ public:
 
   SMTExprRef mkBoolImpl(const bool b) override;
   SMTExprRef mkIntImpl(int64_t v) override;
+  SMTExprRef mkIntImpl(const std::string &v) override;
   SMTExprRef mkRealImpl(const std::string &v) override;
   SMTExprRef mkRealImpl(int64_t v) override;
   SMTExprRef mkRealImpl(int64_t num, int64_t den) override;
