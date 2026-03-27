@@ -19,7 +19,7 @@ feature gaps in backends that are missing parts of the SMT-LIB surface.
 Current encoded/common-layer features:
 
 - floating-point fallback via bit-vector encoding
-- partial array API
+- array support, with some remaining tuple-related gaps
 - tuple encoding layer: planned
 
 ## What Camada Is
@@ -91,12 +91,14 @@ When CMake downloads dependencies itself:
 - `Z3` uses the prebuilt release archive from `z3-4.16.0`.
 - `CVC5` uses the prebuilt static release archive from `cvc5-1.3.3`.
 - `Yices` uses a source build.
+- `GMP` uses a source build when it is needed by downloaded dependencies and no
+  suitable staged copy is already available.
 - `MathSAT` uses the vendor-provided prebuilt archive from `5.6.15`.
 - `STP` still falls back to a source build. The `2.3.4_cadical` GitHub release
   only ships a standalone `stp` executable, not the headers and libraries that
   Camada needs to link against the STP C++ API.
-- `STP`, `CryptoMiniSat`, `GMP`, and `Minisat` still build from
-  source.
+- `CryptoMiniSat` and `Minisat` still build from source as part of the STP
+  dependency chain.
 
 The `<build-dir>/deps/install` directory will contain the staged solver headers,
 libraries, and auxiliary artifacts, and Camada will use them from this
@@ -124,17 +126,30 @@ Camada currently provides public APIs for:
 
 - booleans
 - bit-vectors
+- integers and reals on supporting backends
 - floating-point
 - rounding modes
 - arrays
+- uninterpreted functions on supporting backends
+- incremental solving (`push`/`pop`)
 - model queries for supported value kinds
 
-Not implemented yet:
+Still not implemented:
 
 - tuples
+
+Partially backend-dependent:
+
+- quantifiers
+  - supported on `Bitwuzla`, `CVC5`, and `Z3`
+  - implemented but still unreliable on `MathSAT` in the current setup
+  - unsupported on `STP` and `Yices`
 - integers/reals
+  - supported on `CVC5`, `MathSAT`, `Yices`, and `Z3`
+  - unsupported on `Bitwuzla` and `STP`
 - uninterpreted functions
-- incremental solving API
+  - supported on `Bitwuzla`, `CVC5`, `MathSAT`, `Yices`, and `Z3`
+  - unsupported on `STP`
 
 Array support is currently partial in the larger structured-data sense:
 
@@ -182,16 +197,32 @@ Camada also smooths over backend quirks where practical. For example:
 - MathSAT native FP still falls back for unsupported operations such as
   `fp.rem`
 
+### Caching Philosophy
+
+Camada does some solver-local caching, but it is intentionally narrow.
+
+The goal is to keep the wrapper lightweight, not to implement a full-blown
+global expression cache for every sort and node shape. The built-in caching is
+focused on cases where reuse is very frequent and the cache overhead is low,
+such as:
+
+- canonical sorts per solver generation
+- common symbols
+- boolean constants
+- a small set of high-hit-rate bit-vector and floating-point helper constants
+
+This means Camada does not try to intern every generated expression or sort.
+If a client needs broader structural caching, it is expected to build that at a
+higher layer on top of Camada, with the application owning the larger
+expression cache while Camada stays focused on backend adaptation and
+common-layer encodings.
+
 ## Implementation Details
 
 Camada is designed as a wrapper library to simplify the usage of multiple SMT solvers. It provides a common interface for interacting with these solvers, allowing developers to switch between them seamlessly without changing their codebase.
 
 Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbmc) so some of the implementation decisions were geared towards the verification of C programs, in particular, camada diverges from the SMT standard in:
 - `fp.neg` supports negative `NaN`s. See https://github.com/Z3Prover/z3/issues/4466 for a more detailed discussion.
-
-Expression and sort handles are solver-owned. Any `SMTExprRef` or `SMTSortRef`
-obtained from a solver becomes invalid after `solver->reset()` or after the
-solver is destroyed, and should not be reused across those boundaries.
 
 ## Usage Example
 
@@ -258,6 +289,13 @@ The regression tests are also a good source of small usage examples:
 - [`regression/simple.test.h`](/home/mgadelha/tools/camada/regression/simple.test.h)
 - [`regression/array.test.h`](/home/mgadelha/tools/camada/regression/array.test.h)
 - [`regression/fp.test.h`](/home/mgadelha/tools/camada/regression/fp.test.h)
+
+Backend-specific feature coverage is also demonstrated in:
+
+- [`regression/cvc5.test.cpp`](/home/mgadelha/tools/camada/regression/cvc5.test.cpp)
+- [`regression/mathsat.test.cpp`](/home/mgadelha/tools/camada/regression/mathsat.test.cpp)
+- [`regression/yices.test.cpp`](/home/mgadelha/tools/camada/regression/yices.test.cpp)
+- [`regression/z3.test.cpp`](/home/mgadelha/tools/camada/regression/z3.test.cpp)
 
 ## Benchmarking
 
