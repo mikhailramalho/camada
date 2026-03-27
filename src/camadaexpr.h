@@ -212,6 +212,7 @@ public:
   SMTExprKind getKind() const { return Kind; }
 
   virtual void dump() const;
+  virtual void dump(std::string &Out) const;
 
 protected:
   /// Query the SMT solver and returns true if two Exprs are equal (same kind

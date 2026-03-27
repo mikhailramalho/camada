@@ -49,8 +49,15 @@ unsigned STPSort::getWidthFromSolver() const {
 }
 
 void STPSort::dump() const {
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void STPSort::dump(std::string &Out) const {
   char *s = STP::typeString(Sort);
-  std::fprintf(stderr, "%s\n", s);
+  Out = s;
+  Out += "\n";
   free(s);
 }
 
@@ -62,8 +69,15 @@ bool STPExpr::equal_to(SMTExpr const &Other) const {
 }
 
 void STPExpr::dump() const {
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void STPExpr::dump(std::string &Out) const {
   char *s = STP::exprString(Expr);
-  std::fprintf(stderr, "%s\n", s);
+  Out = s;
+  Out += "\n";
   free(s);
 }
 
@@ -580,13 +594,33 @@ std::string STPSolver::getSolverNameAndVersion() const {
   return std::string("STP v").append(STP::get_git_version_tag());
 }
 
-void STPSolver::dumpImpl() { STP::vc_printAsserts(*Context); }
+void STPSolver::dumpImpl() {
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void STPSolver::dumpImpl(std::string &Out) {
+  char *buf = nullptr;
+  unsigned long len = 0;
+  STP::vc_printQueryStateToBuffer(*Context, STP::vc_trueExpr(*Context), &buf,
+                                  &len, 0);
+  Out.assign(buf, len);
+  free(buf);
+}
 
 void STPSolver::dumpModelImpl() {
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void STPSolver::dumpModelImpl(std::string &Out) {
   char *buf;
   unsigned long len;
   STP::vc_printCounterExampleToBuffer(*Context, &buf, &len);
-  std::fprintf(stderr, "%s\n", buf);
+  Out = buf;
+  Out += "\n";
   free(buf);
 }
 

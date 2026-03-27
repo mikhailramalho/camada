@@ -86,6 +86,7 @@ public:
   unsigned getWidthFromSolver() const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 }; // end class MathSATSort
 
 class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
@@ -105,6 +106,7 @@ public:
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 
   bool IsDecl = false;
   msat_decl Decl{};
@@ -364,9 +366,11 @@ public:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl() override;
+  void dumpImpl();
+  void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl() override;
+  void dumpModelImpl();
+  void dumpModelImpl(std::string &Out) override;
 }; // end class MathSATSolver
 
 } // namespace camada

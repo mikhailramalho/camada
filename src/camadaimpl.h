@@ -25,6 +25,7 @@
 #include "camada.h"
 
 #include <cassert>
+#include <cstdio>
 #include <string>
 
 namespace camada {
@@ -1223,9 +1224,19 @@ public:
 
   void pop(unsigned nscopes = 1) override final { popImpl(nscopes); }
 
-  void dump() override final { return dumpImpl(); }
+  void dump() override final {
+    std::string Out;
+    dump(Out);
+    std::fprintf(stderr, "%s", Out.c_str());
+  }
+  void dump(std::string &Out) override final { return dumpImpl(Out); }
 
-  void dumpModel() override final { return dumpModelImpl(); }
+  void dumpModel() override final {
+    std::string Out;
+    dumpModel(Out);
+    std::fprintf(stderr, "%s", Out.c_str());
+  }
+  void dumpModel(std::string &Out) override final { return dumpModelImpl(Out); }
 
   SMTSortRef mkBVFPSort(const unsigned ExpWidth,
                         const unsigned SigWidth) override final {
@@ -1612,8 +1623,10 @@ protected:
   virtual void popImpl(unsigned nscopes) = 0;
 
   virtual void dumpImpl();
+  virtual void dumpImpl(std::string &Out);
 
   virtual void dumpModelImpl();
+  virtual void dumpModelImpl(std::string &Out);
 
   virtual SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) = 0;

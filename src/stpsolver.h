@@ -86,6 +86,7 @@ public:
   unsigned getWidthFromSolver() const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 }; // end class STPSort
 
 class STPExpr : public SolverExpr<STPContextRef, STP::Expr> {
@@ -106,6 +107,7 @@ public:
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 }; // end class STPExpr
 
 class STPSolver : public SMTSolverImpl {
@@ -247,9 +249,11 @@ public:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl() override;
+  void dumpImpl();
+  void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl() override;
+  void dumpModelImpl();
+  void dumpModelImpl(std::string &Out) override;
 }; // end class STPSolver
 
 } // namespace camada

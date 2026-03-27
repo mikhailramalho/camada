@@ -3,6 +3,7 @@
 
 #include <bitset>
 #include <catch2/catch_test_macros.hpp>
+#include <string>
 
 inline void equal_ten(const camada::SMTSolverRef &solver) {
   // A free variable
@@ -134,6 +135,34 @@ inline void uf_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(x, y));
   solver->addConstraint(solver->mkNot(solver->mkEqual(fx, fy)));
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+inline void dump_string_semantics(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto x = solver->mkSymbol("x", bv8);
+  auto five = solver->mkBVFromDec(5, 8);
+  solver->addConstraint(solver->mkEqual(x, five));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  std::string sort_dump = "seed";
+  bv8->dump(sort_dump);
+  REQUIRE(!sort_dump.empty());
+  REQUIRE(sort_dump != "seed");
+
+  std::string expr_dump = "seed";
+  x->dump(expr_dump);
+  REQUIRE(!expr_dump.empty());
+  REQUIRE(expr_dump != "seed");
+
+  std::string solver_dump = "seed";
+  solver->dump(solver_dump);
+  REQUIRE(!solver_dump.empty());
+  REQUIRE(solver_dump != "seed");
+
+  std::string model_dump = "seed";
+  solver->dumpModel(model_dump);
+  REQUIRE(!model_dump.empty());
+  REQUIRE(model_dump != "seed");
 }
 
 inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {

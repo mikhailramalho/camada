@@ -76,8 +76,14 @@ unsigned Z3Sort::getWidthFromSolver() const {
 }
 
 void Z3Sort::dump() const {
-  const auto s = Sort.to_string();
-  std::fprintf(stderr, "%s\n", s.c_str());
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void Z3Sort::dump(std::string &Out) const {
+  Out = Sort.to_string();
+  Out += "\n";
 }
 
 bool Z3Expr::equal_to(SMTExpr const &Other) const {
@@ -87,8 +93,14 @@ bool Z3Expr::equal_to(SMTExpr const &Other) const {
 }
 
 void Z3Expr::dump() const {
-  const auto s = Expr.to_string();
-  std::fprintf(stderr, "%s\n", s.c_str());
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void Z3Expr::dump(std::string &Out) const {
+  Out = Expr.to_string();
+  Out += "\n";
 }
 
 Z3Solver::Z3Solver()
@@ -916,13 +928,25 @@ std::string Z3Solver::getSolverNameAndVersion() const {
 }
 
 void Z3Solver::dumpImpl() {
-  const auto s = Solver.to_smt2();
-  std::fprintf(stderr, "%s\n", s.c_str());
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void Z3Solver::dumpImpl(std::string &Out) {
+  Out = Solver.to_smt2();
+  Out += "\n";
 }
 
 void Z3Solver::dumpModelImpl() {
-  const auto s = Solver.get_model().to_string();
-  std::fprintf(stderr, "%s\n", s.c_str());
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void Z3Solver::dumpModelImpl(std::string &Out) {
+  Out = Solver.get_model().to_string();
+  Out += "\n";
 }
 
 } // namespace camada

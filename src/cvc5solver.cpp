@@ -61,8 +61,14 @@ unsigned CVC5Sort::getWidthFromSolver() const {
 }
 
 void CVC5Sort::dump() const {
-  const auto s = Sort.toString();
-  std::fprintf(stderr, "%s\n", s.c_str());
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void CVC5Sort::dump(std::string &Out) const {
+  Out = Sort.toString();
+  Out += "\n";
 }
 
 bool CVC5Expr::equal_to(SMTExpr const &Other) const {
@@ -72,8 +78,14 @@ bool CVC5Expr::equal_to(SMTExpr const &Other) const {
 }
 
 void CVC5Expr::dump() const {
-  const auto s = Expr.toString();
-  std::fprintf(stderr, "%s\n", s.c_str());
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void CVC5Expr::dump(std::string &Out) const {
+  Out = Expr.toString();
+  Out += "\n";
 }
 
 CVC5Solver::CVC5Solver()
@@ -1105,18 +1117,32 @@ std::string CVC5Solver::getSolverNameAndVersion() const {
 }
 
 void CVC5Solver::dumpImpl() {
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void CVC5Solver::dumpImpl(std::string &Out) {
+  Out.clear();
   auto const &assertions = Context->getAssertions();
   for (auto const &a : assertions) {
-    const auto s = a.toString();
-    std::fprintf(stderr, "%s\n", s.c_str());
+    Out += a.toString();
+    Out += "\n";
   }
 }
 
 void CVC5Solver::dumpModelImpl() {
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void CVC5Solver::dumpModelImpl(std::string &Out) {
+  Out.clear();
   auto const &assertions = Context->getAssertions();
   for (auto const &a : assertions) {
-    const auto s = Context->getValue(a).toString();
-    std::fprintf(stderr, "%s\n", s.c_str());
+    Out += Context->getValue(a).toString();
+    Out += "\n";
   }
 }
 

@@ -24,5 +24,11 @@
 #include <cstdio>
 
 void camada::SMTExpr::dump() const {
-  std::fprintf(stderr, "SMTExpr dump not implemented.\n");
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void camada::SMTExpr::dump(std::string &Out) const {
+  Out = "SMTExpr dump not implemented.\n";
 }

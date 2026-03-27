@@ -50,6 +50,8 @@ public:
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
+  void dump() const override { return SMTSort::dump(); }
+  void dump(std::string &Out) const override;
 };
 
 class BitwExpr : public SolverExpr<BitwuzlaContextRef, BitwuzlaTerm> {
@@ -62,6 +64,7 @@ public:
 
   bool equal_to(SMTExpr const &Other) const override;
   void dump() const override;
+  void dump(std::string &Out) const override;
 };
 
 class BitwuzlaSolver : public SMTSolverImpl {
@@ -229,8 +232,10 @@ public:
   void popImpl(unsigned nscopes) override;
 
   std::string getSolverNameAndVersion() const override;
-  void dumpImpl() override;
-  void dumpModelImpl() override;
+  void dumpImpl();
+  void dumpImpl(std::string &Out) override;
+  void dumpModelImpl();
+  void dumpModelImpl(std::string &Out) override;
 };
 
 } // namespace camada
