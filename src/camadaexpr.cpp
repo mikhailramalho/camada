@@ -21,8 +21,8 @@
 
 #include "camadaexpr.h"
 
-#include <iostream>
+#include <cstdio>
 
 void camada::SMTExpr::dump() const {
-  std::cerr << "SMTExpr dump not implemented.\n";
+  std::fprintf(stderr, "SMTExpr dump not implemented.\n");
 }

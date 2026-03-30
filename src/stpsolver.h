@@ -136,9 +136,6 @@ public:
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;
 
-  SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
-                                const SMTSortRef &CodomainSort) override;
-
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkBVNotImpl(const SMTExprRef &Exp) override;
@@ -221,12 +218,6 @@ public:
 
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
-  SMTExprRef mkApplyImpl(const SMTExprRef &Function,
-                         const std::vector<SMTExprRef> &Args) override;
-  SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                          const SMTExprRef &Body) override;
-  SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                          const SMTExprRef &Body) override;
 
   bool getBoolImpl(const SMTExprRef &Exp) override;
 

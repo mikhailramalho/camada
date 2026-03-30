@@ -3,10 +3,10 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <functional>
 #include <iomanip>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -99,10 +99,10 @@ void runCase(const std::string &backend, const std::string &name,
   auto per_iter_ns =
       iterations == 0 ? 0.0 : static_cast<double>(total_ns) / iterations;
 
-  std::cout << "benchmark=" << name << " backend=" << backend
-            << " iterations=" << iterations << " total_ns=" << total_ns
-            << " ns_per_iter=" << std::fixed << std::setprecision(2)
-            << per_iter_ns << "\n";
+  std::printf(
+      "benchmark=%s backend=%s iterations=%zu total_ns=%lld ns_per_iter=%.*f\n",
+      name.c_str(), backend.c_str(), iterations,
+      static_cast<long long>(total_ns), 2, per_iter_ns);
 }
 
 void benchmarkBVSort(camada::SMTSolver &solver, std::size_t iterations) {
@@ -318,9 +318,10 @@ void benchmarkFPFMAOnly(camada::SMTSolver &solver, std::size_t iterations) {
 }
 
 void printUsage(const char *argv0) {
-  std::cerr << "Usage: " << argv0
-            << " [backend] [iterations]\n"
-               "Backends: bitwuzla cvc5 mathsat stp yices z3\n";
+  std::fprintf(stderr,
+               "Usage: %s [backend] [iterations]\n"
+               "Backends: bitwuzla cvc5 mathsat stp yices z3\n",
+               argv0);
 }
 
 } // namespace
@@ -350,7 +351,7 @@ int main(int argc, char **argv) {
     runCase(backend, "fp_construct", iterations, benchmarkFPConstruct);
     return 0;
   } catch (const std::exception &Exn) {
-    std::cerr << Exn.what() << "\n";
+    std::fprintf(stderr, "%s\n", Exn.what());
     printUsage(argv[0]);
     return 1;
   }

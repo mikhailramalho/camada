@@ -23,8 +23,8 @@
 
 #include <bitset>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <limits>
 #include <stdexcept>
 
@@ -123,7 +123,7 @@ SMTExprRef mkMaxExp(SMTSolver &S, unsigned int ExpWidth) {
 
 [[noreturn]] void
 SMTSolverImpl::unsupportedFeatureImpl(const char *Feature) const {
-  std::cerr << Feature << " is not supported by this backend\n";
+  std::fprintf(stderr, "%s is not supported by this backend\n", Feature);
   std::abort();
 }
 
@@ -447,6 +447,11 @@ SMTSortRef SMTSolverImpl::mkFPSortImpl(const unsigned ExpWidth,
   return mkBVFPSort(ExpWidth, SigWidth);
 }
 
+SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
+                                             const SMTSortRef &) {
+  unsupportedFeatureImpl("Uninterpreted functions");
+}
+
 SMTExprRef SMTSolverImpl::mkArithNegImpl(const SMTExprRef &) {
   unsupportedFeatureImpl("Arithmetic");
 }
@@ -505,6 +510,21 @@ SMTExprRef SMTSolverImpl::mkRealImpl(int64_t) {
 
 SMTExprRef SMTSolverImpl::mkRealImpl(int64_t, int64_t) {
   unsupportedFeatureImpl("Real arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkApplyImpl(const SMTExprRef &,
+                                      const std::vector<SMTExprRef> &) {
+  unsupportedFeatureImpl("Uninterpreted functions");
+}
+
+SMTExprRef SMTSolverImpl::mkForallImpl(const std::vector<SMTExprRef> &,
+                                       const SMTExprRef &) {
+  unsupportedFeatureImpl("Quantifiers");
+}
+
+SMTExprRef SMTSolverImpl::mkExistsImpl(const std::vector<SMTExprRef> &,
+                                       const SMTExprRef &) {
+  unsupportedFeatureImpl("Quantifiers");
 }
 
 SMTExprRef SMTSolverImpl::mkFPAbsImpl(const SMTExprRef &Exp) {
@@ -2467,11 +2487,11 @@ camada::SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double) {
 }
 
 void SMTSolverImpl::dumpImpl() {
-  std::cerr << "SMTSolver dump not implemented.\n";
+  std::fprintf(stderr, "SMTSolver dump not implemented.\n");
 }
 
 void SMTSolverImpl::dumpModelImpl() {
-  std::cerr << "SMTSolver model dump not implemented.\n";
+  std::fprintf(stderr, "SMTSolver model dump not implemented.\n");
 }
 
 } // namespace camada

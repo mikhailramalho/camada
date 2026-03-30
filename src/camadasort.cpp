@@ -22,7 +22,9 @@
 #include "camadasort.h"
 
 #include <cassert>
-#include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 
 void camada::SMTSort::dump() const {
   std::string k;
@@ -45,38 +47,39 @@ void camada::SMTSort::dump() const {
   else if (isFunctionSort())
     k = "Function";
   else {
-    std::cerr << "Unknown sort.\n";
+    std::fprintf(stderr, "Unknown sort.\n");
     abort();
   }
 
-  std::cerr << "kind: " << k << '\n';
+  std::fprintf(stderr, "kind: %s\n", k.c_str());
   if (isArraySort()) {
-    std::cerr << "Index: ";
+    std::fprintf(stderr, "Index: ");
     getIndexSort()->dump();
-    std::cerr << "Element: ";
+    std::fprintf(stderr, "Element: ");
     getElementSort()->dump();
     return;
   }
 
   if (isFunctionSort()) {
-    std::cerr << "Domain:\n";
+    std::fprintf(stderr, "Domain:\n");
     for (const auto &Sort : getDomainSorts())
       Sort->dump();
-    std::cerr << "Codomain: ";
+    std::fprintf(stderr, "Codomain: ");
     getCodomainSort()->dump();
     return;
   }
 
   if (isArithSort()) {
-    std::cerr << '\n';
+    std::fprintf(stderr, "\n");
     return;
   }
 
-  std::cerr << "width: " << getWidth() << ", solver: " << getWidthFromSolver();
+  std::fprintf(stderr, "width: %u, solver: %u", getWidth(),
+               getWidthFromSolver());
   if (isFPSort())
-    std::cerr << " (exp: " << getFPExponentWidth()
-              << ", sig: " << getFPSignificandWidth() << ")";
-  std::cerr << '\n';
+    std::fprintf(stderr, " (exp: %u, sig: %u)", getFPExponentWidth(),
+                 getFPSignificandWidth());
+  std::fprintf(stderr, "\n");
 }
 
 unsigned camada::SMTSort::getWidth() const {
