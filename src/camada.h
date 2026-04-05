@@ -33,6 +33,7 @@
 #include "camadacache.h"
 #include "camadaexpr.h"
 #include "camadafeatures.h"
+#include "camadafp.h"
 
 namespace camada {
 
@@ -40,14 +41,6 @@ namespace camada {
 std::string getCamadaVersion();
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
-
-enum class RM {
-  ROUND_TO_EVEN = 0,
-  ROUND_TO_AWAY = 1,
-  ROUND_TO_PLUS_INF = 2,
-  ROUND_TO_MINUS_INF = 3,
-  ROUND_TO_ZERO = 4,
-};
 
 /// Generic base class for SMT Solvers
 ///

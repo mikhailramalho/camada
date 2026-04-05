@@ -26,6 +26,7 @@ set(LIBRARY_TARGET_NAME ${PROJECT_NAME})
 set(${LIBRARY_TARGET_NAME}_SRC
     camada.cpp
     camadaexpr.cpp
+    camadafp.cpp
     camadasort.cpp
     camadaimpl.cpp
     bitwuzlasolver.cpp
@@ -37,8 +38,8 @@ set(${LIBRARY_TARGET_NAME}_SRC
 
 # List of HPP (header) library files, the public ones will be installed on the
 # system
-set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadacache.h camadasort.h
-                                   camadaexpr.h camadaimpl.h)
+set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadacache.h camadaexpr.h
+                                   camadafp.h camadaimpl.h camadasort.h)
 
 # add each solver specific header, if it is enabled
 add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
