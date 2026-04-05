@@ -26,6 +26,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <gmp.h>
 
 namespace camada {
 
@@ -419,6 +420,13 @@ SMTExprRef YicesSolver::mkArithDivImpl(const SMTExprRef &LHS,
                                toSolverExpr<YicesExpr>(*RHS).Expr)));
 }
 
+SMTExprRef YicesSolver::mkArithModImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return newExprRef(YicesExpr(Context, mkIntSort(),
+                              yices_imod(toSolverExpr<YicesExpr>(*LHS).Expr,
+                                         toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
 SMTExprRef YicesSolver::mkArithLtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return newExprRef(
@@ -449,6 +457,24 @@ SMTExprRef YicesSolver::mkArithGeImpl(const SMTExprRef &LHS,
       YicesExpr(Context, mkBoolSort(),
                 yices_arith_geq_atom(toSolverExpr<YicesExpr>(*LHS).Expr,
                                      toSolverExpr<YicesExpr>(*RHS).Expr)));
+}
+
+SMTExprRef YicesSolver::mkInt2RealImpl(const SMTExprRef &Exp) {
+  return newExprRef(
+      YicesExpr(Context, mkRealSort(),
+                yices_division(toSolverExpr<YicesExpr>(*Exp).Expr,
+                               toSolverExpr<YicesExpr>(*mkReal(1)).Expr)));
+}
+
+SMTExprRef YicesSolver::mkReal2IntImpl(const SMTExprRef &Exp) {
+  return newExprRef(YicesExpr(Context, mkIntSort(),
+                              yices_floor(toSolverExpr<YicesExpr>(*Exp).Expr)));
+}
+
+SMTExprRef YicesSolver::mkIsIntImpl(const SMTExprRef &Exp) {
+  return newExprRef(
+      YicesExpr(Context, mkBoolSort(),
+                yices_is_int_atom(toSolverExpr<YicesExpr>(*Exp).Expr)));
 }
 
 SMTExprRef YicesSolver::mkEqualImpl(const SMTExprRef &LHS,
@@ -542,6 +568,13 @@ bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   return val ? true : false;
 }
 
+static inline void getYicesMPQValue(context_t *Context, term_t Expr,
+                                    mpq_t Val) {
+  auto res = yices_get_mpq_value(yices_get_model(Context, 1), Expr, Val);
+  (void)res;
+  assert(!res && "Can't get rational value from Yices");
+}
+
 std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
@@ -557,6 +590,38 @@ std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
 
   delete[] data;
   return val;
+}
+
+std::string YicesSolver::getIntImpl(const SMTExprRef &Exp) {
+  if (Exp->isRealSort()) {
+    std::string Num, Den;
+    getRationalImpl(Exp, Num, Den);
+    assert(Den == "1" && "Real value is not integral");
+    return Num;
+  }
+
+  int64_t val;
+  auto res = yices_get_int64_value(yices_get_model(Context, 1),
+                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
+  (void)res;
+  assert(!res && "Can't get integer value from Yices");
+  return std::to_string(val);
+}
+
+void YicesSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                                  std::string &Den) {
+  mpq_t val;
+  mpq_init(val);
+  getYicesMPQValue(Context, toSolverExpr<YicesExpr>(*Exp).Expr, val);
+  char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
+  char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
+  Num = raw_num;
+  Den = raw_den;
+  void (*gmp_free)(void *, std::size_t);
+  mp_get_memory_functions(nullptr, nullptr, &gmp_free);
+  gmp_free(raw_num, Num.size() + 1);
+  gmp_free(raw_den, Den.size() + 1);
+  mpq_clear(val);
 }
 
 SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
@@ -582,6 +647,14 @@ SMTExprRef YicesSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef YicesSolver::mkIntImpl(int64_t v) {
   return newExprRef(YicesExpr(Context, mkIntSort(), yices_int64(v)));
+}
+
+SMTExprRef YicesSolver::mkIntImpl(const std::string &v) {
+  mpz_t val;
+  mpz_init_set_str(val, v.c_str(), 10);
+  term_t term = yices_mpz(val);
+  mpz_clear(val);
+  return newExprRef(YicesExpr(Context, mkIntSort(), term));
 }
 
 SMTExprRef YicesSolver::mkRealImpl(const std::string &v) {

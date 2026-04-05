@@ -37,6 +37,10 @@ TEST_CASE("Arith MathSAT test", "[MathSAT]") {
   int_arithmetic_semantics(mathsat);
   mathsat->reset();
   real_arithmetic_semantics(mathsat);
+  mathsat->reset();
+  arith_model_queries(mathsat);
+  mathsat->reset();
+  arith_conversion_semantics(mathsat);
 }
 
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {

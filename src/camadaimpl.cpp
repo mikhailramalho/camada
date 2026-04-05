@@ -21,9 +21,12 @@
 
 #include "camadaimpl.h"
 
+#include <gmp.h>
+
 #include <bitset>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -105,6 +108,17 @@ static inline SMTExprRef extractExpSig(SMTSolver &S, const SMTExprRef &Exp) {
 static inline int64_t power2(unsigned int N, bool Negated) {
   int64_t b = 1ULL << N;
   return Negated ? -b : b;
+}
+
+static std::string power2Dec(unsigned int N) {
+  mpz_t value;
+  mpz_init(value);
+  mpz_ui_pow_ui(value, 2, N);
+  char *raw = mpz_get_str(nullptr, 10, value);
+  std::string result(raw);
+  std::free(raw);
+  mpz_clear(value);
+  return result;
 }
 
 static inline int64_t power2m1(unsigned int N, bool Negated) {
@@ -476,6 +490,21 @@ SMTExprRef SMTSolverImpl::mkArithDivImpl(const SMTExprRef &,
   unsupportedFeatureImpl("Arithmetic");
 }
 
+SMTExprRef SMTSolverImpl::mkArithModImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
+                                         unsigned Amount) {
+  return mkArithMul(Exp, mkInt(power2Dec(Amount)));
+}
+
+SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
 SMTExprRef SMTSolverImpl::mkArithLtImpl(const SMTExprRef &,
                                         const SMTExprRef &) {
   unsupportedFeatureImpl("Arithmetic");
@@ -496,7 +525,23 @@ SMTExprRef SMTSolverImpl::mkArithGeImpl(const SMTExprRef &,
   unsupportedFeatureImpl("Arithmetic");
 }
 
+SMTExprRef SMTSolverImpl::mkInt2RealImpl(const SMTExprRef &) {
+  unsupportedFeatureImpl("Real arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkReal2IntImpl(const SMTExprRef &) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkIsIntImpl(const SMTExprRef &) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
 SMTExprRef SMTSolverImpl::mkIntImpl(int64_t) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkIntImpl(const std::string &) {
   unsupportedFeatureImpl("Integer arithmetic");
 }
 
@@ -2211,6 +2256,15 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
 
 std::string SMTSolverImpl::getFPInBinImpl(const SMTExprRef &Exp) {
   return getBVInBin(Exp);
+}
+
+std::string SMTSolverImpl::getIntImpl(const SMTExprRef &) {
+  unsupportedFeatureImpl("Integer arithmetic");
+}
+
+void SMTSolverImpl::getRationalImpl(const SMTExprRef &, std::string &,
+                                    std::string &) {
+  unsupportedFeatureImpl("Real arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkFPFromBinImpl(const std::string &FP,

@@ -369,6 +369,19 @@ SMTExprRef Z3Solver::mkArithDivImpl(const SMTExprRef &LHS,
   return newExprRef(Z3Expr(Context, LHS->Sort, toZ3Expr(LHS) / toZ3Expr(RHS)));
 }
 
+SMTExprRef Z3Solver::mkArithModImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(
+      Z3Expr(Context, mkIntSort(), z3::mod(toZ3Expr(LHS), toZ3Expr(RHS))));
+}
+
+SMTExprRef Z3Solver::mkArithShlImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return newExprRef(
+      Z3Expr(Context, mkIntSort(),
+             toZ3Expr(LHS) * z3::pw(toZ3Expr(mkInt("2")), toZ3Expr(RHS))));
+}
+
 SMTExprRef Z3Solver::mkArithLtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
@@ -391,6 +404,20 @@ SMTExprRef Z3Solver::mkArithGeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return newExprRef(
       Z3Expr(Context, mkBoolSort(), toZ3Expr(LHS) >= toZ3Expr(RHS)));
+}
+
+SMTExprRef Z3Solver::mkInt2RealImpl(const SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(Context, mkRealSort(), z3::to_real(toZ3Expr(Exp))));
+}
+
+SMTExprRef Z3Solver::mkReal2IntImpl(const SMTExprRef &Exp) {
+  Z3_ast Ast = Z3_mk_real2int(*Context, toZ3Expr(Exp));
+  Context->check_error();
+  return newExprRef(Z3Expr(Context, mkIntSort(), z3::to_expr(*Context, Ast)));
+}
+
+SMTExprRef Z3Solver::mkIsIntImpl(const SMTExprRef &Exp) {
+  return newExprRef(Z3Expr(Context, mkBoolSort(), z3::is_int(toZ3Expr(Exp))));
 }
 
 SMTExprRef Z3Solver::mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
@@ -653,6 +680,37 @@ std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   return bv;
 }
 
+std::string Z3Solver::getIntImpl(const SMTExprRef &Exp) {
+  z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
+  if (Exp->isRealSort()) {
+    std::string Num, Den;
+    getRationalImpl(Exp, Num, Den);
+    assert(Den == "1" && "Real value is not integral");
+    return Num;
+  }
+  assert(value.is_numeral() && "Expected integer numeral from Z3");
+  std::string numeral;
+  bool is_num = value.is_numeral(numeral);
+  (void)is_num;
+  assert(is_num && "Failed to get integer numeral from Z3");
+  return numeral;
+}
+
+void Z3Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                               std::string &Den) {
+  z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
+  assert(value.is_numeral() && "Expected rational numeral from Z3");
+  std::string num;
+  std::string den;
+  bool has_num = value.numerator().is_numeral(num);
+  bool has_den = value.denominator().is_numeral(den);
+  (void)has_num;
+  (void)has_den;
+  assert(has_num && has_den && "Failed to get rational numeral from Z3");
+  Num = num;
+  Den = den;
+}
+
 std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   const SMTExprRef &value =
       hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
@@ -680,6 +738,10 @@ SMTExprRef Z3Solver::mkBoolImpl(const bool b) {
 
 SMTExprRef Z3Solver::mkIntImpl(int64_t v) {
   return newExprRef(Z3Expr(Context, mkIntSort(), Context->int_val(v)));
+}
+
+SMTExprRef Z3Solver::mkIntImpl(const std::string &v) {
+  return newExprRef(Z3Expr(Context, mkIntSort(), Context->int_val(v.c_str())));
 }
 
 SMTExprRef Z3Solver::mkRealImpl(const std::string &v) {

@@ -188,3 +188,75 @@ inline void real_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkArithLt(r, one));
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
+
+inline void arith_model_queries(const camada::SMTSolverRef &solver) {
+  auto int_sort = solver->mkIntSort();
+  auto real_sort = solver->mkRealSort();
+
+  auto x = solver->mkSymbol("x", int_sort);
+  auto r = solver->mkSymbol("r", real_sort);
+  auto x_plus_two = solver->mkArithAdd(x, solver->mkInt("2"));
+  auto r_plus_half = solver->mkArithAdd(r, solver->mkReal(1, 2));
+
+  solver->addConstraint(solver->mkEqual(x, solver->mkInt(5)));
+  solver->addConstraint(solver->mkEqual(r, solver->mkReal(3, 2)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  REQUIRE(solver->getInt(x) == "5");
+  REQUIRE(solver->getInt(x_plus_two) == "7");
+
+  std::string num;
+  std::string den;
+  solver->getRational(r, num, den);
+  REQUIRE(num == "3");
+  REQUIRE(den == "2");
+  REQUIRE(solver->getRealNumerator(r) == "3");
+  REQUIRE(solver->getRealDenominator(r) == "2");
+
+  REQUIRE(solver->getInt(r_plus_half) == "2");
+}
+
+inline void arith_conversion_semantics(const camada::SMTSolverRef &solver) {
+  auto int_sort = solver->mkIntSort();
+  auto real_sort = solver->mkRealSort();
+
+  auto x = solver->mkSymbol("x", int_sort);
+  auto r = solver->mkSymbol("r", real_sort);
+
+  auto x_real = solver->mkInt2Real(x);
+  auto r_int = solver->mkReal2Int(r);
+  auto r_is_int = solver->mkIsInt(r);
+  auto x_real_is_int = solver->mkIsInt(x_real);
+  auto mod_expr = solver->mkArithMod(solver->mkInt("17"), solver->mkInt("5"));
+  auto shl_expr = solver->mkArithShl(x, 3);
+
+  REQUIRE(x_real->getKind() == camada::SMTExprKind::Int2Real);
+  REQUIRE(r_int->getKind() == camada::SMTExprKind::Real2Int);
+  REQUIRE(r_is_int->getKind() == camada::SMTExprKind::IsInt);
+  REQUIRE(mod_expr->getKind() == camada::SMTExprKind::ArithMod);
+  REQUIRE(shl_expr->getKind() == camada::SMTExprKind::ArithShl);
+
+  solver->addConstraint(solver->mkEqual(x, solver->mkInt("5")));
+  solver->addConstraint(solver->mkEqual(r, solver->mkReal(7, 2)));
+  solver->addConstraint(solver->mkEqual(x_real, solver->mkReal("5")));
+  solver->addConstraint(solver->mkEqual(r_int, solver->mkInt("3")));
+  solver->addConstraint(solver->mkNot(r_is_int));
+  solver->addConstraint(x_real_is_int);
+  solver->addConstraint(solver->mkEqual(mod_expr, solver->mkInt("2")));
+  solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void arith_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
+  auto int_sort = solver->mkIntSort();
+  auto x = solver->mkSymbol("x", int_sort);
+  auto k = solver->mkSymbol("k", int_sort);
+  auto shl_expr = solver->mkArithShl(x, k);
+
+  REQUIRE(shl_expr->getKind() == camada::SMTExprKind::ArithShl);
+
+  solver->addConstraint(solver->mkEqual(x, solver->mkInt("5")));
+  solver->addConstraint(solver->mkEqual(k, solver->mkInt("3")));
+  solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}

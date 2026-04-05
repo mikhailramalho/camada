@@ -213,6 +213,17 @@ public:
   virtual SMTExprRef mkArithDiv(const SMTExprRef &LHS,
                                 const SMTExprRef &RHS) = 0;
 
+  /// Creates an integer modulus operation.
+  virtual SMTExprRef mkArithMod(const SMTExprRef &LHS,
+                                const SMTExprRef &RHS) = 0;
+
+  /// Creates an integer left-shift-by-constant operation.
+  virtual SMTExprRef mkArithShl(const SMTExprRef &Exp, unsigned Amount) = 0;
+
+  /// Creates an integer shift-left operation, equivalent to lhs * 2^rhs.
+  virtual SMTExprRef mkArithShl(const SMTExprRef &LHS,
+                                const SMTExprRef &RHS) = 0;
+
   /// Creates an arithmetic less-than operation.
   virtual SMTExprRef mkArithLt(const SMTExprRef &LHS,
                                const SMTExprRef &RHS) = 0;
@@ -228,6 +239,15 @@ public:
   /// Creates an arithmetic greater-than-or-equal operation.
   virtual SMTExprRef mkArithGe(const SMTExprRef &LHS,
                                const SMTExprRef &RHS) = 0;
+
+  /// Converts an integer expression to a real.
+  virtual SMTExprRef mkInt2Real(const SMTExprRef &Exp) = 0;
+
+  /// Converts an arithmetic expression to an integer via floor semantics.
+  virtual SMTExprRef mkReal2Int(const SMTExprRef &Exp) = 0;
+
+  /// Returns true iff an arithmetic expression denotes an integer.
+  virtual SMTExprRef mkIsInt(const SMTExprRef &Exp) = 0;
 
   /// Creates a boolean ite operation
   virtual SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -378,6 +398,21 @@ public:
   /// symbol as a 2-complement form binary string
   virtual std::string getBVInBin(const SMTExprRef &Exp) = 0;
 
+  /// If a model is available, returns the value of a given integer expression
+  /// as a decimal string.
+  virtual std::string getInt(const SMTExprRef &Exp) = 0;
+
+  /// If a model is available, returns the value of a given real expression
+  /// as a rational numerator/denominator in decimal string form.
+  virtual void getRational(const SMTExprRef &Exp, std::string &Num,
+                           std::string &Den) = 0;
+
+  /// Convenience method to get the numerator of a real expression value.
+  virtual std::string getRealNumerator(const SMTExprRef &Exp) = 0;
+
+  /// Convenience method to get the denominator of a real expression value.
+  virtual std::string getRealDenominator(const SMTExprRef &Exp) = 0;
+
   /// If a model is available, returns the value of a given floating-point
   /// symbol as a binary string in the IEEE-754 format: 1 bit for the sign + N
   /// bits for the exponent + M bits for the significand
@@ -405,7 +440,11 @@ public:
   /// Constructs an SMTExprRef from an integer.
   virtual SMTExprRef mkInt(int64_t v) = 0;
 
-  /// Constructs an SMTExprRef from a real written as SMT-LIB numeral text.
+  /// Constructs an SMTExprRef from a base-10 integer string.
+  virtual SMTExprRef mkInt(const std::string &v) = 0;
+
+  /// Constructs an SMTExprRef from a real written as base-10 SMT-LIB numeral
+  /// text.
   virtual SMTExprRef mkReal(const std::string &v) = 0;
 
   /// Constructs an SMTExprRef from an integral real.

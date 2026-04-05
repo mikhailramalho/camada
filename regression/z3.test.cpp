@@ -25,6 +25,12 @@ TEST_CASE("Arith Z3 test", "[Z3]") {
   int_arithmetic_semantics(z3);
   z3->reset();
   real_arithmetic_semantics(z3);
+  z3->reset();
+  arith_model_queries(z3);
+  z3->reset();
+  arith_conversion_semantics(z3);
+  z3->reset();
+  arith_symbolic_shift_semantics(z3);
 }
 
 TEST_CASE("Override Z3 Solver", "[Z3]") {

@@ -27,6 +27,18 @@
 
 namespace camada {
 
+static inline void parseCVC5RationalValue(const std::string &Value,
+                                          std::string &Num, std::string &Den) {
+  const auto slash = Value.find('/');
+  if (slash == std::string::npos) {
+    Num = Value;
+    Den = "1";
+    return;
+  }
+  Num = Value.substr(0, slash);
+  Den = Value.substr(slash + 1);
+}
+
 unsigned CVC5Sort::getWidthFromSolver() const {
   if (Sort.isBitVector()) {
     cvc5::Sort bvType = static_cast<cvc5::Sort>(Sort);
@@ -464,6 +476,26 @@ SMTExprRef CVC5Solver::mkArithDivImpl(const SMTExprRef &LHS,
                               toSolverExpr<CVC5Expr>(*RHS).Expr})));
 }
 
+SMTExprRef CVC5Solver::mkArithModImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(
+      CVC5Expr(Context, mkIntSort(),
+               Terms->mkTerm(cvc5::Kind::INTS_MODULUS,
+                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkArithShlImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return newExprRef(CVC5Expr(
+      Context, mkIntSort(),
+      Terms->mkTerm(cvc5::Kind::MULT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     Terms->mkTerm(cvc5::Kind::POW,
+                                   {Terms->mkInteger(2),
+                                    toSolverExpr<CVC5Expr>(*RHS).Expr})})));
+}
+
 SMTExprRef CVC5Solver::mkArithLtImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   return newExprRef(CVC5Expr(
@@ -494,6 +526,26 @@ SMTExprRef CVC5Solver::mkArithGeImpl(const SMTExprRef &LHS,
       Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::GEQ, {toSolverExpr<CVC5Expr>(*LHS).Expr,
                                       toSolverExpr<CVC5Expr>(*RHS).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkInt2RealImpl(const SMTExprRef &Exp) {
+  return newExprRef(CVC5Expr(
+      Context, mkRealSort(),
+      Terms->mkTerm(cvc5::Kind::TO_REAL, {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkReal2IntImpl(const SMTExprRef &Exp) {
+  return newExprRef(
+      CVC5Expr(Context, mkIntSort(),
+               Terms->mkTerm(cvc5::Kind::TO_INTEGER,
+                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+}
+
+SMTExprRef CVC5Solver::mkIsIntImpl(const SMTExprRef &Exp) {
+  return newExprRef(
+      CVC5Expr(Context, mkBoolSort(),
+               Terms->mkTerm(cvc5::Kind::IS_INTEGER,
+                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
 }
 
 SMTExprRef CVC5Solver::mkEqualImpl(const SMTExprRef &LHS,
@@ -812,6 +864,25 @@ std::string CVC5Solver::getBVInBinImpl(const SMTExprRef &Exp) {
       .getBitVectorValue();
 }
 
+std::string CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
+  cvc5::Term value = Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
+  if (Exp->isRealSort()) {
+    std::string num, den;
+    getRationalImpl(Exp, num, den);
+    assert(den == "1" && "Real value is not integral");
+    return num;
+  }
+  assert(value.isIntegerValue() && "Expected integer model value");
+  return value.getIntegerValue();
+}
+
+void CVC5Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
+                                 std::string &Den) {
+  cvc5::Term value = Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
+  assert(value.isRealValue() && "Expected rational model value");
+  parseCVC5RationalValue(value.getRealValue(), Num, Den);
+}
+
 std::string CVC5Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   std::tuple<uint32_t, uint32_t, cvc5::Term> fp =
       Context->getValue(toSolverExpr<CVC5Expr>(*Exp).Expr)
@@ -832,6 +903,10 @@ SMTExprRef CVC5Solver::mkBoolImpl(const bool b) {
 }
 
 SMTExprRef CVC5Solver::mkIntImpl(int64_t v) {
+  return newExprRef(CVC5Expr(Context, mkIntSort(), Terms->mkInteger(v)));
+}
+
+SMTExprRef CVC5Solver::mkIntImpl(const std::string &v) {
   return newExprRef(CVC5Expr(Context, mkIntSort(), Terms->mkInteger(v)));
 }
 
