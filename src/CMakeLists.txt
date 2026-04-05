@@ -52,22 +52,6 @@ add_library(
   ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR}
   ${${LIBRARY_TARGET_NAME}_PUB_HDR})
 
-if(MSVC)
-  set(CAMADA_RTTI_COMPILE_OPTION /GR)
-else()
-  set(CAMADA_RTTI_COMPILE_OPTION -frtti)
-endif()
-
-set_source_files_properties(
-  camadaimpl.cpp
-  bitwuzlasolver.cpp
-  cvc5solver.cpp
-  mathsatsolver.cpp
-  stpsolver.cpp
-  yicessolver.cpp
-  z3solver.cpp
-  PROPERTIES COMPILE_OPTIONS "${CAMADA_RTTI_COMPILE_OPTION}")
-
 # Within this project, you can link to this library by just specifing the name
 # of the target, i.e. ${LIBRARY_TARGET_NAME} = LibTemplateCMake. It is useful,
 # however, to define an alias of this library with the scope of the exported
