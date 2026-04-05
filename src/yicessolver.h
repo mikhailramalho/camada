@@ -52,6 +52,7 @@ public:
   unsigned getWidthFromSolver() const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 }; // end class YicesSort
 
 class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
@@ -66,6 +67,7 @@ public:
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 }; // end class YicesExpr
 
 class YicesSolver : public SMTSolverImpl {
@@ -261,9 +263,11 @@ public:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl() override;
+  void dumpImpl();
+  void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl() override;
+  void dumpModelImpl();
+  void dumpModelImpl(std::string &Out) override;
 
 protected:
   using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;

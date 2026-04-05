@@ -73,6 +73,11 @@ BitwuzlaTerm mkTerm4(BitwuzlaTermManager *tm, BitwuzlaKind kind,
 
 unsigned BitwSort::getWidthFromSolver() const { return getWidth(); }
 
+void BitwSort::dump(std::string &Out) const {
+  Out = bitwuzla_sort_to_string(Sort);
+  Out += "\n";
+}
+
 bool BitwExpr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
@@ -80,7 +85,13 @@ bool BitwExpr::equal_to(SMTExpr const &Other) const {
 }
 
 void BitwExpr::dump() const {
-  fprintf(stderr, "%s", bitwuzla_term_to_string(Expr));
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void BitwExpr::dump(std::string &Out) const {
+  Out = bitwuzla_term_to_string(Expr);
 }
 
 BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() {
@@ -748,16 +759,39 @@ std::string BitwuzlaSolver::getSolverNameAndVersion() const {
 }
 
 void BitwuzlaSolver::dumpImpl() {
-  bitwuzla_print_formula(Context, "smt2", stderr, 2);
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void BitwuzlaSolver::dumpImpl(std::string &Out) {
+  char *Buffer = nullptr;
+  size_t Size = 0;
+  FILE *Stream = open_memstream(&Buffer, &Size);
+  assert(Stream && "Failed to open memory stream for Bitwuzla dump");
+  bitwuzla_print_formula(Context, "smt2", Stream, 2);
+  fclose(Stream);
+  Out.assign(Buffer, Size);
+  free(Buffer);
 }
 
 void BitwuzlaSolver::dumpModelImpl() {
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void BitwuzlaSolver::dumpModelImpl(std::string &Out) {
+  Out.clear();
   for (const auto &entry : SymbolTable) {
     const BitwuzlaTerm term = toSolverExpr<BitwExpr>(*entry.second).Expr;
-    fprintf(stderr, "(define-fun %s () %s %s)\n",
-            bitwuzla_term_get_symbol(term),
-            bitwuzla_sort_to_string(bitwuzla_term_get_sort(term)),
-            bitwuzla_term_to_string(bitwuzla_get_value(Context, term)));
+    Out += "(define-fun ";
+    Out += bitwuzla_term_get_symbol(term);
+    Out += " () ";
+    Out += bitwuzla_sort_to_string(bitwuzla_term_get_sort(term));
+    Out += " ";
+    Out += bitwuzla_term_to_string(bitwuzla_get_value(Context, term));
+    Out += ")\n";
   }
 }
 

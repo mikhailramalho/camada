@@ -25,6 +25,7 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace camada {
@@ -175,6 +176,7 @@ public:
 #endif
 
   virtual void dump() const;
+  virtual void dump(std::string &Out) const;
 
 protected:
   SMTSortKind Kind;

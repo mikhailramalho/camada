@@ -540,9 +540,11 @@ public:
 
   /// Dump formula
   virtual void dump() = 0;
+  virtual void dump(std::string &Out) = 0;
 
   /// Dump Model
   virtual void dumpModel() = 0;
+  virtual void dumpModel(std::string &Out) = 0;
 
   /// Flag to enable encoding floating-points using bitvectors even if the
   /// solver supports floating-points. For solvers that don't support

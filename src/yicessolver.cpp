@@ -47,8 +47,15 @@ unsigned YicesSort::getWidthFromSolver() const {
 }
 
 void YicesSort::dump() const {
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void YicesSort::dump(std::string &Out) const {
   char *ty_str = yices_type_to_string(Sort, 160, 80, 0);
-  std::fprintf(stderr, "%s\n", ty_str);
+  Out = ty_str;
+  Out += "\n";
   yices_free_string(ty_str);
 }
 
@@ -59,8 +66,15 @@ bool YicesExpr::equal_to(SMTExpr const &Other) const {
 }
 
 void YicesExpr::dump() const {
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void YicesExpr::dump(std::string &Out) const {
   char *term_str = yices_term_to_string(Expr, 160, 80, 0);
-  std::fprintf(stderr, "%s\n", term_str);
+  Out = term_str;
+  Out += "\n";
   yices_free_string(term_str);
 }
 
@@ -772,14 +786,31 @@ std::string YicesSolver::getSolverNameAndVersion() const {
 }
 
 void YicesSolver::dumpImpl() {
-  for (auto const &a : Assertions)
-    a->dump();
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void YicesSolver::dumpImpl(std::string &Out) {
+  Out.clear();
+  for (auto const &a : Assertions) {
+    std::string Assertion;
+    a->dump(Assertion);
+    Out += Assertion;
+  }
 }
 
 void YicesSolver::dumpModelImpl() {
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void YicesSolver::dumpModelImpl(std::string &Out) {
   char *model_str =
       yices_model_to_string(yices_get_model(Context, 1), 160, 80, 0);
-  std::fprintf(stderr, "%s\n", model_str);
+  Out = model_str;
+  Out += "\n";
   yices_free_string(model_str);
 }
 

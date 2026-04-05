@@ -2541,11 +2541,23 @@ camada::SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double) {
 }
 
 void SMTSolverImpl::dumpImpl() {
-  std::fprintf(stderr, "SMTSolver dump not implemented.\n");
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void SMTSolverImpl::dumpImpl(std::string &Out) {
+  Out = "SMTSolver dump not implemented.\n";
 }
 
 void SMTSolverImpl::dumpModelImpl() {
-  std::fprintf(stderr, "SMTSolver model dump not implemented.\n");
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void SMTSolverImpl::dumpModelImpl(std::string &Out) {
+  Out = "SMTSolver model dump not implemented.\n";
 }
 
 } // namespace camada

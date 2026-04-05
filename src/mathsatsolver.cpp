@@ -82,8 +82,15 @@ unsigned MathSATSort::getWidthFromSolver() const {
 }
 
 void MathSATSort::dump() const {
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void MathSATSort::dump(std::string &Out) const {
   char *s = msat_type_repr(Sort);
-  std::fprintf(stderr, "%s\n", s);
+  Out = s;
+  Out += "\n";
   msat_free(s);
 }
 
@@ -99,14 +106,23 @@ bool MathSATExpr::equal_to(SMTExpr const &Other) const {
 }
 
 void MathSATExpr::dump() const {
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void MathSATExpr::dump(std::string &Out) const {
   if (IsDecl) {
     char *name = msat_decl_get_name(Decl);
-    std::fprintf(stderr, "(declare-fun %s ...)\n", name);
+    Out = "(declare-fun ";
+    Out += name;
+    Out += " ...)\n";
     msat_free(name);
     return;
   }
   char *ast = msat_to_smtlib2(*Context, Expr);
-  std::fprintf(stderr, "%s\n", ast);
+  Out = ast;
+  Out += "\n";
   msat_free(ast);
 }
 
@@ -1116,17 +1132,30 @@ std::string MathSATSolver::getSolverNameAndVersion() const {
 }
 
 void MathSATSolver::dumpImpl() {
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void MathSATSolver::dumpImpl(std::string &Out) {
+  Out.clear();
   size_t num_of_asserted;
   msat_term *asserted_formulas =
       msat_get_asserted_formulas(*Context, &num_of_asserted);
 
   for (unsigned i = 0; i < num_of_asserted; i++)
-    std::fprintf(stderr, "%s\n",
-                 msat_to_smtlib2(*Context, asserted_formulas[i]));
+    Out += std::string(msat_to_smtlib2(*Context, asserted_formulas[i])) + "\n";
   msat_free(asserted_formulas);
 }
 
 void MathSATSolver::dumpModelImpl() {
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void MathSATSolver::dumpModelImpl(std::string &Out) {
+  Out.clear();
   // we use a model iterator to retrieve the model values for all the
   // variables, and the necessary function instantiations
   msat_model_iterator iter = msat_create_model_iterator(*Context);
@@ -1139,11 +1168,13 @@ void MathSATSolver::dumpModelImpl() {
     msat_model_iterator_next(iter, &t, &v);
     s = msat_term_repr(t);
     assert(s && "Error when getting variable from model");
-    std::fprintf(stderr, "%s = ", s);
+    Out += s;
+    Out += " = ";
     msat_free(s);
     s = msat_term_repr(v);
     assert(s && "Error when getting variable value from model");
-    std::fprintf(stderr, "%s\n", s);
+    Out += s;
+    Out += "\n";
     msat_free(s);
   }
   msat_destroy_model_iterator(iter);

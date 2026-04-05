@@ -42,6 +42,7 @@ public:
   unsigned getWidthFromSolver() const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 }; // end class CVC5Sort
 
 class CVC5Expr : public SolverExpr<CVC5ContextRef, cvc5::Term> {
@@ -56,6 +57,7 @@ public:
   bool equal_to(SMTExpr const &Other) const override;
 
   void dump() const override;
+  void dump(std::string &Out) const override;
 }; // end class CVC5Expr
 
 class CVC5Solver : public SMTSolverImpl {
@@ -337,9 +339,11 @@ public:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl() override;
+  void dumpImpl();
+  void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl() override;
+  void dumpModelImpl();
+  void dumpModelImpl(std::string &Out) override;
 
 protected:
   using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;

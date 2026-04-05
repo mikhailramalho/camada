@@ -27,6 +27,12 @@
 #include <string>
 
 void camada::SMTSort::dump() const {
+  std::string Out;
+  dump(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void camada::SMTSort::dump(std::string &Out) const {
   std::string k;
   if (isBoolSort())
     k = "Bool";
@@ -47,39 +53,48 @@ void camada::SMTSort::dump() const {
   else if (isFunctionSort())
     k = "Function";
   else {
-    std::fprintf(stderr, "Unknown sort.\n");
+    Out = "Unknown sort.\n";
     abort();
   }
 
-  std::fprintf(stderr, "kind: %s\n", k.c_str());
+  Out = "kind: " + k + "\n";
   if (isArraySort()) {
-    std::fprintf(stderr, "Index: ");
-    getIndexSort()->dump();
-    std::fprintf(stderr, "Element: ");
-    getElementSort()->dump();
+    std::string Index;
+    std::string Element;
+    getIndexSort()->dump(Index);
+    getElementSort()->dump(Element);
+    Out += "Index: " + Index;
+    Out += "Element: " + Element;
     return;
   }
 
   if (isFunctionSort()) {
-    std::fprintf(stderr, "Domain:\n");
-    for (const auto &Sort : getDomainSorts())
-      Sort->dump();
-    std::fprintf(stderr, "Codomain: ");
-    getCodomainSort()->dump();
+    Out += "Domain:\n";
+    for (const auto &Sort : getDomainSorts()) {
+      std::string Domain;
+      Sort->dump(Domain);
+      Out += Domain;
+    }
+    Out += "Codomain: ";
+    {
+      std::string Codomain;
+      getCodomainSort()->dump(Codomain);
+      Out += Codomain;
+    }
     return;
   }
 
   if (isArithSort()) {
-    std::fprintf(stderr, "\n");
+    Out += "\n";
     return;
   }
 
-  std::fprintf(stderr, "width: %u, solver: %u", getWidth(),
-               getWidthFromSolver());
+  Out += "width: " + std::to_string(getWidth()) +
+         ", solver: " + std::to_string(getWidthFromSolver());
   if (isFPSort())
-    std::fprintf(stderr, " (exp: %u, sig: %u)", getFPExponentWidth(),
-                 getFPSignificandWidth());
-  std::fprintf(stderr, "\n");
+    Out += " (exp: " + std::to_string(getFPExponentWidth()) +
+           ", sig: " + std::to_string(getFPSignificandWidth()) + ")";
+  Out += "\n";
 }
 
 unsigned camada::SMTSort::getWidth() const {
