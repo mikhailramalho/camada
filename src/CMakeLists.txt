@@ -37,8 +37,8 @@ set(${LIBRARY_TARGET_NAME}_SRC
 
 # List of HPP (header) library files, the public ones will be installed on the
 # system
-set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadasort.h camadaexpr.h
-                                   camadaimpl.h)
+set(${LIBRARY_TARGET_NAME}_PUB_HDR camada.h camadacache.h camadasort.h
+                                   camadaexpr.h camadaimpl.h)
 
 # add each solver specific header, if it is enabled
 add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
@@ -64,7 +64,10 @@ add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS
 
 # Solvers
 if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC PkgConfig::Bitwuzla)
+  target_link_libraries(${LIBRARY_TARGET_NAME}
+                        PUBLIC ${Bitwuzla_LINK_LIBRARIES})
+  target_include_directories(${LIBRARY_TARGET_NAME}
+                             PRIVATE ${Bitwuzla_INCLUDE_DIRS})
   target_compile_definitions(${LIBRARY_TARGET_NAME}
                              PRIVATE SOLVER_BITWUZLA_ENABLED)
 endif()
@@ -134,8 +137,11 @@ set_target_properties(
 # https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-relocatable-packages
 target_include_directories(
   ${LIBRARY_TARGET_NAME}
-  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-         "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>")
+  PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}>"
+)
 
 # Specify installation targets, typology and destination folders.
 install(
@@ -146,3 +152,8 @@ install(
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT bin
   PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}"
                 COMPONENT dev)
+
+install(
+  FILES "${CMAKE_BINARY_DIR}/src/camadafeatures.h"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}"
+  COMPONENT dev)

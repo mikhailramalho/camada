@@ -58,16 +58,19 @@ def rewrite_release_link_interface(targets_file, solver_archives):
 if __name__ == '__main__':
 
     curr_dir = os.getcwd()
+    release_build_dir = Path("./.build-release")
+    path_remap_flag = f"-ffile-prefix-map={curr_dir}=."
+    debug_remap_flag = f"-fdebug-prefix-map={curr_dir}=."
 
     check_root_dir()
 
     if os.path.exists('./release'):
         shutil.rmtree('./release')
 
-    if os.path.exists('./build'):
-        shutil.rmtree('./build')
-    os.mkdir("./build")
-    os.chdir("./build")
+    if release_build_dir.exists():
+        shutil.rmtree(release_build_dir)
+    release_build_dir.mkdir()
+    os.chdir(release_build_dir)
 
     run_command(["cmake", "..", "-GNinja", "-DBUILD_SHARED_LIBS=OFF",
                  "-DCAMADA_ENABLE_REGRESSION=OFF",
@@ -78,7 +81,9 @@ if __name__ == '__main__':
                  "-DCAMADA_SOLVER_STP_ENABLE=OFF",
                  "-DCAMADA_SOLVER_YICES_ENABLE=OFF",
                  "-DCAMADA_SOLVER_Z3_ENABLE=ON",
-                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                 "-DCMAKE_BUILD_TYPE=Release",
+                 f"-DCMAKE_C_FLAGS_RELEASE={path_remap_flag} {debug_remap_flag}",
+                 f"-DCMAKE_CXX_FLAGS_RELEASE={path_remap_flag} {debug_remap_flag}",
                  "-DCMAKE_INSTALL_PREFIX=../release/",
                  "-DRELEASE_MODE=ON"])
 
@@ -89,7 +94,7 @@ if __name__ == '__main__':
     os.chdir(curr_dir)
 
     release_lib_dir = "./release/lib"
-    deps_install_dir = "./build/deps/install"
+    deps_install_dir = str(release_build_dir / "deps" / "install")
 
     solver_archives = []
     solver_archives.extend(
@@ -101,14 +106,28 @@ if __name__ == '__main__':
     rewrite_release_link_interface("./release/lib/cmake/camada/camadaTargets.cmake",
                                    solver_archives)
 
-    # We'll also copy solver's headers, in case the user
-    # wants to override the solver
-    run_command(["cp", "-r", f"{deps_install_dir}/include/", "./release/"])
+    # Also copy packaged solver headers under include/camada/, so downstream
+    # users can include Camada's solver wrappers without polluting include/.
+    release_include_dir = Path("./release/include")
+    release_camada_include_dir = release_include_dir / "camada"
+    release_camada_include_dir.mkdir(parents=True, exist_ok=True)
+
+    deps_include_dir = Path(deps_install_dir) / "include"
+    if deps_include_dir.exists():
+        for entry in deps_include_dir.iterdir():
+            destination = release_camada_include_dir / entry.name
+            if entry.is_dir():
+                shutil.copytree(entry, destination, dirs_exist_ok=True)
+            else:
+                shutil.copy2(entry, destination)
 
     # Finally, copy the licenses and other docs
     os.mkdir("./release/license")
     run_command(["cp", "LICENSE", "./release/license/"])
-    if os.path.exists("./build/deps/install/COPYING"):
-        run_command(["cp", "-r", "./build/deps/install/COPYING", "./release/license/BITWUZLA_LICENSE.txt"])
+    bitwuzla_copying = release_build_dir / "deps" / "install" / "COPYING"
+    if bitwuzla_copying.exists():
+        run_command(
+            ["cp", "-r", str(bitwuzla_copying),
+             "./release/license/BITWUZLA_LICENSE.txt"])
     run_command(
         ["cp", "-r", "./scripts/licenses/Z3_LICENSE.txt", "./release/license/"])
