@@ -30,11 +30,6 @@
 
 namespace camada {
 
-void YicesContextDeleter::operator()(context_t *Ctx) const {
-  if (Ctx)
-    yices_free_context(Ctx);
-}
-
 unsigned YicesSort::getWidthFromSolver() const {
   if (yices_type_is_bool(Sort))
     return 1;
@@ -85,15 +80,15 @@ YicesSolver::YicesSolver() : SMTSolverImpl() {
   ctx_config_t *config = yices_new_config();
   yices_default_config_for_logic(config, "QF_AUFBV");
 
-  OwnedContext.reset(yices_new_context(config));
-  Context = OwnedContext.get();
+  Context = yices_new_context(config);
   yices_free_config(config);
   initializeCommonSingletons();
 }
 
 YicesSolver::~YicesSolver() {
   invalidateGeneratedObjects();
-  OwnedContext.reset();
+  if (Context)
+    yices_free_context(Context);
   Context = nullptr;
   yices_exit();
 }
@@ -763,7 +758,8 @@ void YicesSolver::resetImpl() {
   AssertionScopeSizes.clear();
 
   // Delete
-  OwnedContext.reset();
+  if (Context)
+    yices_free_context(Context);
   Context = nullptr;
   yices_exit();
 
@@ -774,8 +770,7 @@ void YicesSolver::resetImpl() {
   ctx_config_t *config = yices_new_config();
   yices_default_config_for_logic(config, "QF_AUFBV");
 
-  OwnedContext.reset(yices_new_context(config));
-  Context = OwnedContext.get();
+  Context = yices_new_context(config);
   yices_free_config(config);
 }
 

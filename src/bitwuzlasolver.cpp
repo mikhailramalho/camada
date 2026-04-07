@@ -29,11 +29,6 @@
 
 namespace camada {
 
-void BitwuzlaContextDeleter::operator()(Bitwuzla *Ctx) const {
-  if (Ctx)
-    bitwuzla_delete(Ctx);
-}
-
 namespace {
 
 void bitwuzlaErrorHandler(const char *msg) { fatalError(msg); }
@@ -106,12 +101,12 @@ void BitwuzlaSolver::initializeContext() {
   Options = bitwuzla_options_new();
   bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_MODELS, 1);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
-  OwnedContext.reset(bitwuzla_new(TermManager, Options));
-  Context = OwnedContext.get();
+  Context = bitwuzla_new(TermManager, Options);
 }
 
 void BitwuzlaSolver::destroyContext() {
-  OwnedContext.reset();
+  if (Context)
+    bitwuzla_delete(Context);
   Context = nullptr;
   if (Options) {
     bitwuzla_options_delete(Options);

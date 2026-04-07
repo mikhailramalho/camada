@@ -35,12 +35,6 @@ namespace camada {
 
 using BitwuzlaContextRef = Bitwuzla *;
 
-struct BitwuzlaContextDeleter {
-  void operator()(Bitwuzla *Ctx) const;
-};
-
-using BitwuzlaContextOwner = std::unique_ptr<Bitwuzla, BitwuzlaContextDeleter>;
-
 class BitwSort : public SolverSort<BitwuzlaContextRef, BitwuzlaSort> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Bitwuzla;
@@ -71,7 +65,6 @@ class BitwuzlaSolver : public SMTSolverImpl {
 public:
   using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
 
-  BitwuzlaContextOwner OwnedContext;
   BitwuzlaContextRef Context = nullptr;
   BitwuzlaOptions *Options = nullptr;
   BitwuzlaTermManager *TermManager = nullptr;

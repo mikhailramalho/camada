@@ -34,12 +34,6 @@ namespace camada {
 
 using YicesContextRef = context_t *;
 
-struct YicesContextDeleter {
-  void operator()(context_t *Ctx) const;
-};
-
-using YicesContextOwner = std::unique_ptr<context_t, YicesContextDeleter>;
-
 /// Wrapper for Yices Sort
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
 public:
@@ -72,7 +66,6 @@ public:
 
 class YicesSolver : public SMTSolverImpl {
 public:
-  YicesContextOwner OwnedContext;
   YicesContextRef Context = nullptr;
 
   unsigned int ConstArrayCounter = 0;

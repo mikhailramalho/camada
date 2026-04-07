@@ -25,54 +25,12 @@
 #include "camadaimpl.h"
 
 #include <mathsat.h>
-#include <utility>
+#include <variant>
 
 namespace camada {
 
 using MathSATContextRef = msat_env *;
-
-class MathSATContextOwner {
-public:
-  MathSATContextOwner() = default;
-
-  explicit MathSATContextOwner(const msat_env &Env)
-      : Context(Env), Valid(true) {}
-
-  ~MathSATContextOwner() { reset(); }
-
-  MathSATContextOwner(MathSATContextOwner &&Other) noexcept
-      : Context(Other.Context), Valid(Other.Valid) {
-    Other.Valid = false;
-  }
-
-  MathSATContextOwner &operator=(MathSATContextOwner &&Other) noexcept {
-    if (this != &Other) {
-      reset();
-      Context = Other.Context;
-      Valid = Other.Valid;
-      Other.Valid = false;
-    }
-    return *this;
-  }
-
-  MathSATContextOwner(const MathSATContextOwner &) = delete;
-  MathSATContextOwner &operator=(const MathSATContextOwner &) = delete;
-
-  void reset();
-
-  void reset(const msat_env &Env) {
-    reset();
-    Context = Env;
-    Valid = true;
-  }
-
-  MathSATContextRef get() { return Valid ? &Context : nullptr; }
-  const msat_env *get() const { return Valid ? &Context : nullptr; }
-
-private:
-  msat_env Context{};
-  bool Valid = false;
-};
+using MathSATNode = std::variant<msat_term, msat_decl>;
 
 /// Wrapper for MathSAT Sort
 class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
@@ -89,17 +47,18 @@ public:
   void dump(std::string &Out) const override;
 }; // end class MathSATSort
 
-class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
+class MathSATExpr : public SolverExpr<MathSATContextRef, MathSATNode> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
-  using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
+  using SolverExpr<MathSATContextRef, MathSATNode>::SolverExpr;
   MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
               const msat_term &T)
-      : SolverExpr<MathSATContextRef, msat_term>(Kind, C, S, T) {}
+      : SolverExpr<MathSATContextRef, MathSATNode>(Kind, C, S, MathSATNode(T)) {
+  }
   MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
               const msat_decl &D)
-      : SolverExpr<MathSATContextRef, msat_term>(Kind, C, S, msat_term{}),
-        IsDecl(true), Decl(D) {}
+      : SolverExpr<MathSATContextRef, MathSATNode>(Kind, C, S, MathSATNode(D)) {
+  }
   virtual ~MathSATExpr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
@@ -110,14 +69,21 @@ public:
   void dump() const override;
   void dump(std::string &Out) const override;
 
-  bool IsDecl = false;
-  msat_decl Decl{};
+  bool isDecl() const { return std::holds_alternative<msat_decl>(Expr); }
+  bool isTerm() const { return std::holds_alternative<msat_term>(Expr); }
+  const msat_decl &getDecl() const {
+    assert(isDecl() && "Expected MathSAT declaration");
+    return std::get<msat_decl>(Expr);
+  }
+  const msat_term &getTerm() const {
+    assert(isTerm() && "Expected MathSAT term");
+    return std::get<msat_term>(Expr);
+  }
 }; // end class MathSATExpr
 
 class MathSATSolver : public SMTSolverImpl {
 public:
-  MathSATContextOwner OwnedContext;
-  MathSATContextRef Context{};
+  msat_env Context{};
 
   explicit MathSATSolver();
 

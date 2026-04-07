@@ -62,14 +62,13 @@ public:
 
 class Z3Solver : public SMTSolverImpl {
 public:
-  std::unique_ptr<z3::context> OwnedContext;
-  Z3ContextRef Context = nullptr;
+  z3::context Context;
 
   z3::solver Solver;
 
   explicit Z3Solver();
-  explicit Z3Solver(std::unique_ptr<z3::context> C);
-  explicit Z3Solver(std::unique_ptr<z3::context> C, z3::solver S);
+  explicit Z3Solver(z3::context C);
+  explicit Z3Solver(z3::context C, z3::solver S);
   ~Z3Solver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;

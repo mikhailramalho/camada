@@ -62,10 +62,8 @@ public:
 
 class CVC5Solver : public SMTSolverImpl {
 public:
-  std::unique_ptr<cvc5::TermManager> OwnedTerms;
-  cvc5::TermManager *Terms = nullptr;
-  std::unique_ptr<cvc5::Solver> OwnedContext;
-  CVC5ContextRef Context = nullptr;
+  cvc5::TermManager Terms;
+  cvc5::Solver Context;
 
   unsigned int ToBVCounter = 0;
 
