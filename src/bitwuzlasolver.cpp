@@ -724,8 +724,9 @@ SMTExprRef BitwuzlaSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 
 SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
-  const SMTSortRef &to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
-                                    Exp->Sort->getFPSignificandWidth());
+  const SMTSortRef &to =
+      mkFPSort(Exp->Sort->getFPExponentWidth(),
+               Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
   const SMTExprRef &newSymbol = mkSymbol(name, to);
   addConstraint(mkEqual(Exp, mkBVToIEEEFP(newSymbol, Exp->Sort)));
   return newSymbol;

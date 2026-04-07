@@ -23,12 +23,16 @@
 
 #include <cstdio>
 
-void camada::SMTExpr::dump() const {
+namespace camada {
+
+void SMTExpr::dump() const {
   std::string Out;
   dump(Out);
   std::fprintf(stderr, "%s", Out.c_str());
 }
 
-void camada::SMTExpr::dump(std::string &Out) const {
+void SMTExpr::dump(std::string &Out) const {
   Out = "SMTExpr dump not implemented.\n";
 }
+
+} // namespace camada

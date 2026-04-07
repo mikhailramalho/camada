@@ -25,6 +25,7 @@
 #include <cstdlib>
 
 namespace camada {
+
 static std::string power2Dec(unsigned int N) {
   std::string result = "1";
   for (unsigned int I = 0; I < N; ++I) {

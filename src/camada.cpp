@@ -49,9 +49,11 @@
 #include "stpsolver.h"
 #endif
 
-std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
+namespace camada {
 
-void camada::SMTSolver::invalidateGeneratedObjects() {
+std::string getCamadaVersion() { return CAMADA_VERSION; }
+
+void SMTSolverImpl::invalidateGeneratedObjects() {
   clearSortCaches();
   clearExprCaches();
   ++HandleState->Generation;
@@ -59,7 +61,7 @@ void camada::SMTSolver::invalidateGeneratedObjects() {
   SortArena.clear();
 }
 
-void camada::SMTSolver::clearSortCaches() {
+void SMTSolverImpl::clearSortCaches() {
   CachedBoolSort = {};
   CachedIntSort = {};
   CachedRealSort = {};
@@ -72,7 +74,7 @@ void camada::SMTSolver::clearSortCaches() {
   FunctionSortCache.clear();
 }
 
-void camada::SMTSolver::clearExprCaches() {
+void SMTSolverImpl::clearExprCaches() {
   CachedBoolExprs.fill({});
   CachedBVOne1Expr = {};
   CachedSmallBVZeroExprs.fill({});
@@ -84,7 +86,7 @@ void camada::SMTSolver::clearExprCaches() {
   FPSpecialExprCache.clear();
 }
 
-void camada::SMTSolver::initializeCommonSingletons() {
+void SMTSolverImpl::initializeCommonSingletons() {
   CachedBoolExprs[0] = mkBool(false);
   CachedBoolExprs[1] = mkBool(true);
   CachedBVOne1Expr = mkBVFromBin("1", 1);
@@ -113,7 +115,7 @@ void camada::SMTSolver::initializeCommonSingletons() {
       mkBVFromBin("100", 3);
 }
 
-camada::SMTSolverRef camada::createZ3Solver() {
+SMTSolverRef createZ3Solver() {
 #if SOLVER_Z3_ENABLED
   return std::make_unique<Z3Solver>();
 #else
@@ -123,7 +125,7 @@ camada::SMTSolverRef camada::createZ3Solver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createMathSATSolver() {
+SMTSolverRef createMathSATSolver() {
 #if SOLVER_MATHSAT_ENABLED
   return std::make_unique<MathSATSolver>();
 #else
@@ -134,7 +136,7 @@ camada::SMTSolverRef camada::createMathSATSolver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createCVC5Solver() {
+SMTSolverRef createCVC5Solver() {
 #if SOLVER_CVC5_ENABLED
   return std::make_unique<CVC5Solver>();
 #else
@@ -145,7 +147,7 @@ camada::SMTSolverRef camada::createCVC5Solver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createBitwuzlaSolver() {
+SMTSolverRef createBitwuzlaSolver() {
 #if SOLVER_BITWUZLA_ENABLED
   return std::make_unique<BitwuzlaSolver>();
 #else
@@ -156,7 +158,7 @@ camada::SMTSolverRef camada::createBitwuzlaSolver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createYicesSolver() {
+SMTSolverRef createYicesSolver() {
 #if SOLVER_YICES_ENABLED
   return std::make_unique<YicesSolver>();
 #else
@@ -167,7 +169,7 @@ camada::SMTSolverRef camada::createYicesSolver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createSTPSolver() {
+SMTSolverRef createSTPSolver() {
 #if SOLVER_STP_ENABLED
   return std::make_unique<STPSolver>();
 #else
@@ -176,3 +178,5 @@ camada::SMTSolverRef camada::createSTPSolver() {
   abort();
 #endif
 }
+
+} // namespace camada

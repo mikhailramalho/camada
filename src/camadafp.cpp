@@ -424,7 +424,7 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
   assert(Sig->getWidth() == SWidth);
 }
 
-SMTSortRef SMTSolverImpl::mkRMSortImpl() { return mkBVRMSort(); }
+SMTSortRef SMTSolverImpl::mkRMSortImpl() { return mkBVRMSortImpl(); }
 
 SMTSortRef SMTSolverImpl::mkIntSortImpl() {
   unsupportedFeatureImpl("Integer arithmetic");
@@ -436,7 +436,7 @@ SMTSortRef SMTSolverImpl::mkRealSortImpl() {
 
 SMTSortRef SMTSolverImpl::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return mkBVFPSort(ExpWidth, SigWidth);
+  return mkBVFPSortImpl(ExpWidth, SigWidth);
 }
 
 SMTExprRef SMTSolverImpl::mkFPAbsImpl(const SMTExprRef &Exp) {

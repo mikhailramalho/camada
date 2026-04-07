@@ -792,12 +792,7 @@ bool MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
   __builtin_unreachable();
 }
 
-static inline std::string getGMPVal(const MathSATSolver &S,
-                                    const SMTExprRef &Exp) {
-  const SMTExprRef &t = S.newExprRef(
-      MathSATExpr(S.Context, Exp->Sort,
-                  msat_get_model_value(*S.Context, toMathSATTerm(Exp))));
-
+static inline std::string getGMPVal(const SMTExprRef &t) {
   // GMP rational value object.
   mpq_t val;
   mpq_init(val);
@@ -813,17 +808,15 @@ static inline std::string getGMPVal(const MathSATSolver &S,
   return bv;
 }
 
-static inline void getMathSATModelRational(const MathSATSolver &S,
-                                           const SMTExprRef &Exp, mpq_t val) {
-  const SMTExprRef &t = S.newExprRef(
-      MathSATExpr(S.Context, Exp->Sort,
-                  msat_get_model_value(*S.Context, toMathSATTerm(Exp))));
+static inline void getMathSATModelRational(const SMTExprRef &t, mpq_t val) {
   msat_term_to_number(*toSolverExpr<MathSATExpr>(*t).Context, toMathSATTerm(t),
                       val);
 }
 
 std::string MathSATSolver::getBVInBinImpl(const SMTExprRef &Exp) {
-  return getGMPVal(*this, Exp);
+  const SMTExprRef &t = newExprRef(MathSATExpr(
+      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  return getGMPVal(t);
 }
 
 std::string MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
@@ -836,7 +829,9 @@ std::string MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
 
   mpq_t val;
   mpq_init(val);
-  getMathSATModelRational(*this, Exp, val);
+  const SMTExprRef &t = newExprRef(MathSATExpr(
+      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  getMathSATModelRational(t, val);
   assert(mpz_cmp_ui(mpq_denref(val), 1) == 0 && "Expected integer value");
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   std::string num = raw_num;
@@ -851,7 +846,9 @@ void MathSATSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
                                     std::string &Den) {
   mpq_t val;
   mpq_init(val);
-  getMathSATModelRational(*this, Exp, val);
+  const SMTExprRef &t = newExprRef(MathSATExpr(
+      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  getMathSATModelRational(t, val);
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
   Num = raw_num;
@@ -864,7 +861,9 @@ void MathSATSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
 }
 
 std::string MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {
-  return getGMPVal(*this, Exp);
+  const SMTExprRef &t = newExprRef(MathSATExpr(
+      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  return getGMPVal(t);
 }
 
 SMTExprRef MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
@@ -1004,8 +1003,9 @@ SMTExprRef MathSATSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef MathSATSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  const SMTSortRef &to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
-                                    Exp->Sort->getFPSignificandWidth());
+  const SMTSortRef &to =
+      mkFPSort(Exp->Sort->getFPExponentWidth(),
+               Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
   return newExprRef(MathSATExpr(
       Context, to, msat_make_fp_as_ieeebv(*Context, toMathSATTerm(Exp))));
 }

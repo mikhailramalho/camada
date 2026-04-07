@@ -30,6 +30,9 @@
 
 namespace camada {
 
+class SMTSolver;
+class SMTSolverImpl;
+
 enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3 };
 enum class SMTSortKind {
   Bool,
@@ -86,6 +89,7 @@ private:
   }
 
   friend class SMTSolver;
+  friend class SMTSolverImpl;
 };
 
 /// Generic base class for SMT sorts

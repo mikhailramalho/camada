@@ -163,6 +163,7 @@ private:
   }
 
   friend class SMTSolver;
+  friend class SMTSolverImpl;
 };
 
 /// Generic base class for SMT exprs

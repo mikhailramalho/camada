@@ -676,15 +676,13 @@ static inline bool hasZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
   return S.Solver.get_model().has_interp(toZ3Expr(Exp).decl());
 }
 
-static inline SMTExprRef getZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
-  return S.newExprRef(
-      Z3Expr(S.Context, Exp->Sort,
-             S.Solver.get_model().get_const_interp(toZ3Expr(Exp).decl())));
-}
-
 std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
-  const SMTExprRef &value =
-      hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
+  SMTExprRef value = Exp;
+  if (hasZ3Interp(*this, Exp)) {
+    value = newExprRef(
+        Z3Expr(Context, Exp->Sort,
+               Solver.get_model().get_const_interp(toZ3Expr(Exp).decl())));
+  }
   std::string bv;
   bool is_num = toZ3Expr(value).as_binary(bv);
   (void)is_num;
@@ -724,8 +722,12 @@ void Z3Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
 }
 
 std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
-  const SMTExprRef &value =
-      hasZ3Interp(*this, Exp) ? getZ3Interp(*this, Exp) : Exp;
+  SMTExprRef value = Exp;
+  if (hasZ3Interp(*this, Exp)) {
+    value = newExprRef(
+        Z3Expr(Context, Exp->Sort,
+               Solver.get_model().get_const_interp(toZ3Expr(Exp).decl())));
+  }
 
   // Convert the float to bv
   z3::expr fp_value =
@@ -864,8 +866,9 @@ SMTExprRef Z3Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef Z3Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  const SMTSortRef &to = mkBVFPSort(Exp->Sort->getFPExponentWidth(),
-                                    Exp->Sort->getFPSignificandWidth());
+  const SMTSortRef &to =
+      mkFPSort(Exp->Sort->getFPExponentWidth(),
+               Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
   return newExprRef(Z3Expr(Context, to, toZ3Expr(Exp).mk_to_ieee_bv()));
 }
 

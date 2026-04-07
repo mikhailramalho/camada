@@ -67,13 +67,87 @@ public:
     return usesBVRMEncoding(Exp->Sort);
   }
 
-  SMTExprRef newExprRef(const SMTExpr &Exp) const final {
+protected:
+  /// Wrapper to create new SMTSort
+  template <typename SolverSort>
+  SMTSortRef newSortRef(const SolverSort &Sort) const {
+    auto OwnedSort = std::make_unique<SolverSort>(Sort);
+#ifndef NDEBUG
+    assert(OwnedSort->validateSortWidth());
+    OwnedSort->markWidthValidated();
+#endif
+    const SMTSort *SortPtr = OwnedSort.get();
+    SortArena.emplace_back(std::move(OwnedSort));
+    return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
+  }
+
+  template <typename SolverExpr>
+  SMTExprRef storeExprRef(const SolverExpr &Exp) const {
+    auto OwnedExpr = std::make_unique<SolverExpr>(Exp);
+    const SMTExpr *ExprPtr = OwnedExpr.get();
+    ExprArena.emplace_back(std::move(OwnedExpr));
+    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
+  }
+
+  template <typename SolverExpr>
+  SMTExprRef storeOwnedExprRef(std::unique_ptr<SolverExpr> Exp) const {
+    const SMTExpr *ExprPtr = Exp.get();
+    ExprArena.emplace_back(std::move(Exp));
+    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
+  }
+
+  void invalidateGeneratedObjects();
+
+  void clearSortCaches();
+
+  void clearExprCaches();
+
+  void initializeCommonSingletons();
+
+  mutable std::deque<std::unique_ptr<SMTSort>> SortArena;
+  mutable std::deque<std::unique_ptr<SMTExpr>> ExprArena;
+  mutable std::array<SMTExprRef, 2> CachedBoolExprs;
+  mutable SMTExprRef CachedBVOne1Expr;
+  mutable std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
+  mutable std::array<SMTExprRef, 5> CachedRMBVExprs;
+  mutable std::vector<SMTExprRef> CachedBVNegOneExprs;
+  mutable std::vector<SMTExprRef> CachedBVZeroExprs;
+  mutable std::vector<SMTExprRef> CachedBVOneExprs;
+  mutable SMTSortRef CachedBoolSort;
+  mutable SMTSortRef CachedIntSort;
+  mutable SMTSortRef CachedRealSort;
+  mutable SMTSortRef CachedNativeRMSort;
+  mutable SMTSortRef CachedEncodedRMSort;
+  mutable std::unordered_map<SymbolExprCacheKey, SMTExprRef,
+                             SymbolExprCacheKeyHash>
+      SymbolExprCache;
+  mutable std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
+                             FPSpecialExprCacheKeyHash>
+      FPSpecialExprCache;
+  mutable std::unordered_map<unsigned, SMTSortRef> BVSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      NativeFPSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      EncodedFPSortCache;
+  mutable std::unordered_map<ArraySortCacheKey, SMTSortRef,
+                             ArraySortCacheKeyHash>
+      ArraySortCache;
+  mutable std::unordered_map<FunctionSortCacheKey, SMTSortRef,
+                             FunctionSortCacheKeyHash>
+      FunctionSortCache;
+  std::shared_ptr<SMTHandleState> HandleState =
+      std::make_shared<SMTHandleState>();
+
+protected:
+  SMTExprRef newExprRef(const SMTExpr &Exp) const {
     SMTExprRef theExp = newExprRefImpl(Exp);
 #ifndef NDEBUG
     assert(theExp->Sort->isWidthValidated());
 #endif
     return theExp;
   }
+
+public:
   SMTSortRef mkBoolSort() override final {
     if (CachedBoolSort)
       return CachedBoolSort;
@@ -1314,31 +1388,6 @@ public:
     std::fprintf(stderr, "%s", Out.c_str());
   }
   void dumpModel(std::string &Out) override final { return dumpModelImpl(Out); }
-
-  SMTSortRef mkBVFPSort(const unsigned ExpWidth,
-                        const unsigned SigWidth) override final {
-    FPSortCacheKey Key{ExpWidth, SigWidth};
-    auto It = EncodedFPSortCache.find(Key);
-    if (It != EncodedFPSortCache.end())
-      return It->second;
-
-    SMTSortRef theSort = mkBVFPSortImpl(ExpWidth, SigWidth);
-    assert(theSort->isFPSort());
-    assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
-    assert(theSort->getWidth() == theSort->getWidthFromSolver());
-    EncodedFPSortCache.emplace(Key, theSort);
-    return theSort;
-  }
-
-  SMTSortRef mkBVRMSort() override final {
-    if (CachedEncodedRMSort)
-      return CachedEncodedRMSort;
-
-    SMTSortRef theSort = mkBVRMSortImpl();
-    assert(theSort->isRMSort());
-    CachedEncodedRMSort = theSort;
-    return theSort;
-  }
 
 protected:
   [[noreturn]] void unsupportedFeatureImpl(const char *Feature) const;
