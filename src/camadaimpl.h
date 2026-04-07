@@ -46,11 +46,6 @@ public:
   SMTExprRef getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
                               FPSpecialValueKind Kind, bool Sign);
 
-  static SMTExprRef tagExprKind(const SMTExprRef &Exp, SMTExprKind Kind) {
-    const_cast<SMTExpr &>(*Exp).setKind(Kind);
-    return Exp;
-  }
-
   static bool usesBVFPEncoding(const SMTSortRef &Sort) {
     return Sort->isBVFPSort();
   }
@@ -68,6 +63,22 @@ public:
   }
 
 protected:
+  static SMTExprRef tagExprKind(const SMTExprRef &Exp, SMTExprKind Kind) {
+    const_cast<SMTExpr &>(*Exp).setKind(Kind);
+    return Exp;
+  }
+
+  SMTExprRef cloneExprWithSort(const SMTExprRef &Exp,
+                               const SMTSortRef &Sort) const {
+    return cloneExprWithSortImpl(*Exp, Sort);
+  }
+
+  SMTExprRef cloneExprWithSortKind(const SMTExprRef &Exp,
+                                   const SMTSortRef &Sort,
+                                   SMTExprKind Kind) const {
+    return tagExprKind(cloneExprWithSort(Exp, Sort), Kind);
+  }
+
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
   SMTSortRef newSortRef(const SolverSort &Sort) const {

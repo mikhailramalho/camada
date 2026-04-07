@@ -94,6 +94,11 @@ public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
   bool OwnsExpr = false;
 
+  STPExpr(SMTExprKind Kind, STPContextRef C, const SMTSortRef &S,
+          const STP::Expr &E, bool Owns = false)
+      : SolverExpr<STPContextRef, STP::Expr>(Kind, std::move(C), S, E),
+        OwnsExpr(Owns) {}
+
   STPExpr(STPContextRef C, const SMTSortRef &S, const STP::Expr &E,
           bool Owns = false)
       : SolverExpr<STPContextRef, STP::Expr>(std::move(C), S, E),

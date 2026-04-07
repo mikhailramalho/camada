@@ -93,8 +93,15 @@ class MathSATExpr : public SolverExpr<MathSATContextRef, msat_term> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
   using SolverExpr<MathSATContextRef, msat_term>::SolverExpr;
+  MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
+              const msat_term &T)
+      : SolverExpr<MathSATContextRef, msat_term>(Kind, C, S, T) {}
   MathSATExpr(MathSATContextRef C, const SMTSortRef &S, const msat_term &T)
       : SolverExpr<MathSATContextRef, msat_term>(C, S, T) {}
+  MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
+              const msat_decl &D)
+      : SolverExpr<MathSATContextRef, msat_term>(Kind, C, S, msat_term{}),
+        IsDecl(true), Decl(D) {}
   MathSATExpr(MathSATContextRef C, const SMTSortRef &S, const msat_decl &D)
       : SolverExpr<MathSATContextRef, msat_term>(C, S, msat_term{}),
         IsDecl(true), Decl(D) {}
