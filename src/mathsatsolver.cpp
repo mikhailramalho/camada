@@ -634,19 +634,10 @@ SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   // MathSAT does not support rem, so convert to BVFP and call the fp_api
 
-  // Save camada flag
-  bool oldUseCamadaFP = useCamadaFP;
-
-  // Enable fp conversion API
-  useCamadaFP = true;
-
   // We can call the conversion API directly here because the arguments were
   // already checked
   const SMTExprRef &rem =
       SMTSolverImpl::mkFPRemImpl(mkIEEEFPToBVImpl(LHS), mkIEEEFPToBVImpl(RHS));
-
-  // Restore camada flag
-  useCamadaFP = oldUseCamadaFP;
 
   // And convert it back the right type
   return mkBVToIEEEFP(rem, LHS->Sort);
@@ -682,34 +673,28 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                       const SMTExprRef &R) {
   // MathSAT does not support FMA, so convert to BVFP and call the fp_api
 
-  // Save camada flag
-  bool oldUseCamadaFP = useCamadaFP;
-
   // To convert the rounding mode, we first need to generate the equalities in
   // floating-point mode
-  const SMTExprRef &isNe = mkEqual(R, mkRM(RM::ROUND_TO_EVEN));
-  const SMTExprRef &isPi = mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF));
-  const SMTExprRef &isMi = mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF));
-
-  // Enable fp conversion API
-  useCamadaFP = true;
+  const SMTExprRef &isNe =
+      mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native));
+  const SMTExprRef &isPi =
+      mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native));
+  const SMTExprRef &isMi =
+      mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF, FPEncoding::Native));
 
   // Now we want to generate the correct rounding mode encoded as a bitvector,
   // so use the equalities previously generated in an ite chain
   const SMTExprRef &roundingMode =
-      mkIte(isNe, mkBVFromDec(0, mkRMSort()),
-            mkIte(isPi, mkBVFromDec(2, mkRMSort()),
-                  mkIte(isMi, mkBVFromDec(3, mkRMSort()),
-                        mkBVFromDec(4, mkRMSort()))));
+      mkIte(isNe, mkBVFromDec(0, mkRMSort(FPEncoding::BV)),
+            mkIte(isPi, mkBVFromDec(2, mkRMSort(FPEncoding::BV)),
+                  mkIte(isMi, mkBVFromDec(3, mkRMSort(FPEncoding::BV)),
+                        mkBVFromDec(4, mkRMSort(FPEncoding::BV)))));
 
   // We can call the conversion API directly here because the arguments were
   // already checked
   const SMTExprRef &fma =
       SMTSolverImpl::mkFPFMAImpl(mkIEEEFPToBVImpl(X), mkIEEEFPToBVImpl(Y),
                                  mkIEEEFPToBVImpl(Z), roundingMode);
-
-  // Restore camada flag
-  useCamadaFP = oldUseCamadaFP;
 
   // And convert it back the right type
   return mkBVToIEEEFP(fma, X->Sort);
@@ -770,7 +755,7 @@ SMTExprRef MathSATSolver::mkFPtoSBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(MathSATExpr(Context, mkBVSort(ToWidth),
                                 msat_make_fp_to_bv(*Context, ToWidth,
                                                    toMathSATTerm(roundingMode),
@@ -781,7 +766,7 @@ SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(MathSATExpr(Context, mkBVSort(ToWidth),
                                 msat_make_fp_to_ubv(*Context, ToWidth,
                                                     toMathSATTerm(roundingMode),
@@ -964,9 +949,9 @@ SMTExprRef MathSATSolver::mkFPFromBinImpl(const std::string &FP,
       .append(FP.substr(1 + EWidth))
       .append(")");
 
-  return newExprRef(MathSATExpr(Context,
-                                mkFPSort(EWidth, FP.length() - EWidth - 1),
-                                msat_from_string(*Context, fpSMTStr.c_str())));
+  return newExprRef(MathSATExpr(
+      Context, mkFPSort(EWidth, FP.length() - EWidth - 1, FPEncoding::Native),
+      msat_from_string(*Context, fpSMTStr.c_str())));
 }
 
 SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
@@ -988,12 +973,12 @@ SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
     e = msat_make_fp_roundingmode_zero(*Context);
     break;
   }
-  return newExprRef(MathSATExpr(Context, mkRMSort(), e));
+  return newExprRef(MathSATExpr(Context, mkRMSort(FPEncoding::Native), e));
 }
 
 SMTExprRef MathSATSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   const SMTExprRef &theNaN = newExprRef(MathSATExpr(
       Context, sort, msat_make_fp_nan(*Context, ExpWidth, SigWidth - 1)));
 
@@ -1002,7 +987,7 @@ SMTExprRef MathSATSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef MathSATSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   return newExprRef(MathSATExpr(
       Context, sort,
       Sgn ? msat_make_fp_minus_inf(*Context, ExpWidth, SigWidth - 1)

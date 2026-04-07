@@ -67,17 +67,17 @@ public:
   virtual SMTSortRef mkBVSort(const unsigned BitWidth) = 0;
 
   /// Returns an appropriate rounding mode sort.
-  virtual SMTSortRef mkRMSort() = 0;
+  virtual SMTSortRef mkRMSort(FPEncoding Encoding) = 0;
 
   /// Returns an appropriate floating-point sort for the given bitwidth.
-  virtual SMTSortRef mkFPSort(const unsigned ExpWidth,
-                              const unsigned SigWidth) = 0;
+  virtual SMTSortRef mkFPSort(const unsigned ExpWidth, const unsigned SigWidth,
+                              FPEncoding Encoding) = 0;
 
   /// Convenience method to create a 32 bits long a floating-point sort.
-  virtual SMTSortRef mkFP32Sort() = 0;
+  virtual SMTSortRef mkFP32Sort(FPEncoding Encoding) = 0;
 
   /// Convenience method to create a 64 bits long a floating-point sort.
-  virtual SMTSortRef mkFP64Sort() = 0;
+  virtual SMTSortRef mkFP64Sort(FPEncoding Encoding) = 0;
 
   /// Returns an appropriate array sort.
   virtual SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
@@ -470,40 +470,41 @@ public:
 
   /// Constructs a floating-point from a binary string, in the IEEE-754 format:
   /// 1 bit for the sign + N bits for the exponent + M bits for the significand
-  virtual SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth) = 0;
+  virtual SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth,
+                                 FPEncoding Encoding) = 0;
 
   /// Constructs an SMTExprRef from a float. We assume the floating-point is
   /// using the IEEE-754 format: 1 bit for the sign + 8 bits for the exponent +
   /// 23 bits for the significand and 1 hidden bit in the significand
-  virtual SMTExprRef mkFP32(const float Float) = 0;
+  virtual SMTExprRef mkFP32(const float Float, FPEncoding Encoding) = 0;
 
   /// Constructs an SMTExprRef from a double.  We assume the floating-point is
   /// using the IEEE-754 format: 1 bit for the sign + 11 bits for the exponent +
   /// 52 bits for the significand and 1 hidden bit in the significand
-  virtual SMTExprRef mkFP64(const double Double) = 0;
+  virtual SMTExprRef mkFP64(const double Double, FPEncoding Encoding) = 0;
 
   /// Returns an appropriate floating-point rounding mode.
-  virtual SMTExprRef mkRM(const RM &R) = 0;
+  virtual SMTExprRef mkRM(const RM &R, FPEncoding Encoding) = 0;
 
   /// Returns a NaN floating-point
   virtual SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) = 0;
+                           const unsigned SigWidth, FPEncoding Encoding) = 0;
 
   /// Convenience method to create 32 bits long NaN
-  virtual SMTExprRef mkNaN32(const bool Sgn) = 0;
+  virtual SMTExprRef mkNaN32(const bool Sgn, FPEncoding Encoding) = 0;
 
   /// Convenience method to create 64 bits long NaN
-  virtual SMTExprRef mkNaN64(const bool Sgn) = 0;
+  virtual SMTExprRef mkNaN64(const bool Sgn, FPEncoding Encoding) = 0;
 
   /// Returns a Inf floating-point
   virtual SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                           const unsigned SigWidth) = 0;
+                           const unsigned SigWidth, FPEncoding Encoding) = 0;
 
   /// Convenience method to create 32 bits long Inf
-  virtual SMTExprRef mkInf32(const bool Sgn) = 0;
+  virtual SMTExprRef mkInf32(const bool Sgn, FPEncoding Encoding) = 0;
 
   /// Convenience method to create 64 bits long Inf
-  virtual SMTExprRef mkInf64(const bool Sgn) = 0;
+  virtual SMTExprRef mkInf64(const bool Sgn, FPEncoding Encoding) = 0;
 
   /// Creates an array and initializes all elements to InitValue
   virtual SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
@@ -538,12 +539,6 @@ public:
   /// Dump Model
   virtual void dumpModel() = 0;
   virtual void dumpModel(std::string &Out) = 0;
-
-  /// Flag to enable encoding floating-points using bitvectors even if the
-  /// solver supports floating-points. For solvers that don't support
-  /// floating-point arithmetic, bitvectors will be used even if this flag is
-  /// false
-  bool useCamadaFP = false;
 
 protected:
   /// Wrapper to create new SMTSort

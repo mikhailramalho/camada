@@ -145,7 +145,7 @@ static inline SMTExprRef mkPZero(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(mkBVZero1(S),
                    S.mkBVConcat(bot_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.mkFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
 static inline SMTExprRef mkNZero(SMTSolver &S, unsigned int EWidth,
@@ -154,7 +154,7 @@ static inline SMTExprRef mkNZero(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(mkBVOne1(S),
                    S.mkBVConcat(bot_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.mkFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
 static inline SMTExprRef mkPInf(SMTSolver &S, unsigned int EWidth,
@@ -163,7 +163,7 @@ static inline SMTExprRef mkPInf(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(mkBVZero1(S),
                    S.mkBVConcat(top_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.mkFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
 static inline SMTExprRef mkNInf(SMTSolver &S, unsigned int EWidth,
@@ -172,7 +172,7 @@ static inline SMTExprRef mkNInf(SMTSolver &S, unsigned int EWidth,
   return S.mkBVToIEEEFP(
       S.mkBVConcat(mkBVOne1(S),
                    S.mkBVConcat(top_exp, S.mkBVFromDec(0, SWidth - 1))),
-      S.mkFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
 static inline SMTExprRef mkIsPZero(SMTSolver &S, const SMTExprRef &Exp) {
@@ -197,7 +197,7 @@ SMTExprRef mkOne(SMTSolver &S, const SMTExprRef &Sgn, unsigned int EWidth,
       S.mkBVConcat(
           Sgn, S.mkBVConcat(S.mkBVFromDec(power2m1(EWidth - 1, false), EWidth),
                             S.mkBVFromDec(0, SWidth - 1))),
-      S.mkFPSort(EWidth, SWidth - 1));
+      S.mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
 SMTExprRef SMTSolverImpl::getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
@@ -210,7 +210,7 @@ SMTExprRef SMTSolverImpl::getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
   SMTExprRef Special;
   switch (Kind) {
   case FPSpecialValueKind::NaN:
-    Special = mkNaN(Sign, ExpWidth, SigWidth);
+    Special = mkNaN(Sign, ExpWidth, SigWidth, FPEncoding::BV);
     break;
   case FPSpecialValueKind::Zero:
     Special = Sign ? mkNZero(*this, ExpWidth, SigWidth)
@@ -860,7 +860,7 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef rndd_sgn = a_sgn;
   SMTExprRef rndd_exp = mkBVSub(b_exp_ext, b_lz_ext);
   SMTExprRef rndd_sig = mkBVExtract(sbits + 3, 0, huge_rem);
-  SMTExprRef rne_bv = mkRM(RM::ROUND_TO_EVEN);
+  SMTExprRef rne_bv = mkRM(RM::ROUND_TO_EVEN, FPEncoding::BV);
   SMTExprRef rndd_sig_lz = mkLeadingZeros(*this, rndd_sig, ebits + 2);
 
   SMTExprRef rndd_exp_eq_y_exp =
@@ -1831,7 +1831,7 @@ SMTExprRef SMTSolverImpl::mkUBVtoFPImpl(const SMTExprRef &From,
 
 SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
                                  unsigned int ToWidth) {
-  SMTExprRef rm = mkRM(RM::ROUND_TO_ZERO);
+  SMTExprRef rm = mkRM(RM::ROUND_TO_ZERO, FPEncoding::BV);
   SMTSortRef xs = Exp->Sort;
 
   unsigned ebits = xs->getFPExponentWidth();
@@ -2111,7 +2111,7 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
   res_sig = mkBVExtract(sbits - 2, 0, res_sig);
   SMTExprRef v6 =
       mkBVToIEEEFP(mkBVConcat(res_sgn, mkBVConcat(res_exp, res_sig)),
-                   mkFPSort(ebits, sbits - 1));
+                   mkFPSort(ebits, sbits - 1, FPEncoding::BV));
 
   // And finally, we tie them together.
   SMTExprRef result = mkIte(c5, v5, v6);
@@ -2127,11 +2127,12 @@ std::string SMTSolverImpl::getFPInBinImpl(const SMTExprRef &Exp) {
 
 SMTExprRef SMTSolverImpl::mkFPFromBinImpl(const std::string &FP,
                                           unsigned EWidth) {
-  return mkBVFromBin(FP, mkFPSort(EWidth, FP.length() - EWidth - 1));
+  return mkBVFromBin(
+      FP, mkFPSort(EWidth, FP.length() - EWidth - 1, FPEncoding::BV));
 }
 
 SMTExprRef SMTSolverImpl::mkRMImpl(const RM &R) {
-  return mkBVFromDec(static_cast<int64_t>(R), mkRMSort());
+  return mkBVFromDec(static_cast<int64_t>(R), mkRMSort(FPEncoding::BV));
 }
 
 SMTExprRef SMTSolverImpl::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
@@ -2141,7 +2142,7 @@ SMTExprRef SMTSolverImpl::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
   return mkBVToIEEEFP(
       mkBVConcat(mkBVFromDec(Sgn, 1),
                  mkBVConcat(top_exp, mkBVFromDec(1, SigWidth - 1))),
-      mkFPSort(ExpWidth, SigWidth - 1));
+      mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::BV));
 }
 
 SMTExprRef SMTSolverImpl::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
@@ -2150,7 +2151,7 @@ SMTExprRef SMTSolverImpl::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
   return mkBVToIEEEFP(
       mkBVConcat(mkBVFromDec(Sgn, 1),
                  mkBVConcat(top_exp, mkBVFromDec(0, SigWidth - 1))),
-      mkFPSort(ExpWidth, SigWidth - 1));
+      mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::BV));
 }
 
 SMTExprRef SMTSolverImpl::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
@@ -2343,7 +2344,7 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
   assert(Exp->getWidth() == EWidth);
 
   return mkBVToIEEEFP(mkBVConcat(Sgn, mkBVConcat(Exp, Sig)),
-                      mkFPSort(EWidth, SWidth - 1));
+                      mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
 int64_t SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
@@ -2388,14 +2389,16 @@ static inline IntType FPAsInt(const FPType FP) {
   return FPAsInt;
 }
 
-camada::SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float) {
+camada::SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float,
+                                             FPEncoding Encoding) {
   uint32_t fp = FPAsInt<float, uint32_t>(Float);
-  return mkFPFromBin(std::bitset<32>(fp).to_string(), 8);
+  return mkFPFromBin(std::bitset<32>(fp).to_string(), 8, Encoding);
 }
 
-camada::SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double) {
+camada::SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double,
+                                             FPEncoding Encoding) {
   uint64_t fp = FPAsInt<double, uint64_t>(Double);
-  return mkFPFromBin(std::bitset<64>(fp).to_string(), 11);
+  return mkFPFromBin(std::bitset<64>(fp).to_string(), 11, Encoding);
 }
 
 } // namespace camada

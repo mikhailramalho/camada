@@ -467,7 +467,7 @@ SMTExprRef BitwuzlaSolver::mkUBVtoFPImpl(const SMTExprRef &From,
 
 SMTExprRef BitwuzlaSolver::mkFPtoSBVImpl(const SMTExprRef &From,
                                          unsigned ToWidth) {
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(BitwExpr(
       Context, mkBVSort(ToWidth),
       bitwuzla_mk_term2_indexed1(TermManager, BITWUZLA_KIND_FP_TO_SBV,
@@ -477,7 +477,7 @@ SMTExprRef BitwuzlaSolver::mkFPtoSBVImpl(const SMTExprRef &From,
 
 SMTExprRef BitwuzlaSolver::mkFPtoUBVImpl(const SMTExprRef &From,
                                          unsigned ToWidth) {
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(BitwExpr(
       Context, mkBVSort(ToWidth),
       bitwuzla_mk_term2_indexed1(TermManager, BITWUZLA_KIND_FP_TO_UBV,
@@ -587,7 +587,7 @@ SMTExprRef BitwuzlaSolver::mkFPFromBinImpl(const std::string &FP,
   const SMTExprRef &sig = SMTSolverImpl::mkBVFromBin(FP.substr(1 + EWidth));
   const unsigned SWidth = FP.length() - EWidth - 1;
   return newExprRef(
-      BitwExpr(Context, mkFPSort(EWidth, SWidth),
+      BitwExpr(Context, mkFPSort(EWidth, SWidth, FPEncoding::Native),
                mkTerm3(TermManager, BITWUZLA_KIND_FP_FP, sgn, exp, sig)));
 }
 
@@ -613,13 +613,13 @@ SMTExprRef BitwuzlaSolver::mkRMImpl(const RM &R) {
     mode = BITWUZLA_RM_RTZ;
     break;
   }
-  return newExprRef(
-      BitwExpr(Context, mkRMSort(), bitwuzla_mk_rm_value(TermManager, mode)));
+  return newExprRef(BitwExpr(Context, mkRMSort(FPEncoding::Native),
+                             bitwuzla_mk_rm_value(TermManager, mode)));
 }
 
 SMTExprRef BitwuzlaSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                      const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   const SMTExprRef &theNaN = newExprRef(BitwExpr(
       Context, sort,
       bitwuzla_mk_fp_nan(TermManager, toSolverSort<BitwSort>(*sort).Sort)));
@@ -628,7 +628,7 @@ SMTExprRef BitwuzlaSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef BitwuzlaSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                      const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   return newExprRef(
       BitwExpr(Context, sort,
                Sgn ? bitwuzla_mk_fp_neg_inf(TermManager,

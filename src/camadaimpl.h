@@ -118,29 +118,31 @@ public:
     return theSort;
   }
 
-  SMTSortRef mkRMSort() override final {
+  SMTSortRef mkRMSort(FPEncoding Encoding) override final {
     SMTSortRef &CachedSort =
-        useCamadaFP ? CachedEncodedRMSort : CachedNativeRMSort;
+        Encoding == FPEncoding::BV ? CachedEncodedRMSort : CachedNativeRMSort;
     if (CachedSort)
       return CachedSort;
 
-    SMTSortRef theSort =
-        useCamadaFP ? SMTSolverImpl::mkRMSortImpl() : mkRMSortImpl();
+    SMTSortRef theSort = Encoding == FPEncoding::BV
+                             ? SMTSolverImpl::mkRMSortImpl()
+                             : mkRMSortImpl();
     assert(theSort->isRMSort());
     CachedSort = theSort;
     return theSort;
   }
 
-  SMTSortRef mkFPSort(const unsigned ExpWidth,
-                      const unsigned SigWidth) override final {
+  SMTSortRef mkFPSort(const unsigned ExpWidth, const unsigned SigWidth,
+                      FPEncoding Encoding) override final {
     assert(ExpWidth && SigWidth);
-    auto &Cache = useCamadaFP ? EncodedFPSortCache : NativeFPSortCache;
+    auto &Cache =
+        Encoding == FPEncoding::BV ? EncodedFPSortCache : NativeFPSortCache;
     FPSortCacheKey Key{ExpWidth, SigWidth};
     auto It = Cache.find(Key);
     if (It != Cache.end())
       return It->second;
 
-    SMTSortRef theSort = useCamadaFP
+    SMTSortRef theSort = Encoding == FPEncoding::BV
                              ? SMTSolverImpl::mkFPSortImpl(ExpWidth, SigWidth)
                              : mkFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
@@ -150,9 +152,13 @@ public:
     return theSort;
   }
 
-  SMTSortRef mkFP32Sort() override final { return mkFPSort(8, 23); }
+  SMTSortRef mkFP32Sort(FPEncoding Encoding) override final {
+    return mkFPSort(8, 23, Encoding);
+  }
 
-  SMTSortRef mkFP64Sort() override final { return mkFPSort(11, 52); }
+  SMTSortRef mkFP64Sort(FPEncoding Encoding) override final {
+    return mkFPSort(11, 52, Encoding);
+  }
 
   SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
                          const SMTSortRef &ElemSort) override final {
@@ -1177,8 +1183,9 @@ public:
     return tagExprKind(theExp, SMTExprKind::Symbol);
   }
 
-  SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth) override {
-    SMTSortRef Sort = mkFPSort(EWidth, FP.length() - EWidth - 1);
+  SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth,
+                         FPEncoding Encoding) override {
+    SMTSortRef Sort = mkFPSort(EWidth, FP.length() - EWidth - 1, Encoding);
     SMTExprRef theExp = usesBVFPEncoding(Sort)
                             ? SMTSolverImpl::mkFPFromBinImpl(FP, EWidth)
                             : mkFPFromBinImpl(FP, EWidth);
@@ -1187,31 +1194,32 @@ public:
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkFP32(const float Float) override final {
-    SMTExprRef theExp = mkFP32Impl(Float);
+  SMTExprRef mkFP32(const float Float, FPEncoding Encoding) override final {
+    SMTExprRef theExp = mkFP32Impl(Float, Encoding);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == 32);
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkFP64(const double Double) override final {
-    SMTExprRef theExp = mkFP64Impl(Double);
+  SMTExprRef mkFP64(const double Double, FPEncoding Encoding) override final {
+    SMTExprRef theExp = mkFP64Impl(Double, Encoding);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == 64);
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkRM(const RM &R) override final {
+  SMTExprRef mkRM(const RM &R, FPEncoding Encoding) override final {
     SMTExprRef theExp =
-        usesBVRMEncoding(mkRMSort()) ? SMTSolverImpl::mkRMImpl(R) : mkRMImpl(R);
+        Encoding == FPEncoding::BV ? SMTSolverImpl::mkRMImpl(R) : mkRMImpl(R);
     assert(theExp->isRMSort());
     return tagExprKind(theExp, SMTExprKind::RMConst);
   }
 
   SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override final {
+                   const unsigned SigWidth,
+                   FPEncoding Encoding) override final {
     assert(SigWidth);
-    SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1);
+    SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);
     SMTExprRef theExp = usesBVFPEncoding(Sort)
                             ? SMTSolverImpl::mkNaNImpl(Sgn, ExpWidth, SigWidth)
                             : mkNaNImpl(Sgn, ExpWidth, SigWidth);
@@ -1221,18 +1229,19 @@ public:
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkNaN32(const bool Sgn) override final {
-    return mkNaN(Sgn, 8, 24);
+  SMTExprRef mkNaN32(const bool Sgn, FPEncoding Encoding) override final {
+    return mkNaN(Sgn, 8, 24, Encoding);
   }
 
-  SMTExprRef mkNaN64(const bool Sgn) override final {
-    return mkNaN(Sgn, 11, 53);
+  SMTExprRef mkNaN64(const bool Sgn, FPEncoding Encoding) override final {
+    return mkNaN(Sgn, 11, 53, Encoding);
   }
 
   SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override final {
+                   const unsigned SigWidth,
+                   FPEncoding Encoding) override final {
     assert(SigWidth);
-    SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1);
+    SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);
     SMTExprRef theExp = usesBVFPEncoding(Sort)
                             ? SMTSolverImpl::mkInfImpl(Sgn, ExpWidth, SigWidth)
                             : mkInfImpl(Sgn, ExpWidth, SigWidth);
@@ -1242,12 +1251,12 @@ public:
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkInf32(const bool Sgn) override final {
-    return mkInf(Sgn, 8, 24);
+  SMTExprRef mkInf32(const bool Sgn, FPEncoding Encoding) override final {
+    return mkInf(Sgn, 8, 24, Encoding);
   }
 
-  SMTExprRef mkInf64(const bool Sgn) override final {
-    return mkInf(Sgn, 11, 53);
+  SMTExprRef mkInf64(const bool Sgn, FPEncoding Encoding) override final {
+    return mkInf(Sgn, 11, 53, Encoding);
   }
 
   SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
@@ -1655,9 +1664,9 @@ protected:
 
   virtual SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth);
 
-  SMTExprRef mkFP32Impl(const float Float);
+  SMTExprRef mkFP32Impl(const float Float, FPEncoding Encoding);
 
-  SMTExprRef mkFP64Impl(const double Double);
+  SMTExprRef mkFP64Impl(const double Double, FPEncoding Encoding);
 
   virtual SMTExprRef mkRMImpl(const RM &R);
 

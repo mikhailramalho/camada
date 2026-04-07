@@ -24,6 +24,8 @@
 
 namespace camada {
 
+enum class FPEncoding { Native, BV };
+
 enum class RM {
   ROUND_TO_EVEN = 0,
   ROUND_TO_AWAY = 1,

@@ -11,9 +11,7 @@ TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   tests(mathsat);
 }
 
-// Known bug: this MathSAT build constructs quantified terms, but solving the
-// resulting AUFBV formulas still returns UNKNOWN for trivial tautologies.
-TEST_CASE("Quantifiers MathSAT test", "[MathSAT][.]") {
+TEST_CASE("Quantifiers MathSAT test", "[MathSAT]") {
   msat_config Config = msat_create_default_config("AUFBV");
   msat_set_option(Config, "model_generation", "true");
   camada::SMTSolverRef mathsat =
@@ -41,6 +39,8 @@ TEST_CASE("Arith MathSAT test", "[MathSAT]") {
   arith_model_queries(mathsat);
   mathsat->reset();
   arith_conversion_semantics(mathsat);
+  mathsat->reset();
+  arith_symbolic_shift_semantics(mathsat);
 }
 
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {

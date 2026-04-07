@@ -27,14 +27,15 @@ inline void equal_ten(const camada::SMTSolverRef &solver) {
   REQUIRE(f_res == solver->getBV(ten));
 }
 
-inline void fp_equal(const camada::SMTSolverRef &solver) {
-  auto x = solver->mkFP32(0.06f);
-  auto y = solver->mkFP64(-7.0);
+inline void fp_equal(const camada::SMTSolverRef &solver,
+                     camada::FPEncoding Encoding) {
+  auto x = solver->mkFP32(0.06f, Encoding);
+  auto y = solver->mkFP64(-7.0, Encoding);
   REQUIRE(x->getKind() == camada::SMTExprKind::FPConst);
   REQUIRE(y->getKind() == camada::SMTExprKind::FPConst);
 
-  auto fx = solver->mkSymbol("fx", solver->mkFP32Sort());
-  auto fy = solver->mkSymbol("fy", solver->mkFP64Sort());
+  auto fx = solver->mkSymbol("fx", solver->mkFP32Sort(Encoding));
+  auto fy = solver->mkSymbol("fy", solver->mkFP64Sort(Encoding));
   REQUIRE(fx->getKind() == camada::SMTExprKind::Symbol);
   REQUIRE(fy->getKind() == camada::SMTExprKind::Symbol);
 
