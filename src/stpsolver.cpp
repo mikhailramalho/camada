@@ -82,10 +82,7 @@ void STPExpr::dump(std::string &Out) const {
 }
 
 // Function used to report errors
-void STPErrorHandler(const char *msg) {
-  (void)msg;
-  assert(0 && msg);
-}
+void STPErrorHandler(const char *msg) { fatalError(msg); }
 
 STPSolver::STPSolver()
     : SMTSolverImpl(), OwnedContext(STP::vc_createValidityChecker()),

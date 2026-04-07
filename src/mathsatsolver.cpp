@@ -810,8 +810,7 @@ bool MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
   if (msat_term_is_false(*Context, toMathSATTerm(Exp)))
     return false;
 
-  assert(0 && "Bool is neither true nor false");
-  __builtin_unreachable();
+  fatalError("Bool is neither true nor false");
 }
 
 static inline std::string getGMPVal(const SMTExprRef &t) {

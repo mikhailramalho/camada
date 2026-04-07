@@ -36,10 +36,7 @@ void BitwuzlaContextDeleter::operator()(Bitwuzla *Ctx) const {
 
 namespace {
 
-void bitwuzlaErrorHandler(const char *msg) {
-  (void)msg;
-  assert(0 && msg);
-}
+void bitwuzlaErrorHandler(const char *msg) { fatalError(msg); }
 
 BitwuzlaTerm mkTerm1(BitwuzlaTermManager *tm, BitwuzlaKind kind,
                      const SMTExprRef &Exp) {
@@ -696,8 +693,7 @@ bool BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
   if (!strcmp(result, "false"))
     return false;
 
-  assert(0 && "Bool is neither true nor false");
-  __builtin_unreachable();
+  fatalError("Bool is neither true nor false");
 }
 
 std::string BitwuzlaSolver::getBVInBinImpl(const SMTExprRef &Exp) {
@@ -762,8 +758,7 @@ SMTExprRef BitwuzlaSolver::mkRMImpl(const RM &R) {
   BitwuzlaRoundingMode mode;
   switch (R) {
   default:
-    assert(0 && "Unsupported floating-point semantics.");
-    __builtin_unreachable();
+    fatalError("Unsupported floating-point semantics.");
   case RM::ROUND_TO_EVEN:
     mode = BITWUZLA_RM_RNE;
     break;

@@ -23,10 +23,9 @@
 #define CAMADAIMPL_H_
 
 #include "camada.h"
+#include "camadaerror.h"
 
 #include <cassert>
-#include <cstdio>
-#include <cstdlib>
 #include <string>
 
 namespace camada {
@@ -112,13 +111,67 @@ protected:
     return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
   }
 
-  void invalidateGeneratedObjects();
+  void invalidateGeneratedObjects() {
+    clearSortCaches();
+    clearExprCaches();
+    ++HandleState->Generation;
+    ExprArena.clear();
+    SortArena.clear();
+  }
 
-  void clearSortCaches();
+  void clearSortCaches() {
+    CachedBoolSort = {};
+    CachedIntSort = {};
+    CachedRealSort = {};
+    CachedNativeRMSort = {};
+    CachedEncodedRMSort = {};
+    BVSortCache.clear();
+    NativeFPSortCache.clear();
+    EncodedFPSortCache.clear();
+    ArraySortCache.clear();
+    FunctionSortCache.clear();
+  }
 
-  void clearExprCaches();
+  void clearExprCaches() {
+    CachedBoolExprs.fill({});
+    CachedBVOne1Expr = {};
+    CachedSmallBVZeroExprs.fill({});
+    CachedRMBVExprs.fill({});
+    CachedBVNegOneExprs.clear();
+    CachedBVZeroExprs.clear();
+    CachedBVOneExprs.clear();
+    SymbolExprCache.clear();
+    FPSpecialExprCache.clear();
+  }
 
-  void initializeCommonSingletons();
+  void initializeCommonSingletons() {
+    CachedBoolExprs[0] = mkBool(false);
+    CachedBoolExprs[1] = mkBool(true);
+    CachedBVOne1Expr = mkBVFromBin("1", 1);
+    CachedSmallBVZeroExprs[1] = mkBVFromBin("0", 1);
+    CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
+    CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
+    CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
+    CachedBVZeroExprs.resize(5);
+    CachedBVZeroExprs[1] = CachedSmallBVZeroExprs[1];
+    CachedBVZeroExprs[2] = CachedSmallBVZeroExprs[2];
+    CachedBVZeroExprs[3] = CachedSmallBVZeroExprs[3];
+    CachedBVZeroExprs[4] = CachedSmallBVZeroExprs[4];
+    CachedBVOneExprs.resize(2);
+    CachedBVOneExprs[1] = CachedBVOne1Expr;
+    CachedBVNegOneExprs.resize(2);
+    CachedBVNegOneExprs[1] = CachedBVOne1Expr;
+    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
+        mkBVFromBin("000", 3);
+    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
+        mkBVFromBin("001", 3);
+    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
+        mkBVFromBin("010", 3);
+    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
+        mkBVFromBin("011", 3);
+    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
+        mkBVFromBin("100", 3);
+  }
 
   mutable std::deque<std::unique_ptr<SMTSort>> SortArena;
   mutable std::deque<std::unique_ptr<SMTExpr>> ExprArena;
@@ -1406,11 +1459,6 @@ public:
   void dumpModel(std::string &Out) override final { return dumpModelImpl(Out); }
 
 protected:
-  [[noreturn]] inline void unsupportedFeatureImpl(const char *Feature) const {
-    std::fprintf(stderr, "%s is not supported by this backend\n", Feature);
-    std::abort();
-  }
-
   virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) const = 0;
 
   virtual SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
@@ -1434,7 +1482,7 @@ protected:
 
   virtual SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &,
                                         const SMTSortRef &) {
-    unsupportedFeatureImpl("Uninterpreted functions");
+    fatalError("Uninterpreted functions");
   }
 
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
@@ -1554,27 +1602,27 @@ protected:
   }
 
   virtual SMTExprRef mkArithNegImpl(const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithAddImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithSubImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithMulImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithDivImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithModImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Integer arithmetic");
+    fatalError("Integer arithmetic");
   }
 
   virtual SMTExprRef mkArithShlImpl(const SMTExprRef &Exp, unsigned Amount) {
@@ -1583,35 +1631,35 @@ protected:
   }
 
   virtual SMTExprRef mkArithShlImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Integer arithmetic");
+    fatalError("Integer arithmetic");
   }
 
   virtual SMTExprRef mkArithLtImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithGtImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithLeImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkArithGeImpl(const SMTExprRef &, const SMTExprRef &) {
-    unsupportedFeatureImpl("Arithmetic");
+    fatalError("Arithmetic");
   }
 
   virtual SMTExprRef mkInt2RealImpl(const SMTExprRef &) {
-    unsupportedFeatureImpl("Real arithmetic");
+    fatalError("Real arithmetic");
   }
 
   virtual SMTExprRef mkReal2IntImpl(const SMTExprRef &) {
-    unsupportedFeatureImpl("Integer arithmetic");
+    fatalError("Integer arithmetic");
   }
 
   virtual SMTExprRef mkIsIntImpl(const SMTExprRef &) {
-    unsupportedFeatureImpl("Integer arithmetic");
+    fatalError("Integer arithmetic");
   }
 
   virtual SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -1719,17 +1767,17 @@ protected:
 
   virtual SMTExprRef mkApplyImpl(const SMTExprRef &,
                                  const std::vector<SMTExprRef> &) {
-    unsupportedFeatureImpl("Uninterpreted functions");
+    fatalError("Uninterpreted functions");
   }
 
   virtual SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &,
                                   const SMTExprRef &) {
-    unsupportedFeatureImpl("Quantifiers");
+    fatalError("Quantifiers");
   }
 
   virtual SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &,
                                   const SMTExprRef &) {
-    unsupportedFeatureImpl("Quantifiers");
+    fatalError("Quantifiers");
   }
 
   virtual bool getBoolImpl(const SMTExprRef &Exp) = 0;
@@ -1739,12 +1787,12 @@ protected:
   virtual std::string getBVInBinImpl(const SMTExprRef &Exp) = 0;
 
   virtual std::string getIntImpl(const SMTExprRef &) {
-    unsupportedFeatureImpl("Integer arithmetic");
+    fatalError("Integer arithmetic");
   }
 
   virtual void getRationalImpl(const SMTExprRef &, std::string &,
                                std::string &) {
-    unsupportedFeatureImpl("Real arithmetic");
+    fatalError("Real arithmetic");
   }
 
   virtual std::string getFPInBinImpl(const SMTExprRef &Exp);
@@ -1758,24 +1806,20 @@ protected:
 
   virtual SMTExprRef mkBoolImpl(const bool b) = 0;
 
-  virtual SMTExprRef mkIntImpl(int64_t) {
-    unsupportedFeatureImpl("Integer arithmetic");
-  }
+  virtual SMTExprRef mkIntImpl(int64_t) { fatalError("Integer arithmetic"); }
 
   virtual SMTExprRef mkIntImpl(const std::string &) {
-    unsupportedFeatureImpl("Integer arithmetic");
+    fatalError("Integer arithmetic");
   }
 
   virtual SMTExprRef mkRealImpl(const std::string &) {
-    unsupportedFeatureImpl("Real arithmetic");
+    fatalError("Real arithmetic");
   }
 
-  virtual SMTExprRef mkRealImpl(int64_t) {
-    unsupportedFeatureImpl("Real arithmetic");
-  }
+  virtual SMTExprRef mkRealImpl(int64_t) { fatalError("Real arithmetic"); }
 
   virtual SMTExprRef mkRealImpl(int64_t, int64_t) {
-    unsupportedFeatureImpl("Real arithmetic");
+    fatalError("Real arithmetic");
   }
 
   virtual SMTExprRef mkBVFromDecImpl(const int64_t Int,

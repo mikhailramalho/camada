@@ -984,8 +984,7 @@ SMTExprRef CVC5Solver::mkRMImpl(const RM &R) {
   cvc5::Term e;
   switch (R) {
   default:
-    assert(0 && "Unsupported floating-point semantics.");
-    __builtin_unreachable();
+    fatalError("Unsupported floating-point semantics.");
   case RM::ROUND_TO_EVEN:
     e = Terms->mkRoundingMode(cvc5::RoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
     break;

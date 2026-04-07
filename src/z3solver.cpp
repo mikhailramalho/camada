@@ -693,8 +693,7 @@ bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
   case Z3_L_UNDEF:
     break;
   }
-  assert(0 && "Bool is neither true nor false");
-  __builtin_unreachable();
+  fatalError("Bool is neither true nor false");
 }
 
 static inline bool hasZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
@@ -851,8 +850,7 @@ SMTExprRef Z3Solver::mkRMImpl(const RM &R) {
   z3::expr e(*Context);
   switch (R) {
   default:
-    assert(0 && "Unsupported floating-point semantics.");
-    __builtin_unreachable();
+    fatalError("Unsupported floating-point semantics.");
   case RM::ROUND_TO_EVEN:
     e = z3::to_expr(*Context, Z3_mk_fpa_rne(*Context));
     break;

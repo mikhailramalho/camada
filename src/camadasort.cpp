@@ -20,6 +20,7 @@
  **************************************************************************/
 
 #include "camadasort.h"
+#include "camadaerror.h"
 
 #include <cassert>
 #include <cstdio>
@@ -106,8 +107,7 @@ unsigned SMTSort::getWidth() const {
 }
 
 unsigned SMTSort::getWidthFromSolver() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
+  fatalError("Unimplemented for current type");
 }
 
 unsigned SMTSort::getFPSignificandWidth() const {

@@ -283,8 +283,7 @@ static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
   SMTExprRef RNum = mkRMLit(S, R);
   switch (R) {
   default:
-    assert(0 && "Unsupported floating-point semantics.");
-    __builtin_unreachable();
+    fatalError("Unsupported floating-point semantics.");
   case RM::ROUND_TO_EVEN:
   case RM::ROUND_TO_AWAY:
   case RM::ROUND_TO_PLUS_INF:
@@ -426,13 +425,9 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
 
 SMTSortRef SMTSolverImpl::mkRMSortImpl() { return mkBVRMSortImpl(); }
 
-SMTSortRef SMTSolverImpl::mkIntSortImpl() {
-  unsupportedFeatureImpl("Integer arithmetic");
-}
+SMTSortRef SMTSolverImpl::mkIntSortImpl() { fatalError("Integer arithmetic"); }
 
-SMTSortRef SMTSolverImpl::mkRealSortImpl() {
-  unsupportedFeatureImpl("Real arithmetic");
-}
+SMTSortRef SMTSolverImpl::mkRealSortImpl() { fatalError("Real arithmetic"); }
 
 SMTSortRef SMTSolverImpl::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
