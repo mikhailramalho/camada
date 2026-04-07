@@ -109,11 +109,11 @@ SMTExprRef CVC5Solver::newExprRefImpl(const SMTExpr &Exp) const {
   return storeExprRef(toSolverExpr<CVC5Expr>(Exp));
 }
 
-SMTExprRef CVC5Solver::cloneExprWithSortImpl(const SMTExpr &Exp,
-                                             const SMTSortRef &Sort) const {
-  CVC5Expr Retagged = toSolverExpr<CVC5Expr>(Exp);
-  Retagged.Sort = Sort;
-  return storeExprRef(Retagged);
+SMTExprRef CVC5Solver::rewrapExprImpl(const SMTExpr &Exp,
+                                      const SMTSortRef &Sort,
+                                      SMTExprKind Kind) const {
+  const auto &Wrapped = toSolverExpr<CVC5Expr>(Exp);
+  return storeExprRef(CVC5Expr(Kind, Wrapped.Context, Sort, Wrapped.Expr));
 }
 
 SMTSortRef CVC5Solver::mkBoolSortImpl() {
@@ -185,447 +185,446 @@ CVC5Solver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
 }
 
 SMTExprRef CVC5Solver::mkBVNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, Exp->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_NEG,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVNeg, Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_NEG,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVNotImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, Exp->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_NOT,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVNot, Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_NOT,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkNotImpl(const SMTExprRef &Exp) {
-  return newExprRef(CVC5Expr(
-      Context, Exp->Sort,
-      Terms->mkTerm(cvc5::Kind::NOT, {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Not, Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::NOT, {toSolverExpr<CVC5Expr>(*Exp).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkArithNegImpl(const SMTExprRef &Exp) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithNeg, Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::NEG, {toSolverExpr<CVC5Expr>(*Exp).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkInt2RealImpl(const SMTExprRef &Exp) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Int2Real, Context, mkRealSort(),
+      Terms->mkTerm(cvc5::Kind::TO_REAL, {toSolverExpr<CVC5Expr>(*Exp).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkReal2IntImpl(const SMTExprRef &Exp) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Real2Int, Context, mkIntSort(),
+      Terms->mkTerm(cvc5::Kind::TO_INTEGER,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkIsIntImpl(const SMTExprRef &Exp) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::IsInt, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::IS_INTEGER,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVAddImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_ADD,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVAdd, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_ADD,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSubImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SUB,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSub, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SUB,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVMulImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_MULT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVMul, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_MULT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSRemImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SREM,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSRem, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SREM,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVURemImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_UREM,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVURem, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_UREM,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSDivImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SDIV,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSDiv, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SDIV,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVUDivImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_UDIV,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVUDiv, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_UDIV,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVShlImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SHL,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVShl, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SHL,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVAshrImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_ASHR,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVAshr, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_ASHR,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVLshrImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_LSHR,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVLshr, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_LSHR,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVXorImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_XOR,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVXor, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_XOR,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVOrImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_OR,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVOr, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_OR,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVAndImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_AND,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVAnd, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_AND,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVXnorImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_XNOR,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVXnor, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_XNOR,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVNorImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_NOR,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVNor, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_NOR,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVNandImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_NAND,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVNand, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_NAND,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVUltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_ULT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVUlt, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_ULT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSltImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SLT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSlt, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SLT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVUgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_UGT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVUgt, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_UGT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSgtImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SGT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSgt, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SGT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVUleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_ULE,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVUle, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_ULE,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSleImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SLE,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSle, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SLE,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVUgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_UGE,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVUge, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_UGE,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSgeImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_SGE,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSge, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_SGE,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkImpliesImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Implies, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::IMPLIES, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                          toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                          toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::And, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::AND, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Or, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::OR, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                     toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Xor, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::XOR, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
-}
-
-SMTExprRef CVC5Solver::mkArithNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(CVC5Expr(
-      Context, Exp->Sort,
-      Terms->mkTerm(cvc5::Kind::NEG, {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithAddImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, LHS->Sort,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithAdd, Context, LHS->Sort,
       Terms->mkTerm(cvc5::Kind::ADD, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithSubImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, LHS->Sort,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithSub, Context, LHS->Sort,
       Terms->mkTerm(cvc5::Kind::SUB, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithMulImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, LHS->Sort,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithMul, Context, LHS->Sort,
       Terms->mkTerm(cvc5::Kind::MULT, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                       toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                       toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithDivImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::DIVISION,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
-}
-
-SMTExprRef CVC5Solver::mkArithModImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkIntSort(),
-               Terms->mkTerm(cvc5::Kind::INTS_MODULUS,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
-}
-
-SMTExprRef CVC5Solver::mkArithShlImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkIntSort(),
-      Terms->mkTerm(cvc5::Kind::MULT,
-                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                     Terms->mkTerm(cvc5::Kind::POW,
-                                   {Terms->mkInteger(2),
-                                    toSolverExpr<CVC5Expr>(*RHS).Expr})})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithDiv, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::DIVISION, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                                           toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithLtImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithLt, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::LT, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                     toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithGtImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithGt, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::GT, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                     toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithLeImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithLe, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::LEQ, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithGeImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithGe, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::GEQ, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                      toSolverExpr<CVC5Expr>(*RHS).Expr})));
-}
-
-SMTExprRef CVC5Solver::mkInt2RealImpl(const SMTExprRef &Exp) {
-  return newExprRef(CVC5Expr(
-      Context, mkRealSort(),
-      Terms->mkTerm(cvc5::Kind::TO_REAL, {toSolverExpr<CVC5Expr>(*Exp).Expr})));
-}
-
-SMTExprRef CVC5Solver::mkReal2IntImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, mkIntSort(),
-               Terms->mkTerm(cvc5::Kind::TO_INTEGER,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
-}
-
-SMTExprRef CVC5Solver::mkIsIntImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::IS_INTEGER,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+                                      toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkEqualImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Equal, Context, mkBoolSort(),
       Terms->mkTerm(cvc5::Kind::EQUAL, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                        toSolverExpr<CVC5Expr>(*RHS).Expr})));
+                                        toSolverExpr<CVC5Expr>(*RHS).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkArithModImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithMod, Context, mkIntSort(),
+      Terms->mkTerm(cvc5::Kind::INTS_MODULUS,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkArithShlImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArithShl, Context, mkIntSort(),
+      Terms->mkTerm(cvc5::Kind::MULT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     Terms->mkTerm(cvc5::Kind::POW,
+                                   {Terms->mkInteger(2),
+                                    toSolverExpr<CVC5Expr>(*RHS).Expr})}));
 }
 
 SMTExprRef CVC5Solver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                  const SMTExprRef &F) {
-  return newExprRef(CVC5Expr(
-      Context, T->Sort,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Ite, Context, T->Sort,
       Terms->mkTerm(cvc5::Kind::ITE, {toSolverExpr<CVC5Expr>(*Cond).Expr,
                                       toSolverExpr<CVC5Expr>(*T).Expr,
-                                      toSolverExpr<CVC5Expr>(*F).Expr})));
+                                      toSolverExpr<CVC5Expr>(*F).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(CVC5Expr(
-      Context, mkBVSort(i + Exp->getWidth()),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSignExt, Context, mkBVSort(i + Exp->getWidth()),
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::BITVECTOR_SIGN_EXTEND, {i}),
-                    {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(CVC5Expr(
-      Context, mkBVSort(i + Exp->getWidth()),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVZeroExt, Context, mkBVSort(i + Exp->getWidth()),
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::BITVECTOR_ZERO_EXTEND, {i}),
-                    {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVExtractImpl(unsigned High, unsigned Low,
                                        const SMTExprRef &Exp) {
-  return newExprRef(CVC5Expr(
-      Context, mkBVSort(High - Low + 1),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVExtract, Context, mkBVSort(High - Low + 1),
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::BITVECTOR_EXTRACT, {High, Low}),
-                    {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkBVConcatImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
-               Terms->mkTerm(cvc5::Kind::BITVECTOR_CONCAT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVConcat, Context,
+      mkBVSort(LHS->getWidth() + RHS->getWidth()),
+      Terms->mkTerm(cvc5::Kind::BITVECTOR_CONCAT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArraySelectImpl(const SMTExprRef &Array,
                                          const SMTExprRef &Index) {
-  return newExprRef(
-      CVC5Expr(Context, Array->Sort->getElementSort(),
-               Terms->mkTerm(cvc5::Kind::SELECT,
-                             {toSolverExpr<CVC5Expr>(*Array).Expr,
-                              toSolverExpr<CVC5Expr>(*Index).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArraySelect, Context, Array->Sort->getElementSort(),
+      Terms->mkTerm(cvc5::Kind::SELECT, {toSolverExpr<CVC5Expr>(*Array).Expr,
+                                         toSolverExpr<CVC5Expr>(*Index).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArrayStoreImpl(const SMTExprRef &Array,
                                         const SMTExprRef &Index,
                                         const SMTExprRef &Element) {
-  return newExprRef(
-      CVC5Expr(Context, Array->Sort,
-               Terms->mkTerm(cvc5::Kind::STORE,
-                             {toSolverExpr<CVC5Expr>(*Array).Expr,
-                              toSolverExpr<CVC5Expr>(*Index).Expr,
-                              toSolverExpr<CVC5Expr>(*Element).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArrayStore, Context, Array->Sort,
+      Terms->mkTerm(cvc5::Kind::STORE,
+                    {toSolverExpr<CVC5Expr>(*Array).Expr,
+                     toSolverExpr<CVC5Expr>(*Index).Expr,
+                     toSolverExpr<CVC5Expr>(*Element).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkApplyImpl(const SMTExprRef &Function,
@@ -635,236 +634,237 @@ SMTExprRef CVC5Solver::mkApplyImpl(const SMTExprRef &Function,
   ApplyArgs.push_back(toSolverExpr<CVC5Expr>(*Function).Expr);
   for (const auto &Arg : Args)
     ApplyArgs.push_back(toSolverExpr<CVC5Expr>(*Arg).Expr);
-  return newExprRef(CVC5Expr(Context, Function->Sort->getCodomainSort(),
-                             Terms->mkTerm(cvc5::Kind::APPLY_UF, ApplyArgs)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::Apply, Context,
+                               Function->Sort->getCodomainSort(),
+                               Terms->mkTerm(cvc5::Kind::APPLY_UF, ApplyArgs));
 }
 
 SMTExprRef CVC5Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, Exp->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_ABS,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPAbs, Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_ABS,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, Exp->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_NEG,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPNeg, Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_NEG,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_INF,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPIsInfinite, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_INF,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_NAN,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPIsNaN, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_NAN,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_SUBNORMAL,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPIsDenormal, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_SUBNORMAL,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPIsNormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_NORMAL,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPIsNormal, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_NORMAL,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_ZERO,
-                             {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPIsZero, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_IS_ZERO,
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_MULT,
-                             {toSolverExpr<CVC5Expr>(*R).Expr,
-                              toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPMul, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_MULT,
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_DIV,
-                             {toSolverExpr<CVC5Expr>(*R).Expr,
-                              toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPDiv, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_DIV,
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPRemImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_REM,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPRem, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_REM,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_ADD,
-                             {toSolverExpr<CVC5Expr>(*R).Expr,
-                              toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPAdd, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_ADD,
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                    const SMTExprRef &R) {
-  return newExprRef(
-      CVC5Expr(Context, LHS->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_SUB,
-                             {toSolverExpr<CVC5Expr>(*R).Expr,
-                              toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPSub, Context, LHS->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_SUB,
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPSqrtImpl(const SMTExprRef &Exp,
                                     const SMTExprRef &R) {
-  return newExprRef(
-      CVC5Expr(Context, Exp->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_SQRT,
-                             {toSolverExpr<CVC5Expr>(*R).Expr,
-                              toSolverExpr<CVC5Expr>(*Exp).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPSqrt, Context, Exp->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_SQRT,
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                    const SMTExprRef &Z, const SMTExprRef &R) {
-  return newExprRef(CVC5Expr(Context, X->Sort,
-                             Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_FMA,
-                                           {toSolverExpr<CVC5Expr>(*R).Expr,
-                                            toSolverExpr<CVC5Expr>(*X).Expr,
-                                            toSolverExpr<CVC5Expr>(*Y).Expr,
-                                            toSolverExpr<CVC5Expr>(*Z).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPFMA, Context, X->Sort,
+      Terms->mkTerm(
+          cvc5::Kind::FLOATINGPOINT_FMA,
+          {toSolverExpr<CVC5Expr>(*R).Expr, toSolverExpr<CVC5Expr>(*X).Expr,
+           toSolverExpr<CVC5Expr>(*Y).Expr, toSolverExpr<CVC5Expr>(*Z).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPLtImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_LT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPLt, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_LT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPGtImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_GT,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPGt, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_GT,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPLeImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_LEQ,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPLe, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_LEQ,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPGeImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_GEQ,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPGe, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_GEQ,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPEqualImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(
-      CVC5Expr(Context, mkBoolSort(),
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_EQ,
-                             {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                              toSolverExpr<CVC5Expr>(*RHS).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPEqual, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_EQ,
+                    {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPtoFPImpl(const SMTExprRef &From,
                                     const SMTSortRef &To, const SMTExprRef &R) {
-  return newExprRef(CVC5Expr(
-      Context, To,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPtoFP, Context, To,
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_FP,
                                 {To->getFPExponentWidth(),
                                  To->getFPSignificandWidth() + 1}),
                     {toSolverExpr<CVC5Expr>(*R).Expr,
-                     toSolverExpr<CVC5Expr>(*From).Expr})));
+                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkSBVtoFPImpl(const SMTExprRef &From,
                                      const SMTSortRef &To,
                                      const SMTExprRef &R) {
-  return newExprRef(CVC5Expr(
-      Context, To,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::SBVtoFP, Context, To,
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_SBV,
                                 {To->getFPExponentWidth(),
                                  To->getFPSignificandWidth() + 1}),
                     {toSolverExpr<CVC5Expr>(*R).Expr,
-                     toSolverExpr<CVC5Expr>(*From).Expr})));
+                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
                                      const SMTSortRef &To,
                                      const SMTExprRef &R) {
-  return newExprRef(CVC5Expr(
-      Context, To,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::UBVtoFP, Context, To,
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_UBV,
                                 {To->getFPExponentWidth(),
                                  To->getFPSignificandWidth() + 1}),
                     {toSolverExpr<CVC5Expr>(*R).Expr,
-                     toSolverExpr<CVC5Expr>(*From).Expr})));
+                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
-  return newExprRef(CVC5Expr(
-      Context, mkBVSort(ToWidth),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPtoSBV, Context, mkBVSort(ToWidth),
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_SBV, {ToWidth}),
                     {toSolverExpr<CVC5Expr>(*roundingMode).Expr,
-                     toSolverExpr<CVC5Expr>(*From).Expr})));
+                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
-  return newExprRef(CVC5Expr(
-      Context, mkBVSort(ToWidth),
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPtoUBV, Context, mkBVSort(ToWidth),
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_UBV, {ToWidth}),
                     {toSolverExpr<CVC5Expr>(*roundingMode).Expr,
-                     toSolverExpr<CVC5Expr>(*From).Expr})));
+                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
                                           const SMTExprRef &R) {
-  return newExprRef(
-      CVC5Expr(Context, From->Sort,
-               Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_RTI,
-                             {toSolverExpr<CVC5Expr>(*R).Expr,
-                              toSolverExpr<CVC5Expr>(*From).Expr})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPtoIntegral, Context, From->Sort,
+      Terms->mkTerm(cvc5::Kind::FLOATINGPOINT_RTI,
+                    {toSolverExpr<CVC5Expr>(*R).Expr,
+                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
 bool CVC5Solver::getBoolImpl(const SMTExprRef &Exp) {
@@ -905,45 +905,51 @@ std::string CVC5Solver::getFPInBinImpl(const SMTExprRef &Exp) {
 SMTExprRef CVC5Solver::getArrayElementImpl(const SMTExprRef &Array,
                                            const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
-  return newExprRef(
-      CVC5Expr(Context, sel->Sort,
-               Context->getValue(toSolverExpr<CVC5Expr>(*sel).Expr)));
+  return makeExprRef<CVC5Expr>(
+      sel->getKind(), Context, sel->Sort,
+      Context->getValue(toSolverExpr<CVC5Expr>(*sel).Expr));
 }
 
 SMTExprRef CVC5Solver::mkBoolImpl(const bool b) {
-  return newExprRef(CVC5Expr(Context, mkBoolSort(), Terms->mkBoolean(b)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::BoolConst, Context, mkBoolSort(),
+                               Terms->mkBoolean(b));
 }
 
 SMTExprRef CVC5Solver::mkIntImpl(int64_t v) {
-  return newExprRef(CVC5Expr(Context, mkIntSort(), Terms->mkInteger(v)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::IntConst, Context, mkIntSort(),
+                               Terms->mkInteger(v));
 }
 
 SMTExprRef CVC5Solver::mkIntImpl(const std::string &v) {
-  return newExprRef(CVC5Expr(Context, mkIntSort(), Terms->mkInteger(v)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::IntConst, Context, mkIntSort(),
+                               Terms->mkInteger(v));
 }
 
 SMTExprRef CVC5Solver::mkRealImpl(const std::string &v) {
-  return newExprRef(CVC5Expr(Context, mkRealSort(), Terms->mkReal(v)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::RealConst, Context, mkRealSort(),
+                               Terms->mkReal(v));
 }
 
 SMTExprRef CVC5Solver::mkRealImpl(int64_t v) {
-  return newExprRef(CVC5Expr(Context, mkRealSort(), Terms->mkReal(v)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::RealConst, Context, mkRealSort(),
+                               Terms->mkReal(v));
 }
 
 SMTExprRef CVC5Solver::mkRealImpl(int64_t num, int64_t den) {
-  return newExprRef(CVC5Expr(Context, mkRealSort(), Terms->mkReal(num, den)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::RealConst, Context, mkRealSort(),
+                               Terms->mkReal(num, den));
 }
 
 SMTExprRef CVC5Solver::mkBVFromDecImpl(const int64_t Int,
                                        const SMTSortRef &Sort) {
-  return newExprRef(
-      CVC5Expr(Context, Sort, Terms->mkBitVector(Sort->getWidth(), Int)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::BVConst, Context, Sort,
+                               Terms->mkBitVector(Sort->getWidth(), Int));
 }
 
 SMTExprRef CVC5Solver::mkBVFromBinImpl(const std::string &Int,
                                        const SMTSortRef &Sort) {
-  return newExprRef(
-      CVC5Expr(Context, Sort, Terms->mkBitVector(Sort->getWidth(), Int, 2)));
+  return makeExprRef<CVC5Expr>(SMTExprKind::BVConst, Context, Sort,
+                               Terms->mkBitVector(Sort->getWidth(), Int, 2));
 }
 
 SMTExprRef CVC5Solver::mkSymbolImpl(const std::string &Name,
@@ -957,9 +963,9 @@ SMTExprRef CVC5Solver::mkSymbolImpl(const std::string &Name,
 
   // Time for a new one.
   auto inserted = SymbolTable.insert(SymbolTablet::value_type(
-      Name, newExprRef(CVC5Expr(
-                Context, Sort,
-                Terms->mkConst(toSolverSort<CVC5Sort>(*Sort).Sort, Name)))));
+      Name, makeExprRef<CVC5Expr>(
+                SMTExprKind::Symbol, Context, Sort,
+                Terms->mkConst(toSolverSort<CVC5Sort>(*Sort).Sort, Name))));
 
   assert(inserted.second && "Could not cache new CVC5 variable");
   return inserted.first->second;
@@ -968,10 +974,10 @@ SMTExprRef CVC5Solver::mkSymbolImpl(const std::string &Name,
 SMTExprRef CVC5Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
   unsigned SWidth = FP.length() - EWidth - 1;
   const SMTSortRef &sort = mkFPSort(EWidth, SWidth, FPEncoding::Native);
-  return newExprRef(CVC5Expr(
-      Context, sort,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPConst, Context, sort,
       Terms->mkFloatingPoint(EWidth, SWidth + 1,
-                             Terms->mkBitVector(sort->getWidth(), FP, 2))));
+                             Terms->mkBitVector(sort->getWidth(), FP, 2)));
 }
 
 SMTExprRef CVC5Solver::mkRMImpl(const RM &R) {
@@ -996,34 +1002,36 @@ SMTExprRef CVC5Solver::mkRMImpl(const RM &R) {
     e = Terms->mkRoundingMode(cvc5::RoundingMode::ROUND_TOWARD_ZERO);
     break;
   }
-  return newExprRef(CVC5Expr(Context, mkRMSortImpl(), e));
+  return makeExprRef<CVC5Expr>(SMTExprKind::RMConst, Context, mkRMSortImpl(),
+                               e);
 }
 
 SMTExprRef CVC5Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
   const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth, FPEncoding::Native);
-  const SMTExprRef &theNaN = newExprRef(
-      CVC5Expr(Context, sort, Terms->mkFloatingPointNaN(ExpWidth, SigWidth)));
+  const SMTExprRef &theNaN =
+      makeExprRef<CVC5Expr>(SMTExprKind::FPConst, Context, sort,
+                            Terms->mkFloatingPointNaN(ExpWidth, SigWidth));
   return Sgn ? mkFPNeg(theNaN) : theNaN;
 }
 
 SMTExprRef CVC5Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
   const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth, FPEncoding::Native);
-  return newExprRef(
-      CVC5Expr(Context, sort,
-               Sgn ? Terms->mkFloatingPointNegInf(ExpWidth, SigWidth)
-                   : Terms->mkFloatingPointPosInf(ExpWidth, SigWidth)));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::FPConst, Context, sort,
+      Sgn ? Terms->mkFloatingPointNegInf(ExpWidth, SigWidth)
+          : Terms->mkFloatingPointPosInf(ExpWidth, SigWidth));
 }
 
 SMTExprRef CVC5Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                         const SMTSortRef &To) {
-  return newExprRef(CVC5Expr(
-      Context, To,
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVToIEEEFP, Context, To,
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_FP_FROM_IEEE_BV,
                                 {To->getFPExponentWidth(),
                                  To->getFPSignificandWidth() + 1}),
-                    {toSolverExpr<CVC5Expr>(*Exp).Expr})));
+                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
@@ -1047,10 +1055,10 @@ SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
   const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
-  return newExprRef(
-      CVC5Expr(Context, sort,
-               Terms->mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort,
-                                   toSolverExpr<CVC5Expr>(*InitValue).Expr)));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArrayConst, Context, sort,
+      Terms->mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort,
+                          toSolverExpr<CVC5Expr>(*InitValue).Expr));
 }
 
 SMTExprRef CVC5Solver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
@@ -1068,9 +1076,9 @@ SMTExprRef CVC5Solver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
   cvc5::Term bound_list = Terms->mkTerm(cvc5::Kind::VARIABLE_LIST, bound_vars);
   cvc5::Term substituted_body =
       toSolverExpr<CVC5Expr>(*Body).Expr.substitute(old_terms, bound_vars);
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
-      Terms->mkTerm(cvc5::Kind::FORALL, {bound_list, substituted_body})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Forall, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::FORALL, {bound_list, substituted_body}));
 }
 
 SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
@@ -1088,9 +1096,9 @@ SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
   cvc5::Term bound_list = Terms->mkTerm(cvc5::Kind::VARIABLE_LIST, bound_vars);
   cvc5::Term substituted_body =
       toSolverExpr<CVC5Expr>(*Body).Expr.substitute(old_terms, bound_vars);
-  return newExprRef(CVC5Expr(
-      Context, mkBoolSort(),
-      Terms->mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body})));
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Exists, Context, mkBoolSort(),
+      Terms->mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body}));
 }
 
 checkResult CVC5Solver::checkImpl() {

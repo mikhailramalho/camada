@@ -96,14 +96,9 @@ public:
   MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
               const msat_term &T)
       : SolverExpr<MathSATContextRef, msat_term>(Kind, C, S, T) {}
-  MathSATExpr(MathSATContextRef C, const SMTSortRef &S, const msat_term &T)
-      : SolverExpr<MathSATContextRef, msat_term>(C, S, T) {}
   MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
               const msat_decl &D)
       : SolverExpr<MathSATContextRef, msat_term>(Kind, C, S, msat_term{}),
-        IsDecl(true), Decl(D) {}
-  MathSATExpr(MathSATContextRef C, const SMTSortRef &S, const msat_decl &D)
-      : SolverExpr<MathSATContextRef, msat_term>(C, S, msat_term{}),
         IsDecl(true), Decl(D) {}
   virtual ~MathSATExpr() override = default;
 
@@ -134,8 +129,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
-  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                   const SMTSortRef &Sort) const override;
+  SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkIntSortImpl() override;

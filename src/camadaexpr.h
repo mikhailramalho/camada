@@ -245,9 +245,6 @@ public:
              const TheExpr &SA)
       : SMTExpr(Kind, S), Context(std::move(C)), Expr(SA) {}
 
-  SolverExpr(SolverContextRef C, const SMTSortRef &S, const TheExpr &SA)
-      : SolverExpr(SMTExprKind::Unknown, std::move(C), S, SA) {}
-
   virtual ~SolverExpr() override = default;
 
   bool isBVSort() const override { return Sort->isBVSort(); }

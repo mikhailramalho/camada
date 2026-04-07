@@ -83,7 +83,8 @@ SMTExprRef SMTSolverImpl::mkArithModImpl(const SMTExprRef &,
 
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
                                          unsigned Amount) {
-  return mkArithMul(Exp, mkInt(power2Dec(Amount)));
+  SMTExprRef theExp = mkArithMul(Exp, mkInt(power2Dec(Amount)));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::ArithShl);
 }
 
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &,

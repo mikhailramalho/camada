@@ -83,8 +83,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
-  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                   const SMTSortRef &Sort) const override;
+  SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkIntSortImpl() override;

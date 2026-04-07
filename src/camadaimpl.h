@@ -63,20 +63,9 @@ public:
   }
 
 protected:
-  static SMTExprRef tagExprKind(const SMTExprRef &Exp, SMTExprKind Kind) {
-    const_cast<SMTExpr &>(*Exp).setKind(Kind);
-    return Exp;
-  }
-
-  SMTExprRef cloneExprWithSort(const SMTExprRef &Exp,
-                               const SMTSortRef &Sort) const {
-    return cloneExprWithSortImpl(*Exp, Sort);
-  }
-
-  SMTExprRef cloneExprWithSortKind(const SMTExprRef &Exp,
-                                   const SMTSortRef &Sort,
-                                   SMTExprKind Kind) const {
-    return tagExprKind(cloneExprWithSort(Exp, Sort), Kind);
+  template <typename SolverExpr, typename... Args>
+  SMTExprRef makeExprRef(SMTExprKind Kind, Args &&...ArgsV) const {
+    return newExprRef(SolverExpr(Kind, std::forward<Args>(ArgsV)...));
   }
 
   /// Wrapper to create new SMTSort
@@ -290,7 +279,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVAddImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVAdd);
+    return theExp;
   }
 
   SMTExprRef mkBVSub(const SMTExprRef &LHS,
@@ -299,7 +288,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSubImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVSub);
+    return theExp;
   }
 
   SMTExprRef mkBVMul(const SMTExprRef &LHS,
@@ -308,7 +297,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVMulImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVMul);
+    return theExp;
   }
 
   SMTExprRef mkBVSRem(const SMTExprRef &LHS,
@@ -317,7 +306,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSRemImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVSRem);
+    return theExp;
   }
 
   SMTExprRef mkBVURem(const SMTExprRef &LHS,
@@ -326,7 +315,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVURemImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVURem);
+    return theExp;
   }
 
   SMTExprRef mkBVSDiv(const SMTExprRef &LHS,
@@ -335,7 +324,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSDivImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVSDiv);
+    return theExp;
   }
 
   SMTExprRef mkBVUDiv(const SMTExprRef &LHS,
@@ -344,7 +333,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUDivImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVUDiv);
+    return theExp;
   }
 
   SMTExprRef mkBVShl(const SMTExprRef &LHS,
@@ -353,7 +342,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVShlImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVShl);
+    return theExp;
   }
 
   SMTExprRef mkBVAshr(const SMTExprRef &LHS,
@@ -362,7 +351,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVAshrImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVAshr);
+    return theExp;
   }
 
   SMTExprRef mkBVLshr(const SMTExprRef &LHS,
@@ -371,21 +360,21 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVLshrImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVLshr);
+    return theExp;
   }
 
   SMTExprRef mkBVNeg(const SMTExprRef &Exp) override final {
     assert(Exp->isBVSort());
     SMTExprRef theExp = mkBVNegImpl(Exp);
     assert(theExp->Sort == Exp->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVNeg);
+    return theExp;
   }
 
   SMTExprRef mkBVNot(const SMTExprRef &Exp) override final {
     assert(Exp->isBVSort());
     SMTExprRef theExp = mkBVNotImpl(Exp);
     assert(theExp->Sort == Exp->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVNot);
+    return theExp;
   }
 
   SMTExprRef mkBVXor(const SMTExprRef &LHS,
@@ -394,7 +383,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVXorImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVXor);
+    return theExp;
   }
 
   SMTExprRef mkBVOr(const SMTExprRef &LHS,
@@ -403,7 +392,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVOrImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVOr);
+    return theExp;
   }
 
   SMTExprRef mkBVAnd(const SMTExprRef &LHS,
@@ -412,7 +401,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVAndImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVAnd);
+    return theExp;
   }
 
   SMTExprRef mkBVXnor(const SMTExprRef &LHS,
@@ -421,7 +410,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVXnorImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVXnor);
+    return theExp;
   }
 
   SMTExprRef mkBVNor(const SMTExprRef &LHS,
@@ -430,7 +419,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVNorImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVNor);
+    return theExp;
   }
 
   SMTExprRef mkBVNand(const SMTExprRef &LHS,
@@ -439,7 +428,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVNandImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::BVNand);
+    return theExp;
   }
 
   SMTExprRef mkBVUlt(const SMTExprRef &LHS,
@@ -448,7 +437,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUltImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVUlt);
+    return theExp;
   }
 
   SMTExprRef mkBVSlt(const SMTExprRef &LHS,
@@ -457,7 +446,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSltImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVSlt);
+    return theExp;
   }
 
   SMTExprRef mkBVUgt(const SMTExprRef &LHS,
@@ -466,7 +455,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUgtImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVUgt);
+    return theExp;
   }
 
   SMTExprRef mkBVSgt(const SMTExprRef &LHS,
@@ -475,7 +464,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSgtImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVSgt);
+    return theExp;
   }
 
   SMTExprRef mkBVUle(const SMTExprRef &LHS,
@@ -484,7 +473,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUleImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVUle);
+    return theExp;
   }
 
   SMTExprRef mkBVSle(const SMTExprRef &LHS,
@@ -493,7 +482,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSleImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVSle);
+    return theExp;
   }
 
   SMTExprRef mkBVUge(const SMTExprRef &LHS,
@@ -502,7 +491,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVUgeImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVUge);
+    return theExp;
   }
 
   SMTExprRef mkBVSge(const SMTExprRef &LHS,
@@ -511,14 +500,14 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkBVSgeImpl(LHS, RHS);
     assert(theExp->Sort->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::BVSge);
+    return theExp;
   }
 
   SMTExprRef mkNot(const SMTExprRef &Exp) override final {
     assert(Exp->isBoolSort());
     SMTExprRef theExp = mkNotImpl(Exp);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::Not);
+    return theExp;
   }
 
   SMTExprRef mkEqual(const SMTExprRef &LHS,
@@ -526,7 +515,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkEqualImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::Equal);
+    return theExp;
   }
 
   SMTExprRef mkImplies(const SMTExprRef &LHS,
@@ -535,7 +524,7 @@ public:
     assert(*LHS->Sort == *RHS->Sort);
     SMTExprRef theExp = mkImpliesImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::Implies);
+    return theExp;
   }
 
   SMTExprRef mkAnd(const SMTExprRef &LHS,
@@ -544,7 +533,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkAndImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::And);
+    return theExp;
   }
 
   SMTExprRef mkOr(const SMTExprRef &LHS, const SMTExprRef &RHS) override final {
@@ -552,7 +541,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkOrImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::Or);
+    return theExp;
   }
 
   SMTExprRef mkXor(const SMTExprRef &LHS,
@@ -561,14 +550,14 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkXorImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::Xor);
+    return theExp;
   }
 
   SMTExprRef mkArithNeg(const SMTExprRef &Exp) override final {
     assert(Exp->isArithSort());
     SMTExprRef theExp = mkArithNegImpl(Exp);
     assert(theExp->Sort == Exp->Sort);
-    return tagExprKind(theExp, SMTExprKind::ArithNeg);
+    return theExp;
   }
 
   SMTExprRef mkArithAdd(const SMTExprRef &LHS,
@@ -577,7 +566,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithAddImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::ArithAdd);
+    return theExp;
   }
 
   SMTExprRef mkArithSub(const SMTExprRef &LHS,
@@ -586,7 +575,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithSubImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::ArithSub);
+    return theExp;
   }
 
   SMTExprRef mkArithMul(const SMTExprRef &LHS,
@@ -595,7 +584,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithMulImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::ArithMul);
+    return theExp;
   }
 
   SMTExprRef mkArithDiv(const SMTExprRef &LHS,
@@ -604,7 +593,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithDivImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::ArithDiv);
+    return theExp;
   }
 
   SMTExprRef mkArithMod(const SMTExprRef &LHS,
@@ -613,14 +602,14 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithModImpl(LHS, RHS);
     assert(theExp->isIntSort());
-    return tagExprKind(theExp, SMTExprKind::ArithMod);
+    return theExp;
   }
 
   SMTExprRef mkArithShl(const SMTExprRef &Exp, unsigned Amount) override final {
     assert(Exp->isIntSort());
     SMTExprRef theExp = mkArithShlImpl(Exp, Amount);
     assert(theExp->isIntSort());
-    return tagExprKind(theExp, SMTExprKind::ArithShl);
+    return theExp;
   }
 
   SMTExprRef mkArithShl(const SMTExprRef &LHS,
@@ -629,7 +618,7 @@ public:
     assert(RHS->isIntSort());
     SMTExprRef theExp = mkArithShlImpl(LHS, RHS);
     assert(theExp->isIntSort());
-    return tagExprKind(theExp, SMTExprKind::ArithShl);
+    return theExp;
   }
 
   SMTExprRef mkArithLt(const SMTExprRef &LHS,
@@ -638,7 +627,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithLtImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::ArithLt);
+    return theExp;
   }
 
   SMTExprRef mkArithGt(const SMTExprRef &LHS,
@@ -647,7 +636,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithGtImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::ArithGt);
+    return theExp;
   }
 
   SMTExprRef mkArithLe(const SMTExprRef &LHS,
@@ -656,7 +645,7 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithLeImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::ArithLe);
+    return theExp;
   }
 
   SMTExprRef mkArithGe(const SMTExprRef &LHS,
@@ -665,28 +654,28 @@ public:
     assert(LHS->Sort == RHS->Sort);
     SMTExprRef theExp = mkArithGeImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::ArithGe);
+    return theExp;
   }
 
   SMTExprRef mkInt2Real(const SMTExprRef &Exp) override final {
     assert(Exp->isIntSort());
     SMTExprRef theExp = mkInt2RealImpl(Exp);
     assert(theExp->isRealSort());
-    return tagExprKind(theExp, SMTExprKind::Int2Real);
+    return theExp;
   }
 
   SMTExprRef mkReal2Int(const SMTExprRef &Exp) override final {
     assert(Exp->isArithSort());
     SMTExprRef theExp = mkReal2IntImpl(Exp);
     assert(theExp->isIntSort());
-    return tagExprKind(theExp, SMTExprKind::Real2Int);
+    return theExp;
   }
 
   SMTExprRef mkIsInt(const SMTExprRef &Exp) override final {
     assert(Exp->isArithSort());
     SMTExprRef theExp = mkIsIntImpl(Exp);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::IsInt);
+    return theExp;
   }
 
   SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -695,21 +684,21 @@ public:
     assert(T->Sort == F->Sort);
     SMTExprRef theExp = mkIteImpl(Cond, T, F);
     assert(theExp->Sort == F->Sort);
-    return tagExprKind(theExp, SMTExprKind::Ite);
+    return theExp;
   }
 
   SMTExprRef mkBVSignExt(unsigned i, const SMTExprRef &Exp) override final {
     assert(Exp->isBVSort());
     SMTExprRef theExp = mkBVSignExtImpl(i, Exp);
     assert(theExp->getWidth() == Exp->getWidth() + i);
-    return tagExprKind(theExp, SMTExprKind::BVSignExt);
+    return theExp;
   }
 
   SMTExprRef mkBVZeroExt(unsigned i, const SMTExprRef &Exp) override final {
     assert(Exp->isBVSort());
     SMTExprRef theExp = mkBVZeroExtImpl(i, Exp);
     assert(theExp->getWidth() == Exp->getWidth() + i);
-    return tagExprKind(theExp, SMTExprKind::BVZeroExt);
+    return theExp;
   }
 
   SMTExprRef mkBVExtract(unsigned High, unsigned Low,
@@ -721,7 +710,7 @@ public:
                             ? mkBVExtractImpl(High, Low, Exp)
                             : mkBVExtractImpl(High, Low, mkIEEEFPToBV(Exp));
     assert(theExp->getWidth() == (High - Low + 1));
-    return tagExprKind(theExp, SMTExprKind::BVExtract);
+    return theExp;
   }
 
   SMTExprRef mkBVConcat(const SMTExprRef &LHS,
@@ -730,21 +719,21 @@ public:
     assert(RHS->isBVSort());
     SMTExprRef theExp = mkBVConcatImpl(LHS, RHS);
     assert(theExp->getWidth() == (LHS->getWidth() + RHS->getWidth()));
-    return tagExprKind(theExp, SMTExprKind::BVConcat);
+    return theExp;
   }
 
   SMTExprRef mkBVRedOr(const SMTExprRef &Exp) override final {
     assert(Exp->isBVSort());
     SMTExprRef theExp = mkBVRedOrImpl(Exp);
     assert(theExp->getWidth() == 1);
-    return tagExprKind(theExp, SMTExprKind::BVRedOr);
+    return theExp;
   }
 
   SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) override final {
     assert(Exp->isBVSort());
     SMTExprRef theExp = mkBVRedAndImpl(Exp);
     assert(theExp->getWidth() == 1);
-    return tagExprKind(theExp, SMTExprKind::BVRedAnd);
+    return theExp;
   }
 
   SMTExprRef mkFPAbs(const SMTExprRef &Exp) override final {
@@ -752,7 +741,7 @@ public:
     SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPAbsImpl(Exp)
                                               : mkFPAbsImpl(Exp);
     assert(theExp->Sort == Exp->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPAbs);
+    return theExp;
   }
 
   SMTExprRef mkFPNeg(const SMTExprRef &Exp) override final {
@@ -760,7 +749,7 @@ public:
     SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPNegImpl(Exp)
                                               : mkFPNegImpl(Exp);
     assert(theExp->Sort == Exp->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPNeg);
+    return theExp;
   }
 
   SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override final {
@@ -769,7 +758,7 @@ public:
                             ? SMTSolverImpl::mkFPIsInfiniteImpl(Exp)
                             : mkFPIsInfiniteImpl(Exp);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPIsInfinite);
+    return theExp;
   }
 
   SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override final {
@@ -778,7 +767,7 @@ public:
                             ? SMTSolverImpl::mkFPIsNaNImpl(Exp)
                             : mkFPIsNaNImpl(Exp);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPIsNaN);
+    return theExp;
   }
 
   SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override final {
@@ -787,7 +776,7 @@ public:
                             ? SMTSolverImpl::mkFPIsDenormalImpl(Exp)
                             : mkFPIsDenormalImpl(Exp);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPIsDenormal);
+    return theExp;
   }
 
   SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override final {
@@ -796,7 +785,7 @@ public:
                             ? SMTSolverImpl::mkFPIsNormalImpl(Exp)
                             : mkFPIsNormalImpl(Exp);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPIsNormal);
+    return theExp;
   }
 
   SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override final {
@@ -805,7 +794,7 @@ public:
                             ? SMTSolverImpl::mkFPIsZeroImpl(Exp)
                             : mkFPIsZeroImpl(Exp);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPIsZero);
+    return theExp;
   }
 
   SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -818,7 +807,7 @@ public:
                             ? SMTSolverImpl::mkFPMulImpl(LHS, RHS, R)
                             : mkFPMulImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPMul);
+    return theExp;
   }
 
   SMTExprRef mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -831,7 +820,7 @@ public:
                             ? SMTSolverImpl::mkFPDivImpl(LHS, RHS, R)
                             : mkFPDivImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPDiv);
+    return theExp;
   }
 
   SMTExprRef mkFPRem(const SMTExprRef &LHS,
@@ -842,7 +831,7 @@ public:
                             ? SMTSolverImpl::mkFPRemImpl(LHS, RHS)
                             : mkFPRemImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPRem);
+    return theExp;
   }
 
   SMTExprRef mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -855,7 +844,7 @@ public:
                             ? SMTSolverImpl::mkFPAddImpl(LHS, RHS, R)
                             : mkFPAddImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPAdd);
+    return theExp;
   }
 
   SMTExprRef mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -868,7 +857,7 @@ public:
                             ? SMTSolverImpl::mkFPSubImpl(LHS, RHS, R)
                             : mkFPSubImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPSub);
+    return theExp;
   }
 
   SMTExprRef mkFPSqrt(const SMTExprRef &Exp,
@@ -880,7 +869,7 @@ public:
                             ? SMTSolverImpl::mkFPSqrtImpl(Exp, R)
                             : mkFPSqrtImpl(Exp, R);
     assert(theExp->Sort == Exp->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPSqrt);
+    return theExp;
   }
 
   SMTExprRef mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
@@ -894,7 +883,7 @@ public:
                             ? SMTSolverImpl::mkFPFMAImpl(X, Y, Z, R)
                             : mkFPFMAImpl(X, Y, Z, R);
     assert(theExp->Sort == Z->Sort);
-    return tagExprKind(theExp, SMTExprKind::FPFMA);
+    return theExp;
   }
 
   SMTExprRef mkFPLt(const SMTExprRef &LHS,
@@ -905,7 +894,7 @@ public:
                             ? SMTSolverImpl::mkFPLtImpl(LHS, RHS)
                             : mkFPLtImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPLt);
+    return theExp;
   }
 
   SMTExprRef mkFPGt(const SMTExprRef &LHS,
@@ -916,7 +905,7 @@ public:
                             ? SMTSolverImpl::mkFPGtImpl(LHS, RHS)
                             : mkFPGtImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPGt);
+    return theExp;
   }
 
   SMTExprRef mkFPLe(const SMTExprRef &LHS,
@@ -927,7 +916,7 @@ public:
                             ? SMTSolverImpl::mkFPLeImpl(LHS, RHS)
                             : mkFPLeImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPLe);
+    return theExp;
   }
 
   SMTExprRef mkFPGe(const SMTExprRef &LHS,
@@ -938,7 +927,7 @@ public:
                             ? SMTSolverImpl::mkFPGeImpl(LHS, RHS)
                             : mkFPGeImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPGe);
+    return theExp;
   }
 
   SMTExprRef mkFPEqual(const SMTExprRef &LHS,
@@ -949,7 +938,7 @@ public:
                             ? SMTSolverImpl::mkFPEqualImpl(LHS, RHS)
                             : mkFPEqualImpl(LHS, RHS);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::FPEqual);
+    return theExp;
   }
 
   SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
@@ -963,7 +952,7 @@ public:
                             ? SMTSolverImpl::mkFPtoFPImpl(From, To, R)
                             : mkFPtoFPImpl(From, To, R);
     assert(theExp->Sort == To);
-    return tagExprKind(theExp, SMTExprKind::FPtoFP);
+    return theExp;
   }
 
   SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
@@ -976,7 +965,7 @@ public:
                             ? SMTSolverImpl::mkSBVtoFPImpl(From, To, R)
                             : mkSBVtoFPImpl(From, To, R);
     assert(theExp->Sort == To);
-    return tagExprKind(theExp, SMTExprKind::SBVtoFP);
+    return theExp;
   }
 
   SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
@@ -989,7 +978,7 @@ public:
                             ? SMTSolverImpl::mkUBVtoFPImpl(From, To, R)
                             : mkUBVtoFPImpl(From, To, R);
     assert(theExp->Sort == To);
-    return tagExprKind(theExp, SMTExprKind::UBVtoFP);
+    return theExp;
   }
 
   SMTExprRef mkFPtoSBV(const SMTExprRef &From,
@@ -999,7 +988,7 @@ public:
                             ? SMTSolverImpl::mkFPtoSBVImpl(From, ToWidth)
                             : mkFPtoSBVImpl(From, ToWidth);
     assert(theExp->getWidth() == ToWidth);
-    return tagExprKind(theExp, SMTExprKind::FPtoSBV);
+    return theExp;
   }
 
   SMTExprRef mkFPtoUBV(const SMTExprRef &From,
@@ -1009,7 +998,7 @@ public:
                             ? SMTSolverImpl::mkFPtoUBVImpl(From, ToWidth)
                             : mkFPtoUBVImpl(From, ToWidth);
     assert(theExp->getWidth() == ToWidth);
-    return tagExprKind(theExp, SMTExprKind::FPtoUBV);
+    return theExp;
   }
 
   SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
@@ -1021,7 +1010,7 @@ public:
                             ? SMTSolverImpl::mkFPtoIntegralImpl(From, R)
                             : mkFPtoIntegralImpl(From, R);
     assert(theExp->isFPSort());
-    return tagExprKind(theExp, SMTExprKind::FPtoIntegral);
+    return theExp;
   }
 
   SMTExprRef mkArraySelect(const SMTExprRef &Array,
@@ -1030,7 +1019,7 @@ public:
     assert(Array->Sort->getIndexSort() == Index->Sort);
     SMTExprRef theExp = mkArraySelectImpl(Array, Index);
     assert(theExp->Sort == Array->Sort->getElementSort());
-    return tagExprKind(theExp, SMTExprKind::ArraySelect);
+    return theExp;
   }
 
   SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
@@ -1040,7 +1029,7 @@ public:
     assert(Array->Sort->getElementSort() == Element->Sort);
     SMTExprRef theExp = mkArrayStoreImpl(Array, Index, Element);
     assert(theExp->Sort == Array->Sort);
-    return tagExprKind(theExp, SMTExprKind::ArrayStore);
+    return theExp;
   }
 
   SMTExprRef mkApply(const SMTExprRef &Function,
@@ -1051,7 +1040,7 @@ public:
       assert(Function->Sort->getDomainSorts()[i] == Args[i]->Sort);
     SMTExprRef theExp = mkApplyImpl(Function, Args);
     assert(theExp->Sort == Function->Sort->getCodomainSort());
-    return tagExprKind(theExp, SMTExprKind::Apply);
+    return theExp;
   }
 
   SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
@@ -1059,7 +1048,7 @@ public:
     assert(Body->isBoolSort());
     SMTExprRef theExp = mkForallImpl(Vars, Body);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::Forall);
+    return theExp;
   }
 
   SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
@@ -1067,7 +1056,7 @@ public:
     assert(Body->isBoolSort());
     SMTExprRef theExp = mkExistsImpl(Vars, Body);
     assert(theExp->isBoolSort());
-    return tagExprKind(theExp, SMTExprKind::Exists);
+    return theExp;
   }
 
   bool getBool(const SMTExprRef &Exp) override final {
@@ -1141,7 +1130,7 @@ public:
     assert(Array->Sort->getIndexSort() == Index->Sort);
     SMTExprRef theExp = getArrayElementImpl(Array, Index);
     assert(theExp->Sort == Array->Sort->getElementSort());
-    return tagExprKind(theExp, SMTExprKind::ArraySelect);
+    return theExp;
   }
 
   SMTExprRef mkBool(const bool b) override final {
@@ -1152,37 +1141,37 @@ public:
     SMTExprRef theExp = mkBoolImpl(b);
     assert(theExp->isBoolSort());
     CachedExpr = theExp;
-    return tagExprKind(CachedExpr, SMTExprKind::BoolConst);
+    return CachedExpr;
   }
 
   SMTExprRef mkInt(int64_t v) override final {
     SMTExprRef theExp = mkIntImpl(v);
     assert(theExp->isIntSort());
-    return tagExprKind(theExp, SMTExprKind::IntConst);
+    return theExp;
   }
 
   SMTExprRef mkInt(const std::string &v) override final {
     SMTExprRef theExp = mkIntImpl(v);
     assert(theExp->isIntSort());
-    return tagExprKind(theExp, SMTExprKind::IntConst);
+    return theExp;
   }
 
   SMTExprRef mkReal(const std::string &v) override final {
     SMTExprRef theExp = mkRealImpl(v);
     assert(theExp->isRealSort());
-    return tagExprKind(theExp, SMTExprKind::RealConst);
+    return theExp;
   }
 
   SMTExprRef mkReal(int64_t v) override final {
     SMTExprRef theExp = mkRealImpl(v);
     assert(theExp->isRealSort());
-    return tagExprKind(theExp, SMTExprKind::RealConst);
+    return theExp;
   }
 
   SMTExprRef mkReal(int64_t num, int64_t den) override final {
     SMTExprRef theExp = mkRealImpl(num, den);
     assert(theExp->isRealSort());
-    return tagExprKind(theExp, SMTExprKind::RealConst);
+    return theExp;
   }
 
   SMTExprRef mkBVFromDec(const int64_t Int,
@@ -1223,14 +1212,14 @@ public:
       SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
       assert(theExp->isBVSort());
       assert(theExp->getWidth() == Sort->getWidth());
-      CachedExpr = tagExprKind(theExp, SMTExprKind::BVConst);
+      CachedExpr = theExp;
       return CachedExpr;
     }
 
     SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());
-    return tagExprKind(theExp, SMTExprKind::BVConst);
+    return theExp;
   }
 
   SMTExprRef mkBVFromDec(const int64_t Int, unsigned BitWidth) override final {
@@ -1243,7 +1232,7 @@ public:
     SMTExprRef theExp = mkBVFromBinImpl(Int, Sort);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Sort->getWidth());
-    return tagExprKind(theExp, SMTExprKind::BVConst);
+    return theExp;
   }
 
   SMTExprRef mkBVFromBin(const std::string &Int,
@@ -1265,7 +1254,7 @@ public:
     SMTExprRef theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
     SymbolExprCache.emplace(Key, theExp);
-    return tagExprKind(theExp, SMTExprKind::Symbol);
+    return theExp;
   }
 
   SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth,
@@ -1276,28 +1265,28 @@ public:
                             : mkFPFromBinImpl(FP, EWidth);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == FP.length());
-    return tagExprKind(theExp, SMTExprKind::FPConst);
+    return theExp;
   }
 
   SMTExprRef mkFP32(const float Float, FPEncoding Encoding) override final {
     SMTExprRef theExp = mkFP32Impl(Float, Encoding);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == 32);
-    return tagExprKind(theExp, SMTExprKind::FPConst);
+    return theExp;
   }
 
   SMTExprRef mkFP64(const double Double, FPEncoding Encoding) override final {
     SMTExprRef theExp = mkFP64Impl(Double, Encoding);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == 64);
-    return tagExprKind(theExp, SMTExprKind::FPConst);
+    return theExp;
   }
 
   SMTExprRef mkRM(const RM &R, FPEncoding Encoding) override final {
     SMTExprRef theExp =
         Encoding == FPEncoding::BV ? SMTSolverImpl::mkRMImpl(R) : mkRMImpl(R);
     assert(theExp->isRMSort());
-    return tagExprKind(theExp, SMTExprKind::RMConst);
+    return theExp;
   }
 
   SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
@@ -1311,7 +1300,7 @@ public:
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == (ExpWidth + SigWidth));
     assert(theExp->getWidth() == theExp->Sort->getWidthFromSolver());
-    return tagExprKind(theExp, SMTExprKind::FPConst);
+    return theExp;
   }
 
   SMTExprRef mkNaN32(const bool Sgn, FPEncoding Encoding) override final {
@@ -1333,7 +1322,7 @@ public:
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == (ExpWidth + SigWidth));
     assert(theExp->getWidth() == theExp->Sort->getWidthFromSolver());
-    return tagExprKind(theExp, SMTExprKind::FPConst);
+    return theExp;
   }
 
   SMTExprRef mkInf32(const bool Sgn, FPEncoding Encoding) override final {
@@ -1350,7 +1339,7 @@ public:
     assert(theExp->isArraySort());
     assert(theExp->Sort->getIndexSort() == IndexSort);
     assert(theExp->Sort->getElementSort() == InitValue->Sort);
-    return tagExprKind(theExp, SMTExprKind::ArrayConst);
+    return theExp;
   }
 
   SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
@@ -1361,7 +1350,7 @@ public:
                             : mkBVToIEEEFPImpl(Exp, To);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == Exp->getWidth());
-    return tagExprKind(theExp, SMTExprKind::BVToIEEEFP);
+    return theExp;
   }
 
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final {
@@ -1371,7 +1360,7 @@ public:
                             : mkIEEEFPToBVImpl(Exp);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Exp->getWidth());
-    return tagExprKind(theExp, SMTExprKind::IEEEFPToBV);
+    return theExp;
   }
 
   checkResult check() override final { return checkImpl(); }
@@ -1405,8 +1394,8 @@ protected:
 
   virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) const = 0;
 
-  virtual SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                           const SMTSortRef &Sort) const = 0;
+  virtual SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                                    SMTExprKind Kind) const = 0;
 
   virtual SMTSortRef mkBoolSortImpl() = 0;
 
@@ -1475,16 +1464,19 @@ protected:
 
   virtual SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-    return mkBVNot(mkBVXor(LHS, RHS));
+    SMTExprRef theExp = mkBVNot(mkBVXor(LHS, RHS));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVXnor);
   };
 
   virtual SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkBVNot(mkBVOr(LHS, RHS));
+    SMTExprRef theExp = mkBVNot(mkBVOr(LHS, RHS));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNor);
   };
 
   virtual SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-    return mkBVNot(mkBVAnd(LHS, RHS));
+    SMTExprRef theExp = mkBVNot(mkBVAnd(LHS, RHS));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNand);
   };
 
   virtual SMTExprRef mkBVUltImpl(const SMTExprRef &LHS,
@@ -1494,11 +1486,13 @@ protected:
                                  const SMTExprRef &RHS) = 0;
 
   virtual SMTExprRef mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVUle(LHS, RHS));
+    SMTExprRef theExp = mkNot(mkBVUle(LHS, RHS));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUgt);
   }
 
   virtual SMTExprRef mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVSle(LHS, RHS));
+    SMTExprRef theExp = mkNot(mkBVSle(LHS, RHS));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSgt);
   }
 
   virtual SMTExprRef mkBVUleImpl(const SMTExprRef &LHS,
@@ -1508,11 +1502,13 @@ protected:
                                  const SMTExprRef &RHS) = 0;
 
   virtual SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVUlt(LHS, RHS));
+    SMTExprRef theExp = mkNot(mkBVUlt(LHS, RHS));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUge);
   }
 
   virtual SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkNot(mkBVSlt(LHS, RHS));
+    SMTExprRef theExp = mkNot(mkBVSlt(LHS, RHS));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSge);
   }
 
   virtual SMTExprRef mkNotImpl(const SMTExprRef &Exp) = 0;
@@ -1523,7 +1519,8 @@ protected:
   virtual SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
     // This is: logical-or(logical-not(LHS), RHS)
-    return mkOr(mkNot(LHS), RHS);
+    SMTExprRef theExp = mkOr(mkNot(LHS), RHS);
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Implies);
   }
 
   virtual SMTExprRef mkAndImpl(const SMTExprRef &LHS,
@@ -1532,7 +1529,8 @@ protected:
   virtual SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   virtual SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
+    SMTExprRef theExp = mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Xor);
   }
 
   virtual SMTExprRef mkArithNegImpl(const SMTExprRef &Exp);
@@ -1591,13 +1589,17 @@ protected:
   virtual SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) {
     // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
-    return mkIte(mkNot(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+    SMTExprRef theExp =
+        mkIte(mkNot(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
   }
 
   virtual SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) {
     // bvredand = bvcomp(x,-1) ? bv1 : bv0;
     SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
-    return mkIte(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+    SMTExprRef theExp =
+        mkIte(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
   }
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
@@ -1636,14 +1638,16 @@ protected:
   virtual SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    return mkFPLt(RHS, LHS);
+    SMTExprRef theExp = mkFPLt(RHS, LHS);
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGt);
   }
 
   virtual SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
     // (a >= b) iff (b <= a)
-    return mkFPLe(RHS, LHS);
+    SMTExprRef theExp = mkFPLe(RHS, LHS);
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGe);
   }
 
   virtual SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,

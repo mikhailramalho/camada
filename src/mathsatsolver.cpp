@@ -163,17 +163,28 @@ static inline bool checkExprError(const SMTExpr &Exp) {
   return false;
 }
 
+static inline bool checkExprError(MathSATContextRef Context, msat_decl Decl) {
+  if (MSAT_ERROR_DECL(Decl)) {
+    std::fprintf(stderr, "MathSAT Error %s\n",
+                 msat_last_error_message(*Context));
+    return true;
+  }
+  return false;
+}
+
 SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) const {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
   return storeExprRef(toSolverExpr<MathSATExpr>(Exp));
 }
 
-SMTExprRef MathSATSolver::cloneExprWithSortImpl(const SMTExpr &Exp,
-                                                const SMTSortRef &Sort) const {
+SMTExprRef MathSATSolver::rewrapExprImpl(const SMTExpr &Exp,
+                                         const SMTSortRef &Sort,
+                                         SMTExprKind Kind) const {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
-  MathSATExpr Retagged = toSolverExpr<MathSATExpr>(Exp);
-  Retagged.Sort = Sort;
-  return storeExprRef(Retagged);
+  const auto &Wrapped = toSolverExpr<MathSATExpr>(Exp);
+  if (Wrapped.IsDecl)
+    return storeExprRef(MathSATExpr(Kind, Wrapped.Context, Sort, Wrapped.Decl));
+  return storeExprRef(MathSATExpr(Kind, Wrapped.Context, Sort, Wrapped.Expr));
 }
 
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
@@ -248,165 +259,167 @@ MathSATSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
 }
 
 SMTExprRef MathSATSolver::mkBVNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_make_bv_neg(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVNeg, Context, Exp->Sort,
+      msat_make_bv_neg(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkBVNotImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_make_bv_not(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVNot, Context, Exp->Sort,
+      msat_make_bv_not(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkNotImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(Context, Exp->Sort,
-                                msat_make_not(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(SMTExprKind::Not, Context, Exp->Sort,
+                                  msat_make_not(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkBVAddImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_plus(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVAdd, Context, LHS->Sort,
+      msat_make_bv_plus(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVSubImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_minus(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVSub, Context, LHS->Sort,
+      msat_make_bv_minus(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVMulImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_times(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVMul, Context, LHS->Sort,
+      msat_make_bv_times(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVSRemImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_srem(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVSRem, Context, LHS->Sort,
+      msat_make_bv_srem(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVURemImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_urem(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVURem, Context, LHS->Sort,
+      msat_make_bv_urem(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVSDivImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_sdiv(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVSDiv, Context, LHS->Sort,
+      msat_make_bv_sdiv(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVUDivImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_udiv(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVUDiv, Context, LHS->Sort,
+      msat_make_bv_udiv(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVShlImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_lshl(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVShl, Context, LHS->Sort,
+      msat_make_bv_lshl(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVAshrImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_ashr(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVAshr, Context, LHS->Sort,
+      msat_make_bv_ashr(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVLshrImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_lshr(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVLshr, Context, LHS->Sort,
+      msat_make_bv_lshr(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVXorImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_xor(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVXor, Context, LHS->Sort,
+      msat_make_bv_xor(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVOrImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_or(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVOr, Context, LHS->Sort,
+      msat_make_bv_or(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVAndImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_bv_and(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVAnd, Context, LHS->Sort,
+      msat_make_bv_and(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVUltImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_bv_ult(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVUlt, Context, mkBoolSort(),
+      msat_make_bv_ult(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVSltImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_bv_slt(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVSlt, Context, mkBoolSort(),
+      msat_make_bv_slt(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVUleImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_bv_uleq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVUle, Context, mkBoolSort(),
+      msat_make_bv_uleq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkBVSleImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_bv_sleq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVSle, Context, mkBoolSort(),
+      msat_make_bv_sleq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkAndImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_and(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::And, Context, mkBoolSort(),
+      msat_make_and(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkOrImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_or(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::Or, Context, mkBoolSort(),
+      msat_make_or(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkArithNegImpl(const SMTExprRef &Exp) {
   const SMTExprRef &minus_one = Exp->isIntSort() ? mkInt(-1) : mkReal(-1);
-  return newExprRef(MathSATExpr(
-      Context, Exp->Sort,
-      msat_make_times(*Context, toMathSATTerm(minus_one), toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArithNeg, Context, Exp->Sort,
+      msat_make_times(*Context, toMathSATTerm(minus_one), toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkArithAddImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_plus(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArithAdd, Context, LHS->Sort,
+      msat_make_plus(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkArithSubImpl(const SMTExprRef &LHS,
@@ -416,16 +429,16 @@ SMTExprRef MathSATSolver::mkArithSubImpl(const SMTExprRef &LHS,
 
 SMTExprRef MathSATSolver::mkArithMulImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_times(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArithMul, Context, LHS->Sort,
+      msat_make_times(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkArithDivImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, LHS->Sort,
-      msat_make_divide(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArithDiv, Context, LHS->Sort,
+      msat_make_divide(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkArithModImpl(const SMTExprRef &LHS,
@@ -433,16 +446,17 @@ SMTExprRef MathSATSolver::mkArithModImpl(const SMTExprRef &LHS,
   const SMTExprRef &lhs_real = mkInt2Real(LHS);
   const SMTExprRef &rhs_real = mkInt2Real(RHS);
   const SMTExprRef &q = mkReal2Int(mkArithDiv(lhs_real, rhs_real));
-  return mkArithSub(LHS, mkArithMul(RHS, q));
+  SMTExprRef theExp = mkArithSub(LHS, mkArithMul(RHS, q));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::ArithMod);
 }
 
 SMTExprRef MathSATSolver::mkArithShlImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkIntSort(),
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArithShl, Context, mkIntSort(),
       msat_make_times(*Context, toMathSATTerm(LHS),
                       msat_make_pow(*Context, toMathSATTerm(mkInt("2")),
-                                    toMathSATTerm(RHS)))));
+                                    toMathSATTerm(RHS))));
 }
 
 SMTExprRef MathSATSolver::mkArithLtImpl(const SMTExprRef &LHS,
@@ -457,41 +471,43 @@ SMTExprRef MathSATSolver::mkArithGtImpl(const SMTExprRef &LHS,
 
 SMTExprRef MathSATSolver::mkArithLeImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_leq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArithLe, Context, mkBoolSort(),
+      msat_make_leq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkArithGeImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_leq(*Context, toMathSATTerm(RHS), toMathSATTerm(LHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArithGe, Context, mkBoolSort(),
+      msat_make_leq(*Context, toMathSATTerm(RHS), toMathSATTerm(LHS)));
 }
 
 SMTExprRef MathSATSolver::mkInt2RealImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, mkRealSort(),
-      msat_make_times(*Context, toMathSATTerm(Exp), toMathSATTerm(mkReal(1)))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::Int2Real, Context, mkRealSort(),
+      msat_make_times(*Context, toMathSATTerm(Exp), toMathSATTerm(mkReal(1))));
 }
 
 SMTExprRef MathSATSolver::mkReal2IntImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(Context, mkIntSort(),
-                                msat_make_floor(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::Real2Int, Context, mkIntSort(),
+      msat_make_floor(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkIsIntImpl(const SMTExprRef &Exp) {
   if (Exp->isIntSort())
     return mkBool(true);
 
-  return mkEqual(mkInt2Real(mkReal2Int(Exp)), Exp);
+  SMTExprRef theExp = mkEqual(mkInt2Real(mkReal2Int(Exp)), Exp);
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::IsInt);
 }
 
 SMTExprRef MathSATSolver::mkEqualImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_eq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::Equal, Context, mkBoolSort(),
+      msat_make_eq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
@@ -499,36 +515,37 @@ SMTExprRef MathSATSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
   if (T->isBoolSort())
     return mkOr(mkAnd(Cond, T), mkAnd(mkNot(Cond), F));
 
-  return newExprRef(
-      MathSATExpr(Context, T->Sort,
-                  msat_make_term_ite(*Context, toMathSATTerm(Cond),
-                                     toMathSATTerm(T), toMathSATTerm(F))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::Ite, Context, T->Sort,
+      msat_make_term_ite(*Context, toMathSATTerm(Cond), toMathSATTerm(T),
+                         toMathSATTerm(F)));
 }
 
 SMTExprRef MathSATSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      MathSATExpr(Context, mkBVSort(i + Exp->getWidth()),
-                  msat_make_bv_sext(*Context, i, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVSignExt, Context, mkBVSort(i + Exp->getWidth()),
+      msat_make_bv_sext(*Context, i, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
-  return newExprRef(
-      MathSATExpr(Context, mkBVSort(i + Exp->getWidth()),
-                  msat_make_bv_zext(*Context, i, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVZeroExt, Context, mkBVSort(i + Exp->getWidth()),
+      msat_make_bv_zext(*Context, i, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkBVExtractImpl(unsigned High, unsigned Low,
                                           const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, mkBVSort(High - Low + 1),
-      msat_make_bv_extract(*Context, High, Low, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVExtract, Context, mkBVSort(High - Low + 1),
+      msat_make_bv_extract(*Context, High, Low, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkBVConcatImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBVSort(LHS->getWidth() + RHS->getWidth()),
-      msat_make_bv_concat(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVConcat, Context,
+      mkBVSort(LHS->getWidth() + RHS->getWidth()),
+      msat_make_bv_concat(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkArraySelectImpl(const SMTExprRef &Array,
@@ -537,12 +554,13 @@ SMTExprRef MathSATSolver::mkArraySelectImpl(const SMTExprRef &Array,
                                         toMathSATTerm(Index));
   if (Array->Sort->getElementSort()->isBoolSort()) {
     const SMTExprRef &one = mkBVFromDec(1, mkBVSort(1));
-    return newExprRef(
-        MathSATExpr(Context, mkBoolSort(),
-                    msat_make_eq(*Context, read, toMathSATTerm(one))));
+    return makeExprRef<MathSATExpr>(
+        SMTExprKind::ArraySelect, Context, mkBoolSort(),
+        msat_make_eq(*Context, read, toMathSATTerm(one)));
   }
 
-  return newExprRef(MathSATExpr(Context, Array->Sort->getElementSort(), read));
+  return makeExprRef<MathSATExpr>(SMTExprKind::ArraySelect, Context,
+                                  Array->Sort->getElementSort(), read);
 }
 
 SMTExprRef MathSATSolver::mkArrayStoreImpl(const SMTExprRef &Array,
@@ -557,10 +575,10 @@ SMTExprRef MathSATSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                            toMathSATTerm(zero));
   }
 
-  return newExprRef(MathSATExpr(
-      Context, Array->Sort,
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArrayStore, Context, Array->Sort,
       msat_make_array_write(*Context, toMathSATTerm(Array),
-                            toMathSATTerm(Index), backend_element)));
+                            toMathSATTerm(Index), backend_element));
 }
 
 SMTExprRef MathSATSolver::mkApplyImpl(const SMTExprRef &Function,
@@ -569,65 +587,69 @@ SMTExprRef MathSATSolver::mkApplyImpl(const SMTExprRef &Function,
   ApplyArgs.reserve(Args.size());
   for (const auto &Arg : Args)
     ApplyArgs.push_back(toMathSATTerm(Arg));
-  return newExprRef(MathSATExpr(
-      Context, Function->Sort->getCodomainSort(),
-      msat_make_term(*Context, toMathSATDecl(Function), ApplyArgs.data())));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::Apply, Context, Function->Sort->getCodomainSort(),
+      msat_make_term(*Context, toMathSATDecl(Function), ApplyArgs.data()));
 }
 
 SMTExprRef MathSATSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_make_fp_abs(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPAbs, Context, Exp->Sort,
+      msat_make_fp_abs(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPNegImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_make_fp_neg(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPNeg, Context, Exp->Sort,
+      msat_make_fp_neg(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(), msat_make_fp_isinf(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPIsInfinite, Context, mkBoolSort(),
+      msat_make_fp_isinf(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(), msat_make_fp_isnan(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPIsNaN, Context, mkBoolSort(),
+      msat_make_fp_isnan(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      MathSATExpr(Context, mkBoolSort(),
-                  msat_make_fp_issubnormal(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPIsDenormal, Context, mkBoolSort(),
+      msat_make_fp_issubnormal(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPIsNormalImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      MathSATExpr(Context, mkBoolSort(),
-                  msat_make_fp_isnormal(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPIsNormal, Context, mkBoolSort(),
+      msat_make_fp_isnormal(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
-  return newExprRef(
-      MathSATExpr(Context, mkBoolSort(),
-                  msat_make_fp_iszero(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPIsZero, Context, mkBoolSort(),
+      msat_make_fp_iszero(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPMulImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS,
                                       const SMTExprRef &R) {
-  return newExprRef(
-      MathSATExpr(Context, LHS->Sort,
-                  msat_make_fp_times(*Context, toMathSATTerm(R),
-                                     toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(SMTExprKind::FPMul, Context, LHS->Sort,
+                                  msat_make_fp_times(*Context, toMathSATTerm(R),
+                                                     toMathSATTerm(LHS),
+                                                     toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkFPDivImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS,
                                       const SMTExprRef &R) {
-  return newExprRef(
-      MathSATExpr(Context, LHS->Sort,
-                  msat_make_fp_div(*Context, toMathSATTerm(R),
-                                   toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(SMTExprKind::FPDiv, Context, LHS->Sort,
+                                  msat_make_fp_div(*Context, toMathSATTerm(R),
+                                                   toMathSATTerm(LHS),
+                                                   toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
@@ -646,26 +668,26 @@ SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
 SMTExprRef MathSATSolver::mkFPAddImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS,
                                       const SMTExprRef &R) {
-  return newExprRef(
-      MathSATExpr(Context, LHS->Sort,
-                  msat_make_fp_plus(*Context, toMathSATTerm(R),
-                                    toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(SMTExprKind::FPAdd, Context, LHS->Sort,
+                                  msat_make_fp_plus(*Context, toMathSATTerm(R),
+                                                    toMathSATTerm(LHS),
+                                                    toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkFPSubImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS,
                                       const SMTExprRef &R) {
-  return newExprRef(
-      MathSATExpr(Context, LHS->Sort,
-                  msat_make_fp_minus(*Context, toMathSATTerm(R),
-                                     toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(SMTExprKind::FPSub, Context, LHS->Sort,
+                                  msat_make_fp_minus(*Context, toMathSATTerm(R),
+                                                     toMathSATTerm(LHS),
+                                                     toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
                                        const SMTExprRef &R) {
-  return newExprRef(MathSATExpr(
-      Context, Exp->Sort,
-      msat_make_fp_sqrt(*Context, toMathSATTerm(R), toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPSqrt, Context, Exp->Sort,
+      msat_make_fp_sqrt(*Context, toMathSATTerm(R), toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
@@ -702,53 +724,53 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
 SMTExprRef MathSATSolver::mkFPLtImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_fp_lt(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPLt, Context, mkBoolSort(),
+      msat_make_fp_lt(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkFPLeImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_fp_leq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPLe, Context, mkBoolSort(),
+      msat_make_fp_leq(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkFPEqualImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
-  return newExprRef(MathSATExpr(
-      Context, mkBoolSort(),
-      msat_make_fp_equal(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPEqual, Context, mkBoolSort(),
+      msat_make_fp_equal(*Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
 SMTExprRef MathSATSolver::mkFPtoFPImpl(const SMTExprRef &From,
                                        const SMTSortRef &To,
                                        const SMTExprRef &R) {
-  return newExprRef(
-      MathSATExpr(Context, To,
-                  msat_make_fp_cast(*Context, To->getFPExponentWidth(),
-                                    To->getFPSignificandWidth(),
-                                    toMathSATTerm(R), toMathSATTerm(From))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPtoFP, Context, To,
+      msat_make_fp_cast(*Context, To->getFPExponentWidth(),
+                        To->getFPSignificandWidth(), toMathSATTerm(R),
+                        toMathSATTerm(From)));
 }
 
 SMTExprRef MathSATSolver::mkSBVtoFPImpl(const SMTExprRef &From,
                                         const SMTSortRef &To,
                                         const SMTExprRef &R) {
-  return newExprRef(MathSATExpr(
-      Context, To,
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::SBVtoFP, Context, To,
       msat_make_fp_from_sbv(*Context, To->getFPExponentWidth(),
                             To->getFPSignificandWidth(), toMathSATTerm(R),
-                            toMathSATTerm(From))));
+                            toMathSATTerm(From)));
 }
 
 SMTExprRef MathSATSolver::mkUBVtoFPImpl(const SMTExprRef &From,
                                         const SMTSortRef &To,
                                         const SMTExprRef &R) {
-  return newExprRef(MathSATExpr(
-      Context, To,
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::UBVtoFP, Context, To,
       msat_make_fp_from_ubv(*Context, To->getFPExponentWidth(),
                             To->getFPSignificandWidth(), toMathSATTerm(R),
-                            toMathSATTerm(From))));
+                            toMathSATTerm(From)));
 }
 
 SMTExprRef MathSATSolver::mkFPtoSBVImpl(const SMTExprRef &From,
@@ -756,10 +778,10 @@ SMTExprRef MathSATSolver::mkFPtoSBVImpl(const SMTExprRef &From,
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
-  return newExprRef(MathSATExpr(Context, mkBVSort(ToWidth),
-                                msat_make_fp_to_bv(*Context, ToWidth,
-                                                   toMathSATTerm(roundingMode),
-                                                   toMathSATTerm(From))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPtoSBV, Context, mkBVSort(ToWidth),
+      msat_make_fp_to_bv(*Context, ToWidth, toMathSATTerm(roundingMode),
+                         toMathSATTerm(From)));
 }
 
 SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
@@ -767,18 +789,18 @@ SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
-  return newExprRef(MathSATExpr(Context, mkBVSort(ToWidth),
-                                msat_make_fp_to_ubv(*Context, ToWidth,
-                                                    toMathSATTerm(roundingMode),
-                                                    toMathSATTerm(From))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPtoUBV, Context, mkBVSort(ToWidth),
+      msat_make_fp_to_ubv(*Context, ToWidth, toMathSATTerm(roundingMode),
+                          toMathSATTerm(From)));
 }
 
 SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
                                              const SMTExprRef &R) {
-  return newExprRef(
-      MathSATExpr(Context, From->Sort,
-                  msat_make_fp_round_to_int(*Context, toMathSATTerm(R),
-                                            toMathSATTerm(From))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPtoIntegral, Context, From->Sort,
+      msat_make_fp_round_to_int(*Context, toMathSATTerm(R),
+                                toMathSATTerm(From)));
 }
 
 bool MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
@@ -814,8 +836,9 @@ static inline void getMathSATModelRational(const SMTExprRef &t, mpq_t val) {
 }
 
 std::string MathSATSolver::getBVInBinImpl(const SMTExprRef &Exp) {
-  const SMTExprRef &t = newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(
+      Exp->getKind(), Context, Exp->Sort,
+      msat_get_model_value(*Context, toMathSATTerm(Exp)));
   return getGMPVal(t);
 }
 
@@ -829,8 +852,9 @@ std::string MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
 
   mpq_t val;
   mpq_init(val);
-  const SMTExprRef &t = newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(
+      Exp->getKind(), Context, Exp->Sort,
+      msat_get_model_value(*Context, toMathSATTerm(Exp)));
   getMathSATModelRational(t, val);
   assert(mpz_cmp_ui(mpq_denref(val), 1) == 0 && "Expected integer value");
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
@@ -846,8 +870,9 @@ void MathSATSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
                                     std::string &Den) {
   mpq_t val;
   mpq_init(val);
-  const SMTExprRef &t = newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(
+      Exp->getKind(), Context, Exp->Sort,
+      msat_get_model_value(*Context, toMathSATTerm(Exp)));
   getMathSATModelRational(t, val);
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
@@ -861,33 +886,35 @@ void MathSATSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
 }
 
 std::string MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {
-  const SMTExprRef &t = newExprRef(MathSATExpr(
-      Context, Exp->Sort, msat_get_model_value(*Context, toMathSATTerm(Exp))));
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(
+      Exp->getKind(), Context, Exp->Sort,
+      msat_get_model_value(*Context, toMathSATTerm(Exp)));
   return getGMPVal(t);
 }
 
 SMTExprRef MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
                                               const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
-  return newExprRef(MathSATExpr(
-      Context, sel->Sort, msat_get_model_value(*Context, toMathSATTerm(sel))));
+  return makeExprRef<MathSATExpr>(
+      sel->getKind(), Context, sel->Sort,
+      msat_get_model_value(*Context, toMathSATTerm(sel)));
 }
 
 SMTExprRef MathSATSolver::mkBoolImpl(const bool Bool) {
-  return newExprRef(
-      MathSATExpr(Context, mkBoolSort(),
-                  Bool ? msat_make_true(*Context) : msat_make_false(*Context)));
+  return makeExprRef<MathSATExpr>(SMTExprKind::BoolConst, Context, mkBoolSort(),
+                                  Bool ? msat_make_true(*Context)
+                                       : msat_make_false(*Context));
 }
 
 SMTExprRef MathSATSolver::mkIntImpl(int64_t v) {
-  return newExprRef(
-      MathSATExpr(Context, mkIntSort(),
-                  msat_make_number(*Context, std::to_string(v).c_str())));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::IntConst, Context, mkIntSort(),
+      msat_make_number(*Context, std::to_string(v).c_str()));
 }
 
 SMTExprRef MathSATSolver::mkIntImpl(const std::string &v) {
-  return newExprRef(
-      MathSATExpr(Context, mkIntSort(), msat_make_number(*Context, v.c_str())));
+  return makeExprRef<MathSATExpr>(SMTExprKind::IntConst, Context, mkIntSort(),
+                                  msat_make_number(*Context, v.c_str()));
 }
 
 SMTExprRef MathSATSolver::mkRealImpl(const std::string &v) {
@@ -895,8 +922,8 @@ SMTExprRef MathSATSolver::mkRealImpl(const std::string &v) {
   if (repr.find('/') == std::string::npos &&
       repr.find('.') == std::string::npos)
     repr.append("/1");
-  return newExprRef(MathSATExpr(Context, mkRealSort(),
-                                msat_make_number(*Context, repr.c_str())));
+  return makeExprRef<MathSATExpr>(SMTExprKind::RealConst, Context, mkRealSort(),
+                                  msat_make_number(*Context, repr.c_str()));
 }
 
 SMTExprRef MathSATSolver::mkRealImpl(int64_t v) {
@@ -913,28 +940,29 @@ SMTExprRef MathSATSolver::mkBVFromDecImpl(const int64_t Int,
   uint64_t newInt =
       static_cast<uint64_t>(Int) & ((1ULL << Sort->getWidth()) - 1);
 
-  return newExprRef(
-      MathSATExpr(Context, Sort,
-                  msat_make_bv_number(*Context, std::to_string(newInt).c_str(),
-                                      Sort->getWidth(), 10)));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVConst, Context, Sort,
+      msat_make_bv_number(*Context, std::to_string(newInt).c_str(),
+                          Sort->getWidth(), 10));
 }
 
 SMTExprRef MathSATSolver::mkBVFromBinImpl(const std::string &Int,
                                           const SMTSortRef &Sort) {
-  return newExprRef(MathSATExpr(
-      Context, Sort,
-      msat_make_bv_number(*Context, Int.c_str(), Sort->getWidth(), 2)));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVConst, Context, Sort,
+      msat_make_bv_number(*Context, Int.c_str(), Sort->getWidth(), 2));
 }
 
 SMTExprRef MathSATSolver::mkSymbolImpl(const std::string &Name,
                                        const SMTSortRef &Sort) {
   msat_decl d = msat_declare_function(*Context, Name.c_str(),
                                       toSolverSort<MathSATSort>(*Sort).Sort);
-  assert(!MSAT_ERROR_DECL(d) && "Invalid function symbol declaration sort");
+  assert(!checkExprError(Context, d) &&
+         "Invalid function symbol declaration sort");
   if (Sort->isFunctionSort())
-    return newExprRef(MathSATExpr(Context, Sort, d));
-  return newExprRef(
-      MathSATExpr(Context, Sort, msat_make_constant(*Context, d)));
+    return makeExprRef<MathSATExpr>(SMTExprKind::Symbol, Context, Sort, d);
+  return makeExprRef<MathSATExpr>(SMTExprKind::Symbol, Context, Sort,
+                                  msat_make_constant(*Context, d));
 }
 
 SMTExprRef MathSATSolver::mkFPFromBinImpl(const std::string &FP,
@@ -948,9 +976,10 @@ SMTExprRef MathSATSolver::mkFPFromBinImpl(const std::string &FP,
       .append(FP.substr(1 + EWidth))
       .append(")");
 
-  return newExprRef(MathSATExpr(
-      Context, mkFPSort(EWidth, FP.length() - EWidth - 1, FPEncoding::Native),
-      msat_from_string(*Context, fpSMTStr.c_str())));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPConst, Context,
+      mkFPSort(EWidth, FP.length() - EWidth - 1, FPEncoding::Native),
+      msat_from_string(*Context, fpSMTStr.c_str()));
 }
 
 SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
@@ -972,14 +1001,16 @@ SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
     e = msat_make_fp_roundingmode_zero(*Context);
     break;
   }
-  return newExprRef(MathSATExpr(Context, mkRMSort(FPEncoding::Native), e));
+  return makeExprRef<MathSATExpr>(SMTExprKind::RMConst, Context,
+                                  mkRMSort(FPEncoding::Native), e);
 }
 
 SMTExprRef MathSATSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
-  const SMTExprRef &theNaN = newExprRef(MathSATExpr(
-      Context, sort, msat_make_fp_nan(*Context, ExpWidth, SigWidth - 1)));
+  const SMTExprRef &theNaN = makeExprRef<MathSATExpr>(
+      SMTExprKind::FPConst, Context, sort,
+      msat_make_fp_nan(*Context, ExpWidth, SigWidth - 1));
 
   return Sgn ? mkFPNeg(theNaN) : theNaN;
 }
@@ -987,27 +1018,28 @@ SMTExprRef MathSATSolver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 SMTExprRef MathSATSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
-  return newExprRef(MathSATExpr(
-      Context, sort,
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::FPConst, Context, sort,
       Sgn ? msat_make_fp_minus_inf(*Context, ExpWidth, SigWidth - 1)
-          : msat_make_fp_plus_inf(*Context, ExpWidth, SigWidth - 1)));
+          : msat_make_fp_plus_inf(*Context, ExpWidth, SigWidth - 1));
 }
 
 SMTExprRef MathSATSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                            const SMTSortRef &To) {
-  return newExprRef(
-      MathSATExpr(Context, To,
-                  msat_make_fp_from_ieeebv(*Context, To->getFPExponentWidth(),
-                                           To->getFPSignificandWidth(),
-                                           toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BVToIEEEFP, Context, To,
+      msat_make_fp_from_ieeebv(*Context, To->getFPExponentWidth(),
+                               To->getFPSignificandWidth(),
+                               toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   const SMTSortRef &to =
       mkFPSort(Exp->Sort->getFPExponentWidth(),
                Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
-  return newExprRef(MathSATExpr(
-      Context, to, msat_make_fp_as_ieeebv(*Context, toMathSATTerm(Exp))));
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::IEEEFPToBV, Context, to,
+      msat_make_fp_as_ieeebv(*Context, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
@@ -1020,10 +1052,10 @@ SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
     backend_init = msat_make_term_ite(*Context, toMathSATTerm(InitValue),
                                       toMathSATTerm(one), toMathSATTerm(zero));
   }
-  return newExprRef(MathSATExpr(
-      Context, sort,
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::ArrayConst, Context, sort,
       msat_make_array_const(*Context, toSolverSort<MathSATSort>(*sort).Sort,
-                            backend_init)));
+                            backend_init));
 }
 
 SMTExprRef MathSATSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
@@ -1053,7 +1085,8 @@ SMTExprRef MathSATSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
            "Failed to build MathSAT forall term");
   }
 
-  return newExprRef(MathSATExpr(Context, mkBoolSort(), quantified_body));
+  return makeExprRef<MathSATExpr>(SMTExprKind::Forall, Context, mkBoolSort(),
+                                  quantified_body);
 }
 
 SMTExprRef MathSATSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
@@ -1083,7 +1116,8 @@ SMTExprRef MathSATSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
            "Failed to build MathSAT exists term");
   }
 
-  return newExprRef(MathSATExpr(Context, mkBoolSort(), quantified_body));
+  return makeExprRef<MathSATExpr>(SMTExprKind::Exists, Context, mkBoolSort(),
+                                  quantified_body);
 }
 
 checkResult MathSATSolver::checkImpl() {

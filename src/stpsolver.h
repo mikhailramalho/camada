@@ -99,11 +99,6 @@ public:
       : SolverExpr<STPContextRef, STP::Expr>(Kind, std::move(C), S, E),
         OwnsExpr(Owns) {}
 
-  STPExpr(STPContextRef C, const SMTSortRef &S, const STP::Expr &E,
-          bool Owns = false)
-      : SolverExpr<STPContextRef, STP::Expr>(std::move(C), S, E),
-        OwnsExpr(Owns) {}
-
   virtual ~STPExpr() override;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
@@ -129,8 +124,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
-  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                   const SMTSortRef &Sort) const override;
+  SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
