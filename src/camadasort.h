@@ -126,10 +126,16 @@ public:
     return Kind == SMTSortKind::FP || Kind == SMTSortKind::BVFP;
   }
 
+  /// Returns true if the sort is a Camada-encoded floating-point.
+  bool isBVFPSort() const { return Kind == SMTSortKind::BVFP; }
+
   /// Returns true if the sort is a rounding mode.
   bool isRMSort() const {
     return Kind == SMTSortKind::RM || Kind == SMTSortKind::BVRM;
   }
+
+  /// Returns true if the sort is a Camada-encoded rounding mode.
+  bool isBVRMSort() const { return Kind == SMTSortKind::BVRM; }
 
   /// Returns true if the sort is an array.
   bool isArraySort() const { return Kind == SMTSortKind::Array; }
