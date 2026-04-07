@@ -5,20 +5,21 @@
 #include <cmath>
 #include <limits>
 
-inline void fp_arithmetics(const camada::SMTSolverRef &solver) {
-  auto x = solver->mkFP32(0.750000059604644775390625f);
-  auto y = solver->mkFP32(0.750000059604644775390625f);
+inline void fp_arithmetics(const camada::SMTSolverRef &solver,
+                           camada::FPEncoding Encoding) {
+  auto x = solver->mkFP32(0.750000059604644775390625f, Encoding);
+  auto y = solver->mkFP32(0.750000059604644775390625f, Encoding);
   REQUIRE(x->getKind() == camada::SMTExprKind::FPConst);
   REQUIRE(y->getKind() == camada::SMTExprKind::FPConst);
 
-  auto zero = solver->mkFP32(0.f);
-  auto one = solver->mkFP32(1.f);
-  auto two = solver->mkFP32(2.f);
+  auto zero = solver->mkFP32(0.f, Encoding);
+  auto one = solver->mkFP32(1.f, Encoding);
+  auto two = solver->mkFP32(2.f, Encoding);
   REQUIRE(zero->getKind() == camada::SMTExprKind::FPConst);
   REQUIRE(one->getKind() == camada::SMTExprKind::FPConst);
   REQUIRE(two->getKind() == camada::SMTExprKind::FPConst);
 
-  auto r = solver->mkRM(camada::RM::ROUND_TO_EVEN);
+  auto r = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
   REQUIRE(r->getKind() == camada::SMTExprKind::RMConst);
 
   // Add
@@ -38,7 +39,7 @@ inline void fp_arithmetics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(sub_eq);
 
   // mul
-  auto mul = solver->mkFP32(0.562500119209f);
+  auto mul = solver->mkFP32(0.562500119209f, Encoding);
   auto mul_expr = solver->mkFPMul(x, y, r);
   auto mul_eq = solver->mkEqual(mul_expr, mul);
   REQUIRE(mul_expr->getKind() == camada::SMTExprKind::FPMul);
@@ -77,16 +78,12 @@ inline void fp_arithmetics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
-inline void fp_round_to_away(const camada::SMTSolverRef &solver) {
-  const std::string solverName = solver->getSolverNameAndVersion();
-  if (solverName.find("MathSAT") != std::string::npos ||
-      solverName.find("STP") != std::string::npos)
-    return;
-
-  auto one = solver->mkFP32(1.0f);
-  auto half_ulp = solver->mkFP32(std::ldexp(1.0f, -24));
-  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN);
-  auto rna = solver->mkRM(camada::RM::ROUND_TO_AWAY);
+inline void fp_round_to_away(const camada::SMTSolverRef &solver,
+                             camada::FPEncoding Encoding) {
+  auto one = solver->mkFP32(1.0f, Encoding);
+  auto half_ulp = solver->mkFP32(std::ldexp(1.0f, -24), Encoding);
+  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+  auto rna = solver->mkRM(camada::RM::ROUND_TO_AWAY, Encoding);
 
   REQUIRE(one->getKind() == camada::SMTExprKind::FPConst);
   REQUIRE(half_ulp->getKind() == camada::SMTExprKind::FPConst);
@@ -98,17 +95,18 @@ inline void fp_round_to_away(const camada::SMTSolverRef &solver) {
   REQUIRE(even_sum->getKind() == camada::SMTExprKind::FPAdd);
   REQUIRE(away_sum->getKind() == camada::SMTExprKind::FPAdd);
 
-  auto even_expected = solver->mkFP32(1.0f);
-  auto away_expected = solver->mkFP32(std::nextafterf(1.0f, 2.0f));
+  auto even_expected = solver->mkFP32(1.0f, Encoding);
+  auto away_expected = solver->mkFP32(std::nextafterf(1.0f, 2.0f), Encoding);
 
   solver->addConstraint(solver->mkEqual(even_sum, even_expected));
   solver->addConstraint(solver->mkEqual(away_sum, away_expected));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
-inline void fp_bv_conversions(const camada::SMTSolverRef &solver) {
-  auto rtz = solver->mkRM(camada::RM::ROUND_TO_ZERO);
-  auto fp32 = solver->mkFP32Sort();
+inline void fp_bv_conversions(const camada::SMTSolverRef &solver,
+                              camada::FPEncoding Encoding) {
+  auto rtz = solver->mkRM(camada::RM::ROUND_TO_ZERO, Encoding);
+  auto fp32 = solver->mkFP32Sort(Encoding);
   auto all_ones = solver->mkBVFromBin("11111111", 8);
 
   REQUIRE(rtz->getKind() == camada::SMTExprKind::RMConst);
@@ -119,8 +117,8 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver) {
   REQUIRE(signed_fp->getKind() == camada::SMTExprKind::SBVtoFP);
   REQUIRE(unsigned_fp->getKind() == camada::SMTExprKind::UBVtoFP);
 
-  auto minus_one = solver->mkFP32(-1.0f);
-  auto two_fifty_five = solver->mkFP32(255.0f);
+  auto minus_one = solver->mkFP32(-1.0f, Encoding);
+  auto two_fifty_five = solver->mkFP32(255.0f, Encoding);
   solver->addConstraint(solver->mkEqual(signed_fp, minus_one));
   solver->addConstraint(solver->mkEqual(unsigned_fp, two_fifty_five));
 
@@ -135,11 +133,14 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
-inline void fp_denormal_round_to_integral(const camada::SMTSolverRef &solver) {
-  auto pos_denorm = solver->mkFP32(std::numeric_limits<float>::denorm_min());
-  auto neg_denorm = solver->mkFP32(-std::numeric_limits<float>::denorm_min());
-  auto rtp = solver->mkRM(camada::RM::ROUND_TO_PLUS_INF);
-  auto rtn = solver->mkRM(camada::RM::ROUND_TO_MINUS_INF);
+inline void fp_denormal_round_to_integral(const camada::SMTSolverRef &solver,
+                                          camada::FPEncoding Encoding) {
+  auto pos_denorm =
+      solver->mkFP32(std::numeric_limits<float>::denorm_min(), Encoding);
+  auto neg_denorm =
+      solver->mkFP32(-std::numeric_limits<float>::denorm_min(), Encoding);
+  auto rtp = solver->mkRM(camada::RM::ROUND_TO_PLUS_INF, Encoding);
+  auto rtn = solver->mkRM(camada::RM::ROUND_TO_MINUS_INF, Encoding);
 
   auto pos_rounded = solver->mkFPtoIntegral(pos_denorm, rtp);
   auto neg_rounded = solver->mkFPtoIntegral(neg_denorm, rtn);
@@ -151,16 +152,20 @@ inline void fp_denormal_round_to_integral(const camada::SMTSolverRef &solver) {
   REQUIRE(pos_rounded->getKind() == camada::SMTExprKind::FPtoIntegral);
   REQUIRE(neg_rounded->getKind() == camada::SMTExprKind::FPtoIntegral);
 
-  solver->addConstraint(solver->mkEqual(pos_rounded, solver->mkFP32(1.0f)));
-  solver->addConstraint(solver->mkEqual(neg_rounded, solver->mkFP32(-1.0f)));
+  solver->addConstraint(
+      solver->mkEqual(pos_rounded, solver->mkFP32(1.0f, Encoding)));
+  solver->addConstraint(
+      solver->mkEqual(neg_rounded, solver->mkFP32(-1.0f, Encoding)));
 
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
-inline void fp_div_overflow_to_inf(const camada::SMTSolverRef &solver) {
-  auto max_finite = solver->mkFP32(std::numeric_limits<float>::max());
-  auto tiny = solver->mkFP32(std::numeric_limits<float>::denorm_min());
-  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN);
+inline void fp_div_overflow_to_inf(const camada::SMTSolverRef &solver,
+                                   camada::FPEncoding Encoding) {
+  auto max_finite = solver->mkFP32(std::numeric_limits<float>::max(), Encoding);
+  auto tiny =
+      solver->mkFP32(std::numeric_limits<float>::denorm_min(), Encoding);
+  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
 
   auto div = solver->mkFPDiv(max_finite, tiny, rne);
 
@@ -170,15 +175,16 @@ inline void fp_div_overflow_to_inf(const camada::SMTSolverRef &solver) {
   REQUIRE(div->getKind() == camada::SMTExprKind::FPDiv);
 
   solver->addConstraint(solver->mkEqual(
-      div, solver->mkFP32(std::numeric_limits<float>::infinity())));
+      div, solver->mkFP32(std::numeric_limits<float>::infinity(), Encoding)));
 
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
-inline void fp_remainder_semantics(const camada::SMTSolverRef &solver) {
-  auto x = solver->mkFP32(7.0f);
-  auto y = solver->mkFP32(2.0f);
-  auto expected = solver->mkFP32(-1.0f);
+inline void fp_remainder_semantics(const camada::SMTSolverRef &solver,
+                                   camada::FPEncoding Encoding) {
+  auto x = solver->mkFP32(7.0f, Encoding);
+  auto y = solver->mkFP32(2.0f, Encoding);
+  auto expected = solver->mkFP32(-1.0f, Encoding);
 
   auto rem = solver->mkFPRem(x, y);
 

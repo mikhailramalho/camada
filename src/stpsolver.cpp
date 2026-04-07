@@ -505,8 +505,8 @@ SMTExprRef STPSolver::getArrayElementImpl(const SMTExprRef &Array,
     return SMTSolverImpl::mkBVFromBin(getBVInBin(sel));
 
   assert(elementSort->isFPSort() && "Unknown array element type");
-  return SMTSolverImpl::mkFPFromBin(getFPInBin(sel),
-                                    elementSort->getFPExponentWidth());
+  return SMTSolverImpl::mkFPFromBin(
+      getFPInBin(sel), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
 
 SMTExprRef STPSolver::mkBoolImpl(const bool b) {

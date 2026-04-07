@@ -162,11 +162,8 @@ void benchmarkArrayStoreChain(camada::SMTSolver &solver,
 }
 
 void benchmarkFPConstruct(camada::SMTSolver &solver, std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i) {
@@ -176,21 +173,18 @@ void benchmarkFPConstruct(camada::SMTSolver &solver, std::size_t iterations) {
     auto a = solver.mkSBVtoFP(a_bv, fp32, rm);
     auto b = solver.mkUBVtoFP(b_bv, fp32, rm);
     auto sum = solver.mkFPAdd(a, b, rm);
-    auto div = solver.mkFPDiv(sum, solver.mkFP32(3.5f), rm);
+    auto div =
+        solver.mkFPDiv(sum, solver.mkFP32(3.5f, camada::FPEncoding::BV), rm);
     auto integral = solver.mkFPtoIntegral(div, rm);
     sink += solver.mkIEEEFPToBV(integral)->getWidth();
   }
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 
 void benchmarkFPFromBV(camada::SMTSolver &solver, std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i) {
@@ -202,16 +196,12 @@ void benchmarkFPFromBV(camada::SMTSolver &solver, std::size_t iterations) {
     sink += a->getWidth() + b->getWidth();
   }
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 
 void benchmarkFPAddOnly(camada::SMTSolver &solver, std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
   auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
   volatile std::size_t sink = 0;
@@ -219,101 +209,82 @@ void benchmarkFPAddOnly(camada::SMTSolver &solver, std::size_t iterations) {
   for (std::size_t i = 0; i < iterations; ++i)
     sink += solver.mkFPAdd(a, b, rm)->getWidth();
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 
 void benchmarkFPDivOnly(camada::SMTSolver &solver, std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
   auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
-  auto denom = solver.mkFP32(3.5f);
+  auto denom = solver.mkFP32(3.5f, camada::FPEncoding::BV);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
     sink += solver.mkFPDiv(sum, denom, rm)->getWidth();
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 
 void benchmarkFPIntegralOnly(camada::SMTSolver &solver,
                              std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
   auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
-  auto div = solver.mkFPDiv(sum, solver.mkFP32(3.5f), rm);
+  auto div =
+      solver.mkFPDiv(sum, solver.mkFP32(3.5f, camada::FPEncoding::BV), rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
     sink += solver.mkFPtoIntegral(div, rm)->getWidth();
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 
 void benchmarkFPIEEEToBVOnly(camada::SMTSolver &solver,
                              std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
   auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
-  auto div = solver.mkFPDiv(sum, solver.mkFP32(3.5f), rm);
+  auto div =
+      solver.mkFPDiv(sum, solver.mkFP32(3.5f, camada::FPEncoding::BV), rm);
   auto integral = solver.mkFPtoIntegral(div, rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
     sink += solver.mkIEEEFPToBV(integral)->getWidth();
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 
 void benchmarkFPSqrtOnly(camada::SMTSolver &solver, std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   auto a = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
     sink += solver.mkFPSqrt(a, rm)->getWidth();
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 
 void benchmarkFPFMAOnly(camada::SMTSolver &solver, std::size_t iterations) {
-  bool old_use_camada_fp = solver.useCamadaFP;
-  solver.useCamadaFP = true;
-
-  auto fp32 = solver.mkFP32Sort();
-  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
   auto x = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
   auto y = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
-  auto z = solver.mkFP32(1.25f);
+  auto z = solver.mkFP32(1.25f, camada::FPEncoding::BV);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
     sink += solver.mkFPFMA(x, y, z, rm)->getWidth();
 
-  solver.useCamadaFP = old_use_camada_fp;
   (void)sink;
 }
 

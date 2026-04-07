@@ -51,6 +51,22 @@ public:
     return Exp;
   }
 
+  static bool usesBVFPEncoding(const SMTSortRef &Sort) {
+    return Sort->isBVFPSort();
+  }
+
+  static bool usesBVFPEncoding(const SMTExprRef &Exp) {
+    return usesBVFPEncoding(Exp->Sort);
+  }
+
+  static bool usesBVRMEncoding(const SMTSortRef &Sort) {
+    return Sort->isBVRMSort();
+  }
+
+  static bool usesBVRMEncoding(const SMTExprRef &Exp) {
+    return usesBVRMEncoding(Exp->Sort);
+  }
+
   SMTExprRef newExprRef(const SMTExpr &Exp) const final {
     SMTExprRef theExp = newExprRefImpl(Exp);
 #ifndef NDEBUG
@@ -102,29 +118,31 @@ public:
     return theSort;
   }
 
-  SMTSortRef mkRMSort() override final {
+  SMTSortRef mkRMSort(FPEncoding Encoding) override final {
     SMTSortRef &CachedSort =
-        useCamadaFP ? CachedEncodedRMSort : CachedNativeRMSort;
+        Encoding == FPEncoding::BV ? CachedEncodedRMSort : CachedNativeRMSort;
     if (CachedSort)
       return CachedSort;
 
-    SMTSortRef theSort =
-        useCamadaFP ? SMTSolverImpl::mkRMSortImpl() : mkRMSortImpl();
+    SMTSortRef theSort = Encoding == FPEncoding::BV
+                             ? SMTSolverImpl::mkRMSortImpl()
+                             : mkRMSortImpl();
     assert(theSort->isRMSort());
     CachedSort = theSort;
     return theSort;
   }
 
-  SMTSortRef mkFPSort(const unsigned ExpWidth,
-                      const unsigned SigWidth) override final {
+  SMTSortRef mkFPSort(const unsigned ExpWidth, const unsigned SigWidth,
+                      FPEncoding Encoding) override final {
     assert(ExpWidth && SigWidth);
-    auto &Cache = useCamadaFP ? EncodedFPSortCache : NativeFPSortCache;
+    auto &Cache =
+        Encoding == FPEncoding::BV ? EncodedFPSortCache : NativeFPSortCache;
     FPSortCacheKey Key{ExpWidth, SigWidth};
     auto It = Cache.find(Key);
     if (It != Cache.end())
       return It->second;
 
-    SMTSortRef theSort = useCamadaFP
+    SMTSortRef theSort = Encoding == FPEncoding::BV
                              ? SMTSolverImpl::mkFPSortImpl(ExpWidth, SigWidth)
                              : mkFPSortImpl(ExpWidth, SigWidth);
     assert(theSort->isFPSort());
@@ -134,9 +152,13 @@ public:
     return theSort;
   }
 
-  SMTSortRef mkFP32Sort() override final { return mkFPSort(8, 23); }
+  SMTSortRef mkFP32Sort(FPEncoding Encoding) override final {
+    return mkFPSort(8, 23, Encoding);
+  }
 
-  SMTSortRef mkFP64Sort() override final { return mkFPSort(11, 52); }
+  SMTSortRef mkFP64Sort(FPEncoding Encoding) override final {
+    return mkFPSort(11, 52, Encoding);
+  }
 
   SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
                          const SMTSortRef &ElemSort) override final {
@@ -642,56 +664,61 @@ public:
 
   SMTExprRef mkFPAbs(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp =
-        useCamadaFP ? SMTSolverImpl::mkFPAbsImpl(Exp) : mkFPAbsImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPAbsImpl(Exp)
+                                              : mkFPAbsImpl(Exp);
     assert(theExp->Sort == Exp->Sort);
     return tagExprKind(theExp, SMTExprKind::FPAbs);
   }
 
   SMTExprRef mkFPNeg(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp =
-        useCamadaFP ? SMTSolverImpl::mkFPNegImpl(Exp) : mkFPNegImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPNegImpl(Exp)
+                                              : mkFPNegImpl(Exp);
     assert(theExp->Sort == Exp->Sort);
     return tagExprKind(theExp, SMTExprKind::FPNeg);
   }
 
   SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPIsInfiniteImpl(Exp)
-                                    : mkFPIsInfiniteImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp)
+                            ? SMTSolverImpl::mkFPIsInfiniteImpl(Exp)
+                            : mkFPIsInfiniteImpl(Exp);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPIsInfinite);
   }
 
   SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp =
-        useCamadaFP ? SMTSolverImpl::mkFPIsNaNImpl(Exp) : mkFPIsNaNImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp)
+                            ? SMTSolverImpl::mkFPIsNaNImpl(Exp)
+                            : mkFPIsNaNImpl(Exp);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPIsNaN);
   }
 
   SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPIsDenormalImpl(Exp)
-                                    : mkFPIsDenormalImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp)
+                            ? SMTSolverImpl::mkFPIsDenormalImpl(Exp)
+                            : mkFPIsDenormalImpl(Exp);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPIsDenormal);
   }
 
   SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPIsNormalImpl(Exp)
-                                    : mkFPIsNormalImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp)
+                            ? SMTSolverImpl::mkFPIsNormalImpl(Exp)
+                            : mkFPIsNormalImpl(Exp);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPIsNormal);
   }
 
   SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp =
-        useCamadaFP ? SMTSolverImpl::mkFPIsZeroImpl(Exp) : mkFPIsZeroImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp)
+                            ? SMTSolverImpl::mkFPIsZeroImpl(Exp)
+                            : mkFPIsZeroImpl(Exp);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPIsZero);
   }
@@ -700,8 +727,11 @@ public:
                      const SMTExprRef &R) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPMulImpl(LHS, RHS, R)
-                                    : mkFPMulImpl(LHS, RHS, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(LHS) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPMulImpl(LHS, RHS, R)
+                            : mkFPMulImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
     return tagExprKind(theExp, SMTExprKind::FPMul);
   }
@@ -710,8 +740,11 @@ public:
                      const SMTExprRef &R) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPDivImpl(LHS, RHS, R)
-                                    : mkFPDivImpl(LHS, RHS, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(LHS) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPDivImpl(LHS, RHS, R)
+                            : mkFPDivImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
     return tagExprKind(theExp, SMTExprKind::FPDiv);
   }
@@ -720,8 +753,9 @@ public:
                      const SMTExprRef &RHS) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPRemImpl(LHS, RHS)
-                                    : mkFPRemImpl(LHS, RHS);
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPRemImpl(LHS, RHS)
+                            : mkFPRemImpl(LHS, RHS);
     assert(theExp->Sort == LHS->Sort);
     return tagExprKind(theExp, SMTExprKind::FPRem);
   }
@@ -730,8 +764,11 @@ public:
                      const SMTExprRef &R) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPAddImpl(LHS, RHS, R)
-                                    : mkFPAddImpl(LHS, RHS, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(LHS) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPAddImpl(LHS, RHS, R)
+                            : mkFPAddImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
     return tagExprKind(theExp, SMTExprKind::FPAdd);
   }
@@ -740,8 +777,11 @@ public:
                      const SMTExprRef &R) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPSubImpl(LHS, RHS, R)
-                                    : mkFPSubImpl(LHS, RHS, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(LHS) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPSubImpl(LHS, RHS, R)
+                            : mkFPSubImpl(LHS, RHS, R);
     assert(theExp->Sort == LHS->Sort);
     return tagExprKind(theExp, SMTExprKind::FPSub);
   }
@@ -749,8 +789,11 @@ public:
   SMTExprRef mkFPSqrt(const SMTExprRef &Exp,
                       const SMTExprRef &R) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPSqrtImpl(Exp, R)
-                                    : mkFPSqrtImpl(Exp, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(Exp) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(Exp)
+                            ? SMTSolverImpl::mkFPSqrtImpl(Exp, R)
+                            : mkFPSqrtImpl(Exp, R);
     assert(theExp->Sort == Exp->Sort);
     return tagExprKind(theExp, SMTExprKind::FPSqrt);
   }
@@ -760,8 +803,11 @@ public:
     assert(X->isFPSort());
     assert(X->Sort == Y->Sort);
     assert(Y->Sort == Z->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPFMAImpl(X, Y, Z, R)
-                                    : mkFPFMAImpl(X, Y, Z, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(X) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(X)
+                            ? SMTSolverImpl::mkFPFMAImpl(X, Y, Z, R)
+                            : mkFPFMAImpl(X, Y, Z, R);
     assert(theExp->Sort == Z->Sort);
     return tagExprKind(theExp, SMTExprKind::FPFMA);
   }
@@ -770,8 +816,9 @@ public:
                     const SMTExprRef &RHS) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPLtImpl(LHS, RHS)
-                                    : mkFPLtImpl(LHS, RHS);
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPLtImpl(LHS, RHS)
+                            : mkFPLtImpl(LHS, RHS);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPLt);
   }
@@ -780,8 +827,9 @@ public:
                     const SMTExprRef &RHS) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPGtImpl(LHS, RHS)
-                                    : mkFPGtImpl(LHS, RHS);
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPGtImpl(LHS, RHS)
+                            : mkFPGtImpl(LHS, RHS);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPGt);
   }
@@ -790,8 +838,9 @@ public:
                     const SMTExprRef &RHS) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPLeImpl(LHS, RHS)
-                                    : mkFPLeImpl(LHS, RHS);
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPLeImpl(LHS, RHS)
+                            : mkFPLeImpl(LHS, RHS);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPLe);
   }
@@ -800,8 +849,9 @@ public:
                     const SMTExprRef &RHS) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPGeImpl(LHS, RHS)
-                                    : mkFPGeImpl(LHS, RHS);
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPGeImpl(LHS, RHS)
+                            : mkFPGeImpl(LHS, RHS);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPGe);
   }
@@ -810,8 +860,9 @@ public:
                        const SMTExprRef &RHS) override final {
     assert(LHS->isFPSort());
     assert(LHS->Sort == RHS->Sort);
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPEqualImpl(LHS, RHS)
-                                    : mkFPEqualImpl(LHS, RHS);
+    SMTExprRef theExp = usesBVFPEncoding(LHS)
+                            ? SMTSolverImpl::mkFPEqualImpl(LHS, RHS)
+                            : mkFPEqualImpl(LHS, RHS);
     assert(theExp->isBoolSort());
     return tagExprKind(theExp, SMTExprKind::FPEqual);
   }
@@ -820,8 +871,12 @@ public:
                       const SMTExprRef &R) override final {
     assert(From->isFPSort());
     assert(To->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPtoFPImpl(From, To, R)
-                                    : mkFPtoFPImpl(From, To, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(From) == usesBVFPEncoding(To));
+    assert(usesBVFPEncoding(To) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(To)
+                            ? SMTSolverImpl::mkFPtoFPImpl(From, To, R)
+                            : mkFPtoFPImpl(From, To, R);
     assert(theExp->Sort == To);
     return tagExprKind(theExp, SMTExprKind::FPtoFP);
   }
@@ -830,8 +885,11 @@ public:
                        const SMTExprRef &R) override final {
     assert(From->isBVSort());
     assert(To->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkSBVtoFPImpl(From, To, R)
-                                    : mkSBVtoFPImpl(From, To, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(To) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(To)
+                            ? SMTSolverImpl::mkSBVtoFPImpl(From, To, R)
+                            : mkSBVtoFPImpl(From, To, R);
     assert(theExp->Sort == To);
     return tagExprKind(theExp, SMTExprKind::SBVtoFP);
   }
@@ -840,8 +898,11 @@ public:
                        const SMTExprRef &R) override final {
     assert(From->isBVSort());
     assert(To->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkUBVtoFPImpl(From, To, R)
-                                    : mkUBVtoFPImpl(From, To, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(To) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(To)
+                            ? SMTSolverImpl::mkUBVtoFPImpl(From, To, R)
+                            : mkUBVtoFPImpl(From, To, R);
     assert(theExp->Sort == To);
     return tagExprKind(theExp, SMTExprKind::UBVtoFP);
   }
@@ -849,7 +910,7 @@ public:
   SMTExprRef mkFPtoSBV(const SMTExprRef &From,
                        unsigned ToWidth) override final {
     assert(From->isFPSort());
-    SMTExprRef theExp = useCamadaFP
+    SMTExprRef theExp = usesBVFPEncoding(From)
                             ? SMTSolverImpl::mkFPtoSBVImpl(From, ToWidth)
                             : mkFPtoSBVImpl(From, ToWidth);
     assert(theExp->getWidth() == ToWidth);
@@ -859,7 +920,7 @@ public:
   SMTExprRef mkFPtoUBV(const SMTExprRef &From,
                        unsigned ToWidth) override final {
     assert(From->isFPSort());
-    SMTExprRef theExp = useCamadaFP
+    SMTExprRef theExp = usesBVFPEncoding(From)
                             ? SMTSolverImpl::mkFPtoUBVImpl(From, ToWidth)
                             : mkFPtoUBVImpl(From, ToWidth);
     assert(theExp->getWidth() == ToWidth);
@@ -869,8 +930,11 @@ public:
   SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
                             const SMTExprRef &R) override final {
     assert(From->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPtoIntegralImpl(From, R)
-                                    : mkFPtoIntegralImpl(From, R);
+    assert(R->isRMSort());
+    assert(usesBVFPEncoding(From) == usesBVRMEncoding(R));
+    SMTExprRef theExp = usesBVFPEncoding(From)
+                            ? SMTSolverImpl::mkFPtoIntegralImpl(From, R)
+                            : mkFPtoIntegralImpl(From, R);
     assert(theExp->isFPSort());
     return tagExprKind(theExp, SMTExprKind::FPtoIntegral);
   }
@@ -970,8 +1034,9 @@ public:
 
   std::string getFPInBin(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    return addLeadingZeroes(useCamadaFP ? SMTSolverImpl::getFPInBinImpl(Exp)
-                                        : getFPInBinImpl(Exp),
+    return addLeadingZeroes(usesBVFPEncoding(Exp)
+                                ? SMTSolverImpl::getFPInBinImpl(Exp)
+                                : getFPInBinImpl(Exp),
                             Exp->getWidth());
   }
 
@@ -1118,37 +1183,44 @@ public:
     return tagExprKind(theExp, SMTExprKind::Symbol);
   }
 
-  SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth) override {
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkFPFromBinImpl(FP, EWidth)
-                                    : mkFPFromBinImpl(FP, EWidth);
+  SMTExprRef mkFPFromBin(const std::string &FP, unsigned EWidth,
+                         FPEncoding Encoding) override {
+    SMTSortRef Sort = mkFPSort(EWidth, FP.length() - EWidth - 1, Encoding);
+    SMTExprRef theExp = usesBVFPEncoding(Sort)
+                            ? SMTSolverImpl::mkFPFromBinImpl(FP, EWidth)
+                            : mkFPFromBinImpl(FP, EWidth);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == FP.length());
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkFP32(const float Float) override final {
-    SMTExprRef theExp = mkFP32Impl(Float);
+  SMTExprRef mkFP32(const float Float, FPEncoding Encoding) override final {
+    SMTExprRef theExp = mkFP32Impl(Float, Encoding);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == 32);
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkFP64(const double Double) override final {
-    SMTExprRef theExp = mkFP64Impl(Double);
+  SMTExprRef mkFP64(const double Double, FPEncoding Encoding) override final {
+    SMTExprRef theExp = mkFP64Impl(Double, Encoding);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == 64);
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkRM(const RM &R) override final {
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkRMImpl(R) : mkRMImpl(R);
+  SMTExprRef mkRM(const RM &R, FPEncoding Encoding) override final {
+    SMTExprRef theExp =
+        Encoding == FPEncoding::BV ? SMTSolverImpl::mkRMImpl(R) : mkRMImpl(R);
     assert(theExp->isRMSort());
     return tagExprKind(theExp, SMTExprKind::RMConst);
   }
 
   SMTExprRef mkNaN(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override final {
-    SMTExprRef theExp = useCamadaFP
+                   const unsigned SigWidth,
+                   FPEncoding Encoding) override final {
+    assert(SigWidth);
+    SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);
+    SMTExprRef theExp = usesBVFPEncoding(Sort)
                             ? SMTSolverImpl::mkNaNImpl(Sgn, ExpWidth, SigWidth)
                             : mkNaNImpl(Sgn, ExpWidth, SigWidth);
     assert(theExp->isFPSort());
@@ -1157,17 +1229,20 @@ public:
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkNaN32(const bool Sgn) override final {
-    return mkNaN(Sgn, 8, 24);
+  SMTExprRef mkNaN32(const bool Sgn, FPEncoding Encoding) override final {
+    return mkNaN(Sgn, 8, 24, Encoding);
   }
 
-  SMTExprRef mkNaN64(const bool Sgn) override final {
-    return mkNaN(Sgn, 11, 53);
+  SMTExprRef mkNaN64(const bool Sgn, FPEncoding Encoding) override final {
+    return mkNaN(Sgn, 11, 53, Encoding);
   }
 
   SMTExprRef mkInf(const bool Sgn, const unsigned ExpWidth,
-                   const unsigned SigWidth) override final {
-    SMTExprRef theExp = useCamadaFP
+                   const unsigned SigWidth,
+                   FPEncoding Encoding) override final {
+    assert(SigWidth);
+    SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);
+    SMTExprRef theExp = usesBVFPEncoding(Sort)
                             ? SMTSolverImpl::mkInfImpl(Sgn, ExpWidth, SigWidth)
                             : mkInfImpl(Sgn, ExpWidth, SigWidth);
     assert(theExp->isFPSort());
@@ -1176,12 +1251,12 @@ public:
     return tagExprKind(theExp, SMTExprKind::FPConst);
   }
 
-  SMTExprRef mkInf32(const bool Sgn) override final {
-    return mkInf(Sgn, 8, 24);
+  SMTExprRef mkInf32(const bool Sgn, FPEncoding Encoding) override final {
+    return mkInf(Sgn, 8, 24, Encoding);
   }
 
-  SMTExprRef mkInf64(const bool Sgn) override final {
-    return mkInf(Sgn, 11, 53);
+  SMTExprRef mkInf64(const bool Sgn, FPEncoding Encoding) override final {
+    return mkInf(Sgn, 11, 53, Encoding);
   }
 
   SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
@@ -1196,8 +1271,9 @@ public:
   SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
                           const SMTSortRef &To) override final {
     assert(Exp->isBVSort() && To->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkBVToIEEEFPImpl(Exp, To)
-                                    : mkBVToIEEEFPImpl(Exp, To);
+    SMTExprRef theExp = usesBVFPEncoding(To)
+                            ? SMTSolverImpl::mkBVToIEEEFPImpl(Exp, To)
+                            : mkBVToIEEEFPImpl(Exp, To);
     assert(theExp->isFPSort());
     assert(theExp->getWidth() == Exp->getWidth());
     return tagExprKind(theExp, SMTExprKind::BVToIEEEFP);
@@ -1205,8 +1281,9 @@ public:
 
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final {
     assert(Exp->isFPSort());
-    SMTExprRef theExp = useCamadaFP ? SMTSolverImpl::mkIEEEFPToBVImpl(Exp)
-                                    : mkIEEEFPToBVImpl(Exp);
+    SMTExprRef theExp = usesBVFPEncoding(Exp)
+                            ? SMTSolverImpl::mkIEEEFPToBVImpl(Exp)
+                            : mkIEEEFPToBVImpl(Exp);
     assert(theExp->isBVSort());
     assert(theExp->getWidth() == Exp->getWidth());
     return tagExprKind(theExp, SMTExprKind::IEEEFPToBV);
@@ -1587,9 +1664,9 @@ protected:
 
   virtual SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth);
 
-  SMTExprRef mkFP32Impl(const float Float);
+  SMTExprRef mkFP32Impl(const float Float, FPEncoding Encoding);
 
-  SMTExprRef mkFP64Impl(const double Double);
+  SMTExprRef mkFP64Impl(const double Double, FPEncoding Encoding);
 
   virtual SMTExprRef mkRMImpl(const RM &R);
 

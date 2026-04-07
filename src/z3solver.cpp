@@ -634,7 +634,7 @@ SMTExprRef Z3Solver::mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
 SMTExprRef Z3Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(Z3Expr(
       Context, mkBVSort(ToWidth),
       z3::to_expr(*Context, Z3_mk_fpa_to_sbv(*Context, toZ3Expr(roundingMode),
@@ -644,7 +644,7 @@ SMTExprRef Z3Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
 SMTExprRef Z3Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(Z3Expr(
       Context, mkBVSort(ToWidth),
       z3::to_expr(*Context, Z3_mk_fpa_to_ubv(*Context, toZ3Expr(roundingMode),
@@ -810,9 +810,9 @@ SMTExprRef Z3Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
   const SMTExprRef &exp = SMTSolverImpl::mkBVFromBin(FP.substr(1, EWidth));
   const SMTExprRef &sig = SMTSolverImpl::mkBVFromBin(FP.substr(1 + EWidth));
 
-  return newExprRef(
-      Z3Expr(Context, mkFPSort(EWidth, FP.length() - EWidth - 1),
-             z3::fpa_fp(toZ3Expr(sgn), toZ3Expr(exp), toZ3Expr(sig))));
+  return newExprRef(Z3Expr(
+      Context, mkFPSort(EWidth, FP.length() - EWidth - 1, FPEncoding::Native),
+      z3::fpa_fp(toZ3Expr(sgn), toZ3Expr(exp), toZ3Expr(sig))));
 }
 
 SMTExprRef Z3Solver::mkRMImpl(const RM &R) {
@@ -837,12 +837,12 @@ SMTExprRef Z3Solver::mkRMImpl(const RM &R) {
     e = z3::to_expr(*Context, Z3_mk_fpa_rtz(*Context));
     break;
   }
-  return newExprRef(Z3Expr(Context, mkRMSort(), e));
+  return newExprRef(Z3Expr(Context, mkRMSort(FPEncoding::Native), e));
 }
 
 SMTExprRef Z3Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   const SMTExprRef &theNaN = newExprRef(Z3Expr(
       Context, sort, Context->fpa_nan(toSolverSort<Z3Sort>(*sort).Sort)));
 
@@ -851,7 +851,7 @@ SMTExprRef Z3Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef Z3Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   return newExprRef(Z3Expr(
       Context, sort, Context->fpa_inf(toSolverSort<Z3Sort>(*sort).Sort, Sgn)));
 }

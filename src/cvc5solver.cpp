@@ -839,7 +839,7 @@ SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
 SMTExprRef CVC5Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(CVC5Expr(
       Context, mkBVSort(ToWidth),
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_SBV, {ToWidth}),
@@ -850,7 +850,7 @@ SMTExprRef CVC5Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
 SMTExprRef CVC5Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
-  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO);
+  const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return newExprRef(CVC5Expr(
       Context, mkBVSort(ToWidth),
       Terms->mkTerm(Terms->mkOp(cvc5::Kind::FLOATINGPOINT_TO_UBV, {ToWidth}),
@@ -967,7 +967,7 @@ SMTExprRef CVC5Solver::mkSymbolImpl(const std::string &Name,
 
 SMTExprRef CVC5Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
   unsigned SWidth = FP.length() - EWidth - 1;
-  const SMTSortRef &sort = mkFPSort(EWidth, SWidth);
+  const SMTSortRef &sort = mkFPSort(EWidth, SWidth, FPEncoding::Native);
   return newExprRef(CVC5Expr(
       Context, sort,
       Terms->mkFloatingPoint(EWidth, SWidth + 1,
@@ -1001,7 +1001,7 @@ SMTExprRef CVC5Solver::mkRMImpl(const RM &R) {
 
 SMTExprRef CVC5Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth, FPEncoding::Native);
   const SMTExprRef &theNaN = newExprRef(
       CVC5Expr(Context, sort, Terms->mkFloatingPointNaN(ExpWidth, SigWidth)));
   return Sgn ? mkFPNeg(theNaN) : theNaN;
@@ -1009,7 +1009,7 @@ SMTExprRef CVC5Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef CVC5Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth);
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth, FPEncoding::Native);
   return newExprRef(
       CVC5Expr(Context, sort,
                Sgn ? Terms->mkFloatingPointNegInf(ExpWidth, SigWidth)

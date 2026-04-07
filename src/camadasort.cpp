@@ -159,7 +159,7 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
     return true;
 
   if (isRMSort() && Other.isRMSort())
-    return true;
+    return isBVRMSort() == Other.isBVRMSort();
 
   if (isArraySort())
     return Other.isArraySort() && (getIndexSort() == Other.getIndexSort()) &&
@@ -178,7 +178,7 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
     return false;
 
   if (isFPSort() && Other.isFPSort())
-    return !(isBVSort() ^ Other.isBVSort()) && ExpWidth == Other.ExpWidth &&
+    return isBVFPSort() == Other.isBVFPSort() && ExpWidth == Other.ExpWidth &&
            SigWidth == Other.SigWidth;
 
   if (isBVSort() && Other.isBVSort())
