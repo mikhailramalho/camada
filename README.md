@@ -167,6 +167,8 @@ limitations still matter in day-to-day use.
     symbol names with different sorts after a reset is still unreliable.
   - quantifiers are implemented in the wrapper, but the current backend setup
     is still unreliable for them.
+  - MathSAT support still builds in CI, but its regression tests are currently
+    skipped there because of the known reset-related instability.
   - native floating-point support has gaps: `fp.fma` and `fp.rem` are lowered
     through the common bit-vector path, and `ROUND_TO_AWAY` is not supported by
     the native MathSAT FP API.
@@ -232,6 +234,18 @@ This is useful for:
 - backend parity testing
 - benchmarking the common FP encoding layer
 - working around backend-specific native-FP gaps
+
+### Tuples
+
+Tuples are currently supported natively on `CVC5` and `Z3`.
+
+For example:
+
+```cpp
+auto tupleSort = solver->mkTupleSort({solver->mkBoolSort(), solver->mkBVSort(8)});
+auto tupleValue = solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(5, 8)});
+auto second = solver->mkTupleSelect(tupleValue, 1);
+```
 
 ### Backend-Specific Adaptation
 
@@ -337,6 +351,7 @@ The regression tests are also a good source of small usage examples:
 - [`regression/simple.test.h`](/home/mgadelha/tools/camada/regression/simple.test.h)
 - [`regression/array.test.h`](/home/mgadelha/tools/camada/regression/array.test.h)
 - [`regression/fp.test.h`](/home/mgadelha/tools/camada/regression/fp.test.h)
+- [`regression/tuple.test.h`](/home/mgadelha/tools/camada/regression/tuple.test.h)
 
 Backend-specific feature coverage is also demonstrated in:
 

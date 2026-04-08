@@ -19,7 +19,7 @@ jobs:
       run: python3 ./scripts/release.py
 
     - name: Create tarball
-      run: tar -czvf camada-linux-x64.tar.gz release/
+      run: tar -C release -czvf camada-linux-x64.tar.gz .
 
       # Upload asset
     - uses: actions/upload-artifact@v4
@@ -45,7 +45,7 @@ jobs:
       run: python3 ./scripts/release.py
 
     - name: Create tarball
-      run: tar -czvf camada-macos-arm64.tar.gz release/
+      run: tar -C release -czvf camada-macos-arm64.tar.gz .
 
       # Upload asset
     - uses: actions/upload-artifact@v4
