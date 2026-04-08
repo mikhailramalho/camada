@@ -13,7 +13,8 @@ from pathlib import Path
 LINE_RE = re.compile(
     r"^benchmark=(?P<name>\S+)\s+backend=(?P<backend>\S+)\s+iterations="
     r"(?P<iterations>\d+)\s+total_ns=(?P<total_ns>\d+)\s+ns_per_iter="
-    r"(?P<ns_per_iter>\d+(?:\.\d+)?)$"
+    r"(?P<ns_per_iter>\d+(?:\.\d+)?)\s+rss_after_kb=(?P<rss_after_kb>\d+)\s+"
+    r"rss_delta_kb=(?P<rss_delta_kb>-?\d+)$"
 )
 
 DEFAULT_MIN_RUNS = 10
@@ -35,6 +36,8 @@ def parse_lines(lines: list[str], source: str) -> dict[str, dict[str, object]]:
             "iterations": int(data["iterations"]),
             "total_ns": int(data["total_ns"]),
             "ns_per_iter": float(data["ns_per_iter"]),
+            "rss_after_kb": int(data["rss_after_kb"]),
+            "rss_delta_kb": int(data["rss_delta_kb"]),
             "source": source,
             "lineno": lineno,
         }
@@ -121,6 +124,8 @@ def compute_medians(
             continue
         ns_values = [float(sample["ns_per_iter"]) for sample in samples]
         total_values = [int(sample["total_ns"]) for sample in samples]
+        rss_after_values = [int(sample["rss_after_kb"]) for sample in samples]
+        rss_delta_values = [int(sample["rss_delta_kb"]) for sample in samples]
         iterations = int(samples[0]["iterations"])
         backend = str(samples[0]["backend"])
         medians[name] = {
@@ -128,6 +133,8 @@ def compute_medians(
             "iterations": iterations,
             "total_ns": int(statistics.median(total_values)),
             "ns_per_iter": statistics.median(ns_values),
+            "rss_after_kb": int(statistics.median(rss_after_values)),
+            "rss_delta_kb": int(statistics.median(rss_delta_values)),
             "runs": len(samples),
         }
 
@@ -140,7 +147,9 @@ def format_benchmark_line(name: str, data: dict[str, object]) -> str:
         f"backend={data['backend']} "
         f"iterations={data['iterations']} "
         f"total_ns={data['total_ns']} "
-        f"ns_per_iter={float(data['ns_per_iter']):.2f}"
+        f"ns_per_iter={float(data['ns_per_iter']):.2f} "
+        f"rss_after_kb={data['rss_after_kb']} "
+        f"rss_delta_kb={data['rss_delta_kb']}"
     )
 
 
@@ -191,6 +200,15 @@ def format_overall_change(
         f"Overall: {word} "
         f"({baseline_total:.2f} -> {current_total:.2f} total ns/iter, "
         f"{delta:+.2f}%, p={p_value:.4f})"
+    )
+
+
+def format_memory_change(name: str, baseline: float, new: float) -> str:
+    delta = pct_change(baseline, new) if baseline != 0 else 0.0
+    word = "improved" if new < baseline else "regressed" if new > baseline else "unchanged"
+    return (
+        f"{name}: {word} "
+        f"({baseline:.0f} -> {new:.0f} KiB retained RSS, {delta:+.2f}%)"
     )
 
 
@@ -251,6 +269,9 @@ def main() -> int:
     improved: list[str] = []
     regressed: list[str] = []
     unchanged: list[str] = []
+    memory_improved: list[str] = []
+    memory_regressed: list[str] = []
+    memory_unchanged: list[str] = []
     baseline_total = 0.0
     current_total = 0.0
 
@@ -269,6 +290,15 @@ def main() -> int:
             regressed.append(format_change(name, old, cur, p_value))
         else:
             unchanged.append(format_change(name, old, cur, p_value))
+
+        old_rss = float(baseline[name]["rss_delta_kb"])
+        cur_rss = float(medians[name]["rss_delta_kb"])
+        if cur_rss < old_rss:
+            memory_improved.append(format_memory_change(name, old_rss, cur_rss))
+        elif cur_rss > old_rss:
+            memory_regressed.append(format_memory_change(name, old_rss, cur_rss))
+        else:
+            memory_unchanged.append(format_memory_change(name, old_rss, cur_rss))
 
     print(
         f"Compared baseline against medians from {runs_to_execute} runs "
@@ -299,6 +329,22 @@ def main() -> int:
         print("Unchanged:")
         for line in unchanged:
             print(f"  {line}")
+
+    if memory_regressed or memory_improved or memory_unchanged:
+        print()
+        print("Retained RSS delta:")
+        if memory_regressed:
+            print("  Regressed:")
+            for line in memory_regressed:
+                print(f"    {line}")
+        if memory_improved:
+            print("  Improved:")
+            for line in memory_improved:
+                print(f"    {line}")
+        if memory_unchanged:
+            print("  Unchanged:")
+            for line in memory_unchanged:
+                print(f"    {line}")
 
     if baseline_only:
         print()

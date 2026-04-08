@@ -5,16 +5,32 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <iomanip>
 #include <stdexcept>
 #include <string>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
+
+std::size_t readCurrentRSSKiB() {
+  std::ifstream Statm("/proc/self/statm");
+  std::size_t total_pages = 0;
+  std::size_t resident_pages = 0;
+  if (!(Statm >> total_pages >> resident_pages))
+    throw std::runtime_error("Failed to read /proc/self/statm");
+
+  const long page_size = sysconf(_SC_PAGESIZE);
+  if (page_size <= 0)
+    throw std::runtime_error("Failed to read page size");
+
+  return (resident_pages * static_cast<std::size_t>(page_size)) / 1024;
+}
 
 camada::SMTSolverRef createSolver(const std::string &backend) {
   if (backend == "bitwuzla") {
@@ -89,20 +105,28 @@ std::string defaultBackend() {
 void runCase(const std::string &backend, const std::string &name,
              std::size_t iterations,
              const std::function<void(camada::SMTSolver &, std::size_t)> &fn) {
-  auto solver = createSolver(backend);
+  const std::size_t rss_before_kb = readCurrentRSSKiB();
   auto start = Clock::now();
-  fn(*solver, iterations);
+  {
+    auto solver = createSolver(backend);
+    fn(*solver, iterations);
+  }
   auto end = Clock::now();
+  const std::size_t rss_after_kb = readCurrentRSSKiB();
 
   auto total_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   auto per_iter_ns =
       iterations == 0 ? 0.0 : static_cast<double>(total_ns) / iterations;
+  const long long rss_delta_kb = static_cast<long long>(rss_after_kb) -
+                                 static_cast<long long>(rss_before_kb);
 
   std::printf(
-      "benchmark=%s backend=%s iterations=%zu total_ns=%lld ns_per_iter=%.*f\n",
+      "benchmark=%s backend=%s iterations=%zu total_ns=%lld ns_per_iter=%.*f "
+      "rss_after_kb=%zu rss_delta_kb=%lld\n",
       name.c_str(), backend.c_str(), iterations,
-      static_cast<long long>(total_ns), 2, per_iter_ns);
+      static_cast<long long>(total_ns), 2, per_iter_ns, rss_after_kb,
+      rss_delta_kb);
 }
 
 void benchmarkBVSort(camada::SMTSolver &solver, std::size_t iterations) {
