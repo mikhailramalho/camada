@@ -82,13 +82,12 @@ void STPExpr::dump(std::string &Out) const {
   free(s);
 }
 
-STPSolver::STPSolver()
-    : SMTSolverImpl(), Context(STP::vc_createValidityChecker()) {
+STPSolver::STPSolver() : Context(STP::vc_createValidityChecker()) {
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }
 
-STPSolver::STPSolver(STPContextRef C) : SMTSolverImpl(), Context(*C) {
+STPSolver::STPSolver(STPContextRef C) : Context(*C) {
   initializeCommonSingletons();
 }
 

@@ -93,7 +93,7 @@ void BitwExpr::dump(std::string &Out) const {
   Out = bitwuzla_term_to_string(Expr);
 }
 
-BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() {
+BitwuzlaSolver::BitwuzlaSolver() {
   initializeContext();
   initializeCommonSingletons();
 }

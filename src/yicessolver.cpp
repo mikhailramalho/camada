@@ -107,7 +107,7 @@ void YicesExpr::dump(std::string &Out) const {
   yices_free_string(term_str);
 }
 
-YicesSolver::YicesSolver() : SMTSolverImpl() {
+YicesSolver::YicesSolver() {
   yices_init();
   yices_clear_error();
 

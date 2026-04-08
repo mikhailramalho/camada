@@ -110,20 +110,19 @@ void Z3Expr::dump(std::string &Out) const {
   Out += "\n";
 }
 
-Z3Solver::Z3Solver() : SMTSolverImpl(), Context(), Solver(Context) {
+Z3Solver::Z3Solver() : Solver(Context) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
 }
 
-Z3Solver::Z3Solver(z3::context C)
-    : SMTSolverImpl(), Context(std::move(C)), Solver(Context) {
+Z3Solver::Z3Solver(z3::context C) : Context(std::move(C)), Solver(Context) {
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
 }
 
 Z3Solver::Z3Solver(z3::context C, z3::solver S)
-    : SMTSolverImpl(), Context(std::move(C)), Solver(std::move(S)) {
+    : Context(std::move(C)), Solver(std::move(S)) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
