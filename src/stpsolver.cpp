@@ -433,39 +433,52 @@ SMTExprRef STPSolver::mkBVConcatImpl(const SMTExprRef &LHS,
 
 SMTExprRef STPSolver::mkArraySelectImpl(const SMTExprRef &Array,
                                         const SMTExprRef &Index) {
-  STP::Expr read = STP::vc_readExpr(Context, toSolverExpr<STPExpr>(*Array).Expr,
-                                    toSolverExpr<STPExpr>(*Index).Expr);
-  if (Array->Sort->getElementSort()->isBoolSort())
+  const SMTSortRef &elementSort = Array->Sort->getElementSort();
+  const SMTExprRef &read = makeExprRef<STPExpr>(
+      SMTExprKind::ArraySelect, &Context,
+      elementSort->isBoolSort() ? mkBVSort(1) : elementSort,
+      STP::vc_readExpr(Context, toSolverExpr<STPExpr>(*Array).Expr,
+                       toSolverExpr<STPExpr>(*Index).Expr));
+  if (elementSort->isBoolSort()) {
+    const SMTExprRef &one = mkBVFromDec(1, 1);
     return makeExprRef<STPExpr>(
         SMTExprKind::ArraySelect, &Context, mkBoolSort(),
-        STP::vc_eqExpr(Context, read,
-                       STP::vc_bvConstExprFromInt(Context, 1, 1)));
+        STP::vc_eqExpr(Context, toSolverExpr<STPExpr>(*read).Expr,
+                       toSolverExpr<STPExpr>(*one).Expr));
+  }
 
-  return makeExprRef<STPExpr>(SMTExprKind::ArraySelect, &Context,
-                              Array->Sort->getElementSort(), read);
+  return read;
 }
 
 SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                                        const SMTExprRef &Index,
                                        const SMTExprRef &Element) {
   STP::Expr backend_element = toSolverExpr<STPExpr>(*Element).Expr;
-  if (Array->Sort->getElementSort()->isBoolSort())
-    backend_element =
+  if (Array->Sort->getElementSort()->isBoolSort()) {
+    const SMTExprRef &one = mkBVFromDec(1, 1);
+    const SMTExprRef &zero = mkBVFromDec(0, 1);
+    const SMTExprRef &ite = makeExprRef<STPExpr>(
+        SMTExprKind::Ite, &Context, mkBVSort(1),
         STP::vc_iteExpr(Context, toSolverExpr<STPExpr>(*Element).Expr,
-                        STP::vc_bvConstExprFromInt(Context, 1, 1),
-                        STP::vc_bvConstExprFromInt(Context, 1, 0));
+                        toSolverExpr<STPExpr>(*one).Expr,
+                        toSolverExpr<STPExpr>(*zero).Expr));
+    backend_element = toSolverExpr<STPExpr>(*ite).Expr;
+  }
 
-  return makeExprRef<STPExpr>(
-      SMTExprKind::ArrayStore, &Context, Array->Sort,
+  STP::Expr written =
       STP::vc_writeExpr(Context, toSolverExpr<STPExpr>(*Array).Expr,
-                        toSolverExpr<STPExpr>(*Index).Expr, backend_element));
+                        toSolverExpr<STPExpr>(*Index).Expr, backend_element);
+
+  return makeExprRef<STPExpr>(SMTExprKind::ArrayStore, &Context, Array->Sort,
+                              written);
 }
 
 bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(Context, toSolverExpr<STPExpr>(*Exp).Expr);
-  const bool result =
-      STP::getBVUnsigned(STP::vc_boolToBVExpr(Context, value)) != 0;
+  STP::Expr bv_value = STP::vc_boolToBVExpr(Context, value);
+  const bool result = STP::getBVUnsigned(bv_value) != 0;
+  STP::vc_DeleteExpr(bv_value);
   STP::vc_DeleteExpr(value);
   return result;
 }
@@ -594,8 +607,9 @@ void STPSolver::dumpImpl() {
 void STPSolver::dumpImpl(std::string &Out) {
   char *buf = nullptr;
   unsigned long len = 0;
-  STP::vc_printQueryStateToBuffer(Context, STP::vc_trueExpr(Context), &buf,
-                                  &len, 0);
+  STP::Expr query = STP::vc_trueExpr(Context);
+  STP::vc_printQueryStateToBuffer(Context, query, &buf, &len, 0);
+  STP::vc_DeleteExpr(query);
   Out.assign(buf, len);
   free(buf);
 }
