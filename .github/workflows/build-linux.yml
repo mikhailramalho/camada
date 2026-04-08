@@ -31,7 +31,7 @@ jobs:
       run: cmake -S . -B build -GNinja -DCAMADA_ENABLE_REGRESSION=ON -DBUILD_SHARED_LIBS=OFF -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL -DCAMADA_SOLVER_BITWUZLA_ENABLE=ON -DCAMADA_SOLVER_CVC5_ENABLE=ON -DCAMADA_SOLVER_MATHSAT_ENABLE=ON -DCAMADA_SOLVER_STP_ENABLE=ON -DCAMADA_SOLVER_YICES_ENABLE=ON -DCAMADA_SOLVER_Z3_ENABLE=ON -DCMAKE_INSTALL_PREFIX:PATH=$GITHUB_WORKSPACE/release -DCMAKE_BUILD_TYPE=Debug
 
     - name: Build Camada
-      run: cmake --build build -j1 --target install
+      run: cmake --build build --target install
 
     - name: Run tests
       run: ctest --test-dir build --output-on-failure
