@@ -23,6 +23,7 @@
 #define CAMADAIMPL_H_
 
 #include "camada.h"
+#include "camadaarena.h"
 #include "camadaerror.h"
 
 #include <cassert>
@@ -66,22 +67,19 @@ public:
 protected:
   template <typename SolverExpr, typename... Args>
   SMTExprRef makeExprRef(SMTExprKind Kind, Args &&...ArgsV) const {
-    auto Exp = std::make_unique<SolverExpr>(Kind, std::forward<Args>(ArgsV)...);
+    auto *Exp =
+        ExprArena.create<SolverExpr>(Kind, std::forward<Args>(ArgsV)...);
     assert(Exp->Sort->isWidthValidated());
-    const SMTExpr *ExprPtr = Exp.get();
-    ExprArena.emplace_back(std::move(Exp));
-    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
+    return SMTExprRef(Exp, HandleState, HandleState->Generation);
   }
 
   template <typename SolverSort> SMTSortRef newSortRef(SolverSort Sort) const {
-    auto OwnedSort = std::make_unique<SolverSort>(std::move(Sort));
+    auto *OwnedSort = SortArena.create<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
 #ifndef NDEBUG
     OwnedSort->markWidthValidated();
 #endif
-    const SMTSort *SortPtr = OwnedSort.get();
-    SortArena.emplace_back(std::move(OwnedSort));
-    return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
+    return SMTSortRef(OwnedSort, HandleState, HandleState->Generation);
   }
 
   void invalidateGeneratedObjects() {
@@ -150,8 +148,8 @@ protected:
         SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
   }
 
-  mutable std::deque<std::unique_ptr<SMTSort>> SortArena;
-  mutable std::deque<std::unique_ptr<SMTExpr>> ExprArena;
+  mutable ObjectArena SortArena;
+  mutable ObjectArena ExprArena;
   mutable std::array<SMTExprRef, 2> CachedBoolExprs;
   mutable SMTExprRef CachedBVOne1Expr;
   mutable std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;

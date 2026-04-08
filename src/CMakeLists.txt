@@ -40,6 +40,7 @@ set(${LIBRARY_TARGET_NAME}_SRC
 # system
 set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camada.h
+    camadaarena.h
     camadacache.h
     camadaexpr.h
     camadaerror.h
