@@ -31,6 +31,12 @@
 
 namespace camada {
 
+/// Simple bump-pointer arena for solver-owned objects.
+///
+/// Objects are placement-new'ed into growable byte blocks and never moved after
+/// construction. The arena records a destructor callback per object so clear()
+/// can destroy them in reverse creation order while keeping the allocated
+/// blocks for reuse.
 class ObjectArena {
 public:
   explicit ObjectArena(std::size_t InitialBlockSize = 16384)
@@ -44,6 +50,7 @@ public:
 
   ~ObjectArena() { clear(); }
 
+  /// Construct an object inside the arena and return its stable address.
   template <typename T, typename... Args> T *create(Args &&...ArgsV) {
     void *Storage = allocate(sizeof(T), alignof(T));
     T *Object = new (Storage) T(std::forward<Args>(ArgsV)...);
@@ -52,6 +59,8 @@ public:
     return Object;
   }
 
+  /// Destroy all live objects and reset block offsets so future allocations
+  /// can reuse the existing storage.
   void clear() {
     for (auto It = Destructors.rbegin(); It != Destructors.rend(); ++It)
       It->Destroy(It->Ptr);
