@@ -45,6 +45,13 @@ static inline msat_decl toMathSATDecl(const SMTExprRef &Exp) {
   return ME.getDecl();
 }
 
+static inline char *checkMathSATString(char *Str, const char *Message) {
+  if (Str != nullptr)
+    return Str;
+  fatalError(Message);
+  return nullptr;
+}
+
 unsigned MathSATSort::getWidthFromSolver() const {
   std::size_t w;
   if (msat_is_bv_type(*Context, Sort, &w))
@@ -148,7 +155,7 @@ static inline bool checkExprError(msat_env Context, const T &Value) {
     static_assert(!sizeof(T), "Unsupported MathSAT error-checked type");
 
   if (HasError) {
-    std::fprintf(stderr, "MathSAT Error %s\n",
+    std::fprintf(stderr, "MathSAT Error: %s\n",
                  msat_last_error_message(Context));
     return true;
   }
@@ -1066,12 +1073,12 @@ SMTExprRef MathSATSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
   msat_term quantified_body =
       msat_apply_substitution(Context, toMathSATTerm(Body), old_terms.size(),
                               old_terms.data(), bound_vars.data());
-  assert(!MSAT_ERROR_TERM(quantified_body) &&
+  assert(!checkExprError(Context, quantified_body) &&
          "Failed to substitute MathSAT quantified body");
 
   for (auto it = bound_vars.rbegin(); it != bound_vars.rend(); ++it) {
     quantified_body = msat_make_forall(Context, *it, quantified_body);
-    assert(!MSAT_ERROR_TERM(quantified_body) &&
+    assert(!checkExprError(Context, quantified_body) &&
            "Failed to build MathSAT forall term");
   }
 
@@ -1097,12 +1104,12 @@ SMTExprRef MathSATSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
   msat_term quantified_body =
       msat_apply_substitution(Context, toMathSATTerm(Body), old_terms.size(),
                               old_terms.data(), bound_vars.data());
-  assert(!MSAT_ERROR_TERM(quantified_body) &&
+  assert(!checkExprError(Context, quantified_body) &&
          "Failed to substitute MathSAT quantified body");
 
   for (auto it = bound_vars.rbegin(); it != bound_vars.rend(); ++it) {
     quantified_body = msat_make_exists(Context, *it, quantified_body);
-    assert(!MSAT_ERROR_TERM(quantified_body) &&
+    assert(!checkExprError(Context, quantified_body) &&
            "Failed to build MathSAT exists term");
   }
 
@@ -1168,20 +1175,19 @@ void MathSATSolver::dumpModelImpl(std::string &Out) {
   // we use a model iterator to retrieve the model values for all the
   // variables, and the necessary function instantiations
   msat_model_iterator iter = msat_create_model_iterator(Context);
-  assert(!MSAT_ERROR_MODEL_ITERATOR(iter) &&
-         "Error when getting model iterator");
+  assert(!checkExprError(Context, iter) && "Error when getting model iterator");
 
   while (msat_model_iterator_has_next(iter)) {
     msat_term t, v;
     char *s;
     msat_model_iterator_next(iter, &t, &v);
-    s = msat_term_repr(t);
-    assert(s && "Error when getting variable from model");
+    s = checkMathSATString(msat_term_repr(t),
+                           "Error when getting variable from model");
     Out += s;
     Out += " = ";
     msat_free(s);
-    s = msat_term_repr(v);
-    assert(s && "Error when getting variable value from model");
+    s = checkMathSATString(msat_term_repr(v),
+                           "Error when getting variable value from model");
     Out += s;
     Out += "\n";
     msat_free(s);

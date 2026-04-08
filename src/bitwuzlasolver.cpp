@@ -33,6 +33,12 @@ namespace {
 
 void bitwuzlaErrorHandler(const char *msg) { fatalError(msg); }
 
+static inline void bitwuzlaCheck(bool Ok, const char *Message) {
+  if (Ok)
+    return;
+  fatalError(Message);
+}
+
 BitwuzlaTerm mkTerm1(BitwuzlaTermManager *tm, BitwuzlaKind kind,
                      const SMTExprRef &Exp) {
   return bitwuzla_mk_term1(tm, kind, toSolverExpr<BitwExpr>(*Exp).Expr);
@@ -682,7 +688,8 @@ bool BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
   const char *result = bitwuzla_term_to_string(
       bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr));
 
-  assert(result != nullptr && "Bitwuzla returned null boolean value string");
+  bitwuzlaCheck(result != nullptr,
+                "Bitwuzla returned null boolean value string");
   if (!strcmp(result, "true"))
     return true;
   if (!strcmp(result, "false"))
@@ -929,7 +936,8 @@ void BitwuzlaSolver::dumpImpl(std::string &Out) {
   char *Buffer = nullptr;
   size_t Size = 0;
   FILE *Stream = open_memstream(&Buffer, &Size);
-  assert(Stream && "Failed to open memory stream for Bitwuzla dump");
+  bitwuzlaCheck(Stream != nullptr,
+                "Failed to open memory stream for Bitwuzla dump");
   bitwuzla_print_formula(Context, "smt2", Stream, 2);
   fclose(Stream);
   Out.assign(Buffer, Size);
