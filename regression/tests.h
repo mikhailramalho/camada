@@ -35,6 +35,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDFPTEST(fp_round_to_away, BVFP);
   RESETANDFPTEST(fp_bv_conversions, NativeFP);
   RESETANDFPTEST(fp_bv_conversions, BVFP);
+  RESETANDFPTEST(fp_to_signed_bv_multiple_widths, BVFP);
   RESETANDFPTEST(fp_denormal_round_to_integral, NativeFP);
   RESETANDFPTEST(fp_denormal_round_to_integral, BVFP);
   RESETANDFPTEST(fp_div_overflow_to_inf, NativeFP);

@@ -745,13 +745,6 @@ SMTExprRef YicesSolver::mkBVFromBinImpl(const std::string &Int,
 
 SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
                                      const SMTSortRef &Sort) {
-  // We could use yices_get_term_by_name to check if the variable was already
-  // created, but the we would need to create a new SMTExprRef, so use
-  // this map instead
-  auto it = SymbolTable.find(Name);
-  if (it != SymbolTable.end())
-    return it->second;
-
   if (yices_get_term_by_name(Name.c_str()) != NULL_TERM)
     fatalError("Trying to create a symbol but it already exists");
 
@@ -762,11 +755,7 @@ SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
   yicesCheckError(yices_set_term_name(t, Name.c_str()),
                   "Error when trying to set Yices symbol name");
 
-  auto inserted = SymbolTable.insert(SymbolTablet::value_type(
-      Name, makeExprRef<YicesExpr>(SMTExprKind::Symbol, Context, Sort, t)));
-
-  assert(inserted.second && "Could not cache new Yices variable");
-  return inserted.first->second;
+  return makeExprRef<YicesExpr>(SMTExprKind::Symbol, Context, Sort, t);
 }
 
 SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
@@ -794,7 +783,6 @@ checkResult YicesSolver::checkImpl() {
 }
 
 void YicesSolver::resetImpl() {
-  SymbolTable.clear();
   Assertions.clear();
   AssertionScopeSizes.clear();
 

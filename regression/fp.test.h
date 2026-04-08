@@ -138,6 +138,37 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver,
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+inline void fp_to_signed_bv_multiple_widths(const camada::SMTSolverRef &solver,
+                                            camada::FPEncoding Encoding) {
+  auto fp = solver->mkFP32(42.0f, Encoding);
+  auto sbv32 = solver->mkFPtoSBV(fp, 32);
+
+  REQUIRE(fp->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(sbv32->getKind() == camada::SMTExprKind::FPtoSBV);
+
+  solver->addConstraint(solver->mkEqual(sbv32, solver->mkBVFromDec(42, 32)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+  fp = solver->mkFP32(42.0f, Encoding);
+  auto sbv64 = solver->mkFPtoSBV(fp, 64);
+  REQUIRE(fp->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(sbv64->getKind() == camada::SMTExprKind::FPtoSBV);
+  solver->addConstraint(solver->mkEqual(sbv64, solver->mkBVFromDec(42, 64)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+  fp = solver->mkFP32(42.0f, Encoding);
+  sbv32 = solver->mkFPtoSBV(fp, 32);
+  sbv64 = solver->mkFPtoSBV(fp, 64);
+  REQUIRE(fp->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(sbv32->getKind() == camada::SMTExprKind::FPtoSBV);
+  REQUIRE(sbv64->getKind() == camada::SMTExprKind::FPtoSBV);
+  solver->addConstraint(solver->mkEqual(sbv32, solver->mkBVFromDec(42, 32)));
+  solver->addConstraint(solver->mkEqual(sbv64, solver->mkBVFromDec(42, 64)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
 inline void fp_denormal_round_to_integral(const camada::SMTSolverRef &solver,
                                           camada::FPEncoding Encoding) {
   auto pos_denorm =

@@ -807,18 +807,10 @@ SMTExprRef BitwuzlaSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef BitwuzlaSolver::mkSymbolImpl(const std::string &Name,
                                         const SMTSortRef &Sort) {
-  auto it = SymbolTable.find(Name);
-  if (it != SymbolTable.end())
-    return it->second;
-
-  const SMTExprRef &newSymbol = makeExprRef<BitwExpr>(
+  return makeExprRef<BitwExpr>(
       SMTExprKind::Symbol, Context, Sort,
       bitwuzla_mk_const(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
                         Name.c_str()));
-
-  auto inserted = SymbolTable.insert(SymbolTablet::value_type(Name, newSymbol));
-  assert(inserted.second && "Could not cache new Bitwuzla variable");
-  return inserted.first->second;
 }
 
 SMTExprRef BitwuzlaSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
@@ -912,7 +904,6 @@ checkResult BitwuzlaSolver::checkImpl() {
 }
 
 void BitwuzlaSolver::resetImpl() {
-  SymbolTable.clear();
   destroyContext();
   initializeContext();
 }
@@ -955,7 +946,7 @@ void BitwuzlaSolver::dumpModelImpl() {
 
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {
   Out.clear();
-  for (const auto &entry : SymbolTable) {
+  for (const auto &entry : SymbolExprCache) {
     const BitwuzlaTerm term = toSolverExpr<BitwExpr>(*entry.second).Expr;
     Out += "(define-fun ";
     Out += bitwuzla_term_get_symbol(term);

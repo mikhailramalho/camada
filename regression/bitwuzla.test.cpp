@@ -26,7 +26,6 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
     explicit myBitwuzlaSolver() { resetImpl(); }
 
     void resetImpl() override {
-      SymbolTable.clear();
       destroyContext();
       initializeContext();
     }

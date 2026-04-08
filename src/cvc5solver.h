@@ -350,10 +350,6 @@ protected:
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 
-protected:
-  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
-  SymbolTablet SymbolTable;
-
 private:
   cvc5::TermManager Terms;
   cvc5::Solver Context;

@@ -91,7 +91,6 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
     myYicesSolver() = default;
 
     void resetImpl() override {
-      SymbolTable.clear();
       Assertions.clear();
 
       if (context())

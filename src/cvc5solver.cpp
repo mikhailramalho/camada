@@ -996,21 +996,9 @@ SMTExprRef CVC5Solver::mkBVFromBinImpl(const std::string &Int,
 
 SMTExprRef CVC5Solver::mkSymbolImpl(const std::string &Name,
                                     const SMTSortRef &Sort) {
-
-  // Standard arrangement: if we already have the name, return the expression
-  // from the symbol table. If not, time for a new name.
-  auto it = SymbolTable.find(Name);
-  if (it != SymbolTable.end())
-    return it->second;
-
-  // Time for a new one.
-  auto inserted = SymbolTable.insert(SymbolTablet::value_type(
-      Name, makeExprRef<CVC5Expr>(
-                SMTExprKind::Symbol, &Context, Sort,
-                Terms.mkConst(toSolverSort<CVC5Sort>(*Sort).Sort, Name))));
-
-  assert(inserted.second && "Could not cache new CVC5 variable");
-  return inserted.first->second;
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Symbol, &Context, Sort,
+      Terms.mkConst(toSolverSort<CVC5Sort>(*Sort).Sort, Name));
 }
 
 SMTExprRef CVC5Solver::mkFPFromBinImpl(const std::string &FP, unsigned EWidth) {
@@ -1153,10 +1141,7 @@ checkResult CVC5Solver::checkImpl() {
   return checkResult::UNSAT;
 }
 
-void CVC5Solver::resetImpl() {
-  SymbolTable.clear();
-  Context.resetAssertions();
-}
+void CVC5Solver::resetImpl() { Context.resetAssertions(); }
 
 void CVC5Solver::pushImpl(unsigned nscopes) { Context.push(nscopes); }
 

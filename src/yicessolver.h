@@ -263,9 +263,6 @@ protected:
   void dumpModelImpl(std::string &Out) override;
 
 protected:
-  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
-  SymbolTablet SymbolTable;
-
   using TermVectort = std::vector<SMTExprRef>;
   TermVectort Assertions;
   std::vector<std::size_t> AssertionScopeSizes;
