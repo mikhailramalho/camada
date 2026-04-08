@@ -330,30 +330,30 @@ public:
   virtual SMTExprRef mkFPEqual(const SMTExprRef &LHS,
                                const SMTExprRef &RHS) = 0;
 
-  /// Creates a floating-point conversion from floatint-point to floating-point
+  /// Creates a floating-point conversion from floating-point to floating-point
   /// operation
   virtual SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
                               const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from signed bitvector to
-  /// floatint-point operation
+  /// floating-point operation
   virtual SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from unsigned bitvector to
-  /// floatint-point operation
+  /// floating-point operation
   virtual SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
                                const SMTExprRef &R) = 0;
 
-  /// Creates a floating-point conversion from floatint-point to signed
+  /// Creates a floating-point conversion from floating-point to signed
   /// bitvector operation
   virtual SMTExprRef mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) = 0;
 
-  /// Creates a floating-point conversion from floatint-point to unsigned
+  /// Creates a floating-point conversion from floating-point to unsigned
   /// bitvector operation
   virtual SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) = 0;
 
-  /// Creates a floating-point conversion from floatint-point to the closest
+  /// Creates a floating-point conversion from floating-point to the closest
   /// integer, considering the rounding mode.
   virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
                                     const SMTExprRef &R) = 0;
@@ -456,7 +456,7 @@ public:
   /// Constructs an SMTExprRef from an integer in base 10 and its sort
   virtual SMTExprRef mkBVFromDec(const int64_t Int, const SMTSortRef &Sort) = 0;
 
-  /// Convinience method to create a bitvector from an integer in base 10 and
+  /// Convenience method to create a bitvector from an integer in base 10 and
   /// its bitwidth
   virtual SMTExprRef mkBVFromDec(const int64_t Int, unsigned BitWidth) = 0;
 
@@ -464,11 +464,11 @@ public:
   virtual SMTExprRef mkBVFromBin(const std::string &Int,
                                  const SMTSortRef &Sort) = 0;
 
-  /// Convinience method to create a bitvector from an integer in base 2 and
+  /// Convenience method to create a bitvector from an integer in base 2 and
   /// its bitwidth
   virtual SMTExprRef mkBVFromBin(const std::string &Int, unsigned BitWidth) = 0;
 
-  /// Convinience method to create a bitvector from an integer in base 2
+  /// Convenience method to create a bitvector from an integer in base 2
   virtual SMTExprRef mkBVFromBin(const std::string &Int) = 0;
 
   /// Creates a new symbol, given a name and a sort
