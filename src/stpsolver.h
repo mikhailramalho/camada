@@ -79,8 +79,7 @@ public:
   ~STPSolver() override;
 
 protected:
-  STP::VC Context = nullptr;
-  unsigned int ConstArrayCounter = 0;
+  STP::VC context() const { return Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -215,6 +214,10 @@ protected:
 
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
+
+private:
+  STP::VC Context = nullptr;
+  unsigned int ConstArrayCounter = 0;
 }; // end class STPSolver
 
 } // namespace camada

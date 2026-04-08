@@ -24,6 +24,8 @@
 
 #include "camadasort.h"
 
+#include <utility>
+
 namespace camada {
 
 class SMTExpr;
@@ -185,31 +187,31 @@ public:
   }
 
   /// Returns true if the expr sort is bitvector
-  virtual bool isBVSort() const = 0;
+  bool isBVSort() const { return Sort->isBVSort(); }
 
   /// Returns true if the expr sort is boolean
-  virtual bool isBoolSort() const = 0;
+  bool isBoolSort() const { return Sort->isBoolSort(); }
 
   /// Returns true if the expr sort is integer
-  virtual bool isIntSort() const = 0;
+  bool isIntSort() const { return Sort->isIntSort(); }
 
   /// Returns true if the expr sort is real
-  virtual bool isRealSort() const = 0;
+  bool isRealSort() const { return Sort->isRealSort(); }
 
   /// Returns true if the expr sort is arithmetic
-  virtual bool isArithSort() const = 0;
+  bool isArithSort() const { return Sort->isArithSort(); }
 
   /// Returns true if the expr sort is floating-point
-  virtual bool isFPSort() const = 0;
+  bool isFPSort() const { return Sort->isFPSort(); }
 
   /// Returns true if the expr sort is rounding mode
-  virtual bool isRMSort() const = 0;
+  bool isRMSort() const { return Sort->isRMSort(); }
 
   /// Returns true if the expr sort is array
-  virtual bool isArraySort() const = 0;
+  bool isArraySort() const { return Sort->isArraySort(); }
 
   /// Returns true if the expr sort is function
-  virtual bool isFunctionSort() const = 0;
+  bool isFunctionSort() const { return Sort->isFunctionSort(); }
 
   /// Returns this expr's sort width
   unsigned getWidth() const { return Sort->getWidth(); }
@@ -247,25 +249,11 @@ public:
              const TheExpr &SA)
       : SMTExpr(Kind, S), Context(std::move(C)), Expr(SA) {}
 
+  SolverExpr(SMTExprKind Kind, SolverContextRef C, const SMTSortRef &S,
+             TheExpr &&SA)
+      : SMTExpr(Kind, S), Context(std::move(C)), Expr(std::move(SA)) {}
+
   virtual ~SolverExpr() override = default;
-
-  bool isBVSort() const override { return Sort->isBVSort(); }
-
-  bool isBoolSort() const override { return Sort->isBoolSort(); }
-
-  bool isIntSort() const override { return Sort->isIntSort(); }
-
-  bool isRealSort() const override { return Sort->isRealSort(); }
-
-  bool isArithSort() const override { return Sort->isArithSort(); }
-
-  bool isFPSort() const override { return Sort->isFPSort(); }
-
-  bool isRMSort() const override { return Sort->isRMSort(); }
-
-  bool isArraySort() const override { return Sort->isArraySort(); }
-
-  bool isFunctionSort() const override { return Sort->isFunctionSort(); }
 
   bool equal_to(SMTExpr const &other) const override = 0;
 };

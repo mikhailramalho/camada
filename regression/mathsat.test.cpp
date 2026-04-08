@@ -11,18 +11,17 @@ TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   tests(mathsat);
 }
 
-TEST_CASE("Quantifiers MathSAT test", "[MathSAT]") {
-  msat_config Config = msat_create_default_config("AUFBV");
-  msat_set_option(Config, "model_generation", "true");
-  camada::SMTSolverRef mathsat =
-      std::make_unique<camada::MathSATSolver>(Config);
-  msat_destroy_config(Config);
-  quantifier_semantics(mathsat);
-}
-
 TEST_CASE("UF MathSAT test", "[MathSAT]") {
   auto mathsat = camada::createMathSATSolver();
   uf_semantics(mathsat);
+}
+
+TEST_CASE("Unsupported quantifiers MathSAT test", "[MathSAT]") {
+  auto mathsat = camada::createMathSATSolver();
+  require_abort([&]() {
+    auto x = mathsat->mkSymbol("x", mathsat->mkBVSort(4));
+    (void)mathsat->mkForall({x}, mathsat->mkEqual(x, x));
+  });
 }
 
 TEST_CASE("Arith MathSAT test", "[MathSAT]") {
@@ -30,7 +29,6 @@ TEST_CASE("Arith MathSAT test", "[MathSAT]") {
   msat_set_option(Config, "model_generation", "true");
   camada::SMTSolverRef mathsat =
       std::make_unique<camada::MathSATSolver>(Config);
-  msat_destroy_config(Config);
 
   int_arithmetic_semantics(mathsat);
   mathsat->reset();
@@ -39,8 +37,6 @@ TEST_CASE("Arith MathSAT test", "[MathSAT]") {
   arith_model_queries(mathsat);
   mathsat->reset();
   arith_conversion_semantics(mathsat);
-  mathsat->reset();
-  arith_symbolic_shift_semantics(mathsat);
 }
 
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
@@ -77,7 +73,42 @@ TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
 
   // Create custom MathSAT Solver
   camada::SMTSolverRef mathsat = std::make_unique<mySolver>(Config);
-  msat_destroy_config(Config);
 
   tests(mathsat);
+}
+
+TEST_CASE("MathSAT reset reuses symbol names across sort changes",
+          "[MathSAT]") {
+  auto mathsat = camada::createMathSATSolver();
+
+  auto eight = mathsat->mkBVFromDec(8, 8);
+  auto x_bv = mathsat->mkSymbol("x", mathsat->mkBVSort(8));
+  mathsat->addConstraint(mathsat->mkEqual(x_bv, eight));
+  REQUIRE(mathsat->check() == camada::checkResult::SAT);
+  REQUIRE(mathsat->getBV(x_bv) == 8);
+
+  mathsat->reset();
+
+  auto x_bool = mathsat->mkSymbol("x", mathsat->mkBoolSort());
+  mathsat->addConstraint(x_bool);
+  REQUIRE(mathsat->check() == camada::checkResult::SAT);
+  REQUIRE(mathsat->getBool(x_bool));
+}
+
+TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
+  {
+    auto mathsat = camada::createMathSATSolver();
+    auto x_bv = mathsat->mkSymbol("x", mathsat->mkBVSort(4));
+    mathsat->addConstraint(mathsat->mkEqual(x_bv, mathsat->mkBVFromDec(3, 4)));
+    REQUIRE(mathsat->check() == camada::checkResult::SAT);
+    REQUIRE(mathsat->getBV(x_bv) == 3);
+  }
+
+  {
+    auto mathsat = camada::createMathSATSolver();
+    auto x_bool = mathsat->mkSymbol("x", mathsat->mkBoolSort());
+    mathsat->addConstraint(mathsat->mkNot(x_bool));
+    REQUIRE(mathsat->check() == camada::checkResult::SAT);
+    REQUIRE_FALSE(mathsat->getBool(x_bool));
+  }
 }

@@ -110,20 +110,19 @@ void Z3Expr::dump(std::string &Out) const {
   Out += "\n";
 }
 
-Z3Solver::Z3Solver() : SMTSolverImpl(), Context(), Solver(Context) {
+Z3Solver::Z3Solver() : Solver(Context) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
 }
 
-Z3Solver::Z3Solver(z3::context C)
-    : SMTSolverImpl(), Context(std::move(C)), Solver(Context) {
+Z3Solver::Z3Solver(z3::context C) : Context(std::move(C)), Solver(Context) {
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
 }
 
 Z3Solver::Z3Solver(z3::context C, z3::solver S)
-    : SMTSolverImpl(), Context(std::move(C)), Solver(std::move(S)) {
+    : Context(std::move(C)), Solver(std::move(S)) {
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
@@ -136,13 +135,15 @@ void Z3Solver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef Z3Solver::newExprRefImpl(const SMTExpr &Exp) const {
-  return storeExprRef(toSolverExpr<Z3Expr>(Exp));
+  const auto &Wrapped = toSolverExpr<Z3Expr>(Exp);
+  return makeExprRef<Z3Expr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                             Wrapped.Expr);
 }
 
 SMTExprRef Z3Solver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
                                     SMTExprKind Kind) const {
   const auto &Wrapped = toSolverExpr<Z3Expr>(Exp);
-  return storeExprRef(Z3Expr(Kind, Wrapped.Context, Sort, Wrapped.Expr));
+  return makeExprRef<Z3Expr>(Kind, Wrapped.Context, Sort, Wrapped.Expr);
 }
 
 SMTSortRef Z3Solver::mkBoolSortImpl() {
@@ -748,7 +749,8 @@ SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
 }
 
 bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
-  switch (toZ3Expr(Exp).bool_value()) {
+  z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
+  switch (Value.bool_value()) {
   case Z3_L_TRUE:
     return true;
   case Z3_L_FALSE:
@@ -760,14 +762,9 @@ bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
 }
 
 std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
-  SMTExprRef value = Exp;
-  if (Solver.get_model().has_interp(toZ3Expr(Exp).decl())) {
-    value = makeExprRef<Z3Expr>(
-        Exp->getKind(), &Context, Exp->Sort,
-        Solver.get_model().get_const_interp(toZ3Expr(Exp).decl()));
-  }
+  z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   std::string bv;
-  bool is_num = toZ3Expr(value).as_binary(bv);
+  bool is_num = Value.as_binary(bv);
   (void)is_num;
   assert(is_num && "Failed to get bitvector from Z3");
   return bv;
@@ -805,16 +802,8 @@ void Z3Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
 }
 
 std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
-  SMTExprRef value = Exp;
-  if (Solver.get_model().has_interp(toZ3Expr(Exp).decl())) {
-    value = makeExprRef<Z3Expr>(
-        Exp->getKind(), &Context, Exp->Sort,
-        Solver.get_model().get_const_interp(toZ3Expr(Exp).decl()));
-  }
-
-  // Convert the float to bv
-  z3::expr fp_value =
-      Solver.get_model().eval(toZ3Expr(value).mk_to_ieee_bv(), true);
+  z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
+  z3::expr fp_value = Solver.get_model().eval(Value.mk_to_ieee_bv(), true);
   std::string bv;
   bool is_num = fp_value.as_binary(bv);
   (void)is_num;

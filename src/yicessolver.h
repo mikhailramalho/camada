@@ -69,8 +69,13 @@ public:
   ~YicesSolver() override;
 
 protected:
-  YicesContextRef Context = nullptr;
-  unsigned int ConstArrayCounter = 0;
+  YicesContextRef context() const { return Context; }
+  void setContext(YicesContextRef NewContext) { Context = NewContext; }
+  void clearContext() { Context = nullptr; }
+  void recreateContext(const char *Logic);
+  void recreateContextWithConfig(const char *Logic,
+                                 void (*Configure)(ctx_config_t *));
+  void destroyContext();
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -262,12 +267,16 @@ protected:
   void dumpModelImpl(std::string &Out) override;
 
 protected:
-  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
-  SymbolTablet SymbolTable;
-
   using TermVectort = std::vector<SMTExprRef>;
   TermVectort Assertions;
   std::vector<std::size_t> AssertionScopeSizes;
+
+private:
+  void releaseSymbolNames();
+
+  YicesContextRef Context = nullptr;
+  unsigned int ConstArrayCounter = 0;
+  std::vector<std::string> NamedSymbols;
 
 }; // namespace camada
 

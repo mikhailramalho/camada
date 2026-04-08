@@ -22,6 +22,7 @@
 #if SOLVER_BITWUZLA_ENABLED
 
 #include "bitwuzlasolver.h"
+#include "camadautil.h"
 
 #include <cassert>
 #include <cstdio>
@@ -92,7 +93,7 @@ void BitwExpr::dump(std::string &Out) const {
   Out = bitwuzla_term_to_string(Expr);
 }
 
-BitwuzlaSolver::BitwuzlaSolver() : SMTSolverImpl() {
+BitwuzlaSolver::BitwuzlaSolver() {
   initializeContext();
   initializeCommonSingletons();
 }
@@ -129,14 +130,16 @@ void BitwuzlaSolver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef BitwuzlaSolver::newExprRefImpl(const SMTExpr &Exp) const {
-  return storeExprRef(toSolverExpr<BitwExpr>(Exp));
+  const auto &Wrapped = toSolverExpr<BitwExpr>(Exp);
+  return makeExprRef<BitwExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                               Wrapped.Expr);
 }
 
 SMTExprRef BitwuzlaSolver::rewrapExprImpl(const SMTExpr &Exp,
                                           const SMTSortRef &Sort,
                                           SMTExprKind Kind) const {
   const auto &Wrapped = toSolverExpr<BitwExpr>(Exp);
-  return storeExprRef(BitwExpr(Kind, Wrapped.Context, Sort, Wrapped.Expr));
+  return makeExprRef<BitwExpr>(Kind, Wrapped.Context, Sort, Wrapped.Expr);
 }
 
 SMTSortRef BitwuzlaSolver::mkBoolSortImpl() {
@@ -729,14 +732,11 @@ SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef BitwuzlaSolver::mkBVFromDecImpl(const int64_t Int,
                                            const SMTSortRef &Sort) {
-  uint64_t mask =
-      Sort->getWidth() >= 64 ? ~0ULL : ((1ULL << Sort->getWidth()) - 1);
-  uint64_t newInt = static_cast<uint64_t>(Int) & mask;
-
   return makeExprRef<BitwExpr>(
       SMTExprKind::BVConst, Context, Sort,
-      bitwuzla_mk_bv_value_uint64(TermManager,
-                                  toSolverSort<BitwSort>(*Sort).Sort, newInt));
+      bitwuzla_mk_bv_value(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
+                           toTwosComplementBin(Int, Sort->getWidth()).c_str(),
+                           2));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVFromBinImpl(const std::string &Int,
@@ -807,18 +807,10 @@ SMTExprRef BitwuzlaSolver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef BitwuzlaSolver::mkSymbolImpl(const std::string &Name,
                                         const SMTSortRef &Sort) {
-  auto it = SymbolTable.find(Name);
-  if (it != SymbolTable.end())
-    return it->second;
-
-  const SMTExprRef &newSymbol = makeExprRef<BitwExpr>(
+  return makeExprRef<BitwExpr>(
       SMTExprKind::Symbol, Context, Sort,
       bitwuzla_mk_const(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
                         Name.c_str()));
-
-  auto inserted = SymbolTable.insert(SymbolTablet::value_type(Name, newSymbol));
-  assert(inserted.second && "Could not cache new Bitwuzla variable");
-  return inserted.first->second;
 }
 
 SMTExprRef BitwuzlaSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
@@ -912,7 +904,6 @@ checkResult BitwuzlaSolver::checkImpl() {
 }
 
 void BitwuzlaSolver::resetImpl() {
-  SymbolTable.clear();
   destroyContext();
   initializeContext();
 }
@@ -955,7 +946,7 @@ void BitwuzlaSolver::dumpModelImpl() {
 
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {
   Out.clear();
-  for (const auto &entry : SymbolTable) {
+  for (const auto &entry : SymbolExprCache) {
     const BitwuzlaTerm term = toSolverExpr<BitwExpr>(*entry.second).Expr;
     Out += "(define-fun ";
     Out += bitwuzla_term_get_symbol(term);

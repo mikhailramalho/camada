@@ -66,9 +66,10 @@ public:
   ~CVC5Solver() override;
 
 protected:
-  cvc5::TermManager Terms;
-  cvc5::Solver Context;
-  unsigned int ToBVCounter = 0;
+  cvc5::TermManager &termManager() { return Terms; }
+  const cvc5::TermManager &termManager() const { return Terms; }
+  cvc5::Solver &context() { return Context; }
+  const cvc5::Solver &context() const { return Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -349,9 +350,10 @@ protected:
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 
-protected:
-  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
-  SymbolTablet SymbolTable;
+private:
+  cvc5::TermManager Terms;
+  cvc5::Solver Context;
+  unsigned int ToBVCounter = 0;
 
 }; // end class CVC5Solver
 

@@ -28,6 +28,28 @@
 #include <stdexcept>
 
 namespace camada {
+namespace {
+
+template <typename FPType, typename IntType> FPType IntAsFP(const IntType Int) {
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
+  FPType Result;
+  std::memcpy(&Result, &Int, sizeof(IntType));
+  return Result;
+}
+
+template <typename FPType, typename IntType> IntType FPAsInt(const FPType FP) {
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
+  IntType Result;
+  std::memcpy(&Result, &FP, sizeof(FPType));
+  return Result;
+}
+
+} // namespace
+
 static inline SMTExprRef mkPZero(SMTSolver &S, unsigned int EWidth,
                                  unsigned int SWidth);
 static inline SMTExprRef mkNZero(SMTSolver &S, unsigned int EWidth,
@@ -1863,7 +1885,8 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
 
   // NaN, Inf, or negative (except -0) -> unspecified
   SMTExprRef c1 = mkOr(x_is_nan, x_is_inf);
-  SMTExprRef unspec_v = mkSymbol("UNSPEC_FP", mkBVSort(ToWidth));
+  SMTExprRef unspec_v =
+      mkSymbol("UNSPEC_FP" + std::to_string(ToWidth), mkBVSort(ToWidth));
   const SMTExprRef &v1 = unspec_v;
 
   // +-0 -> 0
@@ -2380,18 +2403,6 @@ int64_t SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
   return res;
 }
 
-template <typename FPType, typename IntType>
-static inline FPType IntAsFP(const IntType Int) {
-  // Convert the integer to float/double
-  // We assume that floats are 32 bits long and doubles are 64 bits long
-  assert(sizeof(FPType) == sizeof(IntType) &&
-         "Cannot convert int to floating-point");
-
-  FPType IntAsFP;
-  memcpy(&IntAsFP, &Int, sizeof(IntType));
-  return IntAsFP;
-}
-
 float SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
   return IntAsFP<float, uint32_t>(
       std::strtoul(getFPInBin(Exp).c_str(), nullptr, 2));
@@ -2402,26 +2413,12 @@ double SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
       std::strtoull(getFPInBin(Exp).c_str(), nullptr, 2));
 }
 
-template <typename FPType, typename IntType>
-static inline IntType FPAsInt(const FPType FP) {
-  // Convert the integer to float/double
-  // We assume that floats are 32 bits long and doubles are 64 bits long
-  assert(sizeof(FPType) == sizeof(IntType) &&
-         "Cannot convert int to floating-point");
-
-  IntType FPAsInt;
-  memcpy(&FPAsInt, &FP, sizeof(FPType));
-  return FPAsInt;
-}
-
-camada::SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float,
-                                             FPEncoding Encoding) {
+SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float, FPEncoding Encoding) {
   uint32_t fp = FPAsInt<float, uint32_t>(Float);
   return mkFPFromBin(std::bitset<32>(fp).to_string(), 8, Encoding);
 }
 
-camada::SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double,
-                                             FPEncoding Encoding) {
+SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double, FPEncoding Encoding) {
   uint64_t fp = FPAsInt<double, uint64_t>(Double);
   return mkFPFromBin(std::bitset<64>(fp).to_string(), 11, Encoding);
 }

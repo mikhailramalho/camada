@@ -81,6 +81,11 @@ inline void fp_arithmetics(const camada::SMTSolverRef &solver,
 inline void fp_round_to_away(const camada::SMTSolverRef &solver,
                              camada::FPEncoding Encoding) {
   auto one = solver->mkFP32(1.0f, Encoding);
+  if (Encoding == camada::FPEncoding::Native &&
+      one->getBackendKind() == camada::SMTBackendKind::MathSAT) {
+    // MathSAT's native FP API does not support ROUND_TO_AWAY.
+    return;
+  }
   auto half_ulp = solver->mkFP32(std::ldexp(1.0f, -24), Encoding);
   auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
   auto rna = solver->mkRM(camada::RM::ROUND_TO_AWAY, Encoding);
@@ -130,6 +135,37 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver,
   solver->addConstraint(solver->mkEqual(signed_bv, all_ones));
   solver->addConstraint(solver->mkEqual(unsigned_bv, all_ones));
 
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void fp_to_signed_bv_multiple_widths(const camada::SMTSolverRef &solver,
+                                            camada::FPEncoding Encoding) {
+  auto fp = solver->mkFP32(42.0f, Encoding);
+  auto sbv32 = solver->mkFPtoSBV(fp, 32);
+
+  REQUIRE(fp->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(sbv32->getKind() == camada::SMTExprKind::FPtoSBV);
+
+  solver->addConstraint(solver->mkEqual(sbv32, solver->mkBVFromDec(42, 32)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+  fp = solver->mkFP32(42.0f, Encoding);
+  auto sbv64 = solver->mkFPtoSBV(fp, 64);
+  REQUIRE(fp->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(sbv64->getKind() == camada::SMTExprKind::FPtoSBV);
+  solver->addConstraint(solver->mkEqual(sbv64, solver->mkBVFromDec(42, 64)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+  fp = solver->mkFP32(42.0f, Encoding);
+  sbv32 = solver->mkFPtoSBV(fp, 32);
+  sbv64 = solver->mkFPtoSBV(fp, 64);
+  REQUIRE(fp->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(sbv32->getKind() == camada::SMTExprKind::FPtoSBV);
+  REQUIRE(sbv64->getKind() == camada::SMTExprKind::FPtoSBV);
+  solver->addConstraint(solver->mkEqual(sbv32, solver->mkBVFromDec(42, 32)));
+  solver->addConstraint(solver->mkEqual(sbv64, solver->mkBVFromDec(42, 64)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
@@ -195,5 +231,39 @@ inline void fp_remainder_semantics(const camada::SMTSolverRef &solver,
 
   solver->addConstraint(solver->mkEqual(rem, expected));
 
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void fp_non_standard_widths(const camada::SMTSolverRef &solver,
+                                   camada::FPEncoding Encoding) {
+  // 5-bit exponent, 11-bit significand (float16-style format)
+  auto one = solver->mkFPFromBin("0011110000000000", 5, Encoding);
+  auto two = solver->mkFPFromBin("0100000000000000", 5, Encoding);
+  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+
+  REQUIRE(one->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(two->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(one->getWidth() == 16);
+  REQUIRE(two->getWidth() == 16);
+
+  auto add = solver->mkFPAdd(one, one, rne);
+  REQUIRE(add->getKind() == camada::SMTExprKind::FPAdd);
+
+  solver->addConstraint(solver->mkEqual(add, two));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void
+fp_cancellation_and_normalization(const camada::SMTSolverRef &solver,
+                                  camada::FPEncoding Encoding) {
+  // Subtraction causing cancellation
+  auto x = solver->mkFP32(1.0000001f, Encoding);
+  auto y = solver->mkFP32(1.0f, Encoding);
+  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+  auto sub = solver->mkFPSub(x, y, rne);
+
+  auto eq = solver->mkEqual(sub, solver->mkFP32(1.0000001f - 1.0f, Encoding));
+  solver->addConstraint(eq);
+  solver->addConstraint(solver->mkFPIsNormal(sub));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }

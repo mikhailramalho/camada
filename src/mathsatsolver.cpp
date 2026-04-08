@@ -22,6 +22,7 @@
 #include "ac_config.h"
 #if SOLVER_MATHSAT_ENABLED
 
+#include "camadautil.h"
 #include "mathsatsolver.h"
 
 #include <cassert>
@@ -123,22 +124,31 @@ void MathSATExpr::dump(std::string &Out) const {
   msat_free(ast);
 }
 
-MathSATSolver::MathSATSolver() : SMTSolverImpl() {
-  msat_config cfg = msat_create_default_config("AUFBV");
-  msat_set_option(cfg, "model_generation", "true");
-  Context = msat_create_env(cfg);
-  msat_destroy_config(cfg);
+MathSATSolver::MathSATSolver() {
+  Config = msat_create_default_config("AUFBV");
+  msat_set_option(Config, "model_generation", "true");
+  initializeContext();
   initializeCommonSingletons();
 }
 
-MathSATSolver::MathSATSolver(const msat_config &Config) : SMTSolverImpl() {
-  Context = msat_create_env(Config);
+MathSATSolver::MathSATSolver(msat_config Config) : Config(Config) {
+  initializeContext();
   initializeCommonSingletons();
 }
 
 MathSATSolver::~MathSATSolver() {
   invalidateGeneratedObjects();
-  msat_destroy_env(Context);
+  destroyContext();
+  if (!MSAT_ERROR_CONFIG(Config))
+    msat_destroy_config(Config);
+  Config = msat_config{};
+}
+
+void MathSATSolver::initializeContext() { Context = msat_create_env(Config); }
+
+void MathSATSolver::destroyContext() {
+  if (!MSAT_ERROR_ENV(Context))
+    msat_destroy_env(Context);
   Context = msat_env{};
 }
 
@@ -151,6 +161,8 @@ static inline bool checkExprError(msat_env Context, const T &Value) {
   bool HasError = false;
   if constexpr (std::is_same_v<T, msat_decl>)
     HasError = MSAT_ERROR_DECL(Value);
+  else if constexpr (std::is_same_v<T, msat_model>)
+    HasError = MSAT_ERROR_MODEL(Value);
   else if constexpr (std::is_same_v<T, msat_term>)
     HasError = MSAT_ERROR_TERM(Value);
   else if constexpr (std::is_same_v<T, msat_model_iterator>)
@@ -174,7 +186,12 @@ static inline bool checkExprError(const SMTExpr &Exp) {
 
 SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) const {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
-  return storeExprRef(toSolverExpr<MathSATExpr>(Exp));
+  const auto &Wrapped = toSolverExpr<MathSATExpr>(Exp);
+  if (Wrapped.isDecl())
+    return makeExprRef<MathSATExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                                    Wrapped.getDecl());
+  return makeExprRef<MathSATExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                                  Wrapped.getTerm());
 }
 
 SMTExprRef MathSATSolver::rewrapExprImpl(const SMTExpr &Exp,
@@ -183,10 +200,10 @@ SMTExprRef MathSATSolver::rewrapExprImpl(const SMTExpr &Exp,
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
   const auto &Wrapped = toSolverExpr<MathSATExpr>(Exp);
   if (Wrapped.isDecl())
-    return storeExprRef(
-        MathSATExpr(Kind, Wrapped.Context, Sort, Wrapped.getDecl()));
-  return storeExprRef(
-      MathSATExpr(Kind, Wrapped.Context, Sort, Wrapped.getTerm()));
+    return makeExprRef<MathSATExpr>(Kind, Wrapped.Context, Sort,
+                                    Wrapped.getDecl());
+  return makeExprRef<MathSATExpr>(Kind, Wrapped.Context, Sort,
+                                  Wrapped.getTerm());
 }
 
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
@@ -666,7 +683,8 @@ SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
       SMTSolverImpl::mkFPRemImpl(mkIEEEFPToBVImpl(LHS), mkIEEEFPToBVImpl(RHS));
 
   // And convert it back the right type
-  return mkBVToIEEEFP(rem, LHS->Sort);
+  SMTExprRef result = mkBVToIEEEFP(rem, LHS->Sort);
+  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPRem);
 }
 
 SMTExprRef MathSATSolver::mkFPAddImpl(const SMTExprRef &LHS,
@@ -723,7 +741,8 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                  mkIEEEFPToBVImpl(Z), roundingMode);
 
   // And convert it back the right type
-  return mkBVToIEEEFP(fma, X->Sort);
+  SMTExprRef result = mkBVToIEEEFP(fma, X->Sort);
+  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPFMA);
 }
 
 SMTExprRef MathSATSolver::mkFPLtImpl(const SMTExprRef &LHS,
@@ -808,13 +827,17 @@ SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
 }
 
 bool MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
-  if (msat_term_is_true(Context, toMathSATTerm(Exp)))
+  const SMTExprRef &Value = makeExprRef<MathSATExpr>(
+      SMTExprKind::BoolConst, &Context, mkBoolSort(),
+      msat_get_model_value(Context, toMathSATTerm(Exp)));
+
+  if (msat_term_is_true(Context, toMathSATTerm(Value)))
     return true;
 
-  if (msat_term_is_false(Context, toMathSATTerm(Exp)))
+  if (msat_term_is_false(Context, toMathSATTerm(Value)))
     return false;
 
-  fatalError("Bool is neither true nor false");
+  fatalError("Bool model value is neither true nor false");
 }
 
 static inline std::string getGMPVal(const SMTExprRef &t) {
@@ -940,14 +963,11 @@ SMTExprRef MathSATSolver::mkRealImpl(int64_t num, int64_t den) {
 
 SMTExprRef MathSATSolver::mkBVFromDecImpl(const int64_t Int,
                                           const SMTSortRef &Sort) {
-  // Set upper bits to zero because MathSAT refuses to parse negative numbers
-  uint64_t newInt =
-      static_cast<uint64_t>(Int) & ((1ULL << Sort->getWidth()) - 1);
-
   return makeExprRef<MathSATExpr>(
       SMTExprKind::BVConst, &Context, Sort,
-      msat_make_bv_number(Context, std::to_string(newInt).c_str(),
-                          Sort->getWidth(), 10));
+      msat_make_bv_number(Context,
+                          toTwosComplementBin(Int, Sort->getWidth()).c_str(),
+                          Sort->getWidth(), 2));
 }
 
 SMTExprRef MathSATSolver::mkBVFromBinImpl(const std::string &Int,
@@ -971,19 +991,12 @@ SMTExprRef MathSATSolver::mkSymbolImpl(const std::string &Name,
 
 SMTExprRef MathSATSolver::mkFPFromBinImpl(const std::string &FP,
                                           unsigned EWidth) {
-  std::string fpSMTStr;
-  fpSMTStr.append("(fp #b")
-      .append({FP[0]})
-      .append(" #b")
-      .append(FP.substr(1, EWidth))
-      .append(" #b")
-      .append(FP.substr(1 + EWidth))
-      .append(")");
-
+  const SMTExprRef &bv = mkBVFromBin(FP, FP.length());
   return makeExprRef<MathSATExpr>(
       SMTExprKind::FPConst, &Context,
       mkFPSort(EWidth, FP.length() - EWidth - 1, FPEncoding::Native),
-      msat_from_string(Context, fpSMTStr.c_str()));
+      msat_make_fp_from_ieeebv(Context, EWidth, FP.length() - EWidth - 1,
+                               toMathSATTerm(bv)));
 }
 
 SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
@@ -1062,68 +1075,6 @@ SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                             backend_init));
 }
 
-SMTExprRef MathSATSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                                       const SMTExprRef &Body) {
-  std::vector<msat_term> old_terms;
-  std::vector<msat_term> bound_vars;
-  old_terms.reserve(Vars.size());
-  bound_vars.reserve(Vars.size());
-
-  for (std::size_t i = 0; i < Vars.size(); ++i) {
-    const SMTExprRef &Var = Vars[i];
-    old_terms.push_back(toMathSATTerm(Var));
-    bound_vars.push_back(msat_make_variable(
-        Context, ("__CAMADA_qvar" + std::to_string(i)).c_str(),
-        toSolverSort<MathSATSort>(*Var->Sort).Sort));
-  }
-
-  msat_term quantified_body =
-      msat_apply_substitution(Context, toMathSATTerm(Body), old_terms.size(),
-                              old_terms.data(), bound_vars.data());
-  assert(!checkExprError(Context, quantified_body) &&
-         "Failed to substitute MathSAT quantified body");
-
-  for (auto it = bound_vars.rbegin(); it != bound_vars.rend(); ++it) {
-    quantified_body = msat_make_forall(Context, *it, quantified_body);
-    assert(!checkExprError(Context, quantified_body) &&
-           "Failed to build MathSAT forall term");
-  }
-
-  return makeExprRef<MathSATExpr>(SMTExprKind::Forall, &Context, mkBoolSort(),
-                                  quantified_body);
-}
-
-SMTExprRef MathSATSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                                       const SMTExprRef &Body) {
-  std::vector<msat_term> old_terms;
-  std::vector<msat_term> bound_vars;
-  old_terms.reserve(Vars.size());
-  bound_vars.reserve(Vars.size());
-
-  for (std::size_t i = 0; i < Vars.size(); ++i) {
-    const SMTExprRef &Var = Vars[i];
-    old_terms.push_back(toMathSATTerm(Var));
-    bound_vars.push_back(msat_make_variable(
-        Context, ("__CAMADA_qvar" + std::to_string(i)).c_str(),
-        toSolverSort<MathSATSort>(*Var->Sort).Sort));
-  }
-
-  msat_term quantified_body =
-      msat_apply_substitution(Context, toMathSATTerm(Body), old_terms.size(),
-                              old_terms.data(), bound_vars.data());
-  assert(!checkExprError(Context, quantified_body) &&
-         "Failed to substitute MathSAT quantified body");
-
-  for (auto it = bound_vars.rbegin(); it != bound_vars.rend(); ++it) {
-    quantified_body = msat_make_exists(Context, *it, quantified_body);
-    assert(!checkExprError(Context, quantified_body) &&
-           "Failed to build MathSAT exists term");
-  }
-
-  return makeExprRef<MathSATExpr>(SMTExprKind::Exists, &Context, mkBoolSort(),
-                                  quantified_body);
-}
-
 checkResult MathSATSolver::checkImpl() {
   msat_result res = msat_solve(Context);
   if (res == MSAT_SAT)
@@ -1135,7 +1086,10 @@ checkResult MathSATSolver::checkImpl() {
   return checkResult::UNKNOWN;
 }
 
-void MathSATSolver::resetImpl() { msat_reset_env(Context); }
+void MathSATSolver::resetImpl() {
+  destroyContext();
+  initializeContext();
+}
 
 void MathSATSolver::pushImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i)
@@ -1166,8 +1120,12 @@ void MathSATSolver::dumpImpl(std::string &Out) {
   msat_term *asserted_formulas =
       msat_get_asserted_formulas(Context, &num_of_asserted);
 
-  for (unsigned i = 0; i < num_of_asserted; i++)
-    Out += std::string(msat_to_smtlib2(Context, asserted_formulas[i])) + "\n";
+  for (unsigned i = 0; i < num_of_asserted; i++) {
+    char *tmp = msat_to_smtlib2(Context, asserted_formulas[i]);
+    Out += tmp;
+    Out += "\n";
+    msat_free(tmp);
+  }
   msat_free(asserted_formulas);
 }
 
@@ -1181,7 +1139,9 @@ void MathSATSolver::dumpModelImpl(std::string &Out) {
   Out.clear();
   // we use a model iterator to retrieve the model values for all the
   // variables, and the necessary function instantiations
-  msat_model_iterator iter = msat_create_model_iterator(Context);
+  msat_model model = msat_get_model(Context);
+  assert(!checkExprError(Context, model) && "Error when getting MathSAT model");
+  msat_model_iterator iter = msat_model_create_iterator(model);
   assert(!checkExprError(Context, iter) && "Error when getting model iterator");
 
   while (msat_model_iterator_has_next(iter)) {
@@ -1200,6 +1160,7 @@ void MathSATSolver::dumpModelImpl(std::string &Out) {
     msat_free(s);
   }
   msat_destroy_model_iterator(iter);
+  msat_destroy_model(model);
 }
 
 } // namespace camada

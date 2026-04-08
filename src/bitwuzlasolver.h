@@ -62,16 +62,13 @@ public:
 
 class BitwuzlaSolver : public SMTSolverImpl {
 public:
-  using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
-
   BitwuzlaSolver();
   ~BitwuzlaSolver() override;
 
 protected:
-  BitwuzlaContextRef Context = nullptr;
-  BitwuzlaOptions *Options = nullptr;
-  BitwuzlaTermManager *TermManager = nullptr;
-  SymbolTablet SymbolTable;
+  BitwuzlaContextRef context() const { return Context; }
+  BitwuzlaOptions *options() const { return Options; }
+  BitwuzlaTermManager *termManager() const { return TermManager; }
   uint64_t ToBVCounter = 0;
 
   void initializeContext();
@@ -229,6 +226,11 @@ protected:
   void dumpImpl(std::string &Out) override;
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
+
+private:
+  BitwuzlaContextRef Context = nullptr;
+  BitwuzlaOptions *Options = nullptr;
+  BitwuzlaTermManager *TermManager = nullptr;
 };
 
 } // namespace camada

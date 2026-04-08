@@ -15,32 +15,26 @@ TEST_CASE("UF Yices test", "[YICES]") {
   uf_semantics(yices);
 }
 
+TEST_CASE("Unsupported quantifiers Yices test", "[YICES]") {
+  auto yices = camada::createYicesSolver();
+  require_abort([&]() {
+    auto x = yices->mkSymbol("x", yices->mkBVSort(4));
+    (void)yices->mkExists({x}, yices->mkEqual(x, x));
+  });
+}
+
 TEST_CASE("Arith Yices test", "[YICES]") {
 
   class myYicesArithSolver : public camada::YicesSolver {
   public:
-    explicit myYicesArithSolver(const char *Logic) : Logic(Logic) {
-      destroyAndRecreate();
+    explicit myYicesArithSolver(const char *Logic) {
+      recreateContextWithConfig(Logic, configurePushPop);
     }
 
   private:
-    void destroyAndRecreate() {
-      if (Context)
-        yices_free_context(Context);
-      Context = nullptr;
-      yices_exit();
-      yices_init();
-      yices_clear_error();
-
-      ctx_config_t *config = yices_new_config();
-      yices_default_config_for_logic(config, Logic);
+    static void configurePushPop(ctx_config_t *config) {
       yices_set_config(config, "mode", "push-pop");
-
-      Context = yices_new_context(config);
-      yices_free_config(config);
     }
-
-    const char *Logic;
   };
 
   {
@@ -91,38 +85,42 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
     myYicesSolver() = default;
 
     void resetImpl() override {
-      SymbolTable.clear();
       Assertions.clear();
-
-      if (Context)
-        yices_free_context(Context);
-      Context = nullptr;
-
-      yices_exit();
-
       create();
     }
 
-    void create() {
-      yices_init();
-      yices_clear_error();
-
-      ctx_config_t *config = yices_new_config();
-      yices_default_config_for_logic(config, "QF_BV");
+  private:
+    static void configureQfBv(ctx_config_t *config) {
       yices_set_config(config, "mode", "push-pop");
       yices_set_config(config, "solver-type", "dpllt");
       yices_set_config(config, "uf-solver", "none");
       yices_set_config(config, "bv-solver", "default");
       yices_set_config(config, "array-solver", "none");
       yices_set_config(config, "arith-solver", "none");
-
-      Context = yices_new_context(config);
-      yices_free_config(config);
     }
+
+    void create() { recreateContextWithConfig("QF_BV", configureQfBv); }
   };
 
   // Create Yices Solver
   camada::SMTSolverRef yices = std::make_unique<myYicesSolver>();
 
   tests(yices);
+}
+
+TEST_CASE("Yices multi-instance lifecycle edge case", "[YICES]") {
+  auto yices1 = camada::createYicesSolver();
+  auto yices2 = camada::createYicesSolver(); // Should not abort or break yices1
+
+  auto x = yices1->mkSymbol("x", yices1->mkBVSort(8));
+  yices1->addConstraint(yices1->mkEqual(x, yices1->mkBVFromDec(42, 8)));
+
+  auto y = yices2->mkSymbol("y", yices2->mkBVSort(8));
+  yices2->addConstraint(yices2->mkEqual(y, yices2->mkBVFromDec(100, 8)));
+
+  REQUIRE(yices1->check() == camada::checkResult::SAT);
+  REQUIRE(yices2->check() == camada::checkResult::SAT);
+
+  yices1->reset();
+  REQUIRE(yices2->check() == camada::checkResult::SAT); // Still SAT
 }

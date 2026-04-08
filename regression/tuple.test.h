@@ -35,4 +35,6 @@ inline void tuple_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(42, 8)));
   solver->addConstraint(solver->mkEqual(i, solver->mkInt(7)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->getBool(b));
+  REQUIRE(solver->getBV(bv) == 42);
 }

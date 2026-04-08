@@ -103,6 +103,25 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getBV(x) == 1);
 }
 
+inline void
+handle_invalidation_after_reset(const camada::SMTSolverRef &solver) {
+  auto sort = solver->mkBVSort(8);
+  auto expr = solver->mkSymbol("stale", sort);
+
+  REQUIRE(sort.isValid());
+  REQUIRE(expr.isValid());
+
+  solver->reset();
+
+  REQUIRE_FALSE(sort.isValid());
+  REQUIRE_FALSE(expr.isValid());
+
+  auto fresh_sort = solver->mkBVSort(8);
+  auto fresh_expr = solver->mkSymbol("fresh", fresh_sort);
+  REQUIRE(fresh_sort.isValid());
+  REQUIRE(fresh_expr.isValid());
+}
+
 inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   auto x = solver->mkSymbol("x", solver->mkBVSort(4));
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, x)));
@@ -288,5 +307,34 @@ inline void arith_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(x, solver->mkInt("5")));
   solver->addConstraint(solver->mkEqual(k, solver->mkInt("3")));
   solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void arena_stress_test(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("x", solver->mkBVSort(32));
+  auto acc = x;
+
+  // Force substantial arena growth with many distinct intermediate nodes.
+  for (unsigned i = 0; i < 4096; ++i) {
+    auto c0 = solver->mkBVFromDec(static_cast<int64_t>(i & 0xff), 32);
+    auto c1 = solver->mkBVFromDec(static_cast<int64_t>((i * 3) & 0xff), 32);
+    acc = solver->mkBVAdd(acc, c0);
+    acc = solver->mkBVXor(acc, c1);
+  }
+
+  solver->addConstraint(solver->mkEqual(acc, acc));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+
+  auto y = solver->mkSymbol("y", solver->mkBVSort(32));
+  auto expr = y;
+  for (unsigned i = 0; i < 2048; ++i) {
+    auto c = solver->mkBVFromDec(static_cast<int64_t>((i + 7) & 0xff), 32);
+    expr =
+        solver->mkBVMul(solver->mkBVAdd(expr, c), solver->mkBVFromDec(3, 32));
+  }
+
+  solver->addConstraint(solver->mkEqual(expr, expr));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }

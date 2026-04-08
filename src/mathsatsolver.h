@@ -85,13 +85,12 @@ class MathSATSolver : public SMTSolverImpl {
 public:
   MathSATSolver();
 
-  /// Create MathSAT custom configuration. User is responsible for freeing
-  /// Config
-  explicit MathSATSolver(const msat_config &Config);
+  /// Take ownership of a MathSAT configuration and reuse it across resets.
+  explicit MathSATSolver(msat_config Config);
   ~MathSATSolver() override;
 
 protected:
-  msat_env Context{};
+  msat_env context() const { return Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -218,10 +217,6 @@ protected:
                               const SMTExprRef &Element) override;
   SMTExprRef mkApplyImpl(const SMTExprRef &Function,
                          const std::vector<SMTExprRef> &Args) override;
-  SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                          const SMTExprRef &Body) override;
-  SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                          const SMTExprRef &Body) override;
 
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 
@@ -340,6 +335,13 @@ protected:
 
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
+
+private:
+  void initializeContext();
+  void destroyContext();
+
+  msat_config Config{};
+  msat_env Context{};
 }; // end class MathSATSolver
 
 } // namespace camada

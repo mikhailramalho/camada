@@ -19,14 +19,18 @@ TEST_CASE("UF Bitwuzla test", "[Bitwuzla]") {
   uf_semantics(bitwuzla);
 }
 
+TEST_CASE("Unsupported arithmetic Bitwuzla test", "[Bitwuzla]") {
+  auto bitwuzla = camada::createBitwuzlaSolver();
+  require_abort([&]() { (void)bitwuzla->mkIntSort(); });
+}
+
 TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 
   class myBitwuzlaSolver : public camada::BitwuzlaSolver {
   public:
-    explicit myBitwuzlaSolver() { resetImpl(); }
+    explicit myBitwuzlaSolver() { reset(); }
 
     void resetImpl() override {
-      SymbolTable.clear();
       destroyContext();
       initializeContext();
     }

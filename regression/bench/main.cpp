@@ -5,16 +5,32 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <iomanip>
 #include <stdexcept>
 #include <string>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
+
+std::size_t readCurrentRSSKiB() {
+  std::ifstream Statm("/proc/self/statm");
+  std::size_t total_pages = 0;
+  std::size_t resident_pages = 0;
+  if (!(Statm >> total_pages >> resident_pages))
+    throw std::runtime_error("Failed to read /proc/self/statm");
+
+  const long page_size = sysconf(_SC_PAGESIZE);
+  if (page_size <= 0)
+    throw std::runtime_error("Failed to read page size");
+
+  return (resident_pages * static_cast<std::size_t>(page_size)) / 1024;
+}
 
 camada::SMTSolverRef createSolver(const std::string &backend) {
   if (backend == "bitwuzla") {
@@ -86,23 +102,35 @@ std::string defaultBackend() {
 #endif
 }
 
+bool backendSupportsTuples(const std::string &backend) {
+  return backend == "cvc5" || backend == "z3";
+}
+
 void runCase(const std::string &backend, const std::string &name,
              std::size_t iterations,
              const std::function<void(camada::SMTSolver &, std::size_t)> &fn) {
-  auto solver = createSolver(backend);
+  const std::size_t rss_before_kb = readCurrentRSSKiB();
   auto start = Clock::now();
-  fn(*solver, iterations);
+  {
+    auto solver = createSolver(backend);
+    fn(*solver, iterations);
+  }
   auto end = Clock::now();
+  const std::size_t rss_after_kb = readCurrentRSSKiB();
 
   auto total_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   auto per_iter_ns =
       iterations == 0 ? 0.0 : static_cast<double>(total_ns) / iterations;
+  const long long rss_delta_kb = static_cast<long long>(rss_after_kb) -
+                                 static_cast<long long>(rss_before_kb);
 
   std::printf(
-      "benchmark=%s backend=%s iterations=%zu total_ns=%lld ns_per_iter=%.*f\n",
+      "benchmark=%s backend=%s iterations=%zu total_ns=%lld ns_per_iter=%.*f "
+      "rss_after_kb=%zu rss_delta_kb=%lld\n",
       name.c_str(), backend.c_str(), iterations,
-      static_cast<long long>(total_ns), 2, per_iter_ns);
+      static_cast<long long>(total_ns), 2, per_iter_ns, rss_after_kb,
+      rss_delta_kb);
 }
 
 void benchmarkBVSort(camada::SMTSolver &solver, std::size_t iterations) {
@@ -142,6 +170,32 @@ void benchmarkBVExprChain(camada::SMTSolver &solver, std::size_t iterations) {
   (void)sink;
 }
 
+void benchmarkExprConstructionOnly(camada::SMTSolver &solver,
+                                   std::size_t iterations) {
+  auto x = solver.mkSymbol("construct_x", solver.mkBVSort(32));
+  auto y = solver.mkSymbol("construct_y", solver.mkBVSort(32));
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i) {
+    auto c0 = solver.mkBVFromDec(static_cast<int64_t>(i & 0xff), 32);
+    auto c1 = solver.mkBVFromDec(static_cast<int64_t>((i + 1) & 0xff), 32);
+    auto c2 = solver.mkBVFromDec(static_cast<int64_t>((i + 3) & 0xff), 32);
+
+    auto add = solver.mkBVAdd(x, c0);
+    auto mul = solver.mkBVMul(add, y);
+    auto xor_term = solver.mkBVXor(mul, c1);
+    auto sub = solver.mkBVSub(xor_term, c2);
+    auto and_term = solver.mkBVAnd(sub, solver.mkBVNot(c0));
+    auto eq = solver.mkEqual(and_term, solver.mkBVOr(c1, c2));
+    auto ite = solver.mkIte(eq, solver.mkBVAdd(and_term, c1),
+                            solver.mkBVXor(and_term, c2));
+
+    sink += ite->getWidth() + eq->isBoolSort();
+  }
+
+  (void)sink;
+}
+
 void benchmarkArrayStoreChain(camada::SMTSolver &solver,
                               std::size_t iterations) {
   auto idx_sort = solver.mkBVSort(8);
@@ -158,6 +212,38 @@ void benchmarkArrayStoreChain(camada::SMTSolver &solver,
   auto last_idx = solver.mkBVFromDec(
       static_cast<int64_t>((iterations - 1) & 0xff), idx_sort);
   volatile std::size_t sink = solver.mkArraySelect(array, last_idx)->getWidth();
+  (void)sink;
+}
+
+void benchmarkFunctionSortCacheHit(camada::SMTSolver &solver,
+                                   std::size_t iterations) {
+  auto bv8 = solver.mkBVSort(8);
+  auto bv16 = solver.mkBVSort(16);
+  auto bv32 = solver.mkBVSort(32);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  std::vector<camada::SMTSortRef> domain{bv8, bv16, bv32};
+  solver.mkFunctionSort(domain, fp32);
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkFunctionSort(domain, fp32)->getDomainSorts().size();
+
+  (void)sink;
+}
+
+void benchmarkTupleSortCacheHit(camada::SMTSolver &solver,
+                                std::size_t iterations) {
+  auto bv8 = solver.mkBVSort(8);
+  auto bv16 = solver.mkBVSort(16);
+  auto bv32 = solver.mkBVSort(32);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  std::vector<camada::SMTSortRef> elements{bv8, bv16, bv32, fp32};
+  solver.mkTupleSort(elements);
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkTupleSort(elements)->getTupleElementSorts().size();
+
   (void)sink;
 }
 
@@ -311,7 +397,14 @@ int main(int argc, char **argv) {
     runCase(backend, "bv_const_same", iterations, benchmarkBVConstSame);
     runCase(backend, "bv_const_varied", iterations, benchmarkBVConstVaried);
     runCase(backend, "bv_expr_chain", iterations, benchmarkBVExprChain);
+    runCase(backend, "expr_construction_only", iterations,
+            benchmarkExprConstructionOnly);
     runCase(backend, "array_store_chain", iterations, benchmarkArrayStoreChain);
+    runCase(backend, "function_sort_cache_hit", iterations,
+            benchmarkFunctionSortCacheHit);
+    if (backendSupportsTuples(backend))
+      runCase(backend, "tuple_sort_cache_hit", iterations,
+              benchmarkTupleSortCacheHit);
     runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
     runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
     runCase(backend, "fp_div_only", iterations, benchmarkFPDivOnly);
