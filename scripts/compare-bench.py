@@ -213,6 +213,21 @@ def format_memory_change(name: str, baseline: float, new: float) -> str:
     )
 
 
+def format_overall_memory_change(baseline_total: float, current_total: float) -> str:
+    delta = pct_change(baseline_total, current_total) if baseline_total != 0 else 0.0
+    word = (
+        "improved"
+        if current_total < baseline_total
+        else "regressed"
+        if current_total > baseline_total
+        else "unchanged"
+    )
+    return (
+        f"Overall retained RSS: {word} "
+        f"({baseline_total:.0f} -> {current_total:.0f} KiB, {delta:+.2f}%)"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -275,6 +290,8 @@ def main() -> int:
     memory_unchanged: list[str] = []
     baseline_total = 0.0
     current_total = 0.0
+    baseline_rss_total = 0.0
+    current_rss_total = 0.0
 
     for name in common_names:
         old = float(baseline[name]["ns_per_iter"])
@@ -294,6 +311,8 @@ def main() -> int:
 
         old_rss = float(baseline[name]["rss_delta_kb"])
         cur_rss = float(medians[name]["rss_delta_kb"])
+        baseline_rss_total += old_rss
+        current_rss_total += cur_rss
         if cur_rss < old_rss:
             memory_improved.append(format_memory_change(name, old_rss, cur_rss))
         elif cur_rss > old_rss:
@@ -334,6 +353,9 @@ def main() -> int:
     if memory_regressed or memory_improved or memory_unchanged:
         print()
         print("Retained RSS delta:")
+        print(
+            f"  {format_overall_memory_change(baseline_rss_total, current_rss_total)}"
+        )
         if memory_regressed:
             print("  Regressed:")
             for line in memory_regressed:
