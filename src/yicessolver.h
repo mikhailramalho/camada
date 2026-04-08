@@ -72,6 +72,10 @@ protected:
   YicesContextRef context() const { return Context; }
   void setContext(YicesContextRef NewContext) { Context = NewContext; }
   void clearContext() { Context = nullptr; }
+  void recreateContext(const char *Logic);
+  void recreateContextWithConfig(const char *Logic,
+                                 void (*Configure)(ctx_config_t *));
+  void destroyContext();
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -268,8 +272,11 @@ protected:
   std::vector<std::size_t> AssertionScopeSizes;
 
 private:
+  void releaseSymbolNames();
+
   YicesContextRef Context = nullptr;
   unsigned int ConstArrayCounter = 0;
+  std::vector<std::string> NamedSymbols;
 
 }; // namespace camada
 

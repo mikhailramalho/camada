@@ -27,28 +27,14 @@ TEST_CASE("Arith Yices test", "[YICES]") {
 
   class myYicesArithSolver : public camada::YicesSolver {
   public:
-    explicit myYicesArithSolver(const char *Logic) : Logic(Logic) {
-      destroyAndRecreate();
+    explicit myYicesArithSolver(const char *Logic) {
+      recreateContextWithConfig(Logic, configurePushPop);
     }
 
   private:
-    void destroyAndRecreate() {
-      if (context())
-        yices_free_context(context());
-      clearContext();
-      yices_exit();
-      yices_init();
-      yices_clear_error();
-
-      ctx_config_t *config = yices_new_config();
-      yices_default_config_for_logic(config, Logic);
+    static void configurePushPop(ctx_config_t *config) {
       yices_set_config(config, "mode", "push-pop");
-
-      setContext(yices_new_context(config));
-      yices_free_config(config);
     }
-
-    const char *Logic;
   };
 
   {
@@ -100,32 +86,20 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
 
     void resetImpl() override {
       Assertions.clear();
-
-      if (context())
-        yices_free_context(context());
-      clearContext();
-
-      yices_exit();
-
       create();
     }
 
-    void create() {
-      yices_init();
-      yices_clear_error();
-
-      ctx_config_t *config = yices_new_config();
-      yices_default_config_for_logic(config, "QF_BV");
+  private:
+    static void configureQfBv(ctx_config_t *config) {
       yices_set_config(config, "mode", "push-pop");
       yices_set_config(config, "solver-type", "dpllt");
       yices_set_config(config, "uf-solver", "none");
       yices_set_config(config, "bv-solver", "default");
       yices_set_config(config, "array-solver", "none");
       yices_set_config(config, "arith-solver", "none");
-
-      setContext(yices_new_context(config));
-      yices_free_config(config);
     }
+
+    void create() { recreateContextWithConfig("QF_BV", configureQfBv); }
   };
 
   // Create Yices Solver

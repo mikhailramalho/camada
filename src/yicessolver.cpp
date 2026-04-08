@@ -27,11 +27,38 @@
 #include <cassert>
 #include <cstdio>
 #include <gmp.h>
+#include <mutex>
 #include <vector>
 
 namespace camada {
 
 namespace {
+
+std::mutex &yicesLifecycleMutex() {
+  static std::mutex Mutex;
+  return Mutex;
+}
+
+unsigned &yicesLifecycleRefCount() {
+  static unsigned RefCount = 0;
+  return RefCount;
+}
+
+void acquireYicesLibrary() {
+  std::lock_guard<std::mutex> Lock(yicesLifecycleMutex());
+  unsigned &RefCount = yicesLifecycleRefCount();
+  if (RefCount++ == 0)
+    yices_init();
+  yices_clear_error();
+}
+
+void releaseYicesLibrary() {
+  std::lock_guard<std::mutex> Lock(yicesLifecycleMutex());
+  unsigned &RefCount = yicesLifecycleRefCount();
+  assert(RefCount && "Yices lifecycle refcount underflow");
+  if (--RefCount == 0)
+    yices_exit();
+}
 
 static inline void yicesCheckError(int32_t Res, const char *Message) {
   if (Res == 0)
@@ -109,24 +136,47 @@ void YicesExpr::dump(std::string &Out) const {
 }
 
 YicesSolver::YicesSolver() {
-  yices_init();
-  yices_clear_error();
-
-  ctx_config_t *config = yices_new_config();
-  yices_default_config_for_logic(config, "QF_AUFBV");
-
-  Context = yicesCheckContext(yices_new_context(config),
-                              "Could not create Yices context");
-  yices_free_config(config);
+  acquireYicesLibrary();
+  recreateContext("QF_AUFBV");
   initializeCommonSingletons();
 }
 
 YicesSolver::~YicesSolver() {
   invalidateGeneratedObjects();
+  destroyContext();
+  releaseYicesLibrary();
+}
+
+void YicesSolver::destroyContext() {
+  releaseSymbolNames();
   if (Context)
     yices_free_context(Context);
   Context = nullptr;
-  yices_exit();
+}
+
+void YicesSolver::releaseSymbolNames() {
+  for (const auto &Name : NamedSymbols)
+    yices_remove_term_name(Name.c_str());
+  NamedSymbols.clear();
+}
+
+void YicesSolver::recreateContext(const char *Logic) {
+  recreateContextWithConfig(Logic, nullptr);
+}
+
+void YicesSolver::recreateContextWithConfig(const char *Logic,
+                                            void (*Configure)(ctx_config_t *)) {
+  destroyContext();
+  yices_clear_error();
+
+  ctx_config_t *config = yices_new_config();
+  yices_default_config_for_logic(config, Logic);
+  if (Configure)
+    Configure(config);
+
+  Context = yicesCheckContext(yices_new_context(config),
+                              "Could not create Yices context");
+  yices_free_config(config);
 }
 
 void YicesSolver::addConstraintImpl(const SMTExprRef &Exp) {
@@ -753,6 +803,7 @@ SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
 
   yicesCheckError(yices_set_term_name(t, Name.c_str()),
                   "Error when trying to set Yices symbol name");
+  NamedSymbols.push_back(Name);
 
   return makeExprRef<YicesExpr>(SMTExprKind::Symbol, Context, Sort, t);
 }
@@ -784,23 +835,7 @@ checkResult YicesSolver::checkImpl() {
 void YicesSolver::resetImpl() {
   Assertions.clear();
   AssertionScopeSizes.clear();
-
-  // Delete
-  if (Context)
-    yices_free_context(Context);
-  Context = nullptr;
-  yices_exit();
-
-  // and recreate
-  yices_init();
-  yices_clear_error();
-
-  ctx_config_t *config = yices_new_config();
-  yices_default_config_for_logic(config, "QF_AUFBV");
-
-  Context = yicesCheckContext(yices_new_context(config),
-                              "Could not create Yices context");
-  yices_free_config(config);
+  recreateContext("QF_AUFBV");
 }
 
 void YicesSolver::pushImpl(unsigned nscopes) {
