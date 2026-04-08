@@ -141,6 +141,25 @@ SMTSortRef
 SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
                               const SMTSortRef &CodomainSort) {
   assert(!DomainSorts.empty());
+  if (DomainSorts.size() <= 4) {
+    SmallFunctionSortCacheKey SmallKey{};
+    SmallKey.CodomainSort = CodomainSort.get();
+    SmallKey.Size = static_cast<uint8_t>(DomainSorts.size());
+    for (uint8_t I = 0; I < SmallKey.Size; ++I)
+      SmallKey.DomainSorts[I] = DomainSorts[I].get();
+
+    auto It = SmallFunctionSortCache.find(SmallKey);
+    if (It != SmallFunctionSortCache.end())
+      return It->second;
+
+    SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
+    assert(theSort->isFunctionSort());
+    assert(theSort->getDomainSorts() == DomainSorts);
+    assert(theSort->getCodomainSort() == CodomainSort);
+    SmallFunctionSortCache.emplace(SmallKey, theSort);
+    return theSort;
+  }
+
   FunctionSortCacheKey Key{};
   Key.CodomainSort = CodomainSort.get();
   Key.DomainSorts.reserve(DomainSorts.size());
@@ -161,6 +180,23 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
 SMTSortRef
 SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
   assert(!ElementSorts.empty());
+  if (ElementSorts.size() <= 4) {
+    SmallTupleSortCacheKey SmallKey{};
+    SmallKey.Size = static_cast<uint8_t>(ElementSorts.size());
+    for (uint8_t I = 0; I < SmallKey.Size; ++I)
+      SmallKey.ElementSorts[I] = ElementSorts[I].get();
+
+    auto It = SmallTupleSortCache.find(SmallKey);
+    if (It != SmallTupleSortCache.end())
+      return It->second;
+
+    SMTSortRef theSort = mkTupleSortImpl(ElementSorts);
+    assert(theSort->isTupleSort());
+    assert(theSort->getTupleElementSorts() == ElementSorts);
+    SmallTupleSortCache.emplace(SmallKey, theSort);
+    return theSort;
+  }
+
   TupleSortCacheKey Key{};
   Key.ElementSorts.reserve(ElementSorts.size());
   for (const auto &Sort : ElementSorts)

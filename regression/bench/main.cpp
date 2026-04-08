@@ -102,6 +102,10 @@ std::string defaultBackend() {
 #endif
 }
 
+bool backendSupportsTuples(const std::string &backend) {
+  return backend == "cvc5" || backend == "z3";
+}
+
 void runCase(const std::string &backend, const std::string &name,
              std::size_t iterations,
              const std::function<void(camada::SMTSolver &, std::size_t)> &fn) {
@@ -208,6 +212,38 @@ void benchmarkArrayStoreChain(camada::SMTSolver &solver,
   auto last_idx = solver.mkBVFromDec(
       static_cast<int64_t>((iterations - 1) & 0xff), idx_sort);
   volatile std::size_t sink = solver.mkArraySelect(array, last_idx)->getWidth();
+  (void)sink;
+}
+
+void benchmarkFunctionSortCacheHit(camada::SMTSolver &solver,
+                                   std::size_t iterations) {
+  auto bv8 = solver.mkBVSort(8);
+  auto bv16 = solver.mkBVSort(16);
+  auto bv32 = solver.mkBVSort(32);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  std::vector<camada::SMTSortRef> domain{bv8, bv16, bv32};
+  solver.mkFunctionSort(domain, fp32);
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkFunctionSort(domain, fp32)->getDomainSorts().size();
+
+  (void)sink;
+}
+
+void benchmarkTupleSortCacheHit(camada::SMTSolver &solver,
+                                std::size_t iterations) {
+  auto bv8 = solver.mkBVSort(8);
+  auto bv16 = solver.mkBVSort(16);
+  auto bv32 = solver.mkBVSort(32);
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  std::vector<camada::SMTSortRef> elements{bv8, bv16, bv32, fp32};
+  solver.mkTupleSort(elements);
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkTupleSort(elements)->getTupleElementSorts().size();
+
   (void)sink;
 }
 
@@ -364,6 +400,11 @@ int main(int argc, char **argv) {
     runCase(backend, "expr_construction_only", iterations,
             benchmarkExprConstructionOnly);
     runCase(backend, "array_store_chain", iterations, benchmarkArrayStoreChain);
+    runCase(backend, "function_sort_cache_hit", iterations,
+            benchmarkFunctionSortCacheHit);
+    if (backendSupportsTuples(backend))
+      runCase(backend, "tuple_sort_cache_hit", iterations,
+              benchmarkTupleSortCacheHit);
     runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
     runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
     runCase(backend, "fp_div_only", iterations, benchmarkFPDivOnly);

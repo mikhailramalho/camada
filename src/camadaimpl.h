@@ -102,7 +102,9 @@ protected:
     NativeFPSortCache.clear();
     EncodedFPSortCache.clear();
     ArraySortCache.clear();
+    SmallFunctionSortCache.clear();
     FunctionSortCache.clear();
+    SmallTupleSortCache.clear();
     TupleSortCache.clear();
   }
 
@@ -179,9 +181,15 @@ protected:
   mutable std::unordered_map<ArraySortCacheKey, SMTSortRef,
                              ArraySortCacheKeyHash>
       ArraySortCache;
+  mutable std::unordered_map<SmallFunctionSortCacheKey, SMTSortRef,
+                             SmallFunctionSortCacheKeyHash>
+      SmallFunctionSortCache;
   mutable std::unordered_map<FunctionSortCacheKey, SMTSortRef,
                              FunctionSortCacheKeyHash>
       FunctionSortCache;
+  mutable std::unordered_map<SmallTupleSortCacheKey, SMTSortRef,
+                             SmallTupleSortCacheKeyHash>
+      SmallTupleSortCache;
   mutable std::unordered_map<TupleSortCacheKey, SMTSortRef,
                              TupleSortCacheKeyHash>
       TupleSortCache;

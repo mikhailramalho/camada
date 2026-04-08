@@ -28,7 +28,7 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 
   class myBitwuzlaSolver : public camada::BitwuzlaSolver {
   public:
-    explicit myBitwuzlaSolver() { resetImpl(); }
+    explicit myBitwuzlaSolver() { reset(); }
 
     void resetImpl() override {
       destroyContext();

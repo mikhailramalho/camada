@@ -22,6 +22,7 @@
 #ifndef CAMADACACHE_H_
 #define CAMADACACHE_H_
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -82,6 +83,21 @@ struct TupleSortCacheKey {
   }
 };
 
+struct SmallTupleSortCacheKey {
+  std::array<const SMTSort *, 4> ElementSorts{};
+  uint8_t Size = 0;
+
+  bool operator==(const SmallTupleSortCacheKey &Other) const {
+    if (Size != Other.Size)
+      return false;
+    for (uint8_t I = 0; I < Size; ++I) {
+      if (ElementSorts[I] != Other.ElementSorts[I])
+        return false;
+    }
+    return true;
+  }
+};
+
 struct TupleSortCacheKeyHash {
   std::size_t operator()(const TupleSortCacheKey &Key) const {
     std::size_t Hash = 1469598103934665603ULL;
@@ -100,6 +116,48 @@ struct FunctionSortCacheKeyHash {
                        1469598103934665603ULL;
     for (const SMTSort *Sort : Key.DomainSorts) {
       auto Ptr = reinterpret_cast<std::uintptr_t>(Sort);
+      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
+                                       (Hash << 6) + (Hash >> 2));
+    }
+    return Hash;
+  }
+};
+
+struct SmallTupleSortCacheKeyHash {
+  std::size_t operator()(const SmallTupleSortCacheKey &Key) const {
+    std::size_t Hash = 1469598103934665603ULL ^ Key.Size;
+    for (uint8_t I = 0; I < Key.Size; ++I) {
+      auto Ptr = reinterpret_cast<std::uintptr_t>(Key.ElementSorts[I]);
+      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
+                                       (Hash << 6) + (Hash >> 2));
+    }
+    return Hash;
+  }
+};
+
+struct SmallFunctionSortCacheKey {
+  std::array<const SMTSort *, 4> DomainSorts{};
+  const SMTSort *CodomainSort = nullptr;
+  uint8_t Size = 0;
+
+  bool operator==(const SmallFunctionSortCacheKey &Other) const {
+    if (Size != Other.Size || CodomainSort != Other.CodomainSort)
+      return false;
+    for (uint8_t I = 0; I < Size; ++I) {
+      if (DomainSorts[I] != Other.DomainSorts[I])
+        return false;
+    }
+    return true;
+  }
+};
+
+struct SmallFunctionSortCacheKeyHash {
+  std::size_t operator()(const SmallFunctionSortCacheKey &Key) const {
+    std::size_t Hash = reinterpret_cast<std::uintptr_t>(Key.CodomainSort) *
+                       1469598103934665603ULL;
+    Hash ^= Key.Size;
+    for (uint8_t I = 0; I < Key.Size; ++I) {
+      auto Ptr = reinterpret_cast<std::uintptr_t>(Key.DomainSorts[I]);
       Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
                                        (Hash << 6) + (Hash >> 2));
     }
