@@ -6,6 +6,27 @@ namespace camada {
 
 namespace {
 
+std::string power2Dec(unsigned int N) {
+  std::vector<unsigned char> Digits{1};
+  for (unsigned int I = 0; I < N; ++I) {
+    int Carry = 0;
+    for (auto &Digit : Digits) {
+      int Value = Digit * 2 + Carry;
+      Digit = static_cast<unsigned char>(Value % 10);
+      Carry = Value / 10;
+    }
+    while (Carry != 0) {
+      Digits.push_back(static_cast<unsigned char>(Carry % 10));
+      Carry /= 10;
+    }
+  }
+  std::string Result;
+  Result.reserve(Digits.size());
+  for (auto It = Digits.rbegin(); It != Digits.rend(); ++It)
+    Result.push_back(static_cast<char>('0' + *It));
+  return Result;
+}
+
 std::string addLeadingZeroes(const std::string &Str, const unsigned Width) {
   if (Str.length() == Width)
     return Str;
@@ -1120,5 +1141,195 @@ void SMTSolverImpl::dumpModel() {
 }
 
 void SMTSolverImpl::dumpModel(std::string &Out) { return dumpModelImpl(Out); }
+
+SMTSortRef SMTSolverImpl::mkTupleSortImpl(const std::vector<SMTSortRef> &) {
+  fatalError("Tuples");
+}
+
+SMTExprRef SMTSolverImpl::mkBVNorImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkBVNot(mkBVOr(LHS, RHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNor);
+}
+
+SMTExprRef SMTSolverImpl::mkBVUgtImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkNot(mkBVUle(LHS, RHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUgt);
+}
+
+SMTExprRef SMTSolverImpl::mkBVSgtImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkNot(mkBVSle(LHS, RHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSgt);
+}
+
+SMTExprRef SMTSolverImpl::mkBVUgeImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkNot(mkBVUlt(LHS, RHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUge);
+}
+
+SMTExprRef SMTSolverImpl::mkBVSgeImpl(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkNot(mkBVSlt(LHS, RHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSge);
+}
+
+SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Xor);
+}
+
+SMTExprRef SMTSolverImpl::mkArithNegImpl(const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithAddImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithSubImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithMulImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithDivImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithModImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  fatalError("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
+                                         unsigned Amount) {
+  SMTExprRef TheExp = mkArithMul(Exp, mkInt(power2Dec(Amount)));
+  return rewrapExprImpl(*TheExp, TheExp->Sort, SMTExprKind::ArithShl);
+}
+
+SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &,
+                                         const SMTExprRef &) {
+  fatalError("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithLtImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithGtImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithLeImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkArithGeImpl(const SMTExprRef &,
+                                        const SMTExprRef &) {
+  fatalError("Arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkInt2RealImpl(const SMTExprRef &) {
+  fatalError("Real arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkReal2IntImpl(const SMTExprRef &) {
+  fatalError("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkIsIntImpl(const SMTExprRef &) {
+  fatalError("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
+  // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
+  SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
+  SMTExprRef theExp =
+      mkIte(mkNot(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
+}
+
+SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
+  // bvredand = bvcomp(x,-1) ? bv1 : bv0;
+  SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
+  SMTExprRef theExp = mkIte(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
+}
+
+SMTExprRef SMTSolverImpl::mkFPGtImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkFPLt(RHS, LHS);
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGt);
+}
+
+SMTExprRef SMTSolverImpl::mkFPGeImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  // (a >= b) iff (b <= a)
+  SMTExprRef theExp = mkFPLe(RHS, LHS);
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGe);
+}
+
+SMTExprRef SMTSolverImpl::mkTupleImpl(const std::vector<SMTExprRef> &) {
+  fatalError("Tuples");
+}
+
+SMTExprRef SMTSolverImpl::mkTupleSelectImpl(const SMTExprRef &, unsigned) {
+  fatalError("Tuples");
+}
+
+std::string SMTSolverImpl::getIntImpl(const SMTExprRef &) {
+  fatalError("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkIntImpl(int64_t) {
+  fatalError("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkIntImpl(const std::string &) {
+  fatalError("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkRealImpl(const std::string &) {
+  fatalError("Real arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkRealImpl(int64_t) { fatalError("Real arithmetic"); }
+
+SMTExprRef SMTSolverImpl::mkRealImpl(int64_t, int64_t) {
+  fatalError("Real arithmetic");
+}
+
+void SMTSolverImpl::dumpImpl() {
+  std::string Out;
+  dumpImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void SMTSolverImpl::dumpImpl(std::string &Out) {
+  Out = "SMTSolver dump not implemented.\n";
+}
+
+void SMTSolverImpl::dumpModelImpl() {
+  std::string Out;
+  dumpModelImpl(Out);
+  std::fprintf(stderr, "%s", Out.c_str());
+}
+
+void SMTSolverImpl::dumpModelImpl(std::string &Out) {
+  Out = "SMTSolver model dump not implemented.\n";
+}
 
 } // namespace camada

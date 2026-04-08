@@ -31,27 +31,6 @@
 
 namespace camada {
 
-static inline std::string power2Dec(unsigned int N) {
-  std::vector<unsigned char> Digits{1};
-  for (unsigned int I = 0; I < N; ++I) {
-    int Carry = 0;
-    for (auto &Digit : Digits) {
-      int Value = Digit * 2 + Carry;
-      Digit = static_cast<unsigned char>(Value % 10);
-      Carry = Value / 10;
-    }
-    while (Carry != 0) {
-      Digits.push_back(static_cast<unsigned char>(Carry % 10));
-      Carry /= 10;
-    }
-  }
-  std::string Result;
-  Result.reserve(Digits.size());
-  for (auto It = Digits.rbegin(); It != Digits.rend(); ++It)
-    Result.push_back(static_cast<char>('0' + *It));
-  return Result;
-}
-
 class SMTSolverImpl : public SMTSolver {
 public:
   SMTSolverImpl() = default;
@@ -481,9 +460,7 @@ protected:
     fatalError("Uninterpreted functions");
   }
 
-  virtual SMTSortRef mkTupleSortImpl(const std::vector<SMTSortRef> &) {
-    fatalError("Tuples");
-  }
+  virtual SMTSortRef mkTupleSortImpl(const std::vector<SMTSortRef> &);
 
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 
@@ -536,10 +513,8 @@ protected:
     return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVXnor);
   };
 
-  virtual SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkBVNot(mkBVOr(LHS, RHS));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNor);
-  };
+  virtual SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
+  ;
 
   virtual SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
@@ -553,15 +528,9 @@ protected:
   virtual SMTExprRef mkBVSltImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
 
-  virtual SMTExprRef mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkNot(mkBVUle(LHS, RHS));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUgt);
-  }
+  virtual SMTExprRef mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
-  virtual SMTExprRef mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkNot(mkBVSle(LHS, RHS));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSgt);
-  }
+  virtual SMTExprRef mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkBVUleImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
@@ -569,15 +538,9 @@ protected:
   virtual SMTExprRef mkBVSleImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
 
-  virtual SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkNot(mkBVUlt(LHS, RHS));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUge);
-  }
+  virtual SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
-  virtual SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkNot(mkBVSlt(LHS, RHS));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSge);
-  }
+  virtual SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkNotImpl(const SMTExprRef &Exp) = 0;
 
@@ -596,71 +559,37 @@ protected:
 
   virtual SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
-  virtual SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Xor);
-  }
+  virtual SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
-  virtual SMTExprRef mkArithNegImpl(const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithNegImpl(const SMTExprRef &);
 
-  virtual SMTExprRef mkArithAddImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithAddImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithSubImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithSubImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithMulImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithMulImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithDivImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithDivImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithModImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Integer arithmetic");
-  }
+  virtual SMTExprRef mkArithModImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithShlImpl(const SMTExprRef &Exp, unsigned Amount) {
-    SMTExprRef TheExp = mkArithMul(Exp, mkInt(power2Dec(Amount)));
-    return rewrapExprImpl(*TheExp, TheExp->Sort, SMTExprKind::ArithShl);
-  }
+  virtual SMTExprRef mkArithShlImpl(const SMTExprRef &Exp, unsigned Amount);
 
-  virtual SMTExprRef mkArithShlImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Integer arithmetic");
-  }
+  virtual SMTExprRef mkArithShlImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithLtImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithLtImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithGtImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithGtImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithLeImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithLeImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkArithGeImpl(const SMTExprRef &, const SMTExprRef &) {
-    fatalError("Arithmetic");
-  }
+  virtual SMTExprRef mkArithGeImpl(const SMTExprRef &, const SMTExprRef &);
 
-  virtual SMTExprRef mkInt2RealImpl(const SMTExprRef &) {
-    fatalError("Real arithmetic");
-  }
+  virtual SMTExprRef mkInt2RealImpl(const SMTExprRef &);
 
-  virtual SMTExprRef mkReal2IntImpl(const SMTExprRef &) {
-    fatalError("Integer arithmetic");
-  }
+  virtual SMTExprRef mkReal2IntImpl(const SMTExprRef &);
 
-  virtual SMTExprRef mkIsIntImpl(const SMTExprRef &) {
-    fatalError("Integer arithmetic");
-  }
+  virtual SMTExprRef mkIsIntImpl(const SMTExprRef &);
 
   virtual SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                const SMTExprRef &F) = 0;
@@ -675,21 +604,9 @@ protected:
   virtual SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) = 0;
 
-  virtual SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) {
-    // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
-    SMTExprRef theExp =
-        mkIte(mkNot(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
-  }
+  virtual SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp);
 
-  virtual SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) {
-    // bvredand = bvcomp(x,-1) ? bv1 : bv0;
-    SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
-    SMTExprRef theExp =
-        mkIte(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
-  }
+  virtual SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp);
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
 
@@ -726,18 +643,11 @@ protected:
 
   virtual SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
-  virtual SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkFPLt(RHS, LHS);
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGt);
-  }
+  virtual SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
-  virtual SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-    // (a >= b) iff (b <= a)
-    SMTExprRef theExp = mkFPLe(RHS, LHS);
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGe);
-  }
+  virtual SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS);
@@ -765,13 +675,9 @@ protected:
                                       const SMTExprRef &Index,
                                       const SMTExprRef &Element) = 0;
 
-  virtual SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &) {
-    fatalError("Tuples");
-  }
+  virtual SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &);
 
-  virtual SMTExprRef mkTupleSelectImpl(const SMTExprRef &, unsigned) {
-    fatalError("Tuples");
-  }
+  virtual SMTExprRef mkTupleSelectImpl(const SMTExprRef &, unsigned);
 
   virtual SMTExprRef mkApplyImpl(const SMTExprRef &,
                                  const std::vector<SMTExprRef> &) {
@@ -794,9 +700,7 @@ protected:
 
   virtual std::string getBVInBinImpl(const SMTExprRef &Exp) = 0;
 
-  virtual std::string getIntImpl(const SMTExprRef &) {
-    fatalError("Integer arithmetic");
-  }
+  virtual std::string getIntImpl(const SMTExprRef &);
 
   virtual void getRationalImpl(const SMTExprRef &, std::string &,
                                std::string &) {
@@ -814,21 +718,15 @@ protected:
 
   virtual SMTExprRef mkBoolImpl(const bool b) = 0;
 
-  virtual SMTExprRef mkIntImpl(int64_t) { fatalError("Integer arithmetic"); }
+  virtual SMTExprRef mkIntImpl(int64_t);
 
-  virtual SMTExprRef mkIntImpl(const std::string &) {
-    fatalError("Integer arithmetic");
-  }
+  virtual SMTExprRef mkIntImpl(const std::string &);
 
-  virtual SMTExprRef mkRealImpl(const std::string &) {
-    fatalError("Real arithmetic");
-  }
+  virtual SMTExprRef mkRealImpl(const std::string &);
 
-  virtual SMTExprRef mkRealImpl(int64_t) { fatalError("Real arithmetic"); }
+  virtual SMTExprRef mkRealImpl(int64_t);
 
-  virtual SMTExprRef mkRealImpl(int64_t, int64_t) {
-    fatalError("Real arithmetic");
-  }
+  virtual SMTExprRef mkRealImpl(int64_t, int64_t);
 
   virtual SMTExprRef mkBVFromDecImpl(const int64_t Int,
                                      const SMTSortRef &Sort) = 0;
@@ -876,23 +774,11 @@ protected:
 
   virtual void popImpl(unsigned nscopes) = 0;
 
-  virtual void dumpImpl() {
-    std::string Out;
-    dumpImpl(Out);
-    std::fprintf(stderr, "%s", Out.c_str());
-  }
-  virtual void dumpImpl(std::string &Out) {
-    Out = "SMTSolver dump not implemented.\n";
-  }
+  virtual void dumpImpl();
+  virtual void dumpImpl(std::string &Out);
 
-  virtual void dumpModelImpl() {
-    std::string Out;
-    dumpModelImpl(Out);
-    std::fprintf(stderr, "%s", Out.c_str());
-  }
-  virtual void dumpModelImpl(std::string &Out) {
-    Out = "SMTSolver model dump not implemented.\n";
-  }
+  virtual void dumpModelImpl();
+  virtual void dumpModelImpl(std::string &Out);
 
   virtual SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) = 0;
