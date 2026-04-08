@@ -27,6 +27,7 @@
 #include <cassert>
 #include <cstdio>
 #include <gmp.h>
+#include <vector>
 
 namespace camada {
 
@@ -636,19 +637,17 @@ static inline void getYicesMPQValue(context_t *Context, term_t Expr,
 std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
-  int32_t *data = new int32_t[width];
-  auto res = yices_get_bv_value(yices_get_model(Context, 1),
-                                toSolverExpr<YicesExpr>(*Exp).Expr, data);
-  if (res != 0) {
-    delete[] data;
+  std::vector<int32_t> data(width);
+  auto res =
+      yices_get_bv_value(yices_get_model(Context, 1),
+                         toSolverExpr<YicesExpr>(*Exp).Expr, data.data());
+  if (res != 0)
     yicesCheckError(res, "Can't get bitvector value from Yices");
-  }
 
   std::string val;
   for (unsigned i = 0; i < width; i++)
     val.append(std::to_string(data[width - i - 1]));
 
-  delete[] data;
   return val;
 }
 
