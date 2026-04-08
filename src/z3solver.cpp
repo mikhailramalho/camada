@@ -135,13 +135,15 @@ void Z3Solver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef Z3Solver::newExprRefImpl(const SMTExpr &Exp) const {
-  return storeExprRef(toSolverExpr<Z3Expr>(Exp));
+  const auto &Wrapped = toSolverExpr<Z3Expr>(Exp);
+  return makeExprRef<Z3Expr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                             Wrapped.Expr);
 }
 
 SMTExprRef Z3Solver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
                                     SMTExprKind Kind) const {
   const auto &Wrapped = toSolverExpr<Z3Expr>(Exp);
-  return storeExprRef(Z3Expr(Kind, Wrapped.Context, Sort, Wrapped.Expr));
+  return makeExprRef<Z3Expr>(Kind, Wrapped.Context, Sort, Wrapped.Expr);
 }
 
 SMTSortRef Z3Solver::mkBoolSortImpl() {

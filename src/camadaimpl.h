@@ -66,35 +66,24 @@ public:
 protected:
   template <typename SolverExpr, typename... Args>
   SMTExprRef makeExprRef(SMTExprKind Kind, Args &&...ArgsV) const {
-    return newExprRef(SolverExpr(Kind, std::forward<Args>(ArgsV)...));
+    auto Exp = std::make_unique<SolverExpr>(Kind, std::forward<Args>(ArgsV)...);
+    assert(Exp->Sort->isWidthValidated());
+    const SMTExpr *ExprPtr = Exp.get();
+    ExprArena.emplace_back(std::move(Exp));
+    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
   }
 
   /// Wrapper to create new SMTSort
   template <typename SolverSort>
   SMTSortRef newSortRef(const SolverSort &Sort) const {
     auto OwnedSort = std::make_unique<SolverSort>(Sort);
-#ifndef NDEBUG
     assert(OwnedSort->validateSortWidth());
+#ifndef NDEBUG
     OwnedSort->markWidthValidated();
 #endif
     const SMTSort *SortPtr = OwnedSort.get();
     SortArena.emplace_back(std::move(OwnedSort));
     return SMTSortRef(SortPtr, HandleState, HandleState->Generation);
-  }
-
-  template <typename SolverExpr>
-  SMTExprRef storeExprRef(const SolverExpr &Exp) const {
-    auto OwnedExpr = std::make_unique<SolverExpr>(Exp);
-    const SMTExpr *ExprPtr = OwnedExpr.get();
-    ExprArena.emplace_back(std::move(OwnedExpr));
-    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
-  }
-
-  template <typename SolverExpr>
-  SMTExprRef storeOwnedExprRef(std::unique_ptr<SolverExpr> Exp) const {
-    const SMTExpr *ExprPtr = Exp.get();
-    ExprArena.emplace_back(std::move(Exp));
-    return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
   }
 
   void invalidateGeneratedObjects() {
@@ -129,6 +118,7 @@ protected:
     CachedBVOneExprs.clear();
     SymbolExprCache.clear();
     FPSpecialExprCache.clear();
+    FPConstExprCache.clear();
   }
 
   void initializeCommonSingletons() {
@@ -180,6 +170,9 @@ protected:
   mutable std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
                              FPSpecialExprCacheKeyHash>
       FPSpecialExprCache;
+  mutable std::unordered_map<FPConstExprCacheKey, SMTExprRef,
+                             FPConstExprCacheKeyHash>
+      FPConstExprCache;
   mutable std::unordered_map<unsigned, SMTSortRef> BVSortCache;
   mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
       NativeFPSortCache;
@@ -200,9 +193,7 @@ protected:
 protected:
   SMTExprRef newExprRef(const SMTExpr &Exp) const {
     SMTExprRef theExp = newExprRefImpl(Exp);
-#ifndef NDEBUG
     assert(theExp->Sort->isWidthValidated());
-#endif
     return theExp;
   }
 

@@ -103,19 +103,18 @@ void STPSolver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef STPSolver::newExprRefImpl(const SMTExpr &Exp) const {
-  // Copy the wrapper into the arena and mark the stored instance as owning the
-  // underlying STP term. STP leaks ordinary constructed terms unless the final
-  // arena-held wrapper deletes them via `vc_DeleteExpr`.
-  auto Stored = std::make_unique<STPExpr>(toSolverExpr<STPExpr>(Exp));
-  Stored->OwnsExpr = true;
-  return storeOwnedExprRef(std::move(Stored));
+  // Store a fresh wrapper that owns the underlying STP term. STP leaks
+  // ordinary constructed terms unless the final arena-held wrapper deletes
+  // them via `vc_DeleteExpr`.
+  const auto &Wrapped = toSolverExpr<STPExpr>(Exp);
+  return makeExprRef<STPExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                              Wrapped.Expr, true);
 }
 
 SMTExprRef STPSolver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
                                      SMTExprKind Kind) const {
   const auto &Wrapped = toSolverExpr<STPExpr>(Exp);
-  return storeExprRef(
-      STPExpr(Kind, Wrapped.Context, Sort, Wrapped.Expr, false));
+  return makeExprRef<STPExpr>(Kind, Wrapped.Context, Sort, Wrapped.Expr, false);
 }
 
 SMTSortRef STPSolver::mkBoolSortImpl() {
@@ -567,8 +566,8 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   for (uint64_t i = 0; i < size; i++)
     arr = mkArrayStore(arr, mkBVFromDec(i, IndexSort), InitValue);
 
-  return storeExprRef(STPExpr(SMTExprKind::ArrayConst, &Context, arr->Sort,
-                              toSolverExpr<STPExpr>(*arr).Expr));
+  return makeExprRef<STPExpr>(SMTExprKind::ArrayConst, &Context, arr->Sort,
+                              toSolverExpr<STPExpr>(*arr).Expr, false);
 }
 
 checkResult STPSolver::checkImpl() {

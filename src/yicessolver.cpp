@@ -185,9 +185,10 @@ void YicesSolver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef YicesSolver::newExprRefImpl(const SMTExpr &Exp) const {
-  yicesCheckTerm(toSolverExpr<YicesExpr>(Exp).Expr,
-                 "Error when creating Yices expr");
-  return storeExprRef(toSolverExpr<YicesExpr>(Exp));
+  const auto &Wrapped = toSolverExpr<YicesExpr>(Exp);
+  yicesCheckTerm(Wrapped.Expr, "Error when creating Yices expr");
+  return makeExprRef<YicesExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                                Wrapped.Expr);
 }
 
 SMTExprRef YicesSolver::rewrapExprImpl(const SMTExpr &Exp,
@@ -195,7 +196,7 @@ SMTExprRef YicesSolver::rewrapExprImpl(const SMTExpr &Exp,
                                        SMTExprKind Kind) const {
   const auto &Wrapped = toSolverExpr<YicesExpr>(Exp);
   yicesCheckTerm(Wrapped.Expr, "Error when creating Yices expr");
-  return storeExprRef(YicesExpr(Kind, Wrapped.Context, Sort, Wrapped.Expr));
+  return makeExprRef<YicesExpr>(Kind, Wrapped.Context, Sort, Wrapped.Expr);
 }
 
 SMTSortRef YicesSolver::mkBoolSortImpl() {

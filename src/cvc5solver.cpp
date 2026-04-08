@@ -109,14 +109,16 @@ void CVC5Solver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef CVC5Solver::newExprRefImpl(const SMTExpr &Exp) const {
-  return storeExprRef(toSolverExpr<CVC5Expr>(Exp));
+  const auto &Wrapped = toSolverExpr<CVC5Expr>(Exp);
+  return makeExprRef<CVC5Expr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                               Wrapped.Expr);
 }
 
 SMTExprRef CVC5Solver::rewrapExprImpl(const SMTExpr &Exp,
                                       const SMTSortRef &Sort,
                                       SMTExprKind Kind) const {
   const auto &Wrapped = toSolverExpr<CVC5Expr>(Exp);
-  return storeExprRef(CVC5Expr(Kind, Wrapped.Context, Sort, Wrapped.Expr));
+  return makeExprRef<CVC5Expr>(Kind, Wrapped.Context, Sort, Wrapped.Expr);
 }
 
 SMTSortRef CVC5Solver::mkBoolSortImpl() {

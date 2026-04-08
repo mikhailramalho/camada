@@ -24,6 +24,8 @@
 
 #include "camadasort.h"
 
+#include <utility>
+
 namespace camada {
 
 class SMTExpr;
@@ -246,6 +248,10 @@ public:
   SolverExpr(SMTExprKind Kind, SolverContextRef C, const SMTSortRef &S,
              const TheExpr &SA)
       : SMTExpr(Kind, S), Context(std::move(C)), Expr(SA) {}
+
+  SolverExpr(SMTExprKind Kind, SolverContextRef C, const SMTSortRef &S,
+             TheExpr &&SA)
+      : SMTExpr(Kind, S), Context(std::move(C)), Expr(std::move(SA)) {}
 
   virtual ~SolverExpr() override = default;
 

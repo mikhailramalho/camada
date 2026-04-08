@@ -128,6 +128,15 @@ struct FPSpecialExprCacheKey {
   }
 };
 
+struct FPConstExprCacheKey {
+  const SMTSort *Sort;
+  std::string Bits;
+
+  bool operator==(const FPConstExprCacheKey &Other) const {
+    return Sort == Other.Sort && Bits == Other.Bits;
+  }
+};
+
 struct FPSpecialExprCacheKeyHash {
   std::size_t operator()(const FPSpecialExprCacheKey &Key) const {
     std::size_t Hash = static_cast<std::size_t>(Key.ExpWidth);
@@ -135,6 +144,14 @@ struct FPSpecialExprCacheKeyHash {
     Hash ^= static_cast<std::size_t>(Key.Kind) << 16;
     Hash ^= static_cast<std::size_t>(Key.Sign) << 24;
     return Hash;
+  }
+};
+
+struct FPConstExprCacheKeyHash {
+  std::size_t operator()(const FPConstExprCacheKey &Key) const {
+    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
+    auto BitsHash = std::hash<std::string>{}(Key.Bits);
+    return static_cast<std::size_t>(SortPtr ^ (BitsHash << 1));
   }
 };
 

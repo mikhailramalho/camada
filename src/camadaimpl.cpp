@@ -1013,11 +1013,17 @@ SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
 SMTExprRef SMTSolverImpl::mkFPFromBin(const std::string &FP, unsigned EWidth,
                                       FPEncoding Encoding) {
   SMTSortRef Sort = mkFPSort(EWidth, FP.length() - EWidth - 1, Encoding);
+  FPConstExprCacheKey Key{Sort.get(), FP};
+  auto Cached = FPConstExprCache.find(Key);
+  if (Cached != FPConstExprCache.end())
+    return Cached->second;
+
   SMTExprRef theExp = usesBVFPEncoding(Sort)
                           ? SMTSolverImpl::mkFPFromBinImpl(FP, EWidth)
                           : mkFPFromBinImpl(FP, EWidth);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == FP.length());
+  FPConstExprCache.emplace(std::move(Key), theExp);
   return theExp;
 }
 

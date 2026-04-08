@@ -186,7 +186,12 @@ static inline bool checkExprError(const SMTExpr &Exp) {
 
 SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) const {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
-  return storeExprRef(toSolverExpr<MathSATExpr>(Exp));
+  const auto &Wrapped = toSolverExpr<MathSATExpr>(Exp);
+  if (Wrapped.isDecl())
+    return makeExprRef<MathSATExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                                    Wrapped.getDecl());
+  return makeExprRef<MathSATExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
+                                  Wrapped.getTerm());
 }
 
 SMTExprRef MathSATSolver::rewrapExprImpl(const SMTExpr &Exp,
@@ -195,10 +200,10 @@ SMTExprRef MathSATSolver::rewrapExprImpl(const SMTExpr &Exp,
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
   const auto &Wrapped = toSolverExpr<MathSATExpr>(Exp);
   if (Wrapped.isDecl())
-    return storeExprRef(
-        MathSATExpr(Kind, Wrapped.Context, Sort, Wrapped.getDecl()));
-  return storeExprRef(
-      MathSATExpr(Kind, Wrapped.Context, Sort, Wrapped.getTerm()));
+    return makeExprRef<MathSATExpr>(Kind, Wrapped.Context, Sort,
+                                    Wrapped.getDecl());
+  return makeExprRef<MathSATExpr>(Kind, Wrapped.Context, Sort,
+                                  Wrapped.getTerm());
 }
 
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
