@@ -43,7 +43,7 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
   class myZ3Solver : public camada::Z3Solver {
   public:
     explicit myZ3Solver(z3::context C) : camada::Z3Solver(std::move(C)) {
-      Solver = makeSolver(Context);
+      setSolver(makeSolver(context()));
     }
 
   private:

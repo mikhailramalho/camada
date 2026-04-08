@@ -25,9 +25,9 @@ TEST_CASE("Arith Yices test", "[YICES]") {
 
   private:
     void destroyAndRecreate() {
-      if (Context)
-        yices_free_context(Context);
-      Context = nullptr;
+      if (context())
+        yices_free_context(context());
+      clearContext();
       yices_exit();
       yices_init();
       yices_clear_error();
@@ -36,7 +36,7 @@ TEST_CASE("Arith Yices test", "[YICES]") {
       yices_default_config_for_logic(config, Logic);
       yices_set_config(config, "mode", "push-pop");
 
-      Context = yices_new_context(config);
+      setContext(yices_new_context(config));
       yices_free_config(config);
     }
 
@@ -94,9 +94,9 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
       SymbolTable.clear();
       Assertions.clear();
 
-      if (Context)
-        yices_free_context(Context);
-      Context = nullptr;
+      if (context())
+        yices_free_context(context());
+      clearContext();
 
       yices_exit();
 
@@ -116,7 +116,7 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
       yices_set_config(config, "array-solver", "none");
       yices_set_config(config, "arith-solver", "none");
 
-      Context = yices_new_context(config);
+      setContext(yices_new_context(config));
       yices_free_config(config);
     }
   };

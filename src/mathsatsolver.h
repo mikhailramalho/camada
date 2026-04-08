@@ -91,7 +91,7 @@ public:
   ~MathSATSolver() override;
 
 protected:
-  msat_env Context{};
+  msat_env context() const { return Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -340,6 +340,9 @@ protected:
 
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
+
+private:
+  msat_env Context{};
 }; // end class MathSATSolver
 
 } // namespace camada

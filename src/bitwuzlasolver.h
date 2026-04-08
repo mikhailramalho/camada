@@ -68,9 +68,9 @@ public:
   ~BitwuzlaSolver() override;
 
 protected:
-  BitwuzlaContextRef Context = nullptr;
-  BitwuzlaOptions *Options = nullptr;
-  BitwuzlaTermManager *TermManager = nullptr;
+  BitwuzlaContextRef context() const { return Context; }
+  BitwuzlaOptions *options() const { return Options; }
+  BitwuzlaTermManager *termManager() const { return TermManager; }
   SymbolTablet SymbolTable;
   uint64_t ToBVCounter = 0;
 
@@ -229,6 +229,11 @@ protected:
   void dumpImpl(std::string &Out) override;
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
+
+private:
+  BitwuzlaContextRef Context = nullptr;
+  BitwuzlaOptions *Options = nullptr;
+  BitwuzlaTermManager *TermManager = nullptr;
 };
 
 } // namespace camada

@@ -69,8 +69,9 @@ public:
   ~YicesSolver() override;
 
 protected:
-  YicesContextRef Context = nullptr;
-  unsigned int ConstArrayCounter = 0;
+  YicesContextRef context() const { return Context; }
+  void setContext(YicesContextRef NewContext) { Context = NewContext; }
+  void clearContext() { Context = nullptr; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -268,6 +269,10 @@ protected:
   using TermVectort = std::vector<SMTExprRef>;
   TermVectort Assertions;
   std::vector<std::size_t> AssertionScopeSizes;
+
+private:
+  YicesContextRef Context = nullptr;
+  unsigned int ConstArrayCounter = 0;
 
 }; // namespace camada
 

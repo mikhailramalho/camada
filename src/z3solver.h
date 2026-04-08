@@ -68,9 +68,11 @@ public:
   ~Z3Solver() override;
 
 protected:
-  z3::context Context;
-  z3::solver Solver;
-  unsigned TupleCounter = 0;
+  z3::context &context() { return Context; }
+  const z3::context &context() const { return Context; }
+  z3::solver &solver() { return Solver; }
+  const z3::solver &solver() const { return Solver; }
+  void setSolver(z3::solver S) { Solver = std::move(S); }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -354,6 +356,11 @@ protected:
 
   void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
+
+private:
+  z3::context Context;
+  z3::solver Solver;
+  unsigned TupleCounter = 0;
 }; // end class Z3Solver
 
 } // namespace camada
