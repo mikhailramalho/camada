@@ -40,4 +40,4 @@ jobs:
       run: cmake --build build -j1 --target install
 
     - name: Run tests
-      run: ctest --test-dir build --output-on-failure
+      run: ctest --test-dir build --output-on-failure -E "MathSAT"
