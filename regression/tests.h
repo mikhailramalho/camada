@@ -2,6 +2,7 @@
 #include "array.test.h"
 #include "fp.test.h"
 #include "simple.test.h"
+#include "tuple.test.h"
 
 #include <catch2/catch_test_macros.hpp>
 

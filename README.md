@@ -20,7 +20,7 @@ Current encoded/common-layer features:
 
 - floating-point fallback via bit-vector encoding
 - array support, with some remaining tuple-related gaps
-- tuple encoding layer: planned
+- tuple encoding layer: planned for backends without native tuple support
 
 ## What Camada Is
 
@@ -134,11 +134,11 @@ Camada currently provides public APIs for:
 - incremental solving (`push`/`pop`)
 - model queries for supported value kinds
 
-Still not implemented:
+Partially backend-dependent:
 
 - tuples
-
-Partially backend-dependent:
+  - supported natively on `CVC5` and `Z3`
+  - unsupported on `Bitwuzla`, `MathSAT`, `STP`, and `Yices`
 
 - quantifiers
   - supported on `Bitwuzla`, `CVC5`, and `Z3`

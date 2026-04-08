@@ -63,6 +63,9 @@ static inline z3::func_decl toZ3FuncDecl(const SMTExprRef &Exp) {
 } // namespace
 
 unsigned Z3Sort::getWidthFromSolver() const {
+  if (isTupleSort())
+    return 0;
+
   if (Sort.is_bv())
     return Sort.bv_size();
 
@@ -201,6 +204,32 @@ Z3Solver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
   return newSortRef<Z3Sort>(Z3Sort(SMTSortKind::Function, &Context,
                                    toSolverSort<Z3Sort>(*CodomainSort).Sort, 0,
                                    0, 0, {}, {}, DomainSorts, CodomainSort));
+}
+
+SMTSortRef
+Z3Solver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
+  std::vector<z3::sort> Fields;
+  Fields.reserve(ElementSorts.size());
+  std::vector<std::string> FieldNames;
+  FieldNames.reserve(ElementSorts.size());
+  for (std::size_t I = 0; I < ElementSorts.size(); ++I) {
+    Fields.push_back(toSolverSort<Z3Sort>(*ElementSorts[I]).Sort);
+    FieldNames.push_back("field_" + std::to_string(I));
+  }
+
+  std::vector<char const *> NamePtrs;
+  NamePtrs.reserve(FieldNames.size());
+  for (const auto &Name : FieldNames)
+    NamePtrs.push_back(Name.c_str());
+
+  z3::func_decl_vector Projs(Context);
+  z3::func_decl Ctor = Context.tuple_sort(
+      ("camada_tuple_" + std::to_string(TupleCounter++)).c_str(),
+      static_cast<unsigned>(Fields.size()), NamePtrs.data(), Fields.data(),
+      Projs);
+
+  return newSortRef<Z3Sort>(Z3Sort(SMTSortKind::Tuple, &Context, Ctor.range(),
+                                   0, 0, 0, {}, {}, {}, {}, ElementSorts));
 }
 
 SMTExprRef Z3Solver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -575,6 +604,36 @@ SMTExprRef Z3Solver::mkArrayStoreImpl(const SMTExprRef &Array,
   return makeExprRef<Z3Expr>(
       SMTExprKind::ArrayStore, &Context, Array->Sort,
       z3::store(toZ3Expr(Array), toZ3Expr(Index), toZ3Expr(Element)));
+}
+
+SMTExprRef Z3Solver::mkTupleImpl(const std::vector<SMTExprRef> &Elements) {
+  std::vector<SMTSortRef> ElementSorts;
+  ElementSorts.reserve(Elements.size());
+  for (const auto &Element : Elements)
+    ElementSorts.push_back(Element->Sort);
+  SMTSortRef TupleSort = mkTupleSort(ElementSorts);
+
+  z3::func_decl Ctor(Context,
+                     Z3_get_tuple_sort_mk_decl(
+                         Context, toSolverSort<Z3Sort>(*TupleSort).Sort));
+  std::vector<Z3_ast> Args;
+  Args.reserve(Elements.size());
+  for (const auto &Element : Elements)
+    Args.push_back(toZ3Expr(Element));
+  return makeExprRef<Z3Expr>(
+      SMTExprKind::TupleConst, &Context, TupleSort,
+      z3::to_expr(Context, Z3_mk_app(Context, Ctor, Args.size(), Args.data())));
+}
+
+SMTExprRef Z3Solver::mkTupleSelectImpl(const SMTExprRef &Tuple,
+                                       unsigned Index) {
+  Z3_func_decl FieldDecl = Z3_get_tuple_sort_field_decl(
+      Context, toSolverSort<Z3Sort>(*Tuple->Sort).Sort, Index);
+  Z3_ast Arg = toZ3Ast(Tuple);
+  return makeExprRef<Z3Expr>(
+      SMTExprKind::TupleSelect, &Context,
+      Tuple->Sort->getTupleElementSorts()[Index],
+      z3::to_expr(Context, Z3_mk_app(Context, FieldDecl, 1, &Arg)));
 }
 
 SMTExprRef Z3Solver::mkApplyImpl(const SMTExprRef &Function,

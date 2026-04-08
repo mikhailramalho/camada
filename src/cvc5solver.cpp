@@ -44,6 +44,9 @@ static inline void parseCVC5RationalValue(const std::string &Value,
 } // namespace
 
 unsigned CVC5Sort::getWidthFromSolver() const {
+  if (isTupleSort())
+    return 0;
+
   if (Sort.isBitVector()) {
     cvc5::Sort bvType = static_cast<cvc5::Sort>(Sort);
     return bvType.getBitVectorSize();
@@ -182,6 +185,17 @@ CVC5Solver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
       SMTSortKind::Function, &Context,
       Terms.mkFunctionSort(Domain, toSolverSort<CVC5Sort>(*CodomainSort).Sort),
       0, 0, 0, {}, {}, DomainSorts, CodomainSort));
+}
+
+SMTSortRef
+CVC5Solver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
+  std::vector<cvc5::Sort> Elements;
+  Elements.reserve(ElementSorts.size());
+  for (const auto &Sort : ElementSorts)
+    Elements.push_back(toSolverSort<CVC5Sort>(*Sort).Sort);
+  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::Tuple, &Context,
+                                       Terms.mkTupleSort(Elements), 0, 0, 0, {},
+                                       {}, {}, {}, ElementSorts));
 }
 
 SMTExprRef CVC5Solver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -624,6 +638,31 @@ SMTExprRef CVC5Solver::mkArrayStoreImpl(const SMTExprRef &Array,
       Terms.mkTerm(cvc5::Kind::STORE, {toSolverExpr<CVC5Expr>(*Array).Expr,
                                        toSolverExpr<CVC5Expr>(*Index).Expr,
                                        toSolverExpr<CVC5Expr>(*Element).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkTupleImpl(const std::vector<SMTExprRef> &Elements) {
+  std::vector<cvc5::Term> TupleTerms;
+  TupleTerms.reserve(Elements.size());
+  std::vector<SMTSortRef> ElementSorts;
+  ElementSorts.reserve(Elements.size());
+  for (const auto &Element : Elements) {
+    TupleTerms.push_back(toSolverExpr<CVC5Expr>(*Element).Expr);
+    ElementSorts.push_back(Element->Sort);
+  }
+  SMTSortRef TupleSort = mkTupleSort(ElementSorts);
+  return makeExprRef<CVC5Expr>(SMTExprKind::TupleConst, &Context, TupleSort,
+                               Terms.mkTuple(TupleTerms));
+}
+
+SMTExprRef CVC5Solver::mkTupleSelectImpl(const SMTExprRef &Tuple,
+                                         unsigned Index) {
+  cvc5::Datatype dt = toSolverSort<CVC5Sort>(*Tuple->Sort).Sort.getDatatype();
+  cvc5::Term selector = dt[0][Index].getTerm();
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::TupleSelect, &Context,
+      Tuple->Sort->getTupleElementSorts()[Index],
+      Terms.mkTerm(cvc5::Kind::APPLY_SELECTOR,
+                   {selector, toSolverExpr<CVC5Expr>(*Tuple).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkApplyImpl(const SMTExprRef &Function,

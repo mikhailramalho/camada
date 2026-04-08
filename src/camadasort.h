@@ -44,7 +44,8 @@ enum class SMTSortKind {
   BVFP,
   BVRM,
   Array,
-  Function
+  Function,
+  Tuple
 };
 
 class SMTSort;
@@ -97,10 +98,11 @@ class SMTSort {
 public:
   explicit SMTSort(SMTSortKind K, unsigned W = 0, unsigned EW = 0,
                    unsigned SW = 0, SMTSortRef I = {}, SMTSortRef E = {},
-                   std::vector<SMTSortRef> D = {}, SMTSortRef C = {})
+                   std::vector<SMTSortRef> D = {}, SMTSortRef C = {},
+                   std::vector<SMTSortRef> T = {})
       : Kind(K), Width(W), ExpWidth(EW), SigWidth(SW), IndexSort(std::move(I)),
         ElementSort(std::move(E)), DomainSorts(std::move(D)),
-        CodomainSort(std::move(C)) {}
+        CodomainSort(std::move(C)), TupleElementSorts(std::move(T)) {}
   virtual ~SMTSort() = default;
 
   virtual SMTBackendKind getBackendKind() const = 0;
@@ -147,6 +149,9 @@ public:
   /// Returns true if the sort is a function.
   bool isFunctionSort() const { return Kind == SMTSortKind::Function; }
 
+  /// Returns true if the sort is a tuple.
+  bool isTupleSort() const { return Kind == SMTSortKind::Tuple; }
+
   /// Returns the sort width.
   unsigned getWidth() const;
 
@@ -173,6 +178,9 @@ public:
   /// Returns the function's codomain sort, fails if the sort is not a function.
   SMTSortRef getCodomainSort() const;
 
+  /// Returns the tuple's element sorts, fails if the sort is not a tuple.
+  const std::vector<SMTSortRef> &getTupleElementSorts() const;
+
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
   bool operator==(SMTSort const &Other) const;
@@ -197,6 +205,7 @@ protected:
   SMTSortRef ElementSort;
   std::vector<SMTSortRef> DomainSorts;
   SMTSortRef CodomainSort;
+  std::vector<SMTSortRef> TupleElementSorts;
 #ifndef NDEBUG
   bool WidthValidated = false;
 #endif
@@ -224,9 +233,10 @@ public:
   SolverSort(SMTSortKind K, SolverContextRef C, const TheSort &SS,
              unsigned W = 0, unsigned EW = 0, unsigned SW = 0,
              SMTSortRef I = {}, SMTSortRef E = {},
-             std::vector<SMTSortRef> D = {}, SMTSortRef Co = {})
+             std::vector<SMTSortRef> D = {}, SMTSortRef Co = {},
+             std::vector<SMTSortRef> T = {})
       : SMTSort(K, W, EW, SW, std::move(I), std::move(E), std::move(D),
-                std::move(Co)),
+                std::move(Co), std::move(T)),
         Context(std::move(C)), Sort(SS) {}
 
   virtual ~SolverSort() override = default;

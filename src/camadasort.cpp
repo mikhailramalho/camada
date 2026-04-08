@@ -55,6 +55,8 @@ void SMTSort::dump(std::string &Out) const {
     k = "Array";
   else if (isFunctionSort())
     k = "Function";
+  else if (isTupleSort())
+    k = "Tuple";
   else {
     Out = "Unknown sort.\n";
     abort();
@@ -87,6 +89,16 @@ void SMTSort::dump(std::string &Out) const {
     return;
   }
 
+  if (isTupleSort()) {
+    Out += "Elements:\n";
+    for (const auto &Sort : getTupleElementSorts()) {
+      std::string Element;
+      Sort->dump(Element);
+      Out += Element;
+    }
+    return;
+  }
+
   if (isArithSort()) {
     Out += "\n";
     return;
@@ -101,8 +113,9 @@ void SMTSort::dump(std::string &Out) const {
 }
 
 unsigned SMTSort::getWidth() const {
-  assert(!isArraySort() && !isFunctionSort() && !isArithSort() &&
-         "Width is not defined for array, function, or arithmetic sorts");
+  assert(
+      !isArraySort() && !isFunctionSort() && !isTupleSort() && !isArithSort() &&
+      "Width is not defined for array, function, tuple, or arithmetic sorts");
   return Width;
 }
 
@@ -142,9 +155,15 @@ SMTSortRef SMTSort::getCodomainSort() const {
   return CodomainSort;
 }
 
+const std::vector<SMTSortRef> &SMTSort::getTupleElementSorts() const {
+  assert(isTupleSort() &&
+         "Tuple element sorts are only defined for tuple sorts");
+  return TupleElementSorts;
+}
+
 bool SMTSort::validateSortWidth() const {
   // Don't check array/function/arithmetic sort widths for now
-  if (isArraySort() || isFunctionSort() || isArithSort())
+  if (isArraySort() || isFunctionSort() || isTupleSort() || isArithSort())
     return true;
 
   return getWidthFromSolver() == getWidth();
@@ -172,6 +191,10 @@ bool SMTSort::operator==(SMTSort const &Other) const {
            getDomainSorts() == Other.getDomainSorts() &&
            getCodomainSort() == Other.getCodomainSort();
   }
+
+  if (isTupleSort())
+    return Other.isTupleSort() &&
+           getTupleElementSorts() == Other.getTupleElementSorts();
 
   if (Width != Other.Width)
     return false;
