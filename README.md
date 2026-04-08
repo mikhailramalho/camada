@@ -113,7 +113,7 @@ location during the build.
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
 | [STP](https://stp.github.io/)              |  2.3.4          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
-| [Z3](https://github.com/Z3Prover/z3)       |  4.8.8          | ✔️ |
+| [Z3](https://github.com/Z3Prover/z3)       |  4.16.0         | ✔️ |
 
 <sup>1</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
 it does not support these operations natively. `ROUND_TO_AWAY` is also not

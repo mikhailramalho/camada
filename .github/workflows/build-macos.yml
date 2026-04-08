@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install Dependencies
-      run: brew install catch2 gmp cmake ninja automake boost zlib bison flex libtool pkg-config gettext texinfo doxygen z3
+      run: brew install catch2 gmp cmake ninja automake boost zlib bison flex libtool pkg-config gettext texinfo doxygen
 
     - name: Configure Homebrew Environment
       run: |
