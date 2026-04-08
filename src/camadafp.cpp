@@ -20,14 +20,36 @@
  **************************************************************************/
 
 #include "camadaimpl.h"
-#include "camadautil.h"
 
 #include <bitset>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 
 namespace camada {
+namespace {
+
+template <typename FPType, typename IntType> FPType IntAsFP(const IntType Int) {
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
+  FPType Result;
+  std::memcpy(&Result, &Int, sizeof(IntType));
+  return Result;
+}
+
+template <typename FPType, typename IntType> IntType FPAsInt(const FPType FP) {
+  assert(sizeof(FPType) == sizeof(IntType) &&
+         "Cannot convert int to floating-point");
+
+  IntType Result;
+  std::memcpy(&Result, &FP, sizeof(FPType));
+  return Result;
+}
+
+} // namespace
+
 static inline SMTExprRef mkPZero(SMTSolver &S, unsigned int EWidth,
                                  unsigned int SWidth);
 static inline SMTExprRef mkNZero(SMTSolver &S, unsigned int EWidth,
