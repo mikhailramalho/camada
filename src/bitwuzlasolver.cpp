@@ -23,6 +23,7 @@
 
 #include "bitwuzlasolver.h"
 
+#include <bitset>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -729,14 +730,18 @@ SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef BitwuzlaSolver::mkBVFromDecImpl(const int64_t Int,
                                            const SMTSortRef &Sort) {
-  uint64_t mask =
-      Sort->getWidth() >= 64 ? ~0ULL : ((1ULL << Sort->getWidth()) - 1);
-  uint64_t newInt = static_cast<uint64_t>(Int) & mask;
+  const unsigned Width = Sort->getWidth();
+  const uint64_t RawBits = static_cast<uint64_t>(Int);
+  std::string Bits = std::bitset<64>(RawBits).to_string();
+  if (Width < 64)
+    Bits = Bits.substr(64 - Width);
+  else if (Width > 64)
+    Bits.insert(Bits.begin(), Width - 64, Int < 0 ? '1' : '0');
 
   return makeExprRef<BitwExpr>(
       SMTExprKind::BVConst, Context, Sort,
-      bitwuzla_mk_bv_value_uint64(TermManager,
-                                  toSolverSort<BitwSort>(*Sort).Sort, newInt));
+      bitwuzla_mk_bv_value(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
+                           Bits.c_str(), 2));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVFromBinImpl(const std::string &Int,
