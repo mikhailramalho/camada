@@ -1078,12 +1078,8 @@ checkResult MathSATSolver::checkImpl() {
 }
 
 void MathSATSolver::resetImpl() {
-  invalidateGeneratedObjects();
-  clearSortCaches();
-  clearExprCaches();
   destroyContext();
   initializeContext();
-  initializeCommonSingletons();
 }
 
 void MathSATSolver::pushImpl(unsigned nscopes) {
