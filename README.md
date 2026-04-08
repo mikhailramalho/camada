@@ -157,6 +157,48 @@ Array support is currently partial in the larger structured-data sense:
 - backend-specific array gaps such as `Array<Idx, Bool>` are handled
 - arrays of tuples remain part of the unfinished tuple work
 
+## Backend Caveats
+
+Camada tries to hide backend differences where practical, but a few solver
+limitations still matter in day-to-day use.
+
+- `MathSAT`
+  - `reset()` is currently weaker than on the other backends. Reusing the same
+    symbol names with different sorts after a reset is still unreliable.
+  - quantifiers are implemented in the wrapper, but the current backend setup
+    is still unreliable for them.
+  - native floating-point support has gaps: `fp.fma` and `fp.rem` are lowered
+    through the common bit-vector path, and `ROUND_TO_AWAY` is not supported by
+    the native MathSAT FP API.
+- `STP`
+  - only the bit-vector / array fragment is a natural fit. Integer, real,
+    quantifier, and native floating-point support are not available.
+  - constant arrays and boolean arrays are adapted internally by the wrapper,
+    so some behavior is implemented through backend-specific lowering.
+- `Yices`
+  - there is no native floating-point support, so FP always goes through
+    Camada's bit-vector encoding.
+  - constant arrays are implemented with a backend-native lambda encoding.
+- `Bitwuzla`
+  - integers and reals are not supported.
+  - quantifiers are available, but the strongest coverage in Camada is still in
+    the quantifier-free fragments.
+- `CVC5` and `Z3`
+  - these are currently the most complete backends for the public Camada API.
+
+## Recommended Usage
+
+- Prefer `CVC5` or `Z3` if you want the broadest feature coverage with the
+  fewest backend-specific caveats.
+- Prefer `Bitwuzla` or `STP` for bit-vector-heavy workloads.
+- Prefer `Bitwuzla` when you also need native floating-point.
+- Prefer `STP` when you only need the bit-vector/array fragment.
+- Treat `MathSAT` as usable, but be cautious with `reset()`, quantifiers, and
+  native floating-point edge cases.
+- Use explicit `FPEncoding` when creating floating-point and rounding-mode
+  sorts/constants so the chosen native-vs-BV representation is obvious at the
+  call site.
+
 ## Design Notes
 
 ### Handle Lifetime
@@ -174,10 +216,15 @@ Handles must not be reused across those boundaries.
 If a backend lacks native floating-point support, Camada can encode FP
 operations through bit-vectors in the common layer.
 
-This behavior can also be forced on supported solvers through:
+This behavior can also be forced on supported solvers by constructing FP/RM
+sorts and constants with `FPEncoding::BV` instead of `FPEncoding::Native`.
+
+For example:
 
 ```cpp
-solver->useCamadaFP = true;
+auto fp64sort = solver->mkFPSort(11, 52, camada::FPEncoding::BV);
+auto roundingMode =
+    solver->mkRM(camada::RM::ROUND_TO_MINUS_INF, camada::FPEncoding::BV);
 ```
 
 This is useful for:
@@ -233,25 +280,26 @@ int main() {
   // Create a solver instance (example using Z3)
   auto solver = camada::createZ3Solver();
 
-  // This flag controls if you want to bit-blast floating-point, using Camada's internal bit-vector encoding
-  // Floating-point bitblast is always enabled for solvers that don't support floating-point natively.
-  /* solver->useCamadaFP = true; */
-
-  // Add assertions, check satisfiability, etc.
-  camada::SMTSortRef fp64sort = solver->mkFPSort(11, 52);
+  // Choose the floating-point encoding explicitly.
+  camada::SMTSortRef fp64sort =
+      solver->mkFPSort(11, 52, camada::FPEncoding::Native);
   camada::SMTExprRef roundingMode =
-      solver->mkRM(camada::RM::ROUND_TO_MINUS_INF);
+      solver->mkRM(camada::RM::ROUND_TO_MINUS_INF,
+                   camada::FPEncoding::Native);
 
   camada::SMTExprRef x = solver->mkSymbol("x", fp64sort);
   camada::SMTExprRef y = solver->mkSymbol("y", fp64sort);
   camada::SMTExprRef r = solver->mkSymbol("r", fp64sort);
 
   camada::SMTExprRef xV = solver->mkFPFromBin(
-      "0111011101100100111000010001001010111000010010111000100101001010", 11);
+      "0111011101100100111000010001001010111000010010111000100101001010", 11,
+      camada::FPEncoding::Native);
   camada::SMTExprRef yV = solver->mkFPFromBin(
-      "0100100101001110001001011011001100110001111010011101010010000001", 11);
+      "0100100101001110001001011011001100110001111010011101010010000001", 11,
+      camada::FPEncoding::Native);
   camada::SMTExprRef rV = solver->mkFPFromBin(
-      "0111111111101111111111111111111111111111111111111111111111111111", 11);
+      "0111111111101111111111111111111111111111111111111111111111111111", 11,
+      camada::FPEncoding::Native);
 
   camada::SMTExprRef xE = solver->mkEqual(x, xV);
   camada::SMTExprRef yE = solver->mkEqual(y, yV);
