@@ -30,6 +30,13 @@
 
 namespace camada {
 
+namespace {
+
+// Function used to report errors
+void STPErrorHandler(const char *msg) { fatalError(msg); }
+
+} // namespace
+
 STPExpr::~STPExpr() {
   if (OwnsExpr && Expr != nullptr)
     STP::vc_DeleteExpr(Expr);
@@ -73,9 +80,6 @@ void STPExpr::dump(std::string &Out) const {
   Out += "\n";
   free(s);
 }
-
-// Function used to report errors
-void STPErrorHandler(const char *msg) { fatalError(msg); }
 
 STPSolver::STPSolver()
     : SMTSolverImpl(), Context(STP::vc_createValidityChecker()) {

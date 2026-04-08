@@ -30,6 +30,8 @@
 
 namespace camada {
 
+namespace {
+
 static inline void yicesCheckError(int32_t Res, const char *Message) {
   if (Res == 0)
     return;
@@ -59,6 +61,8 @@ static inline term_t yicesCheckTerm(term_t Term, const char *Message) {
   yicesCheckError(-1, Message);
   return NULL_TERM;
 }
+
+} // namespace
 
 unsigned YicesSort::getWidthFromSolver() const {
   if (yices_type_is_bool(Sort))

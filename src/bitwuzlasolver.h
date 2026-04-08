@@ -64,16 +64,16 @@ class BitwuzlaSolver : public SMTSolverImpl {
 public:
   using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
 
+  BitwuzlaSolver();
+  ~BitwuzlaSolver() override;
+
+protected:
   BitwuzlaContextRef Context = nullptr;
   BitwuzlaOptions *Options = nullptr;
   BitwuzlaTermManager *TermManager = nullptr;
   SymbolTablet SymbolTable;
   uint64_t ToBVCounter = 0;
 
-  BitwuzlaSolver();
-  ~BitwuzlaSolver() override;
-
-protected:
   void initializeContext();
   void destroyContext();
 

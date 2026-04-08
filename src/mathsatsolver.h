@@ -83,8 +83,6 @@ public:
 
 class MathSATSolver : public SMTSolverImpl {
 public:
-  msat_env Context{};
-
   MathSATSolver();
 
   /// Create MathSAT custom configuration. User is responsible for freeing
@@ -93,6 +91,8 @@ public:
   ~MathSATSolver() override;
 
 protected:
+  msat_env Context{};
+
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

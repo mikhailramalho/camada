@@ -28,6 +28,8 @@
 
 namespace camada {
 
+namespace {
+
 static inline const z3::ast &toZ3Ast(const SMTExpr &Exp) {
   return toSolverExpr<Z3Expr>(Exp).Expr;
 }
@@ -57,6 +59,8 @@ static inline z3::func_decl toZ3FuncDecl(const SMTExprRef &Exp) {
   return z3::func_decl(*ZE.Context, reinterpret_cast<Z3_func_decl>(
                                         static_cast<Z3_ast>(ZE.Expr)));
 }
+
+} // namespace
 
 unsigned Z3Sort::getWidthFromSolver() const {
   if (Sort.is_bv())
@@ -692,13 +696,9 @@ bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
   fatalError("Bool is neither true nor false");
 }
 
-static inline bool hasZ3Interp(const Z3Solver &S, const SMTExprRef &Exp) {
-  return S.Solver.get_model().has_interp(toZ3Expr(Exp).decl());
-}
-
 std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   SMTExprRef value = Exp;
-  if (hasZ3Interp(*this, Exp)) {
+  if (Solver.get_model().has_interp(toZ3Expr(Exp).decl())) {
     value = makeExprRef<Z3Expr>(
         Exp->getKind(), &Context, Exp->Sort,
         Solver.get_model().get_const_interp(toZ3Expr(Exp).decl()));
@@ -743,7 +743,7 @@ void Z3Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
 
 std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   SMTExprRef value = Exp;
-  if (hasZ3Interp(*this, Exp)) {
+  if (Solver.get_model().has_interp(toZ3Expr(Exp).decl())) {
     value = makeExprRef<Z3Expr>(
         Exp->getKind(), &Context, Exp->Sort,
         Solver.get_model().get_const_interp(toZ3Expr(Exp).decl()));

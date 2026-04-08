@@ -62,16 +62,15 @@ public:
 
 class Z3Solver : public SMTSolverImpl {
 public:
-  z3::context Context;
-
-  z3::solver Solver;
-
   Z3Solver();
   explicit Z3Solver(z3::context C);
   explicit Z3Solver(z3::context C, z3::solver S);
   ~Z3Solver() override;
 
 protected:
+  z3::context Context;
+  z3::solver Solver;
+
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

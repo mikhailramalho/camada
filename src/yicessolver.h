@@ -65,14 +65,13 @@ public:
 
 class YicesSolver : public SMTSolverImpl {
 public:
-  YicesContextRef Context = nullptr;
-
-  unsigned int ConstArrayCounter = 0;
-
   YicesSolver();
   ~YicesSolver() override;
 
 protected:
+  YicesContextRef Context = nullptr;
+  unsigned int ConstArrayCounter = 0;
+
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

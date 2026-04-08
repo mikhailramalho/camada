@@ -33,6 +33,8 @@
 
 namespace camada {
 
+namespace {
+
 static inline const msat_term &toMathSATTerm(const SMTExprRef &Exp) {
   auto const &ME = toSolverExpr<MathSATExpr>(*Exp);
   assert(ME.isTerm() && "Expected MathSAT term, got declaration");
@@ -51,6 +53,8 @@ static inline char *checkMathSATString(char *Str, const char *Message) {
   fatalError(Message);
   return nullptr;
 }
+
+} // namespace
 
 unsigned MathSATSort::getWidthFromSolver() const {
   std::size_t w;

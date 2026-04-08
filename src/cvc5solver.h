@@ -62,15 +62,14 @@ public:
 
 class CVC5Solver : public SMTSolverImpl {
 public:
-  cvc5::TermManager Terms;
-  cvc5::Solver Context;
-
-  unsigned int ToBVCounter = 0;
-
   CVC5Solver();
   ~CVC5Solver() override;
 
 protected:
+  cvc5::TermManager Terms;
+  cvc5::Solver Context;
+  unsigned int ToBVCounter = 0;
+
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

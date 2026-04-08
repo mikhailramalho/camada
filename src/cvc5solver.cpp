@@ -27,6 +27,8 @@
 
 namespace camada {
 
+namespace {
+
 static inline void parseCVC5RationalValue(const std::string &Value,
                                           std::string &Num, std::string &Den) {
   const auto slash = Value.find('/');
@@ -38,6 +40,8 @@ static inline void parseCVC5RationalValue(const std::string &Value,
   Num = Value.substr(0, slash);
   Den = Value.substr(slash + 1);
 }
+
+} // namespace
 
 unsigned CVC5Sort::getWidthFromSolver() const {
   if (Sort.isBitVector()) {

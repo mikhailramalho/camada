@@ -70,15 +70,14 @@ public:
 
 class STPSolver : public SMTSolverImpl {
 public:
-  STP::VC Context = nullptr;
-
-  unsigned int ConstArrayCounter = 0;
-
   STPSolver();
   explicit STPSolver(STPContextRef C);
   ~STPSolver() override;
 
 protected:
+  STP::VC Context = nullptr;
+  unsigned int ConstArrayCounter = 0;
+
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
