@@ -73,10 +73,8 @@ protected:
     return SMTExprRef(ExprPtr, HandleState, HandleState->Generation);
   }
 
-  /// Wrapper to create new SMTSort
-  template <typename SolverSort>
-  SMTSortRef newSortRef(const SolverSort &Sort) const {
-    auto OwnedSort = std::make_unique<SolverSort>(Sort);
+  template <typename SolverSort> SMTSortRef newSortRef(SolverSort Sort) const {
+    auto OwnedSort = std::make_unique<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
 #ifndef NDEBUG
     OwnedSort->markWidthValidated();
