@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <type_traits>
 
 namespace camada {
 
@@ -36,74 +37,97 @@ void SMTSort::dump() const {
 }
 
 void SMTSort::dump(std::string &Out) const {
-  std::string k;
-  if (isBoolSort())
-    k = "Bool";
-  else if (isIntSort())
-    k = "Int";
-  else if (isRealSort())
-    k = "Real";
-  else if (isBVSort() && isFPSort())
-    k = "BV Floating-point";
-  else if (isBVSort())
-    k = "Bitvector";
-  else if (isRMSort())
-    k = "RoundingMode";
-  else if (isFPSort())
-    k = "Floating-point";
-  else if (isArraySort())
-    k = "Array";
-  else if (isFunctionSort())
-    k = "Function";
-  else {
-    Out = "Unknown sort.\n";
-    abort();
-  }
-
-  Out = "kind: " + k + "\n";
-  if (isArraySort()) {
-    std::string Index;
-    std::string Element;
-    getIndexSort()->dump(Index);
-    getElementSort()->dump(Element);
-    Out += "Index: " + Index;
-    Out += "Element: " + Element;
+  switch (Kind) {
+  case SMTSortKind::Bool:
+    Out = "kind: Bool\n";
+    Out += "width: " + std::to_string(getWidth()) +
+           ", solver: " + std::to_string(getWidthFromSolver()) + "\n";
     return;
-  }
-
-  if (isFunctionSort()) {
-    Out += "Domain:\n";
-    for (const auto &Sort : getDomainSorts()) {
-      std::string Domain;
-      Sort->dump(Domain);
-      Out += Domain;
-    }
-    Out += "Codomain: ";
-    {
-      std::string Codomain;
-      getCodomainSort()->dump(Codomain);
-      Out += Codomain;
-    }
+  case SMTSortKind::Int:
+    Out = "kind: Int\n\n";
     return;
-  }
-
-  if (isArithSort()) {
-    Out += "\n";
+  case SMTSortKind::Real:
+    Out = "kind: Real\n\n";
     return;
+  case SMTSortKind::BV:
+    Out = "kind: Bitvector\n";
+    Out += "width: " + std::to_string(getWidth()) +
+           ", solver: " + std::to_string(getWidthFromSolver()) + "\n";
+    return;
+  case SMTSortKind::RM:
+  case SMTSortKind::BVRM:
+    Out = "kind: RoundingMode\n";
+    Out += "width: " + std::to_string(getWidth()) +
+           ", solver: " + std::to_string(getWidthFromSolver()) + "\n";
+    return;
+  case SMTSortKind::FP:
+    Out = "kind: Floating-point\n";
+    break;
+  case SMTSortKind::BVFP:
+    Out = "kind: BV Floating-point\n";
+    break;
+  case SMTSortKind::Array:
+    Out = "kind: Array\n";
+    break;
+  case SMTSortKind::Function:
+    Out = "kind: Function\n";
+    break;
+  case SMTSortKind::Tuple:
+    Out = "kind: Tuple\n";
+    break;
   }
 
-  Out += "width: " + std::to_string(getWidth()) +
-         ", solver: " + std::to_string(getWidthFromSolver());
-  if (isFPSort())
-    Out += " (exp: " + std::to_string(getFPExponentWidth()) +
-           ", sig: " + std::to_string(getFPSignificandWidth()) + ")";
-  Out += "\n";
+  std::visit(
+      [this, &Out](const auto &DataValue) {
+        using T = std::decay_t<decltype(DataValue)>;
+        if constexpr (std::is_same_v<T, std::monostate>) {
+          return;
+        } else if constexpr (std::is_same_v<T, ScalarSortData>) {
+          Out += "width: " + std::to_string(DataValue.Width) +
+                 ", solver: " + std::to_string(getWidthFromSolver()) + "\n";
+        } else if constexpr (std::is_same_v<T, FPSortData>) {
+          Out += "width: " + std::to_string(DataValue.Width) +
+                 ", solver: " + std::to_string(getWidthFromSolver()) +
+                 " (exp: " + std::to_string(DataValue.ExpWidth) +
+                 ", sig: " + std::to_string(DataValue.SigWidth) + ")\n";
+        } else if constexpr (std::is_same_v<T, ArraySortData>) {
+          std::string Index;
+          std::string Element;
+          DataValue.IndexSort->dump(Index);
+          DataValue.ElementSort->dump(Element);
+          Out += "Index: " + Index;
+          Out += "Element: " + Element;
+        } else if constexpr (std::is_same_v<T, FunctionSortData>) {
+          Out += "Domain:\n";
+          for (const auto &Sort : DataValue.DomainSorts) {
+            std::string Domain;
+            Sort->dump(Domain);
+            Out += Domain;
+          }
+          Out += "Codomain: ";
+          std::string Codomain;
+          DataValue.CodomainSort->dump(Codomain);
+          Out += Codomain;
+        } else if constexpr (std::is_same_v<T, TupleSortData>) {
+          Out += "Elements:\n";
+          for (const auto &Sort : DataValue.ElementSorts) {
+            std::string Element;
+            Sort->dump(Element);
+            Out += Element;
+          }
+        }
+      },
+      Data);
 }
 
 unsigned SMTSort::getWidth() const {
-  assert(!isArraySort() && !isFunctionSort() && !isArithSort() &&
-         "Width is not defined for array, function, or arithmetic sorts");
-  return Width;
+  assert(
+      !isArraySort() && !isFunctionSort() && !isTupleSort() && !isArithSort() &&
+      "Width is not defined for array, function, tuple, or arithmetic sorts");
+  if (isFPSort())
+    return std::get<FPSortData>(Data).Width;
+
+  return std::get<ScalarSortData>(Data).Width;
 }
 
 unsigned SMTSort::getWidthFromSolver() const {
@@ -112,81 +136,89 @@ unsigned SMTSort::getWidthFromSolver() const {
 
 unsigned SMTSort::getFPSignificandWidth() const {
   assert(isFPSort() && "Significand width is only defined for FP sorts");
-  return SigWidth;
+  return std::get<FPSortData>(Data).SigWidth;
 }
 
 unsigned SMTSort::getFPExponentWidth() const {
   assert(isFPSort() && "Exponent width is only defined for FP sorts");
-  return ExpWidth;
+  return std::get<FPSortData>(Data).ExpWidth;
 }
 
 SMTSortRef SMTSort::getIndexSort() const {
   assert(isArraySort() && "Index sort is only defined for array sorts");
-  return IndexSort;
+  return std::get<ArraySortData>(Data).IndexSort;
 }
 
 SMTSortRef SMTSort::getElementSort() const {
   assert(isArraySort() && "Element sort is only defined for array sorts");
-  return ElementSort;
+  return std::get<ArraySortData>(Data).ElementSort;
 }
 
 const std::vector<SMTSortRef> &SMTSort::getDomainSorts() const {
   assert(isFunctionSort() &&
          "Domain sorts are only defined for function sorts");
-  return DomainSorts;
+  return std::get<FunctionSortData>(Data).DomainSorts;
 }
 
 SMTSortRef SMTSort::getCodomainSort() const {
   assert(isFunctionSort() &&
          "Codomain sort is only defined for function sorts");
-  return CodomainSort;
+  return std::get<FunctionSortData>(Data).CodomainSort;
+}
+
+const std::vector<SMTSortRef> &SMTSort::getTupleElementSorts() const {
+  assert(isTupleSort() &&
+         "Tuple element sorts are only defined for tuple sorts");
+  return std::get<TupleSortData>(Data).ElementSorts;
 }
 
 bool SMTSort::validateSortWidth() const {
   // Don't check array/function/arithmetic sort widths for now
-  if (isArraySort() || isFunctionSort() || isArithSort())
+  if (isArraySort() || isFunctionSort() || isTupleSort() || isArithSort())
     return true;
 
   return getWidthFromSolver() == getWidth();
 }
 
 bool SMTSort::operator==(SMTSort const &Other) const {
-  if (isBoolSort() && Other.isBoolSort())
-    return true;
-
-  if (isIntSort() && Other.isIntSort())
-    return true;
-
-  if (isRealSort() && Other.isRealSort())
-    return true;
-
-  if (isRMSort() && Other.isRMSort())
-    return isBVRMSort() == Other.isBVRMSort();
-
-  if (isArraySort())
-    return Other.isArraySort() && (getIndexSort() == Other.getIndexSort()) &&
-           (getElementSort() == Other.getElementSort());
-
-  if (isFunctionSort()) {
-    return Other.isFunctionSort() &&
-           getDomainSorts() == Other.getDomainSorts() &&
-           getCodomainSort() == Other.getCodomainSort();
-  }
-
-  if (Width != Other.Width)
+  if (Kind != Other.Kind)
     return false;
 
-  if (getWidthFromSolver() != Other.getWidthFromSolver())
-    return false;
-
-  if (isFPSort() && Other.isFPSort())
-    return isBVFPSort() == Other.isBVFPSort() && ExpWidth == Other.ExpWidth &&
-           SigWidth == Other.SigWidth;
-
-  if (isBVSort() && Other.isBVSort())
+  // Arithmetic sorts do not carry width-style payload data in Camada, so
+  // sort-kind equality is the whole comparison for them.
+  if (Kind == SMTSortKind::Int || Kind == SMTSortKind::Real)
     return true;
 
-  return false;
+  if (Data.index() != Other.Data.index())
+    return false;
+
+  return std::visit(
+      [this, &Other](const auto &ThisData, const auto &OtherData) -> bool {
+        using T = std::decay_t<decltype(ThisData)>;
+        using U = std::decay_t<decltype(OtherData)>;
+        if constexpr (!std::is_same_v<T, U>) {
+          return false;
+        } else if constexpr (std::is_same_v<T, std::monostate>) {
+          return true;
+        } else if constexpr (std::is_same_v<T, ScalarSortData>) {
+          return ThisData.Width == OtherData.Width &&
+                 getWidthFromSolver() == Other.getWidthFromSolver();
+        } else if constexpr (std::is_same_v<T, FPSortData>) {
+          return ThisData.Width == OtherData.Width &&
+                 ThisData.ExpWidth == OtherData.ExpWidth &&
+                 ThisData.SigWidth == OtherData.SigWidth &&
+                 getWidthFromSolver() == Other.getWidthFromSolver();
+        } else if constexpr (std::is_same_v<T, ArraySortData>) {
+          return ThisData.IndexSort == OtherData.IndexSort &&
+                 ThisData.ElementSort == OtherData.ElementSort;
+        } else if constexpr (std::is_same_v<T, FunctionSortData>) {
+          return ThisData.DomainSorts == OtherData.DomainSorts &&
+                 ThisData.CodomainSort == OtherData.CodomainSort;
+        } else if constexpr (std::is_same_v<T, TupleSortData>) {
+          return ThisData.ElementSorts == OtherData.ElementSorts;
+        }
+      },
+      Data, Other.Data);
 }
 
 } // namespace camada

@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace camada {
@@ -44,7 +45,8 @@ enum class SMTSortKind {
   BVFP,
   BVRM,
   Array,
-  Function
+  Function,
+  Tuple
 };
 
 class SMTSort;
@@ -95,12 +97,35 @@ private:
 /// Generic base class for SMT sorts
 class SMTSort {
 public:
-  explicit SMTSort(SMTSortKind K, unsigned W = 0, unsigned EW = 0,
-                   unsigned SW = 0, SMTSortRef I = {}, SMTSortRef E = {},
-                   std::vector<SMTSortRef> D = {}, SMTSortRef C = {})
-      : Kind(K), Width(W), ExpWidth(EW), SigWidth(SW), IndexSort(std::move(I)),
-        ElementSort(std::move(E)), DomainSorts(std::move(D)),
-        CodomainSort(std::move(C)) {}
+  struct ScalarSortData {
+    unsigned Width = 0;
+  };
+
+  struct FPSortData {
+    unsigned Width = 0;
+    unsigned ExpWidth = 0;
+    unsigned SigWidth = 0;
+  };
+
+  struct ArraySortData {
+    SMTSortRef IndexSort;
+    SMTSortRef ElementSort;
+  };
+
+  struct FunctionSortData {
+    std::vector<SMTSortRef> DomainSorts;
+    SMTSortRef CodomainSort;
+  };
+
+  struct TupleSortData {
+    std::vector<SMTSortRef> ElementSorts;
+  };
+
+  using SortData = std::variant<std::monostate, ScalarSortData, FPSortData,
+                                ArraySortData, FunctionSortData, TupleSortData>;
+
+  explicit SMTSort(SMTSortKind K, SortData D = {})
+      : Kind(K), Data(std::move(D)) {}
   virtual ~SMTSort() = default;
 
   virtual SMTBackendKind getBackendKind() const = 0;
@@ -147,6 +172,9 @@ public:
   /// Returns true if the sort is a function.
   bool isFunctionSort() const { return Kind == SMTSortKind::Function; }
 
+  /// Returns true if the sort is a tuple.
+  bool isTupleSort() const { return Kind == SMTSortKind::Tuple; }
+
   /// Returns the sort width.
   unsigned getWidth() const;
 
@@ -173,6 +201,9 @@ public:
   /// Returns the function's codomain sort, fails if the sort is not a function.
   SMTSortRef getCodomainSort() const;
 
+  /// Returns the tuple's element sorts, fails if the sort is not a tuple.
+  const std::vector<SMTSortRef> &getTupleElementSorts() const;
+
   /// Returns true if two sorts are equal (same kind and bit width). This does
   /// not check if the two sorts are the same objects.
   bool operator==(SMTSort const &Other) const;
@@ -190,13 +221,7 @@ public:
 
 protected:
   SMTSortKind Kind;
-  unsigned Width = 0;
-  unsigned ExpWidth = 0;
-  unsigned SigWidth = 0;
-  SMTSortRef IndexSort;
-  SMTSortRef ElementSort;
-  std::vector<SMTSortRef> DomainSorts;
-  SMTSortRef CodomainSort;
+  SortData Data;
 #ifndef NDEBUG
   bool WidthValidated = false;
 #endif
@@ -222,12 +247,8 @@ public:
   TheSort Sort;
 
   SolverSort(SMTSortKind K, SolverContextRef C, const TheSort &SS,
-             unsigned W = 0, unsigned EW = 0, unsigned SW = 0,
-             SMTSortRef I = {}, SMTSortRef E = {},
-             std::vector<SMTSortRef> D = {}, SMTSortRef Co = {})
-      : SMTSort(K, W, EW, SW, std::move(I), std::move(E), std::move(D),
-                std::move(Co)),
-        Context(std::move(C)), Sort(SS) {}
+             SortData D = {})
+      : SMTSort(K, std::move(D)), Context(std::move(C)), Sort(SS) {}
 
   virtual ~SolverSort() override = default;
 };

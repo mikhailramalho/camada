@@ -74,6 +74,26 @@ struct FunctionSortCacheKey {
   }
 };
 
+struct TupleSortCacheKey {
+  std::vector<const SMTSort *> ElementSorts;
+
+  bool operator==(const TupleSortCacheKey &Other) const {
+    return ElementSorts == Other.ElementSorts;
+  }
+};
+
+struct TupleSortCacheKeyHash {
+  std::size_t operator()(const TupleSortCacheKey &Key) const {
+    std::size_t Hash = 1469598103934665603ULL;
+    for (const SMTSort *Sort : Key.ElementSorts) {
+      auto Ptr = reinterpret_cast<std::uintptr_t>(Sort);
+      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
+                                       (Hash << 6) + (Hash >> 2));
+    }
+    return Hash;
+  }
+};
+
 struct FunctionSortCacheKeyHash {
   std::size_t operator()(const FunctionSortCacheKey &Key) const {
     std::size_t Hash = reinterpret_cast<std::uintptr_t>(Key.CodomainSort) *

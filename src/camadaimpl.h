@@ -130,6 +130,7 @@ protected:
     EncodedFPSortCache.clear();
     ArraySortCache.clear();
     FunctionSortCache.clear();
+    TupleSortCache.clear();
   }
 
   void clearExprCaches() {
@@ -162,15 +163,15 @@ protected:
     CachedBVNegOneExprs.resize(2);
     CachedBVNegOneExprs[1] = CachedBVOne1Expr;
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
-        mkBVFromBin("000", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_EVEN);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
-        mkBVFromBin("001", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_AWAY);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
-        mkBVFromBin("010", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_PLUS_INF);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
-        mkBVFromBin("011", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_MINUS_INF);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
-        mkBVFromBin("100", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
   }
 
   mutable std::deque<std::unique_ptr<SMTSort>> SortArena;
@@ -204,6 +205,9 @@ protected:
   mutable std::unordered_map<FunctionSortCacheKey, SMTSortRef,
                              FunctionSortCacheKeyHash>
       FunctionSortCache;
+  mutable std::unordered_map<TupleSortCacheKey, SMTSortRef,
+                             TupleSortCacheKeyHash>
+      TupleSortCache;
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 
@@ -335,6 +339,24 @@ public:
     assert(theSort->getDomainSorts() == DomainSorts);
     assert(theSort->getCodomainSort() == CodomainSort);
     FunctionSortCache.emplace(std::move(Key), theSort);
+    return theSort;
+  }
+
+  SMTSortRef
+  mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) override final {
+    assert(!ElementSorts.empty());
+    TupleSortCacheKey Key{};
+    Key.ElementSorts.reserve(ElementSorts.size());
+    for (const auto &Sort : ElementSorts)
+      Key.ElementSorts.push_back(Sort.get());
+    auto It = TupleSortCache.find(Key);
+    if (It != TupleSortCache.end())
+      return It->second;
+
+    SMTSortRef theSort = mkTupleSortImpl(ElementSorts);
+    assert(theSort->isTupleSort());
+    assert(theSort->getTupleElementSorts() == ElementSorts);
+    TupleSortCache.emplace(std::move(Key), theSort);
     return theSort;
   }
 
@@ -1101,6 +1123,27 @@ public:
     return theExp;
   }
 
+  SMTExprRef mkTuple(const std::vector<SMTExprRef> &Elements) override final {
+    assert(!Elements.empty());
+    std::vector<SMTSortRef> ElementSorts;
+    ElementSorts.reserve(Elements.size());
+    for (const auto &Element : Elements)
+      ElementSorts.push_back(Element->Sort);
+    SMTSortRef TupleSort = mkTupleSort(ElementSorts);
+    SMTExprRef theExp = mkTupleImpl(Elements);
+    assert(theExp->Sort == TupleSort);
+    return theExp;
+  }
+
+  SMTExprRef mkTupleSelect(const SMTExprRef &Tuple,
+                           unsigned Index) override final {
+    assert(Tuple->Sort->isTupleSort());
+    assert(Index < Tuple->Sort->getTupleElementSorts().size());
+    SMTExprRef theExp = mkTupleSelectImpl(Tuple, Index);
+    assert(theExp->Sort == Tuple->Sort->getTupleElementSorts()[Index]);
+    return theExp;
+  }
+
   SMTExprRef mkApply(const SMTExprRef &Function,
                      const std::vector<SMTExprRef> &Args) override final {
     assert(Function->isFunctionSort());
@@ -1490,6 +1533,10 @@ protected:
     fatalError("Uninterpreted functions");
   }
 
+  virtual SMTSortRef mkTupleSortImpl(const std::vector<SMTSortRef> &) {
+    fatalError("Tuples");
+  }
+
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 
   virtual SMTExprRef mkBVAddImpl(const SMTExprRef &LHS,
@@ -1769,6 +1816,14 @@ protected:
   virtual SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array,
                                       const SMTExprRef &Index,
                                       const SMTExprRef &Element) = 0;
+
+  virtual SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &) {
+    fatalError("Tuples");
+  }
+
+  virtual SMTExprRef mkTupleSelectImpl(const SMTExprRef &, unsigned) {
+    fatalError("Tuples");
+  }
 
   virtual SMTExprRef mkApplyImpl(const SMTExprRef &,
                                  const std::vector<SMTExprRef> &) {

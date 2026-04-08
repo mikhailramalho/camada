@@ -32,3 +32,8 @@ TEST_CASE("Arith CVC5 test", "[CVC5]") {
   cvc5->reset();
   arith_symbolic_shift_semantics(cvc5);
 }
+
+TEST_CASE("Tuple CVC5 test", "[CVC5]") {
+  auto cvc5 = camada::createCVC5Solver();
+  tuple_semantics(cvc5);
+}

@@ -98,6 +98,9 @@ protected:
   SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
                                 const SMTSortRef &CodomainSort) override;
 
+  SMTSortRef
+  mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
+
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkBVNotImpl(const SMTExprRef &Exp) override;
@@ -214,6 +217,9 @@ protected:
 
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
+  SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &Elements) override;
+  SMTExprRef mkTupleSelectImpl(const SMTExprRef &Tuple,
+                               unsigned Index) override;
   SMTExprRef mkApplyImpl(const SMTExprRef &Function,
                          const std::vector<SMTExprRef> &Args) override;
   SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,

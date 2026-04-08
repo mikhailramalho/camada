@@ -84,6 +84,10 @@ public:
   virtual SMTSortRef mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
                                     const SMTSortRef &CodomainSort) = 0;
 
+  /// Returns an appropriate tuple sort.
+  virtual SMTSortRef
+  mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) = 0;
+
   /// Given a constraint, adds it to the solver
   virtual void addConstraint(const SMTExprRef &Exp) = 0;
 
@@ -364,6 +368,12 @@ public:
   virtual SMTExprRef mkArrayStore(const SMTExprRef &Array,
                                   const SMTExprRef &Index,
                                   const SMTExprRef &Element) = 0;
+
+  /// Creates a tuple value from the given elements.
+  virtual SMTExprRef mkTuple(const std::vector<SMTExprRef> &Elements) = 0;
+
+  /// Selects the element at Index from Tuple.
+  virtual SMTExprRef mkTupleSelect(const SMTExprRef &Tuple, unsigned Index) = 0;
 
   /// Applies a function symbol to arguments.
   virtual SMTExprRef mkApply(const SMTExprRef &Function,
