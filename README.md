@@ -65,8 +65,13 @@ cmake --install build
 Useful configure options:
 
 - `-DCMAKE_BUILD_TYPE=Release`
+- `-DBUILD_SHARED_LIBS=ON/OFF`
+- `-DENABLE_WARNINGS=ON/OFF`
+- `-DENABLE_WERROR=ON/OFF`
+- `-DCAMADA_ENABLE_REGRESSION=ON/OFF`
 - `-DCAMADA_DOWNLOAD_DEPENDENCIES=ALL`
-- `-DCAMADA_SOLVER_<NAME>_ENABLE=ON/OFF` to control enabled backends
+- `-DCAMADA_SOLVER_<NAME>_ENABLE=IFAVAILABLE/ON/OFF` to control enabled
+  backends
 
 ### Downloading Supported Solvers
 
@@ -126,30 +131,14 @@ Camada currently provides public APIs for:
 
 - booleans
 - bit-vectors
-- integers and reals on supporting backends
+- integers and reals
 - floating-point
 - rounding modes
 - arrays
-- uninterpreted functions on supporting backends
+- uninterpreted functions
+- quantifiers on supporting backends
 - incremental solving (`push`/`pop`)
 - model queries for supported value kinds
-
-Partially backend-dependent:
-
-- tuples
-  - supported natively on `CVC5` and `Z3`
-  - unsupported on `Bitwuzla`, `MathSAT`, `STP`, and `Yices`
-
-- quantifiers
-  - supported on `Bitwuzla`, `CVC5`, and `Z3`
-  - implemented but still unreliable on `MathSAT` in the current setup
-  - unsupported on `STP` and `Yices`
-- integers/reals
-  - supported on `CVC5`, `MathSAT`, `Yices`, and `Z3`
-  - unsupported on `Bitwuzla` and `STP`
-- uninterpreted functions
-  - supported on `Bitwuzla`, `CVC5`, `MathSAT`, `Yices`, and `Z3`
-  - unsupported on `STP`
 
 Array support is currently partial in the larger structured-data sense:
 
@@ -157,18 +146,37 @@ Array support is currently partial in the larger structured-data sense:
 - backend-specific array gaps such as `Array<Idx, Bool>` are handled
 - arrays of tuples remain part of the unfinished tuple work
 
+## Backend Feature Parity
+
+The table below summarizes the current public-API coverage at a glance.
+`BV FP` means the backend can use Camada's bit-vector floating-point encoding
+even if it lacks native floating-point support.
+
+| Feature | Bitwuzla | CVC5 | MathSAT | STP | Yices | Z3 |
+| ------- | :------: | :--: | :-----: | :-: | :---: | :-: |
+| Booleans | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Bit-vectors | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Integers / reals |   | ✔️ | ✔️ |   | ✔️ | ✔️ |
+| Native FP | ✔️ | ✔️ | ✔️<sup>1</sup> |   |   | ✔️ |
+| BV FP encoding | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Arrays | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Uninterpreted functions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
+| Tuples |   | ✔️ |   |   |   | ✔️ |
+| Quantifiers | ✔️ | ✔️ |   |   |   | ✔️ |
+
+<sup>1</sup> On `MathSAT`, `fp.fma` and `fp.rem` are lowered through the
+common BV path, and native `ROUND_TO_AWAY` is unsupported.
+
 ## Backend Caveats
 
 Camada tries to hide backend differences where practical, but a few solver
 limitations still matter in day-to-day use.
 
 - `MathSAT`
-  - `reset()` is currently weaker than on the other backends. Reusing the same
-    symbol names with different sorts after a reset is still unreliable.
-  - quantifiers are implemented in the wrapper, but the current backend setup
-    is still unreliable for them.
-  - MathSAT support still builds in CI, but its regression tests are currently
-    skipped there because of the known reset-related instability.
+  - `reset()` recreates the solver environment internally so symbol names can
+    be reused safely across resets.
+  - quantified solving is not supported by MathSAT, so Camada treats
+    quantifiers as unsupported on this backend.
   - native floating-point support has gaps: `fp.fma` and `fp.rem` are lowered
     through the common bit-vector path, and `ROUND_TO_AWAY` is not supported by
     the native MathSAT FP API.
@@ -181,6 +189,9 @@ limitations still matter in day-to-day use.
   - there is no native floating-point support, so FP always goes through
     Camada's bit-vector encoding.
   - constant arrays are implemented with a backend-native lambda encoding.
+  - global Yices initialization/teardown is hardened for multiple wrappers, but
+    simultaneously live Yices solver instances can still collide on shared
+    symbol names.
 - `Bitwuzla`
   - integers and reals are not supported.
   - quantifiers are available, but the strongest coverage in Camada is still in
@@ -195,8 +206,8 @@ limitations still matter in day-to-day use.
 - Prefer `Bitwuzla` or `STP` for bit-vector-heavy workloads.
 - Prefer `Bitwuzla` when you also need native floating-point.
 - Prefer `STP` when you only need the bit-vector/array fragment.
-- Treat `MathSAT` as usable, but be cautious with `reset()`, quantifiers, and
-  native floating-point edge cases.
+- Use `MathSAT` when you need its quantifier-free feature set, but not
+  quantifiers, and be cautious with native floating-point edge cases.
 - Use explicit `FPEncoding` when creating floating-point and rounding-mode
   sorts/constants so the chosen native-vs-BV representation is obvious at the
   call site.
@@ -370,8 +381,11 @@ Camada includes a standalone benchmark driver:
 Typical local workflow:
 
 ```bash
+schedtool -a 5 -n 20 -e ./build/bin/camada-bench bitwuzla 200
 python3 scripts/compare-bench.py ./build/bin/camada-bench 200
 ```
 
 This runs repeated pinned benchmark samples, computes medians, and compares the
 result against [`scripts/baseline.txt`](/home/mgadelha/tools/camada/scripts/baseline.txt).
+The benchmark output also records retained RSS (`rss_after_kb` and
+`rss_delta_kb`) alongside timing data.
