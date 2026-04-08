@@ -22,9 +22,9 @@
 #include "ac_config.h"
 #if SOLVER_MATHSAT_ENABLED
 
+#include "camadautil.h"
 #include "mathsatsolver.h"
 
-#include <bitset>
 #include <cassert>
 #include <cstddef>
 #include <cstdio>
@@ -955,17 +955,11 @@ SMTExprRef MathSATSolver::mkRealImpl(int64_t num, int64_t den) {
 
 SMTExprRef MathSATSolver::mkBVFromDecImpl(const int64_t Int,
                                           const SMTSortRef &Sort) {
-  const unsigned Width = Sort->getWidth();
-  const uint64_t RawBits = static_cast<uint64_t>(Int);
-  std::string Bits = std::bitset<64>(RawBits).to_string();
-  if (Width < 64)
-    Bits = Bits.substr(64 - Width);
-  else if (Width > 64)
-    Bits.insert(Bits.begin(), Width - 64, Int < 0 ? '1' : '0');
-
   return makeExprRef<MathSATExpr>(
       SMTExprKind::BVConst, &Context, Sort,
-      msat_make_bv_number(Context, Bits.c_str(), Width, 2));
+      msat_make_bv_number(Context,
+                          toTwosComplementBin(Int, Sort->getWidth()).c_str(),
+                          Sort->getWidth(), 2));
 }
 
 SMTExprRef MathSATSolver::mkBVFromBinImpl(const std::string &Int,

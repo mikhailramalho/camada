@@ -22,8 +22,8 @@
 #if SOLVER_BITWUZLA_ENABLED
 
 #include "bitwuzlasolver.h"
+#include "camadautil.h"
 
-#include <bitset>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -730,18 +730,11 @@ SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef BitwuzlaSolver::mkBVFromDecImpl(const int64_t Int,
                                            const SMTSortRef &Sort) {
-  const unsigned Width = Sort->getWidth();
-  const uint64_t RawBits = static_cast<uint64_t>(Int);
-  std::string Bits = std::bitset<64>(RawBits).to_string();
-  if (Width < 64)
-    Bits = Bits.substr(64 - Width);
-  else if (Width > 64)
-    Bits.insert(Bits.begin(), Width - 64, Int < 0 ? '1' : '0');
-
   return makeExprRef<BitwExpr>(
       SMTExprKind::BVConst, Context, Sort,
       bitwuzla_mk_bv_value(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
-                           Bits.c_str(), 2));
+                           toTwosComplementBin(Int, Sort->getWidth()).c_str(),
+                           2));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVFromBinImpl(const std::string &Int,

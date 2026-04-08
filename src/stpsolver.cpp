@@ -22,10 +22,10 @@
 #include "ac_config.h"
 #if SOLVER_STP_ENABLED
 
+#include "camadautil.h"
 #include "stpsolver.h"
 
 #include <algorithm>
-#include <bitset>
 #include <cassert>
 #include <cstdio>
 
@@ -530,17 +530,10 @@ SMTExprRef STPSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef STPSolver::mkBVFromDecImpl(const int64_t Int,
                                       const SMTSortRef &Sort) {
-  const unsigned Width = Sort->getWidth();
-  const uint64_t RawBits = static_cast<uint64_t>(Int);
-  std::string Bits = std::bitset<64>(RawBits).to_string();
-  if (Width < 64)
-    Bits = Bits.substr(64 - Width);
-  else if (Width > 64)
-    Bits.insert(Bits.begin(), Width - 64, Int < 0 ? '1' : '0');
-
   return makeExprRef<STPExpr>(
       SMTExprKind::BVConst, &Context, Sort,
-      STP::vc_bvConstExprFromStr(Context, Bits.c_str()));
+      STP::vc_bvConstExprFromStr(
+          Context, toTwosComplementBin(Int, Sort->getWidth()).c_str()));
 }
 
 SMTExprRef STPSolver::mkBVFromBinImpl(const std::string &Int,
