@@ -32,54 +32,12 @@ namespace camada {
 
 using STPContextRef = STP::VC *;
 
-class STPContextOwner {
-public:
-  STPContextOwner() = default;
-
-  explicit STPContextOwner(STP::VC Ctx) : Context(Ctx), Valid(true) {}
-
-  ~STPContextOwner() { reset(); }
-
-  STPContextOwner(STPContextOwner &&Other) noexcept
-      : Context(Other.Context), Valid(Other.Valid) {
-    Other.Valid = false;
-  }
-
-  STPContextOwner &operator=(STPContextOwner &&Other) noexcept {
-    if (this != &Other) {
-      reset();
-      Context = Other.Context;
-      Valid = Other.Valid;
-      Other.Valid = false;
-    }
-    return *this;
-  }
-
-  STPContextOwner(const STPContextOwner &) = delete;
-  STPContextOwner &operator=(const STPContextOwner &) = delete;
-
-  void reset();
-
-  void reset(STP::VC Ctx) {
-    reset();
-    Context = Ctx;
-    Valid = true;
-  }
-
-  STPContextRef get() { return Valid ? &Context : nullptr; }
-  const STP::VC *get() const { return Valid ? &Context : nullptr; }
-
-private:
-  STP::VC Context = nullptr;
-  bool Valid = false;
-};
-
 /// Wrapper for STP Sort
 class STPSort : public SolverSort<STPContextRef, STP::Type> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
   using SolverSort<STPContextRef, STP::Type>::SolverSort;
-  virtual ~STPSort() override = default;
+  ~STPSort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -92,14 +50,18 @@ public:
 class STPExpr : public SolverExpr<STPContextRef, STP::Expr> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
+  // STP allocates ordinary term nodes that must be released with
+  // `vc_DeleteExpr`. Arena-stored wrappers therefore need to remember whether
+  // they own the underlying STP expression so copied wrappers do not double
+  // free borrowed handles.
   bool OwnsExpr = false;
 
-  STPExpr(STPContextRef C, const SMTSortRef &S, const STP::Expr &E,
-          bool Owns = false)
-      : SolverExpr<STPContextRef, STP::Expr>(std::move(C), S, E),
+  STPExpr(SMTExprKind Kind, STPContextRef C, const SMTSortRef &S,
+          const STP::Expr &E, bool Owns = false)
+      : SolverExpr<STPContextRef, STP::Expr>(Kind, std::move(C), S, E),
         OwnsExpr(Owns) {}
 
-  virtual ~STPExpr() override;
+  ~STPExpr() override;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -112,20 +74,19 @@ public:
 
 class STPSolver : public SMTSolverImpl {
 public:
-  STPContextOwner OwnedContext;
-  STPContextRef Context = nullptr;
-
-  unsigned int ConstArrayCounter = 0;
-
-  explicit STPSolver();
+  STPSolver();
   explicit STPSolver(STPContextRef C);
-  virtual ~STPSolver();
+  ~STPSolver() override;
+
+protected:
+  STP::VC Context = nullptr;
+  unsigned int ConstArrayCounter = 0;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
-  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                   const SMTSortRef &Sort) const override;
+  SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
@@ -249,10 +210,10 @@ public:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl();
+  void dumpImpl() override;
   void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl();
+  void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 }; // end class STPSolver
 

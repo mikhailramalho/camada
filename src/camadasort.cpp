@@ -20,19 +20,22 @@
  **************************************************************************/
 
 #include "camadasort.h"
+#include "camadaerror.h"
 
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 
-void camada::SMTSort::dump() const {
+namespace camada {
+
+void SMTSort::dump() const {
   std::string Out;
   dump(Out);
   std::fprintf(stderr, "%s", Out.c_str());
 }
 
-void camada::SMTSort::dump(std::string &Out) const {
+void SMTSort::dump(std::string &Out) const {
   std::string k;
   if (isBoolSort())
     k = "Bool";
@@ -97,50 +100,49 @@ void camada::SMTSort::dump(std::string &Out) const {
   Out += "\n";
 }
 
-unsigned camada::SMTSort::getWidth() const {
+unsigned SMTSort::getWidth() const {
   assert(!isArraySort() && !isFunctionSort() && !isArithSort() &&
          "Width is not defined for array, function, or arithmetic sorts");
   return Width;
 }
 
-unsigned camada::SMTSort::getWidthFromSolver() const {
-  assert(0 && "Unimplemented for current type");
-  __builtin_unreachable();
+unsigned SMTSort::getWidthFromSolver() const {
+  fatalError("Unimplemented for current type");
 }
 
-unsigned camada::SMTSort::getFPSignificandWidth() const {
+unsigned SMTSort::getFPSignificandWidth() const {
   assert(isFPSort() && "Significand width is only defined for FP sorts");
   return SigWidth;
 }
 
-unsigned camada::SMTSort::getFPExponentWidth() const {
+unsigned SMTSort::getFPExponentWidth() const {
   assert(isFPSort() && "Exponent width is only defined for FP sorts");
   return ExpWidth;
 }
 
-camada::SMTSortRef camada::SMTSort::getIndexSort() const {
+SMTSortRef SMTSort::getIndexSort() const {
   assert(isArraySort() && "Index sort is only defined for array sorts");
   return IndexSort;
 }
 
-camada::SMTSortRef camada::SMTSort::getElementSort() const {
+SMTSortRef SMTSort::getElementSort() const {
   assert(isArraySort() && "Element sort is only defined for array sorts");
   return ElementSort;
 }
 
-const std::vector<camada::SMTSortRef> &camada::SMTSort::getDomainSorts() const {
+const std::vector<SMTSortRef> &SMTSort::getDomainSorts() const {
   assert(isFunctionSort() &&
          "Domain sorts are only defined for function sorts");
   return DomainSorts;
 }
 
-camada::SMTSortRef camada::SMTSort::getCodomainSort() const {
+SMTSortRef SMTSort::getCodomainSort() const {
   assert(isFunctionSort() &&
          "Codomain sort is only defined for function sorts");
   return CodomainSort;
 }
 
-bool camada::SMTSort::validateSortWidth() const {
+bool SMTSort::validateSortWidth() const {
   // Don't check array/function/arithmetic sort widths for now
   if (isArraySort() || isFunctionSort() || isArithSort())
     return true;
@@ -148,7 +150,7 @@ bool camada::SMTSort::validateSortWidth() const {
   return getWidthFromSolver() == getWidth();
 }
 
-bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
+bool SMTSort::operator==(SMTSort const &Other) const {
   if (isBoolSort() && Other.isBoolSort())
     return true;
 
@@ -186,3 +188,5 @@ bool camada::SMTSort::operator==(camada::SMTSort const &Other) const {
 
   return false;
 }
+
+} // namespace camada

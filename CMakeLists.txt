@@ -195,7 +195,7 @@ config_solver(CVC5 1.0.8)
 config_solver(MathSAT 5.6.3)
 config_solver(STP 2.3.4)
 config_solver(Yices 2.6.1)
-config_solver(Z3 4.8.8)
+config_solver(Z3 4.16.0)
 
 # Generate ac_config.h
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/cmake_config.in"

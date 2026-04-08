@@ -19,20 +19,19 @@
  *
  **************************************************************************/
 
-#include "camadaexpr.h"
+#ifndef CAMADAERROR_H_
+#define CAMADAERROR_H_
 
 #include <cstdio>
+#include <cstdlib>
 
 namespace camada {
 
-void SMTExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
-void SMTExpr::dump(std::string &Out) const {
-  Out = "SMTExpr dump not implemented.\n";
+[[noreturn]] static inline void fatalError(const char *Feature) {
+  std::fprintf(stderr, "%s is not supported by this backend\n", Feature);
+  std::abort();
 }
 
 } // namespace camada
+
+#endif

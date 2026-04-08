@@ -72,6 +72,28 @@ if(CAMADA_Z3_INCLUDE_DIR AND CAMADA_Z3_LIB)
   check_z3_version(${CAMADA_Z3_INCLUDE_DIR} ${CAMADA_Z3_LIB})
 endif()
 
+if(_camada_download_z3
+   AND CAMADA_Z3_INCLUDE_DIR
+   AND CAMADA_Z3_LIB
+   AND Z3_VERSION_STRING
+   AND Z3_FIND_VERSION
+   AND Z3_VERSION_STRING VERSION_LESS Z3_FIND_VERSION)
+  camada_setup_z3()
+  unset(CAMADA_Z3_INCLUDE_DIR CACHE)
+  unset(CAMADA_Z3_LIB CACHE)
+  find_path(
+    CAMADA_Z3_INCLUDE_DIR z3.h
+    HINTS ${_camada_z3_hints}
+    PATH_SUFFIXES include)
+  find_library(
+    CAMADA_Z3_LIB z3
+    HINTS ${_camada_z3_hints}
+    PATH_SUFFIXES lib bin)
+  if(CAMADA_Z3_INCLUDE_DIR AND CAMADA_Z3_LIB)
+    check_z3_version(${CAMADA_Z3_INCLUDE_DIR} ${CAMADA_Z3_LIB})
+  endif()
+endif()
+
 # Alright, now create a list with z3 and it's dependencies
 if(NOT BUILD_SHARED_LIBS)
   find_package(Threads REQUIRED)

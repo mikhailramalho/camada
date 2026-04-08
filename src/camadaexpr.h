@@ -163,6 +163,7 @@ private:
   }
 
   friend class SMTSolver;
+  friend class SMTSolverImpl;
 };
 
 /// Generic base class for SMT exprs
@@ -170,7 +171,9 @@ class SMTExpr {
 public:
   SMTSortRef Sort;
 
-  explicit SMTExpr(SMTSortRef S) : Sort(std::move(S)) {}
+  SMTExpr(SMTExprKind K, SMTSortRef S) : Sort(std::move(S)), Kind(K) {}
+  explicit SMTExpr(SMTSortRef S)
+      : SMTExpr(SMTExprKind::Unknown, std::move(S)) {}
   virtual ~SMTExpr() = default;
 
   virtual SMTBackendKind getBackendKind() const = 0;
@@ -238,8 +241,9 @@ public:
 
   TheExpr Expr;
 
-  SolverExpr(SolverContextRef C, const SMTSortRef &S, const TheExpr &SA)
-      : SMTExpr(S), Context(std::move(C)), Expr(SA) {}
+  SolverExpr(SMTExprKind Kind, SolverContextRef C, const SMTSortRef &S,
+             const TheExpr &SA)
+      : SMTExpr(Kind, S), Context(std::move(C)), Expr(SA) {}
 
   virtual ~SolverExpr() override = default;
 

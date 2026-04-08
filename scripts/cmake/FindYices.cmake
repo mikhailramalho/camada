@@ -93,6 +93,28 @@ if(CAMADA_YICES_INCLUDE_DIR AND CAMADA_YICES_LIB)
   check_yices_version(${CAMADA_YICES_INCLUDE_DIR} ${CAMADA_YICES_LIB})
 endif()
 
+if(_camada_download_yices
+   AND CAMADA_YICES_INCLUDE_DIR
+   AND CAMADA_YICES_LIB
+   AND YICES_VERSION_STRING
+   AND Yices_FIND_VERSION
+   AND YICES_VERSION_STRING VERSION_LESS Yices_FIND_VERSION)
+  camada_setup_yices()
+  unset(CAMADA_YICES_INCLUDE_DIR CACHE)
+  unset(CAMADA_YICES_LIB CACHE)
+  find_path(
+    CAMADA_YICES_INCLUDE_DIR yices.h
+    HINTS ${_camada_yices_hints}
+    PATH_SUFFIXES include)
+  find_library(
+    CAMADA_YICES_LIB yices
+    HINTS ${_camada_yices_hints}
+    PATH_SUFFIXES lib bin)
+  if(CAMADA_YICES_INCLUDE_DIR AND CAMADA_YICES_LIB)
+    check_yices_version(${CAMADA_YICES_INCLUDE_DIR} ${CAMADA_YICES_LIB})
+  endif()
+endif()
+
 # Hack needed for Ubuntu, since it is not linking with static libs from system
 if(DEFINED GMP_DIR)
   find_library(

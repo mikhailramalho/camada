@@ -25,7 +25,6 @@
 #include "camadaimpl.h"
 
 #include <gmp.h>
-#include <memory>
 #include <unordered_map>
 #include <vector>
 #include <yices.h>
@@ -33,12 +32,6 @@
 namespace camada {
 
 using YicesContextRef = context_t *;
-
-struct YicesContextDeleter {
-  void operator()(context_t *Ctx) const;
-};
-
-using YicesContextOwner = std::unique_ptr<context_t, YicesContextDeleter>;
 
 /// Wrapper for Yices Sort
 class YicesSort : public SolverSort<YicesContextRef, type_t> {
@@ -72,19 +65,18 @@ public:
 
 class YicesSolver : public SMTSolverImpl {
 public:
-  YicesContextOwner OwnedContext;
+  YicesSolver();
+  ~YicesSolver() override;
+
+protected:
   YicesContextRef Context = nullptr;
-
   unsigned int ConstArrayCounter = 0;
-
-  explicit YicesSolver();
-  virtual ~YicesSolver() override;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
-  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                   const SMTSortRef &Sort) const override;
+  SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkIntSortImpl() override;
@@ -263,10 +255,10 @@ public:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl();
+  void dumpImpl() override;
   void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl();
+  void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 
 protected:

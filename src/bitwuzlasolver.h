@@ -24,7 +24,6 @@
 
 #include "camadaimpl.h"
 
-#include <memory>
 #include <unordered_map>
 
 extern "C" {
@@ -34,12 +33,6 @@ extern "C" {
 namespace camada {
 
 using BitwuzlaContextRef = Bitwuzla *;
-
-struct BitwuzlaContextDeleter {
-  void operator()(Bitwuzla *Ctx) const;
-};
-
-using BitwuzlaContextOwner = std::unique_ptr<Bitwuzla, BitwuzlaContextDeleter>;
 
 class BitwSort : public SolverSort<BitwuzlaContextRef, BitwuzlaSort> {
 public:
@@ -71,15 +64,15 @@ class BitwuzlaSolver : public SMTSolverImpl {
 public:
   using SymbolTablet = std::unordered_map<std::string, SMTExprRef>;
 
-  BitwuzlaContextOwner OwnedContext;
+  BitwuzlaSolver();
+  ~BitwuzlaSolver() override;
+
+protected:
   BitwuzlaContextRef Context = nullptr;
   BitwuzlaOptions *Options = nullptr;
   BitwuzlaTermManager *TermManager = nullptr;
   SymbolTablet SymbolTable;
   uint64_t ToBVCounter = 0;
-
-  explicit BitwuzlaSolver();
-  ~BitwuzlaSolver() override;
 
   void initializeContext();
   void destroyContext();
@@ -87,8 +80,8 @@ public:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
-  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                   const SMTSortRef &Sort) const override;
+  SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
@@ -232,9 +225,9 @@ public:
   void popImpl(unsigned nscopes) override;
 
   std::string getSolverNameAndVersion() const override;
-  void dumpImpl();
+  void dumpImpl() override;
   void dumpImpl(std::string &Out) override;
-  void dumpModelImpl();
+  void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 };
 

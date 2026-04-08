@@ -62,21 +62,19 @@ public:
 
 class CVC5Solver : public SMTSolverImpl {
 public:
-  std::unique_ptr<cvc5::TermManager> OwnedTerms;
-  cvc5::TermManager *Terms = nullptr;
-  std::unique_ptr<cvc5::Solver> OwnedContext;
-  CVC5ContextRef Context = nullptr;
-
-  unsigned int ToBVCounter = 0;
-
-  explicit CVC5Solver();
+  CVC5Solver();
   ~CVC5Solver() override;
+
+protected:
+  cvc5::TermManager Terms;
+  cvc5::Solver Context;
+  unsigned int ToBVCounter = 0;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
-  SMTExprRef cloneExprWithSortImpl(const SMTExpr &Exp,
-                                   const SMTSortRef &Sort) const override;
+  SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkIntSortImpl() override;
@@ -339,10 +337,10 @@ public:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl();
+  void dumpImpl() override;
   void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl();
+  void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 
 protected:

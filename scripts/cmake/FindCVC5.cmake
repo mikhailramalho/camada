@@ -25,6 +25,16 @@ if(CVC5_FOUND)
                        "${cvc5_VERSION}")
 
   set(CVC5_MIN_VERSION "1.0.8")
+  if(CVC5_VERSION VERSION_LESS CVC5_MIN_VERSION AND _camada_download_cvc5)
+    camada_setup_cvc5()
+    find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
+    set(CVC5_FOUND ${cvc5_FOUND})
+    if(CVC5_FOUND)
+      string(REGEX REPLACE "([0-9]\\.[0-9]\\.[0-9]).*" "\\1" CVC5_VERSION
+                           "${cvc5_VERSION}")
+    endif()
+  endif()
+
   if(CVC5_VERSION VERSION_LESS CVC5_MIN_VERSION)
     message(FATAL_ERROR "Expected version ${CVC5_MIN_VERSION} or greater")
   endif()

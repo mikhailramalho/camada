@@ -49,71 +49,11 @@
 #include "stpsolver.h"
 #endif
 
-std::string camada::getCamadaVersion() { return CAMADA_VERSION; }
+namespace camada {
 
-void camada::SMTSolver::invalidateGeneratedObjects() {
-  clearSortCaches();
-  clearExprCaches();
-  ++HandleState->Generation;
-  ExprArena.clear();
-  SortArena.clear();
-}
+std::string getCamadaVersion() { return CAMADA_VERSION; }
 
-void camada::SMTSolver::clearSortCaches() {
-  CachedBoolSort = {};
-  CachedIntSort = {};
-  CachedRealSort = {};
-  CachedNativeRMSort = {};
-  CachedEncodedRMSort = {};
-  BVSortCache.clear();
-  NativeFPSortCache.clear();
-  EncodedFPSortCache.clear();
-  ArraySortCache.clear();
-  FunctionSortCache.clear();
-}
-
-void camada::SMTSolver::clearExprCaches() {
-  CachedBoolExprs.fill({});
-  CachedBVOne1Expr = {};
-  CachedSmallBVZeroExprs.fill({});
-  CachedRMBVExprs.fill({});
-  CachedBVNegOneExprs.clear();
-  CachedBVZeroExprs.clear();
-  CachedBVOneExprs.clear();
-  SymbolExprCache.clear();
-  FPSpecialExprCache.clear();
-}
-
-void camada::SMTSolver::initializeCommonSingletons() {
-  CachedBoolExprs[0] = mkBool(false);
-  CachedBoolExprs[1] = mkBool(true);
-  CachedBVOne1Expr = mkBVFromBin("1", 1);
-  CachedSmallBVZeroExprs[1] = mkBVFromBin("0", 1);
-  CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
-  CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
-  CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
-  CachedBVZeroExprs.resize(5);
-  CachedBVZeroExprs[1] = CachedSmallBVZeroExprs[1];
-  CachedBVZeroExprs[2] = CachedSmallBVZeroExprs[2];
-  CachedBVZeroExprs[3] = CachedSmallBVZeroExprs[3];
-  CachedBVZeroExprs[4] = CachedSmallBVZeroExprs[4];
-  CachedBVOneExprs.resize(2);
-  CachedBVOneExprs[1] = CachedBVOne1Expr;
-  CachedBVNegOneExprs.resize(2);
-  CachedBVNegOneExprs[1] = CachedBVOne1Expr;
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
-      mkBVFromBin("000", 3);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
-      mkBVFromBin("001", 3);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
-      mkBVFromBin("010", 3);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
-      mkBVFromBin("011", 3);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
-      mkBVFromBin("100", 3);
-}
-
-camada::SMTSolverRef camada::createZ3Solver() {
+SMTSolverRef createZ3Solver() {
 #if SOLVER_Z3_ENABLED
   return std::make_unique<Z3Solver>();
 #else
@@ -123,7 +63,7 @@ camada::SMTSolverRef camada::createZ3Solver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createMathSATSolver() {
+SMTSolverRef createMathSATSolver() {
 #if SOLVER_MATHSAT_ENABLED
   return std::make_unique<MathSATSolver>();
 #else
@@ -134,7 +74,7 @@ camada::SMTSolverRef camada::createMathSATSolver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createCVC5Solver() {
+SMTSolverRef createCVC5Solver() {
 #if SOLVER_CVC5_ENABLED
   return std::make_unique<CVC5Solver>();
 #else
@@ -145,7 +85,7 @@ camada::SMTSolverRef camada::createCVC5Solver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createBitwuzlaSolver() {
+SMTSolverRef createBitwuzlaSolver() {
 #if SOLVER_BITWUZLA_ENABLED
   return std::make_unique<BitwuzlaSolver>();
 #else
@@ -156,7 +96,7 @@ camada::SMTSolverRef camada::createBitwuzlaSolver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createYicesSolver() {
+SMTSolverRef createYicesSolver() {
 #if SOLVER_YICES_ENABLED
   return std::make_unique<YicesSolver>();
 #else
@@ -167,7 +107,7 @@ camada::SMTSolverRef camada::createYicesSolver() {
 #endif
 }
 
-camada::SMTSolverRef camada::createSTPSolver() {
+SMTSolverRef createSTPSolver() {
 #if SOLVER_STP_ENABLED
   return std::make_unique<STPSolver>();
 #else
@@ -176,3 +116,5 @@ camada::SMTSolverRef camada::createSTPSolver() {
   abort();
 #endif
 }
+
+} // namespace camada
