@@ -2415,14 +2415,12 @@ static inline IntType FPAsInt(const FPType FP) {
   return FPAsInt;
 }
 
-camada::SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float,
-                                             FPEncoding Encoding) {
+SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float, FPEncoding Encoding) {
   uint32_t fp = FPAsInt<float, uint32_t>(Float);
   return mkFPFromBin(std::bitset<32>(fp).to_string(), 8, Encoding);
 }
 
-camada::SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double,
-                                             FPEncoding Encoding) {
+SMTExprRef SMTSolverImpl::mkFP64Impl(const double Double, FPEncoding Encoding) {
   uint64_t fp = FPAsInt<double, uint64_t>(Double);
   return mkFPFromBin(std::bitset<64>(fp).to_string(), 11, Encoding);
 }
