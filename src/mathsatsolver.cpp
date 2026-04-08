@@ -161,6 +161,8 @@ static inline bool checkExprError(msat_env Context, const T &Value) {
   bool HasError = false;
   if constexpr (std::is_same_v<T, msat_decl>)
     HasError = MSAT_ERROR_DECL(Value);
+  else if constexpr (std::is_same_v<T, msat_model>)
+    HasError = MSAT_ERROR_MODEL(Value);
   else if constexpr (std::is_same_v<T, msat_term>)
     HasError = MSAT_ERROR_TERM(Value);
   else if constexpr (std::is_same_v<T, msat_model_iterator>)
@@ -983,19 +985,12 @@ SMTExprRef MathSATSolver::mkSymbolImpl(const std::string &Name,
 
 SMTExprRef MathSATSolver::mkFPFromBinImpl(const std::string &FP,
                                           unsigned EWidth) {
-  std::string fpSMTStr;
-  fpSMTStr.append("(fp #b")
-      .append({FP[0]})
-      .append(" #b")
-      .append(FP.substr(1, EWidth))
-      .append(" #b")
-      .append(FP.substr(1 + EWidth))
-      .append(")");
-
+  const SMTExprRef &bv = mkBVFromBin(FP, FP.length());
   return makeExprRef<MathSATExpr>(
       SMTExprKind::FPConst, &Context,
       mkFPSort(EWidth, FP.length() - EWidth - 1, FPEncoding::Native),
-      msat_from_string(Context, fpSMTStr.c_str()));
+      msat_make_fp_from_ieeebv(Context, EWidth, FP.length() - EWidth - 1,
+                               toMathSATTerm(bv)));
 }
 
 SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
@@ -1123,8 +1118,12 @@ void MathSATSolver::dumpImpl(std::string &Out) {
   msat_term *asserted_formulas =
       msat_get_asserted_formulas(Context, &num_of_asserted);
 
-  for (unsigned i = 0; i < num_of_asserted; i++)
-    Out += std::string(msat_to_smtlib2(Context, asserted_formulas[i])) + "\n";
+  for (unsigned i = 0; i < num_of_asserted; i++) {
+    char *tmp = msat_to_smtlib2(Context, asserted_formulas[i]);
+    Out += tmp;
+    Out += "\n";
+    msat_free(tmp);
+  }
   msat_free(asserted_formulas);
 }
 
@@ -1138,7 +1137,9 @@ void MathSATSolver::dumpModelImpl(std::string &Out) {
   Out.clear();
   // we use a model iterator to retrieve the model values for all the
   // variables, and the necessary function instantiations
-  msat_model_iterator iter = msat_create_model_iterator(Context);
+  msat_model model = msat_get_model(Context);
+  assert(!checkExprError(Context, model) && "Error when getting MathSAT model");
+  msat_model_iterator iter = msat_model_create_iterator(model);
   assert(!checkExprError(Context, iter) && "Error when getting model iterator");
 
   while (msat_model_iterator_has_next(iter)) {
@@ -1157,6 +1158,7 @@ void MathSATSolver::dumpModelImpl(std::string &Out) {
     msat_free(s);
   }
   msat_destroy_model_iterator(iter);
+  msat_destroy_model(model);
 }
 
 } // namespace camada
