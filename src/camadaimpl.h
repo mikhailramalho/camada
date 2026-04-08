@@ -163,15 +163,15 @@ protected:
     CachedBVNegOneExprs.resize(2);
     CachedBVNegOneExprs[1] = CachedBVOne1Expr;
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
-        mkBVFromBin("000", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_EVEN);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
-        mkBVFromBin("001", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_AWAY);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
-        mkBVFromBin("010", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_PLUS_INF);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
-        mkBVFromBin("011", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_MINUS_INF);
     CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
-        mkBVFromBin("100", 3);
+        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
   }
 
   mutable std::deque<std::unique_ptr<SMTSort>> SortArena;
