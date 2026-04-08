@@ -81,6 +81,11 @@ inline void fp_arithmetics(const camada::SMTSolverRef &solver,
 inline void fp_round_to_away(const camada::SMTSolverRef &solver,
                              camada::FPEncoding Encoding) {
   auto one = solver->mkFP32(1.0f, Encoding);
+  if (Encoding == camada::FPEncoding::Native &&
+      one->getBackendKind() == camada::SMTBackendKind::MathSAT) {
+    // MathSAT's native FP API does not support ROUND_TO_AWAY.
+    return;
+  }
   auto half_ulp = solver->mkFP32(std::ldexp(1.0f, -24), Encoding);
   auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
   auto rna = solver->mkRM(camada::RM::ROUND_TO_AWAY, Encoding);

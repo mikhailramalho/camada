@@ -21,7 +21,6 @@ TEST_CASE("Arith MathSAT test", "[MathSAT]") {
   msat_set_option(Config, "model_generation", "true");
   camada::SMTSolverRef mathsat =
       std::make_unique<camada::MathSATSolver>(Config);
-  msat_destroy_config(Config);
 
   int_arithmetic_semantics(mathsat);
   mathsat->reset();
@@ -68,7 +67,6 @@ TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
 
   // Create custom MathSAT Solver
   camada::SMTSolverRef mathsat = std::make_unique<mySolver>(Config);
-  msat_destroy_config(Config);
 
   tests(mathsat);
 }

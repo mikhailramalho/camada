@@ -85,9 +85,8 @@ class MathSATSolver : public SMTSolverImpl {
 public:
   MathSATSolver();
 
-  /// Create MathSAT custom configuration. User is responsible for freeing
-  /// Config
-  explicit MathSATSolver(const msat_config &Config);
+  /// Take ownership of a MathSAT configuration and reuse it across resets.
+  explicit MathSATSolver(msat_config Config);
   ~MathSATSolver() override;
 
 protected:
@@ -338,6 +337,10 @@ protected:
   void dumpModelImpl(std::string &Out) override;
 
 private:
+  void initializeContext();
+  void destroyContext();
+
+  msat_config Config{};
   msat_env Context{};
 }; // end class MathSATSolver
 

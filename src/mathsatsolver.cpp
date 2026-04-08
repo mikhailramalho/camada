@@ -124,21 +124,31 @@ void MathSATExpr::dump(std::string &Out) const {
 }
 
 MathSATSolver::MathSATSolver() : SMTSolverImpl() {
-  msat_config cfg = msat_create_default_config("AUFBV");
-  msat_set_option(cfg, "model_generation", "true");
-  Context = msat_create_env(cfg);
-  msat_destroy_config(cfg);
+  Config = msat_create_default_config("AUFBV");
+  msat_set_option(Config, "model_generation", "true");
+  initializeContext();
   initializeCommonSingletons();
 }
 
-MathSATSolver::MathSATSolver(const msat_config &Config) : SMTSolverImpl() {
-  Context = msat_create_env(Config);
+MathSATSolver::MathSATSolver(msat_config Config)
+    : SMTSolverImpl(), Config(Config) {
+  initializeContext();
   initializeCommonSingletons();
 }
 
 MathSATSolver::~MathSATSolver() {
   invalidateGeneratedObjects();
-  msat_destroy_env(Context);
+  destroyContext();
+  if (!MSAT_ERROR_CONFIG(Config))
+    msat_destroy_config(Config);
+  Config = msat_config{};
+}
+
+void MathSATSolver::initializeContext() { Context = msat_create_env(Config); }
+
+void MathSATSolver::destroyContext() {
+  if (!MSAT_ERROR_ENV(Context))
+    msat_destroy_env(Context);
   Context = msat_env{};
 }
 
@@ -666,7 +676,8 @@ SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
       SMTSolverImpl::mkFPRemImpl(mkIEEEFPToBVImpl(LHS), mkIEEEFPToBVImpl(RHS));
 
   // And convert it back the right type
-  return mkBVToIEEEFP(rem, LHS->Sort);
+  SMTExprRef result = mkBVToIEEEFP(rem, LHS->Sort);
+  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPRem);
 }
 
 SMTExprRef MathSATSolver::mkFPAddImpl(const SMTExprRef &LHS,
@@ -723,7 +734,8 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                  mkIEEEFPToBVImpl(Z), roundingMode);
 
   // And convert it back the right type
-  return mkBVToIEEEFP(fma, X->Sort);
+  SMTExprRef result = mkBVToIEEEFP(fma, X->Sort);
+  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPFMA);
 }
 
 SMTExprRef MathSATSolver::mkFPLtImpl(const SMTExprRef &LHS,
@@ -1073,7 +1085,14 @@ checkResult MathSATSolver::checkImpl() {
   return checkResult::UNKNOWN;
 }
 
-void MathSATSolver::resetImpl() { msat_reset_env(Context); }
+void MathSATSolver::resetImpl() {
+  invalidateGeneratedObjects();
+  clearSortCaches();
+  clearExprCaches();
+  destroyContext();
+  initializeContext();
+  initializeCommonSingletons();
+}
 
 void MathSATSolver::pushImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i)
