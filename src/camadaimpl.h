@@ -27,21 +27,28 @@
 
 #include <cassert>
 #include <string>
+#include <vector>
 
 namespace camada {
 
 static inline std::string power2Dec(unsigned int N) {
-  std::string Result = "1";
+  std::vector<unsigned char> Digits{1};
   for (unsigned int I = 0; I < N; ++I) {
     int Carry = 0;
-    for (auto It = Result.rbegin(); It != Result.rend(); ++It) {
-      int Digit = (*It - '0') * 2 + Carry;
-      *It = static_cast<char>('0' + (Digit % 10));
-      Carry = Digit / 10;
+    for (auto &Digit : Digits) {
+      int Value = Digit * 2 + Carry;
+      Digit = static_cast<unsigned char>(Value % 10);
+      Carry = Value / 10;
     }
-    if (Carry != 0)
-      Result.insert(Result.begin(), static_cast<char>('0' + Carry));
+    while (Carry != 0) {
+      Digits.push_back(static_cast<unsigned char>(Carry % 10));
+      Carry /= 10;
+    }
   }
+  std::string Result;
+  Result.reserve(Digits.size());
+  for (auto It = Digits.rbegin(); It != Digits.rend(); ++It)
+    Result.push_back(static_cast<char>('0' + *It));
   return Result;
 }
 
@@ -1181,8 +1188,8 @@ public:
     return getBVImpl(Exp);
   }
 
-  static inline const std::string addLeadingZeroes(const std::string &Str,
-                                                   const unsigned Width) {
+  static inline std::string addLeadingZeroes(const std::string &Str,
+                                             const unsigned Width) {
     if (Str.length() == Width)
       return Str;
     return std::string(Width - Str.length(), '0') + Str;
