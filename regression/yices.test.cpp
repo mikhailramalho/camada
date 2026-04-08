@@ -15,6 +15,14 @@ TEST_CASE("UF Yices test", "[YICES]") {
   uf_semantics(yices);
 }
 
+TEST_CASE("Unsupported quantifiers Yices test", "[YICES]") {
+  auto yices = camada::createYicesSolver();
+  require_abort([&]() {
+    auto x = yices->mkSymbol("x", yices->mkBVSort(4));
+    (void)yices->mkExists({x}, yices->mkEqual(x, x));
+  });
+}
+
 TEST_CASE("Arith Yices test", "[YICES]") {
 
   class myYicesArithSolver : public camada::YicesSolver {

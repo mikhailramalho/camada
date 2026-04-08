@@ -514,7 +514,6 @@ protected:
   };
 
   virtual SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
-  ;
 
   virtual SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {

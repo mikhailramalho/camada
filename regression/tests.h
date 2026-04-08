@@ -5,6 +5,10 @@
 #include "tuple.test.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <csignal>
+#include <cstdlib>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #define RESETANDTEST(testname)                                                 \
   solver->reset();                                                             \
@@ -13,6 +17,25 @@
 #define RESETANDFPTEST(testname, encoding)                                     \
   solver->reset();                                                             \
   testname(solver, encoding);
+
+template <typename Fn> inline void require_abort(Fn &&Body) {
+#if defined(_WIN32)
+  SKIP("Abort regression helper is not implemented on Windows");
+#else
+  const pid_t pid = fork();
+  REQUIRE(pid != -1);
+
+  if (pid == 0) {
+    Body();
+    std::_Exit(0);
+  }
+
+  int status = 0;
+  REQUIRE(waitpid(pid, &status, 0) == pid);
+  REQUIRE(WIFSIGNALED(status));
+  REQUIRE(WTERMSIG(status) == SIGABRT);
+#endif
+}
 
 inline void tests(const camada::SMTSolverRef &solver) {
   constexpr auto NativeFP = camada::FPEncoding::Native;
@@ -23,6 +46,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
   RESETANDTEST(incremental_push_pop);
+  RESETANDTEST(handle_invalidation_after_reset);
   RESETANDTEST(array);
   RESETANDTEST(array_const_store_semantics);
   RESETANDTEST(bool_array_const_store_semantics);

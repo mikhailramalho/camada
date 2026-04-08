@@ -822,13 +822,17 @@ SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
 }
 
 bool MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
-  if (msat_term_is_true(Context, toMathSATTerm(Exp)))
+  const SMTExprRef &Value = makeExprRef<MathSATExpr>(
+      SMTExprKind::BoolConst, &Context, mkBoolSort(),
+      msat_get_model_value(Context, toMathSATTerm(Exp)));
+
+  if (msat_term_is_true(Context, toMathSATTerm(Value)))
     return true;
 
-  if (msat_term_is_false(Context, toMathSATTerm(Exp)))
+  if (msat_term_is_false(Context, toMathSATTerm(Value)))
     return false;
 
-  fatalError("Bool is neither true nor false");
+  fatalError("Bool model value is neither true nor false");
 }
 
 static inline std::string getGMPVal(const SMTExprRef &t) {

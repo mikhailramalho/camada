@@ -103,6 +103,25 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getBV(x) == 1);
 }
 
+inline void
+handle_invalidation_after_reset(const camada::SMTSolverRef &solver) {
+  auto sort = solver->mkBVSort(8);
+  auto expr = solver->mkSymbol("stale", sort);
+
+  REQUIRE(sort.isValid());
+  REQUIRE(expr.isValid());
+
+  solver->reset();
+
+  REQUIRE_FALSE(sort.isValid());
+  REQUIRE_FALSE(expr.isValid());
+
+  auto fresh_sort = solver->mkBVSort(8);
+  auto fresh_expr = solver->mkSymbol("fresh", fresh_sort);
+  REQUIRE(fresh_sort.isValid());
+  REQUIRE(fresh_expr.isValid());
+}
+
 inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   auto x = solver->mkSymbol("x", solver->mkBVSort(4));
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, x)));
