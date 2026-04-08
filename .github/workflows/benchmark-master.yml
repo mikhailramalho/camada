@@ -27,13 +27,13 @@ jobs:
             schedtool
 
       - name: Cache deps
-        id: cache-deps-bench-v1
+        id: cache-deps-bench-v2
         uses: actions/cache@v4
         with:
           path: |
             build/deps
             build/_deps
-          key: ${{ runner.os }}-bench-deps-v1
+          key: ${{ runner.os }}-bench-deps-v2
 
       - name: Configure Camada
         run: >

@@ -90,6 +90,28 @@ if(CAMADA_MATHSAT_INCLUDE_DIR AND CAMADA_MATHSAT_LIB)
   check_mathsat_version(${CAMADA_MATHSAT_INCLUDE_DIR} ${CAMADA_MATHSAT_LIB})
 endif()
 
+if(_camada_download_mathsat
+   AND CAMADA_MATHSAT_INCLUDE_DIR
+   AND CAMADA_MATHSAT_LIB
+   AND MATHSAT_VERSION_STRING
+   AND MathSAT_FIND_VERSION
+   AND MATHSAT_VERSION_STRING VERSION_LESS MathSAT_FIND_VERSION)
+  camada_setup_mathsat()
+  unset(CAMADA_MATHSAT_INCLUDE_DIR CACHE)
+  unset(CAMADA_MATHSAT_LIB CACHE)
+  find_path(
+    CAMADA_MATHSAT_INCLUDE_DIR mathsat.h
+    HINTS ${_camada_mathsat_hints}
+    PATH_SUFFIXES include)
+  find_library(
+    CAMADA_MATHSAT_LIB mathsat
+    HINTS ${_camada_mathsat_hints}
+    PATH_SUFFIXES lib bin)
+  if(CAMADA_MATHSAT_INCLUDE_DIR AND CAMADA_MATHSAT_LIB)
+    check_mathsat_version(${CAMADA_MATHSAT_INCLUDE_DIR} ${CAMADA_MATHSAT_LIB})
+  endif()
+endif()
+
 # Alright, now create a list with MathSAT and it's dependencies
 list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
 

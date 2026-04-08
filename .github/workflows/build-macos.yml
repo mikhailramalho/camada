@@ -25,13 +25,13 @@ jobs:
 
       # Setup/cache dependencies
     - name: Cache deps
-      id: cache-deps-v6
+      id: cache-deps-v7
       uses: actions/cache@v4
       with:
         path: |
           build/deps
           build/_deps
-        key: ${{ runner.os }}-deps-v6
+        key: ${{ runner.os }}-deps-v7
 
     - name: Configure Camada
       run: cmake -S . -B build -GNinja -DCAMADA_ENABLE_REGRESSION=ON -DBUILD_SHARED_LIBS=OFF -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL -DCAMADA_SOLVER_BITWUZLA_ENABLE=ON -DCAMADA_SOLVER_CVC5_ENABLE=ON -DCAMADA_SOLVER_MATHSAT_ENABLE=ON -DCAMADA_SOLVER_STP_ENABLE=ON -DCAMADA_SOLVER_YICES_ENABLE=ON -DCAMADA_SOLVER_Z3_ENABLE=ON -DCMAKE_INSTALL_PREFIX:PATH=$GITHUB_WORKSPACE/release -DCMAKE_BUILD_TYPE=Debug
