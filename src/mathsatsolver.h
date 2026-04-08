@@ -218,10 +218,6 @@ protected:
                               const SMTExprRef &Element) override;
   SMTExprRef mkApplyImpl(const SMTExprRef &Function,
                          const std::vector<SMTExprRef> &Args) override;
-  SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                          const SMTExprRef &Body) override;
-  SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                          const SMTExprRef &Body) override;
 
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 

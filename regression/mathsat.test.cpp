@@ -11,15 +11,6 @@ TEST_CASE("Simple MathSAT test", "[MathSAT]") {
   tests(mathsat);
 }
 
-TEST_CASE("Quantifiers MathSAT test", "[MathSAT]") {
-  msat_config Config = msat_create_default_config("AUFBV");
-  msat_set_option(Config, "model_generation", "true");
-  camada::SMTSolverRef mathsat =
-      std::make_unique<camada::MathSATSolver>(Config);
-  msat_destroy_config(Config);
-  quantifier_semantics(mathsat);
-}
-
 TEST_CASE("UF MathSAT test", "[MathSAT]") {
   auto mathsat = camada::createMathSATSolver();
   uf_semantics(mathsat);

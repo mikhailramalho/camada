@@ -1062,68 +1062,6 @@ SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                             backend_init));
 }
 
-SMTExprRef MathSATSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
-                                       const SMTExprRef &Body) {
-  std::vector<msat_term> old_terms;
-  std::vector<msat_term> bound_vars;
-  old_terms.reserve(Vars.size());
-  bound_vars.reserve(Vars.size());
-
-  for (std::size_t i = 0; i < Vars.size(); ++i) {
-    const SMTExprRef &Var = Vars[i];
-    old_terms.push_back(toMathSATTerm(Var));
-    bound_vars.push_back(msat_make_variable(
-        Context, ("__CAMADA_qvar" + std::to_string(i)).c_str(),
-        toSolverSort<MathSATSort>(*Var->Sort).Sort));
-  }
-
-  msat_term quantified_body =
-      msat_apply_substitution(Context, toMathSATTerm(Body), old_terms.size(),
-                              old_terms.data(), bound_vars.data());
-  assert(!checkExprError(Context, quantified_body) &&
-         "Failed to substitute MathSAT quantified body");
-
-  for (auto it = bound_vars.rbegin(); it != bound_vars.rend(); ++it) {
-    quantified_body = msat_make_forall(Context, *it, quantified_body);
-    assert(!checkExprError(Context, quantified_body) &&
-           "Failed to build MathSAT forall term");
-  }
-
-  return makeExprRef<MathSATExpr>(SMTExprKind::Forall, &Context, mkBoolSort(),
-                                  quantified_body);
-}
-
-SMTExprRef MathSATSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
-                                       const SMTExprRef &Body) {
-  std::vector<msat_term> old_terms;
-  std::vector<msat_term> bound_vars;
-  old_terms.reserve(Vars.size());
-  bound_vars.reserve(Vars.size());
-
-  for (std::size_t i = 0; i < Vars.size(); ++i) {
-    const SMTExprRef &Var = Vars[i];
-    old_terms.push_back(toMathSATTerm(Var));
-    bound_vars.push_back(msat_make_variable(
-        Context, ("__CAMADA_qvar" + std::to_string(i)).c_str(),
-        toSolverSort<MathSATSort>(*Var->Sort).Sort));
-  }
-
-  msat_term quantified_body =
-      msat_apply_substitution(Context, toMathSATTerm(Body), old_terms.size(),
-                              old_terms.data(), bound_vars.data());
-  assert(!checkExprError(Context, quantified_body) &&
-         "Failed to substitute MathSAT quantified body");
-
-  for (auto it = bound_vars.rbegin(); it != bound_vars.rend(); ++it) {
-    quantified_body = msat_make_exists(Context, *it, quantified_body);
-    assert(!checkExprError(Context, quantified_body) &&
-           "Failed to build MathSAT exists term");
-  }
-
-  return makeExprRef<MathSATExpr>(SMTExprKind::Exists, &Context, mkBoolSort(),
-                                  quantified_body);
-}
-
 checkResult MathSATSolver::checkImpl() {
   msat_result res = msat_solve(Context);
   if (res == MSAT_SAT)
