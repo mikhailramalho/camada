@@ -37,7 +37,7 @@ class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
   using SolverSort<MathSATContextRef, msat_type>::SolverSort;
-  virtual ~MathSATSort() override = default;
+  ~MathSATSort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -59,7 +59,7 @@ public:
               const msat_decl &D)
       : SolverExpr<MathSATContextRef, MathSATNode>(Kind, C, S, MathSATNode(D)) {
   }
-  virtual ~MathSATExpr() override = default;
+  ~MathSATExpr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -85,12 +85,12 @@ class MathSATSolver : public SMTSolverImpl {
 public:
   msat_env Context{};
 
-  explicit MathSATSolver();
+  MathSATSolver();
 
   /// Create MathSAT custom configuration. User is responsible for freeing
   /// Config
   explicit MathSATSolver(const msat_config &Config);
-  virtual ~MathSATSolver() override;
+  ~MathSATSolver() override;
 
 protected:
   void addConstraintImpl(const SMTExprRef &Exp) override;

@@ -37,7 +37,7 @@ class STPSort : public SolverSort<STPContextRef, STP::Type> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
   using SolverSort<STPContextRef, STP::Type>::SolverSort;
-  virtual ~STPSort() override = default;
+  ~STPSort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -57,7 +57,7 @@ public:
       : SolverExpr<STPContextRef, STP::Expr>(Kind, std::move(C), S, E),
         OwnsExpr(Owns) {}
 
-  virtual ~STPExpr() override;
+  ~STPExpr() override;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -74,9 +74,9 @@ public:
 
   unsigned int ConstArrayCounter = 0;
 
-  explicit STPSolver();
+  STPSolver();
   explicit STPSolver(STPContextRef C);
-  virtual ~STPSolver();
+  ~STPSolver() override;
 
 protected:
   void addConstraintImpl(const SMTExprRef &Exp) override;

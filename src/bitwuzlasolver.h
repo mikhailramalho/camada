@@ -70,7 +70,7 @@ public:
   SymbolTablet SymbolTable;
   uint64_t ToBVCounter = 0;
 
-  explicit BitwuzlaSolver();
+  BitwuzlaSolver();
   ~BitwuzlaSolver() override;
 
 protected:

@@ -35,7 +35,7 @@ class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
   using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
-  virtual ~Z3Sort() override = default;
+  ~Z3Sort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -49,7 +49,7 @@ class Z3Expr : public SolverExpr<Z3ContextRef, z3::ast> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
   using SolverExpr<Z3ContextRef, z3::ast>::SolverExpr;
-  virtual ~Z3Expr() override = default;
+  ~Z3Expr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -66,7 +66,7 @@ public:
 
   z3::solver Solver;
 
-  explicit Z3Solver();
+  Z3Solver();
   explicit Z3Solver(z3::context C);
   explicit Z3Solver(z3::context C, z3::solver S);
   ~Z3Solver() override;

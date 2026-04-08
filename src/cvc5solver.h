@@ -67,7 +67,7 @@ public:
 
   unsigned int ToBVCounter = 0;
 
-  explicit CVC5Solver();
+  CVC5Solver();
   ~CVC5Solver() override;
 
 protected:
