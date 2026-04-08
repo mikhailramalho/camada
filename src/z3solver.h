@@ -71,6 +71,7 @@ public:
   explicit Z3Solver(z3::context C, z3::solver S);
   ~Z3Solver() override;
 
+protected:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

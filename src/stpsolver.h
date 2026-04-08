@@ -78,6 +78,7 @@ public:
   explicit STPSolver(STPContextRef C);
   virtual ~STPSolver();
 
+protected:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

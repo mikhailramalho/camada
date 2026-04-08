@@ -25,7 +25,6 @@
 #include "camadaimpl.h"
 
 #include <gmp.h>
-#include <memory>
 #include <unordered_map>
 #include <vector>
 #include <yices.h>
@@ -73,6 +72,7 @@ public:
   explicit YicesSolver();
   virtual ~YicesSolver() override;
 
+protected:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

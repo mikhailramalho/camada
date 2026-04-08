@@ -70,6 +70,7 @@ public:
   explicit CVC5Solver();
   ~CVC5Solver() override;
 
+protected:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

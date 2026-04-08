@@ -92,6 +92,7 @@ public:
   explicit MathSATSolver(const msat_config &Config);
   virtual ~MathSATSolver() override;
 
+protected:
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;

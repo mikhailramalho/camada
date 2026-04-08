@@ -24,7 +24,6 @@
 
 #include "camadaimpl.h"
 
-#include <memory>
 #include <unordered_map>
 
 extern "C" {
@@ -74,6 +73,7 @@ public:
   explicit BitwuzlaSolver();
   ~BitwuzlaSolver() override;
 
+protected:
   void initializeContext();
   void destroyContext();
 
