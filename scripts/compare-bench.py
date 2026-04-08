@@ -13,8 +13,9 @@ from pathlib import Path
 LINE_RE = re.compile(
     r"^benchmark=(?P<name>\S+)\s+backend=(?P<backend>\S+)\s+iterations="
     r"(?P<iterations>\d+)\s+total_ns=(?P<total_ns>\d+)\s+ns_per_iter="
-    r"(?P<ns_per_iter>\d+(?:\.\d+)?)\s+rss_after_kb=(?P<rss_after_kb>\d+)\s+"
-    r"rss_delta_kb=(?P<rss_delta_kb>-?\d+)$"
+    r"(?P<ns_per_iter>\d+(?:\.\d+)?)"
+    r"(?:\s+rss_after_kb=(?P<rss_after_kb>\d+)\s+"
+    r"rss_delta_kb=(?P<rss_delta_kb>-?\d+))?$"
 )
 
 DEFAULT_MIN_RUNS = 10
@@ -36,8 +37,8 @@ def parse_lines(lines: list[str], source: str) -> dict[str, dict[str, object]]:
             "iterations": int(data["iterations"]),
             "total_ns": int(data["total_ns"]),
             "ns_per_iter": float(data["ns_per_iter"]),
-            "rss_after_kb": int(data["rss_after_kb"]),
-            "rss_delta_kb": int(data["rss_delta_kb"]),
+            "rss_after_kb": int(data["rss_after_kb"] or 0),
+            "rss_delta_kb": int(data["rss_delta_kb"] or 0),
             "source": source,
             "lineno": lineno,
         }
