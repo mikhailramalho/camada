@@ -120,8 +120,9 @@ SMTExprRef CVC5Solver::rewrapExprImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef CVC5Solver::mkBoolSortImpl() {
-  return newSortRef<CVC5Sort>(
-      CVC5Sort(SMTSortKind::Bool, &Context, Terms.getBooleanSort(), 1));
+  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::Bool, &Context,
+                                       Terms.getBooleanSort(),
+                                       SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef CVC5Solver::mkIntSortImpl() {
@@ -135,34 +136,37 @@ SMTSortRef CVC5Solver::mkRealSortImpl() {
 }
 
 SMTSortRef CVC5Solver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<CVC5Sort>(CVC5Sort(
-      SMTSortKind::BV, &Context, Terms.mkBitVectorSort(BitWidth), BitWidth));
+  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::BV, &Context,
+                                       Terms.mkBitVectorSort(BitWidth),
+                                       SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef CVC5Solver::mkRMSortImpl() {
-  return newSortRef<CVC5Sort>(
-      CVC5Sort(SMTSortKind::RM, &Context, Terms.getRoundingModeSort(), 3));
+  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::RM, &Context,
+                                       Terms.getRoundingModeSort(),
+                                       SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef CVC5Solver::mkFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  return newSortRef<CVC5Sort>(
-      CVC5Sort(SMTSortKind::FP, &Context,
-               Terms.mkFloatingPointSort(ExpWidth, SigWidth + 1),
-               ExpWidth + SigWidth + 1, ExpWidth, SigWidth));
+  return newSortRef<CVC5Sort>(CVC5Sort(
+      SMTSortKind::FP, &Context,
+      Terms.mkFloatingPointSort(ExpWidth, SigWidth + 1),
+      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
 }
 
 SMTSortRef CVC5Solver::mkBVFPSortImpl(const unsigned ExpWidth,
                                       const unsigned SigWidth) {
-  return newSortRef<CVC5Sort>(
-      CVC5Sort(SMTSortKind::BVFP, &Context,
-               Terms.mkBitVectorSort(ExpWidth + SigWidth + 1),
-               ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
+  return newSortRef<CVC5Sort>(CVC5Sort(
+      SMTSortKind::BVFP, &Context,
+      Terms.mkBitVectorSort(ExpWidth + SigWidth + 1),
+      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef CVC5Solver::mkBVRMSortImpl() {
-  return newSortRef<CVC5Sort>(
-      CVC5Sort(SMTSortKind::BVRM, &Context, Terms.mkBitVectorSort(3), 3));
+  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::BVRM, &Context,
+                                       Terms.mkBitVectorSort(3),
+                                       SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef CVC5Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
@@ -171,7 +175,7 @@ SMTSortRef CVC5Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
       CVC5Sort(SMTSortKind::Array, &Context,
                Terms.mkArraySort(toSolverSort<CVC5Sort>(*IndexSort).Sort,
                                  toSolverSort<CVC5Sort>(*ElemSort).Sort),
-               0, 0, 0, IndexSort, ElemSort));
+               SMTSort::ArraySortData{IndexSort, ElemSort}));
 }
 
 SMTSortRef
@@ -184,7 +188,7 @@ CVC5Solver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
   return newSortRef<CVC5Sort>(CVC5Sort(
       SMTSortKind::Function, &Context,
       Terms.mkFunctionSort(Domain, toSolverSort<CVC5Sort>(*CodomainSort).Sort),
-      0, 0, 0, {}, {}, DomainSorts, CodomainSort));
+      SMTSort::FunctionSortData{DomainSorts, CodomainSort}));
 }
 
 SMTSortRef
@@ -194,8 +198,8 @@ CVC5Solver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
   for (const auto &Sort : ElementSorts)
     Elements.push_back(toSolverSort<CVC5Sort>(*Sort).Sort);
   return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::Tuple, &Context,
-                                       Terms.mkTupleSort(Elements), 0, 0, 0, {},
-                                       {}, {}, {}, ElementSorts));
+                                       Terms.mkTupleSort(Elements),
+                                       SMTSort::TupleSortData{ElementSorts}));
 }
 
 SMTExprRef CVC5Solver::mkBVNegImpl(const SMTExprRef &Exp) {

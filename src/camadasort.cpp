@@ -116,7 +116,10 @@ unsigned SMTSort::getWidth() const {
   assert(
       !isArraySort() && !isFunctionSort() && !isTupleSort() && !isArithSort() &&
       "Width is not defined for array, function, tuple, or arithmetic sorts");
-  return Width;
+  if (isFPSort())
+    return std::get<FPSortData>(Data).Width;
+
+  return std::get<ScalarSortData>(Data).Width;
 }
 
 unsigned SMTSort::getWidthFromSolver() const {
@@ -125,40 +128,40 @@ unsigned SMTSort::getWidthFromSolver() const {
 
 unsigned SMTSort::getFPSignificandWidth() const {
   assert(isFPSort() && "Significand width is only defined for FP sorts");
-  return SigWidth;
+  return std::get<FPSortData>(Data).SigWidth;
 }
 
 unsigned SMTSort::getFPExponentWidth() const {
   assert(isFPSort() && "Exponent width is only defined for FP sorts");
-  return ExpWidth;
+  return std::get<FPSortData>(Data).ExpWidth;
 }
 
 SMTSortRef SMTSort::getIndexSort() const {
   assert(isArraySort() && "Index sort is only defined for array sorts");
-  return IndexSort;
+  return std::get<ArraySortData>(Data).IndexSort;
 }
 
 SMTSortRef SMTSort::getElementSort() const {
   assert(isArraySort() && "Element sort is only defined for array sorts");
-  return ElementSort;
+  return std::get<ArraySortData>(Data).ElementSort;
 }
 
 const std::vector<SMTSortRef> &SMTSort::getDomainSorts() const {
   assert(isFunctionSort() &&
          "Domain sorts are only defined for function sorts");
-  return DomainSorts;
+  return std::get<FunctionSortData>(Data).DomainSorts;
 }
 
 SMTSortRef SMTSort::getCodomainSort() const {
   assert(isFunctionSort() &&
          "Codomain sort is only defined for function sorts");
-  return CodomainSort;
+  return std::get<FunctionSortData>(Data).CodomainSort;
 }
 
 const std::vector<SMTSortRef> &SMTSort::getTupleElementSorts() const {
   assert(isTupleSort() &&
          "Tuple element sorts are only defined for tuple sorts");
-  return TupleElementSorts;
+  return std::get<TupleSortData>(Data).ElementSorts;
 }
 
 bool SMTSort::validateSortWidth() const {
@@ -196,15 +199,16 @@ bool SMTSort::operator==(SMTSort const &Other) const {
     return Other.isTupleSort() &&
            getTupleElementSorts() == Other.getTupleElementSorts();
 
-  if (Width != Other.Width)
+  if (getWidth() != Other.getWidth())
     return false;
 
   if (getWidthFromSolver() != Other.getWidthFromSolver())
     return false;
 
   if (isFPSort() && Other.isFPSort())
-    return isBVFPSort() == Other.isBVFPSort() && ExpWidth == Other.ExpWidth &&
-           SigWidth == Other.SigWidth;
+    return isBVFPSort() == Other.isBVFPSort() &&
+           getFPExponentWidth() == Other.getFPExponentWidth() &&
+           getFPSignificandWidth() == Other.getFPSignificandWidth();
 
   if (isBVSort() && Other.isBVSort())
     return true;

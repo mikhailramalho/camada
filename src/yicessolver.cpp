@@ -148,8 +148,9 @@ SMTExprRef YicesSolver::rewrapExprImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef YicesSolver::mkBoolSortImpl() {
-  return newSortRef<YicesSort>(
-      YicesSort(SMTSortKind::Bool, Context, yices_bool_type(), 1));
+  return newSortRef<YicesSort>(YicesSort(SMTSortKind::Bool, Context,
+                                         yices_bool_type(),
+                                         SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef YicesSolver::mkIntSortImpl() {
@@ -163,20 +164,22 @@ SMTSortRef YicesSolver::mkRealSortImpl() {
 }
 
 SMTSortRef YicesSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<YicesSort>(
-      YicesSort(SMTSortKind::BV, Context, yices_bv_type(BitWidth), BitWidth));
+  return newSortRef<YicesSort>(YicesSort(SMTSortKind::BV, Context,
+                                         yices_bv_type(BitWidth),
+                                         SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
   return newSortRef<YicesSort>(YicesSort(
       SMTSortKind::BVFP, Context, yices_bv_type(ExpWidth + SigWidth + 1),
-      ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1));
+      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef YicesSolver::mkBVRMSortImpl() {
-  return newSortRef<YicesSort>(
-      YicesSort(SMTSortKind::BVRM, Context, yices_bv_type(3), 3));
+  return newSortRef<YicesSort>(YicesSort(SMTSortKind::BVRM, Context,
+                                         yices_bv_type(3),
+                                         SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef YicesSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
@@ -185,7 +188,7 @@ SMTSortRef YicesSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
       YicesSort(SMTSortKind::Array, Context,
                 yices_function_type1(toSolverSort<YicesSort>(*IndexSort).Sort,
                                      toSolverSort<YicesSort>(*ElemSort).Sort),
-                0, 0, 0, IndexSort, ElemSort));
+                SMTSort::ArraySortData{IndexSort, ElemSort}));
 }
 
 SMTSortRef
@@ -199,7 +202,7 @@ YicesSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
       SMTSortKind::Function, Context,
       yices_function_type(Domain.size(), Domain.data(),
                           toSolverSort<YicesSort>(*CodomainSort).Sort),
-      0, 0, 0, {}, {}, DomainSorts, CodomainSort));
+      SMTSort::FunctionSortData{DomainSorts, CodomainSort}));
 }
 
 SMTExprRef YicesSolver::mkBVNegImpl(const SMTExprRef &Exp) {

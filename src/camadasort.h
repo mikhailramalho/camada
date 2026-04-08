@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace camada {
@@ -96,13 +97,35 @@ private:
 /// Generic base class for SMT sorts
 class SMTSort {
 public:
-  explicit SMTSort(SMTSortKind K, unsigned W = 0, unsigned EW = 0,
-                   unsigned SW = 0, SMTSortRef I = {}, SMTSortRef E = {},
-                   std::vector<SMTSortRef> D = {}, SMTSortRef C = {},
-                   std::vector<SMTSortRef> T = {})
-      : Kind(K), Width(W), ExpWidth(EW), SigWidth(SW), IndexSort(std::move(I)),
-        ElementSort(std::move(E)), DomainSorts(std::move(D)),
-        CodomainSort(std::move(C)), TupleElementSorts(std::move(T)) {}
+  struct ScalarSortData {
+    unsigned Width = 0;
+  };
+
+  struct FPSortData {
+    unsigned Width = 0;
+    unsigned ExpWidth = 0;
+    unsigned SigWidth = 0;
+  };
+
+  struct ArraySortData {
+    SMTSortRef IndexSort;
+    SMTSortRef ElementSort;
+  };
+
+  struct FunctionSortData {
+    std::vector<SMTSortRef> DomainSorts;
+    SMTSortRef CodomainSort;
+  };
+
+  struct TupleSortData {
+    std::vector<SMTSortRef> ElementSorts;
+  };
+
+  using SortData = std::variant<std::monostate, ScalarSortData, FPSortData,
+                                ArraySortData, FunctionSortData, TupleSortData>;
+
+  explicit SMTSort(SMTSortKind K, SortData D = {})
+      : Kind(K), Data(std::move(D)) {}
   virtual ~SMTSort() = default;
 
   virtual SMTBackendKind getBackendKind() const = 0;
@@ -198,14 +221,7 @@ public:
 
 protected:
   SMTSortKind Kind;
-  unsigned Width = 0;
-  unsigned ExpWidth = 0;
-  unsigned SigWidth = 0;
-  SMTSortRef IndexSort;
-  SMTSortRef ElementSort;
-  std::vector<SMTSortRef> DomainSorts;
-  SMTSortRef CodomainSort;
-  std::vector<SMTSortRef> TupleElementSorts;
+  SortData Data;
 #ifndef NDEBUG
   bool WidthValidated = false;
 #endif
@@ -231,13 +247,8 @@ public:
   TheSort Sort;
 
   SolverSort(SMTSortKind K, SolverContextRef C, const TheSort &SS,
-             unsigned W = 0, unsigned EW = 0, unsigned SW = 0,
-             SMTSortRef I = {}, SMTSortRef E = {},
-             std::vector<SMTSortRef> D = {}, SMTSortRef Co = {},
-             std::vector<SMTSortRef> T = {})
-      : SMTSort(K, W, EW, SW, std::move(I), std::move(E), std::move(D),
-                std::move(Co), std::move(T)),
-        Context(std::move(C)), Sort(SS) {}
+             SortData D = {})
+      : SMTSort(K, std::move(D)), Context(std::move(C)), Sort(SS) {}
 
   virtual ~SolverSort() override = default;
 };
