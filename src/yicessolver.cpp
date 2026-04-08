@@ -624,7 +624,7 @@ bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   auto res = yices_get_bool_value(yices_get_model(Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
   yicesCheckError(res, "Can't get boolean value from Yices");
-  return val ? true : false;
+  return val;
 }
 
 static inline void getYicesMPQValue(context_t *Context, term_t Expr,

@@ -1246,7 +1246,7 @@ public:
   }
 
   SMTExprRef mkBool(const bool b) override final {
-    SMTExprRef &CachedExpr = CachedBoolExprs[b ? 1 : 0];
+    SMTExprRef &CachedExpr = CachedBoolExprs[b];
     if (CachedExpr)
       return CachedExpr;
 
