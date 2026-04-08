@@ -107,3 +107,20 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
 
   tests(yices);
 }
+
+TEST_CASE("Yices multi-instance lifecycle edge case", "[YICES]") {
+  auto yices1 = camada::createYicesSolver();
+  auto yices2 = camada::createYicesSolver(); // Should not abort or break yices1
+
+  auto x = yices1->mkSymbol("x", yices1->mkBVSort(8));
+  yices1->addConstraint(yices1->mkEqual(x, yices1->mkBVFromDec(42, 8)));
+
+  auto y = yices2->mkSymbol("y", yices2->mkBVSort(8));
+  yices2->addConstraint(yices2->mkEqual(y, yices2->mkBVFromDec(100, 8)));
+
+  REQUIRE(yices1->check() == camada::checkResult::SAT);
+  REQUIRE(yices2->check() == camada::checkResult::SAT);
+
+  yices1->reset();
+  REQUIRE(yices2->check() == camada::checkResult::SAT); // Still SAT
+}

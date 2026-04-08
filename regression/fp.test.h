@@ -233,3 +233,37 @@ inline void fp_remainder_semantics(const camada::SMTSolverRef &solver,
 
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
+
+inline void fp_non_standard_widths(const camada::SMTSolverRef &solver,
+                                   camada::FPEncoding Encoding) {
+  // 5-bit exponent, 11-bit significand (float16-style format)
+  auto one = solver->mkFPFromBin("0011110000000000", 5, Encoding);
+  auto two = solver->mkFPFromBin("0100000000000000", 5, Encoding);
+  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+
+  REQUIRE(one->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(two->getKind() == camada::SMTExprKind::FPConst);
+  REQUIRE(one->getWidth() == 16);
+  REQUIRE(two->getWidth() == 16);
+
+  auto add = solver->mkFPAdd(one, one, rne);
+  REQUIRE(add->getKind() == camada::SMTExprKind::FPAdd);
+
+  solver->addConstraint(solver->mkEqual(add, two));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void
+fp_cancellation_and_normalization(const camada::SMTSolverRef &solver,
+                                  camada::FPEncoding Encoding) {
+  // Subtraction causing cancellation
+  auto x = solver->mkFP32(1.0000001f, Encoding);
+  auto y = solver->mkFP32(1.0f, Encoding);
+  auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+  auto sub = solver->mkFPSub(x, y, rne);
+
+  auto eq = solver->mkEqual(sub, solver->mkFP32(1.0000001f - 1.0f, Encoding));
+  solver->addConstraint(eq);
+  solver->addConstraint(solver->mkFPIsNormal(sub));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}

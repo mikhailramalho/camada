@@ -309,3 +309,32 @@ inline void arith_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
+
+inline void arena_stress_test(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("x", solver->mkBVSort(32));
+  auto acc = x;
+
+  // Force substantial arena growth with many distinct intermediate nodes.
+  for (unsigned i = 0; i < 4096; ++i) {
+    auto c0 = solver->mkBVFromDec(static_cast<int64_t>(i & 0xff), 32);
+    auto c1 = solver->mkBVFromDec(static_cast<int64_t>((i * 3) & 0xff), 32);
+    acc = solver->mkBVAdd(acc, c0);
+    acc = solver->mkBVXor(acc, c1);
+  }
+
+  solver->addConstraint(solver->mkEqual(acc, acc));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  solver->reset();
+
+  auto y = solver->mkSymbol("y", solver->mkBVSort(32));
+  auto expr = y;
+  for (unsigned i = 0; i < 2048; ++i) {
+    auto c = solver->mkBVFromDec(static_cast<int64_t>((i + 7) & 0xff), 32);
+    expr =
+        solver->mkBVMul(solver->mkBVAdd(expr, c), solver->mkBVFromDec(3, 32));
+  }
+
+  solver->addConstraint(solver->mkEqual(expr, expr));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}

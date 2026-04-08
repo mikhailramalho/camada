@@ -142,6 +142,32 @@ void benchmarkBVExprChain(camada::SMTSolver &solver, std::size_t iterations) {
   (void)sink;
 }
 
+void benchmarkExprConstructionOnly(camada::SMTSolver &solver,
+                                   std::size_t iterations) {
+  auto x = solver.mkSymbol("construct_x", solver.mkBVSort(32));
+  auto y = solver.mkSymbol("construct_y", solver.mkBVSort(32));
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i) {
+    auto c0 = solver.mkBVFromDec(static_cast<int64_t>(i & 0xff), 32);
+    auto c1 = solver.mkBVFromDec(static_cast<int64_t>((i + 1) & 0xff), 32);
+    auto c2 = solver.mkBVFromDec(static_cast<int64_t>((i + 3) & 0xff), 32);
+
+    auto add = solver.mkBVAdd(x, c0);
+    auto mul = solver.mkBVMul(add, y);
+    auto xor_term = solver.mkBVXor(mul, c1);
+    auto sub = solver.mkBVSub(xor_term, c2);
+    auto and_term = solver.mkBVAnd(sub, solver.mkBVNot(c0));
+    auto eq = solver.mkEqual(and_term, solver.mkBVOr(c1, c2));
+    auto ite = solver.mkIte(eq, solver.mkBVAdd(and_term, c1),
+                            solver.mkBVXor(and_term, c2));
+
+    sink += ite->getWidth() + eq->isBoolSort();
+  }
+
+  (void)sink;
+}
+
 void benchmarkArrayStoreChain(camada::SMTSolver &solver,
                               std::size_t iterations) {
   auto idx_sort = solver.mkBVSort(8);
@@ -311,6 +337,8 @@ int main(int argc, char **argv) {
     runCase(backend, "bv_const_same", iterations, benchmarkBVConstSame);
     runCase(backend, "bv_const_varied", iterations, benchmarkBVConstVaried);
     runCase(backend, "bv_expr_chain", iterations, benchmarkBVExprChain);
+    runCase(backend, "expr_construction_only", iterations,
+            benchmarkExprConstructionOnly);
     runCase(backend, "array_store_chain", iterations, benchmarkArrayStoreChain);
     runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
     runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
