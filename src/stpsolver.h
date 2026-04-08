@@ -50,6 +50,10 @@ public:
 class STPExpr : public SolverExpr<STPContextRef, STP::Expr> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
+  // STP allocates ordinary term nodes that must be released with
+  // `vc_DeleteExpr`. Arena-stored wrappers therefore need to remember whether
+  // they own the underlying STP expression so copied wrappers do not double
+  // free borrowed handles.
   bool OwnsExpr = false;
 
   STPExpr(SMTExprKind Kind, STPContextRef C, const SMTSortRef &S,

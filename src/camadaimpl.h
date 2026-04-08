@@ -1461,6 +1461,11 @@ public:
 protected:
   virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) const = 0;
 
+  // Rewrap an existing backend payload with a different Camada-facing
+  // sort/kind. This is still needed for lowered/common-layer operations where
+  // the semantic API node differs from the literal backend term shape, even
+  // though backend-native operations should construct expressions with the
+  // final kind directly.
   virtual SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
                                     SMTExprKind Kind) const = 0;
 

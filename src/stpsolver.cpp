@@ -103,6 +103,9 @@ void STPSolver::addConstraintImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef STPSolver::newExprRefImpl(const SMTExpr &Exp) const {
+  // Copy the wrapper into the arena and mark the stored instance as owning the
+  // underlying STP term. STP leaks ordinary constructed terms unless the final
+  // arena-held wrapper deletes them via `vc_DeleteExpr`.
   auto Stored = std::make_unique<STPExpr>(toSolverExpr<STPExpr>(Exp));
   Stored->OwnsExpr = true;
   return storeOwnedExprRef(std::move(Stored));
