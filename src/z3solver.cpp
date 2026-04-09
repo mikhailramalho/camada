@@ -147,56 +147,56 @@ SMTExprRef Z3Solver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
 }
 
 SMTSortRef Z3Solver::mkBoolSortImpl() {
-  return newSortRef<Z3Sort>(Z3Sort(SMTSortKind::Bool, &Context,
+  return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::Bool, &Context,
                                    Context.bool_sort(),
                                    SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef Z3Solver::mkIntSortImpl() {
-  return newSortRef<Z3Sort>(
+  return makeSortRef<Z3Sort>(
       Z3Sort(SMTSortKind::Int, &Context, Context.int_sort()));
 }
 
 SMTSortRef Z3Solver::mkRealSortImpl() {
-  return newSortRef<Z3Sort>(
+  return makeSortRef<Z3Sort>(
       Z3Sort(SMTSortKind::Real, &Context, Context.real_sort()));
 }
 
 SMTSortRef Z3Solver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<Z3Sort>(Z3Sort(SMTSortKind::BV, &Context,
+  return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::BV, &Context,
                                    Context.bv_sort(BitWidth),
                                    SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef Z3Solver::mkRMSortImpl() {
-  return newSortRef<Z3Sort>(Z3Sort(SMTSortKind::RM, &Context,
+  return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::RM, &Context,
                                    Context.fpa_rounding_mode_sort(),
                                    SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
                                   const unsigned SigWidth) {
-  return newSortRef<Z3Sort>(Z3Sort(
+  return makeSortRef<Z3Sort>(Z3Sort(
       SMTSortKind::FP, &Context, Context.fpa_sort(ExpWidth, SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
 }
 
 SMTSortRef Z3Solver::mkBVFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  return newSortRef<Z3Sort>(Z3Sort(
+  return makeSortRef<Z3Sort>(Z3Sort(
       SMTSortKind::BVFP, &Context, Context.bv_sort(ExpWidth + SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef Z3Solver::mkBVRMSortImpl() {
-  return newSortRef<Z3Sort>(Z3Sort(SMTSortKind::BVRM, &Context,
+  return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::BVRM, &Context,
                                    Context.bv_sort(3),
                                    SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef Z3Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                      const SMTSortRef &ElemSort) {
-  return newSortRef<Z3Sort>(
+  return makeSortRef<Z3Sort>(
       Z3Sort(SMTSortKind::Array, &Context,
              Context.array_sort(toSolverSort<Z3Sort>(*IndexSort).Sort,
                                 toSolverSort<Z3Sort>(*ElemSort).Sort),
@@ -206,7 +206,7 @@ SMTSortRef Z3Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
 SMTSortRef
 Z3Solver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
                              const SMTSortRef &CodomainSort) {
-  return newSortRef<Z3Sort>(Z3Sort(
+  return makeSortRef<Z3Sort>(Z3Sort(
       SMTSortKind::Function, &Context, toSolverSort<Z3Sort>(*CodomainSort).Sort,
       SMTSort::FunctionSortData{DomainSorts, CodomainSort}));
 }
@@ -233,7 +233,7 @@ Z3Solver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
       static_cast<unsigned>(Fields.size()), NamePtrs.data(), Fields.data(),
       Projs);
 
-  return newSortRef<Z3Sort>(Z3Sort(SMTSortKind::Tuple, &Context, Ctor.range(),
+  return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::Tuple, &Context, Ctor.range(),
                                    SMTSort::TupleSortData{ElementSorts}));
 }
 

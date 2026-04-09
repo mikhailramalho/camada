@@ -73,7 +73,7 @@ protected:
     return SMTExprRef(Exp, HandleState, HandleState->Generation);
   }
 
-  template <typename SolverSort> SMTSortRef newSortRef(SolverSort Sort) const {
+  template <typename SolverSort> SMTSortRef makeSortRef(SolverSort Sort) const {
     auto *OwnedSort = SortArena.create<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
 #ifndef NDEBUG

@@ -118,27 +118,27 @@ SMTExprRef STPSolver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
 }
 
 SMTSortRef STPSolver::mkBoolSortImpl() {
-  return newSortRef<STPSort>(STPSort(SMTSortKind::Bool, &Context,
+  return makeSortRef<STPSort>(STPSort(SMTSortKind::Bool, &Context,
                                      STP::vc_boolType(Context),
                                      SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef STPSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<STPSort>(STPSort(SMTSortKind::BV, &Context,
+  return makeSortRef<STPSort>(STPSort(SMTSortKind::BV, &Context,
                                      STP::vc_bvType(Context, BitWidth),
                                      SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef STPSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                      const unsigned SigWidth) {
-  return newSortRef<STPSort>(STPSort(
+  return makeSortRef<STPSort>(STPSort(
       SMTSortKind::BVFP, &Context,
       STP::vc_bvType(Context, ExpWidth + SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef STPSolver::mkBVRMSortImpl() {
-  return newSortRef<STPSort>(STPSort(SMTSortKind::BVRM, &Context,
+  return makeSortRef<STPSort>(STPSort(SMTSortKind::BVRM, &Context,
                                      STP::vc_bvType(Context, 3),
                                      SMTSort::ScalarSortData{3}));
 }
@@ -147,7 +147,7 @@ SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
   const SMTSortRef &backend_elem_sort =
       ElemSort->isBoolSort() ? mkBVSort(1) : ElemSort;
-  return newSortRef<STPSort>(
+  return makeSortRef<STPSort>(
       STPSort(SMTSortKind::Array, &Context,
               STP::vc_arrayType(Context, toSolverSort<STPSort>(*IndexSort).Sort,
                                 toSolverSort<STPSort>(*backend_elem_sort).Sort),

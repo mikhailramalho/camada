@@ -143,26 +143,26 @@ SMTExprRef BitwuzlaSolver::rewrapExprImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef BitwuzlaSolver::mkBoolSortImpl() {
-  return newSortRef<BitwSort>(BitwSort(SMTSortKind::Bool, Context,
+  return makeSortRef<BitwSort>(BitwSort(SMTSortKind::Bool, Context,
                                        bitwuzla_mk_bool_sort(TermManager),
                                        SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef BitwuzlaSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<BitwSort>(BitwSort(
+  return makeSortRef<BitwSort>(BitwSort(
       SMTSortKind::BV, Context, bitwuzla_mk_bv_sort(TermManager, BitWidth),
       SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef BitwuzlaSolver::mkRMSortImpl() {
-  return newSortRef<BitwSort>(BitwSort(SMTSortKind::RM, Context,
+  return makeSortRef<BitwSort>(BitwSort(SMTSortKind::RM, Context,
                                        bitwuzla_mk_rm_sort(TermManager),
                                        SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef BitwuzlaSolver::mkFPSortImpl(const unsigned ExpWidth,
                                         const unsigned SigWidth) {
-  return newSortRef<BitwSort>(BitwSort(
+  return makeSortRef<BitwSort>(BitwSort(
       SMTSortKind::FP, Context,
       bitwuzla_mk_fp_sort(TermManager, ExpWidth, SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
@@ -170,21 +170,21 @@ SMTSortRef BitwuzlaSolver::mkFPSortImpl(const unsigned ExpWidth,
 
 SMTSortRef BitwuzlaSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                           const unsigned SigWidth) {
-  return newSortRef<BitwSort>(BitwSort(
+  return makeSortRef<BitwSort>(BitwSort(
       SMTSortKind::BVFP, Context,
       bitwuzla_mk_bv_sort(TermManager, ExpWidth + SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef BitwuzlaSolver::mkBVRMSortImpl() {
-  return newSortRef<BitwSort>(BitwSort(SMTSortKind::BVRM, Context,
+  return makeSortRef<BitwSort>(BitwSort(SMTSortKind::BVRM, Context,
                                        bitwuzla_mk_bv_sort(TermManager, 3),
                                        SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef BitwuzlaSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                            const SMTSortRef &ElemSort) {
-  return newSortRef<BitwSort>(
+  return makeSortRef<BitwSort>(
       BitwSort(SMTSortKind::Array, Context,
                bitwuzla_mk_array_sort(TermManager,
                                       toSolverSort<BitwSort>(*IndexSort).Sort,
@@ -199,7 +199,7 @@ BitwuzlaSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
   Domain.reserve(DomainSorts.size());
   for (const auto &Sort : DomainSorts)
     Domain.push_back(toSolverSort<BitwSort>(*Sort).Sort);
-  return newSortRef<BitwSort>(
+  return makeSortRef<BitwSort>(
       BitwSort(SMTSortKind::Function, Context,
                bitwuzla_mk_fun_sort(TermManager, Domain.size(), Domain.data(),
                                     toSolverSort<BitwSort>(*CodomainSort).Sort),
