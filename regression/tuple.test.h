@@ -38,3 +38,19 @@ inline void tuple_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getBool(b));
   REQUIRE(solver->getBV(bv) == 42);
 }
+
+inline void empty_tuple_semantics(const camada::SMTSolverRef &solver) {
+  auto tupleSort = solver->mkTupleSort({});
+  auto tupleValue = solver->mkTuple({});
+
+  REQUIRE(tupleSort->isTupleSort());
+  REQUIRE(tupleSort->getTupleElementSorts().empty());
+  REQUIRE(tupleValue->getKind() == camada::SMTExprKind::TupleConst);
+  REQUIRE(tupleValue->Sort == tupleSort);
+
+  auto tupleSymbol = solver->mkSymbol("empty_tuple", tupleSort);
+  REQUIRE(tupleSymbol->Sort == tupleSort);
+
+  solver->addConstraint(solver->mkEqual(tupleSymbol, tupleValue));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}

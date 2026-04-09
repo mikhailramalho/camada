@@ -283,7 +283,6 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
 
 SMTSortRef
 SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
-  assert(!ElementSorts.empty());
   if (ElementSorts.size() <= 4) {
     SmallTupleSortCacheKey SmallKey{};
     SmallKey.Size = static_cast<uint8_t>(ElementSorts.size());
@@ -937,7 +936,6 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
-  assert(!Elements.empty());
   std::vector<SMTSortRef> ElementSorts;
   ElementSorts.reserve(Elements.size());
   for (const auto &Element : Elements)
