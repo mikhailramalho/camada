@@ -289,7 +289,7 @@ SMTExprRef Z3Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
                              z3::abs(toZ3Expr(Exp)));
 }
 
-SMTExprRef Z3Solver::mkFPNegImpl(const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) {
   return makeExprRef<Z3Expr>(SMTExprKind::FPNeg, &Context, Exp->Sort,
                              -toZ3Expr(Exp));
 }

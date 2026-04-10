@@ -467,11 +467,15 @@ SMTExprRef SMTSolverImpl::mkFPAbsImpl(const SMTExprRef &Exp) {
   return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPAbs);
 }
 
-SMTExprRef SMTSolverImpl::mkFPNegImpl(const SMTExprRef &Exp) {
+SMTExprRef SMTSolverImpl::mkFPNegImpl(const SMTExprRef &Exp,
+                                      FPNegBehavior Behavior) {
   // Extract everything but the sign bit
   SMTExprRef ew_sw = extractExpSig(*this, Exp);
   SMTExprRef sgn = extractSgn(*this, Exp);
-  SMTExprRef result = mkBVToIEEEFP(mkBVConcat(mkBVNot(sgn), ew_sw), Exp->Sort);
+  SMTExprRef flipped = mkBVToIEEEFP(mkBVConcat(mkBVNot(sgn), ew_sw), Exp->Sort);
+  SMTExprRef result = Behavior == FPNegBehavior::FlipSignBit
+                          ? flipped
+                          : mkIte(mkFPIsNaN(Exp), Exp, flipped);
   return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPNeg);
 }
 

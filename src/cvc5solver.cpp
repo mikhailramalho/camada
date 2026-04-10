@@ -700,7 +700,7 @@ SMTExprRef CVC5Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkFPNegImpl(const SMTExprRef &Exp) {
+SMTExprRef CVC5Solver::mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) {
   return makeExprRef<CVC5Expr>(
       SMTExprKind::FPNeg, &Context, Exp->Sort,
       Terms.mkTerm(cvc5::Kind::FLOATINGPOINT_NEG,

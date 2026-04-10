@@ -708,10 +708,12 @@ SMTExprRef SMTSolverImpl::mkFPAbs(const SMTExprRef &Exp) {
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp) {
+SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
+                                  FPNegBehavior Behavior) {
   assert(Exp->isFPSort());
-  SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPNegImpl(Exp)
-                                            : mkFPNegImpl(Exp);
+  SMTExprRef theExp = usesBVFPEncoding(Exp)
+                          ? SMTSolverImpl::mkFPNegImpl(Exp, Behavior)
+                          : mkFPNegImpl(Exp, Behavior);
   assert(theExp->Sort == Exp->Sort);
   return theExp;
 }

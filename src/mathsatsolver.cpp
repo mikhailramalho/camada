@@ -619,7 +619,7 @@ SMTExprRef MathSATSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
       msat_make_fp_abs(Context, toMathSATTerm(Exp)));
 }
 
-SMTExprRef MathSATSolver::mkFPNegImpl(const SMTExprRef &Exp) {
+SMTExprRef MathSATSolver::mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) {
   return makeExprRef<MathSATExpr>(
       SMTExprKind::FPNeg, &Context, Exp->Sort,
       msat_make_fp_neg(Context, toMathSATTerm(Exp)));

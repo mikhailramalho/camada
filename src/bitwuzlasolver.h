@@ -149,7 +149,7 @@ protected:
   SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
   SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;

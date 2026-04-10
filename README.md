@@ -297,8 +297,10 @@ common-layer encodings.
 
 Camada is designed as a wrapper library to simplify the usage of multiple SMT solvers. It provides a common interface for interacting with these solvers, allowing developers to switch between them seamlessly without changing their codebase.
 
-Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbmc) so some of the implementation decisions were geared towards the verification of C programs, in particular, camada diverges from the SMT standard in:
-- `fp.neg` supports negative `NaN`s. See https://github.com/Z3Prover/z3/issues/4466 for a more detailed discussion.
+Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbmc) so some of the implementation decisions were geared towards the verification of C programs. In particular:
+- `mkFPNeg` now accepts `FPNegBehavior`.
+- The default, `FPNegBehavior::FlipSignBit`, preserves the full IEEE payload and only toggles the sign bit, including on `NaN`s.
+- `FPNegBehavior::PreserveNaNPayload` follows the SMT floating-point standard and leaves `NaN`s unchanged.
 
 ## Usage Example
 

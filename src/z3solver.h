@@ -242,7 +242,7 @@ protected:
 
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
 
   SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
 

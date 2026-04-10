@@ -334,8 +334,13 @@ public:
   /// Creates a floating-point absolute operation
   virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) = 0;
 
-  /// Creates a floating-point negation operation
-  virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) = 0;
+  /// Creates a floating-point negation operation.
+  /// `FlipSignBit` preserves the full IEEE encoding and only toggles the sign
+  /// bit. `PreserveNaNPayload` follows the SMT floating-point standard and
+  /// leaves NaNs unchanged.
+  virtual SMTExprRef
+  mkFPNeg(const SMTExprRef &Exp,
+          FPNegBehavior Behavior = FPNegBehavior::FlipSignBit) = 0;
 
   /// Creates a floating-point isInfinite operation
   virtual SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) = 0;

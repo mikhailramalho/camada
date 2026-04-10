@@ -26,6 +26,12 @@ namespace camada {
 
 enum class FPEncoding { Native, BV };
 
+enum class FPNegBehavior {
+  FlipSignBit,
+  // Follows SMT-LIB FP semantics: fp.neg leaves NaNs unchanged.
+  PreserveNaNPayload,
+};
+
 enum class RM {
   ROUND_TO_EVEN = 0,
   ROUND_TO_AWAY = 1,

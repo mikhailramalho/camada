@@ -237,7 +237,9 @@ public:
   SMTExprRef mkBVRedOr(const SMTExprRef &Exp) override final;
   SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPAbs(const SMTExprRef &Exp) override final;
-  SMTExprRef mkFPNeg(const SMTExprRef &Exp) override final;
+  SMTExprRef
+  mkFPNeg(const SMTExprRef &Exp,
+          FPNegBehavior Behavior = FPNegBehavior::FlipSignBit) override final;
   SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override final;
 
@@ -515,7 +517,7 @@ protected:
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
 
-  virtual SMTExprRef mkFPNegImpl(const SMTExprRef &Exp);
+  virtual SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior Behavior);
 
   virtual SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp);
 

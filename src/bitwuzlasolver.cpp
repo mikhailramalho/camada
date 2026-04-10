@@ -245,7 +245,7 @@ SMTExprRef BitwuzlaSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
                                mkTerm1(TermManager, BITWUZLA_KIND_FP_ABS, Exp));
 }
 
-SMTExprRef BitwuzlaSolver::mkFPNegImpl(const SMTExprRef &Exp) {
+SMTExprRef BitwuzlaSolver::mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) {
   return makeExprRef<BitwExpr>(SMTExprKind::FPNeg, Context, Exp->Sort,
                                mkTerm1(TermManager, BITWUZLA_KIND_FP_NEG, Exp));
 }
