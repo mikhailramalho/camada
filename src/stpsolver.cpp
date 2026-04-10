@@ -573,7 +573,12 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   const std::string name = "__CAMADA_arr" + std::to_string(ConstArrayCounter++);
   SMTExprRef arr = mkSymbol(name, mkArraySort(IndexSort, InitValue->Sort));
 
-  uint64_t size = 1ULL << IndexSort->getWidth();
+  const unsigned width = IndexSort->getWidth();
+  if (width >= 64)
+    fatalError(
+        "STP constant-array lowering does not support index widths >= 64");
+
+  uint64_t size = uint64_t{1} << width;
   for (uint64_t i = 0; i < size; i++)
     arr = mkArrayStore(arr, mkBVFromDec(i, IndexSort), InitValue);
 

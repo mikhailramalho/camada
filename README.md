@@ -185,6 +185,8 @@ limitations still matter in day-to-day use.
     quantifier, and native floating-point support are not available.
   - constant arrays and boolean arrays are adapted internally by the wrapper,
     so some behavior is implemented through backend-specific lowering.
+  - constant arrays are still lowered through explicit store chains, so they
+    are only practical for small index widths.
 - `Yices`
   - there is no native floating-point support, so FP always goes through
     Camada's bit-vector encoding.
@@ -264,6 +266,8 @@ Camada also smooths over backend quirks where practical. For example:
 
 - MathSAT and STP now lower `Array<Idx, Bool>` through backend `Array<Idx, BV1>`
   representations internally
+- STP constant arrays still use eager store-based lowering rather than a lazy
+  default-value representation
 - Yices constant arrays use a backend-native lambda encoding instead of a full
   store chain
 - MathSAT native FP still falls back for unsupported operations such as
