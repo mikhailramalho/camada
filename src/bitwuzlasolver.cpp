@@ -144,8 +144,8 @@ SMTExprRef BitwuzlaSolver::rewrapExprImpl(const SMTExpr &Exp,
 
 SMTSortRef BitwuzlaSolver::mkBoolSortImpl() {
   return makeSortRef<BitwSort>(BitwSort(SMTSortKind::Bool, Context,
-                                       bitwuzla_mk_bool_sort(TermManager),
-                                       SMTSort::ScalarSortData{1}));
+                                        bitwuzla_mk_bool_sort(TermManager),
+                                        SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef BitwuzlaSolver::mkBVSortImpl(unsigned BitWidth) {
@@ -156,8 +156,8 @@ SMTSortRef BitwuzlaSolver::mkBVSortImpl(unsigned BitWidth) {
 
 SMTSortRef BitwuzlaSolver::mkRMSortImpl() {
   return makeSortRef<BitwSort>(BitwSort(SMTSortKind::RM, Context,
-                                       bitwuzla_mk_rm_sort(TermManager),
-                                       SMTSort::ScalarSortData{3}));
+                                        bitwuzla_mk_rm_sort(TermManager),
+                                        SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef BitwuzlaSolver::mkFPSortImpl(const unsigned ExpWidth,
@@ -178,8 +178,8 @@ SMTSortRef BitwuzlaSolver::mkBVFPSortImpl(const unsigned ExpWidth,
 
 SMTSortRef BitwuzlaSolver::mkBVRMSortImpl() {
   return makeSortRef<BitwSort>(BitwSort(SMTSortKind::BVRM, Context,
-                                       bitwuzla_mk_bv_sort(TermManager, 3),
-                                       SMTSort::ScalarSortData{3}));
+                                        bitwuzla_mk_bv_sort(TermManager, 3),
+                                        SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef BitwuzlaSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
@@ -690,7 +690,7 @@ SMTExprRef BitwuzlaSolver::mkApplyImpl(const SMTExprRef &Function,
                        ApplyArgs.data()));
 }
 
-bool BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<bool> BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
   const char *result = bitwuzla_term_to_string(
       bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr));
 
@@ -701,16 +701,17 @@ bool BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
   if (!strcmp(result, "false"))
     return false;
 
-  fatalError("Bool is neither true nor false");
+  return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Bitwuzla,
+                  "Bool model value is neither true nor false"};
 }
 
-std::string BitwuzlaSolver::getBVInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> BitwuzlaSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   const char *result = bitwuzla_term_value_get_str(
       bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr));
   return result ? std::string(result) : std::string();
 }
 
-std::string BitwuzlaSolver::getFPInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> BitwuzlaSolver::getFPInBinImpl(const SMTExprRef &Exp) {
   const char *result = bitwuzla_term_value_get_str_fmt(
       bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr), 2);
   return result ? std::string(result) : std::string();

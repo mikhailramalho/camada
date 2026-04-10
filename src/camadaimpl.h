@@ -281,17 +281,18 @@ public:
                       const SMTExprRef &Body) override final;
   SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
                       const SMTExprRef &Body) override final;
-  bool getBool(const SMTExprRef &Exp) override final;
-  int64_t getBV(const SMTExprRef &Exp) override final;
-  std::string getBVInBin(const SMTExprRef &Exp) override final;
-  std::string getInt(const SMTExprRef &Exp) override final;
-  void getRational(const SMTExprRef &Exp, std::string &Num,
-                   std::string &Den) override final;
-  std::string getRealNumerator(const SMTExprRef &Exp) override final;
-  std::string getRealDenominator(const SMTExprRef &Exp) override final;
-  std::string getFPInBin(const SMTExprRef &Exp) override final;
-  float getFP32(const SMTExprRef &Exp) override final;
-  double getFP64(const SMTExprRef &Exp) override final;
+  SMTResult<bool> getBool(const SMTExprRef &Exp) override final;
+  SMTResult<int64_t> getBV(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getBVInBin(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getInt(const SMTExprRef &Exp) override final;
+  SMTResult<std::pair<std::string, std::string>>
+  getRational(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getRealNumerator(const SMTExprRef &Exp) override final;
+  SMTResult<std::string>
+  getRealDenominator(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getFPInBin(const SMTExprRef &Exp) override final;
+  SMTResult<float> getFP32(const SMTExprRef &Exp) override final;
+  SMTResult<double> getFP64(const SMTExprRef &Exp) override final;
   SMTExprRef getArrayElement(const SMTExprRef &Array,
                              const SMTExprRef &Index) override final;
   SMTExprRef mkBool(const bool b) override final;
@@ -582,22 +583,22 @@ protected:
   virtual SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &,
                                   const SMTExprRef &);
 
-  virtual bool getBoolImpl(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) = 0;
 
-  int64_t getBVImpl(const SMTExprRef &Exp);
+  SMTResult<int64_t> getBVImpl(const SMTExprRef &Exp);
 
-  virtual std::string getBVInBinImpl(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) = 0;
 
-  virtual std::string getIntImpl(const SMTExprRef &);
+  virtual SMTResult<std::string> getIntImpl(const SMTExprRef &);
 
-  virtual void getRationalImpl(const SMTExprRef &, std::string &,
-                               std::string &);
+  virtual SMTResult<std::pair<std::string, std::string>>
+  getRationalImpl(const SMTExprRef &);
 
-  virtual std::string getFPInBinImpl(const SMTExprRef &Exp);
+  virtual SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp);
 
-  float getFP32Impl(const SMTExprRef &Exp);
+  SMTResult<float> getFP32Impl(const SMTExprRef &Exp);
 
-  double getFP64Impl(const SMTExprRef &Exp);
+  SMTResult<double> getFP64Impl(const SMTExprRef &Exp);
 
   virtual SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                          const SMTExprRef &Index) = 0;

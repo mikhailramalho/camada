@@ -181,9 +181,9 @@ protected:
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
 
-  bool getBoolImpl(const SMTExprRef &Exp) override;
+  SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
 
-  std::string getBVInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;

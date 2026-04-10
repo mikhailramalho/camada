@@ -119,14 +119,14 @@ SMTExprRef STPSolver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
 
 SMTSortRef STPSolver::mkBoolSortImpl() {
   return makeSortRef<STPSort>(STPSort(SMTSortKind::Bool, &Context,
-                                     STP::vc_boolType(Context),
-                                     SMTSort::ScalarSortData{1}));
+                                      STP::vc_boolType(Context),
+                                      SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef STPSolver::mkBVSortImpl(unsigned BitWidth) {
   return makeSortRef<STPSort>(STPSort(SMTSortKind::BV, &Context,
-                                     STP::vc_bvType(Context, BitWidth),
-                                     SMTSort::ScalarSortData{BitWidth}));
+                                      STP::vc_bvType(Context, BitWidth),
+                                      SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef STPSolver::mkBVFPSortImpl(const unsigned ExpWidth,
@@ -139,8 +139,8 @@ SMTSortRef STPSolver::mkBVFPSortImpl(const unsigned ExpWidth,
 
 SMTSortRef STPSolver::mkBVRMSortImpl() {
   return makeSortRef<STPSort>(STPSort(SMTSortKind::BVRM, &Context,
-                                     STP::vc_bvType(Context, 3),
-                                     SMTSort::ScalarSortData{3}));
+                                      STP::vc_bvType(Context, 3),
+                                      SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
@@ -482,7 +482,7 @@ SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                               written);
 }
 
-bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<bool> STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(Context, toSolverExpr<STPExpr>(*Exp).Expr);
   STP::Expr bv_value = STP::vc_boolToBVExpr(Context, value);
@@ -492,7 +492,7 @@ bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   return result;
 }
 
-std::string STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(Context, toSolverExpr<STPExpr>(*Exp).Expr);
   char *buf;
@@ -509,15 +509,23 @@ SMTExprRef STPSolver::getArrayElementImpl(const SMTExprRef &Array,
   const SMTExprRef &sel = mkArraySelect(Array, Index);
 
   const SMTSortRef &elementSort = Array->Sort->getElementSort();
-  if (elementSort->isBoolSort())
-    return mkBool(getBool(sel));
+  if (elementSort->isBoolSort()) {
+    SMTResult<bool> result = getBool(sel);
+    assert(result && "Failed to get STP boolean array element");
+    return mkBool(result.value());
+  }
 
-  if (elementSort->isBVSort())
-    return SMTSolverImpl::mkBVFromBin(getBVInBin(sel));
+  if (elementSort->isBVSort()) {
+    SMTResult<std::string> result = getBVInBin(sel);
+    assert(result && "Failed to get STP bit-vector array element");
+    return SMTSolverImpl::mkBVFromBin(result.value());
+  }
 
   assert(elementSort->isFPSort() && "Unknown array element type");
+  SMTResult<std::string> result = getFPInBin(sel);
+  assert(result && "Failed to get STP FP array element");
   return SMTSolverImpl::mkFPFromBin(
-      getFPInBin(sel), elementSort->getFPExponentWidth(), FPEncoding::BV);
+      result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
 
 SMTExprRef STPSolver::mkBoolImpl(const bool b) {

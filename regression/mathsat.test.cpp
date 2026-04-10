@@ -85,14 +85,18 @@ TEST_CASE("MathSAT reset reuses symbol names across sort changes",
   auto x_bv = mathsat->mkSymbol("x", mathsat->mkBVSort(8));
   mathsat->addConstraint(mathsat->mkEqual(x_bv, eight));
   REQUIRE(mathsat->check() == camada::checkResult::SAT);
-  REQUIRE(mathsat->getBV(x_bv) == 8);
+  auto x_bv_res = mathsat->getBV(x_bv);
+  REQUIRE(x_bv_res);
+  REQUIRE(x_bv_res.value() == 8);
 
   mathsat->reset();
 
   auto x_bool = mathsat->mkSymbol("x", mathsat->mkBoolSort());
   mathsat->addConstraint(x_bool);
   REQUIRE(mathsat->check() == camada::checkResult::SAT);
-  REQUIRE(mathsat->getBool(x_bool));
+  auto x_bool_res = mathsat->getBool(x_bool);
+  REQUIRE(x_bool_res);
+  REQUIRE(x_bool_res.value());
 }
 
 TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
@@ -101,7 +105,9 @@ TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
     auto x_bv = mathsat->mkSymbol("x", mathsat->mkBVSort(4));
     mathsat->addConstraint(mathsat->mkEqual(x_bv, mathsat->mkBVFromDec(3, 4)));
     REQUIRE(mathsat->check() == camada::checkResult::SAT);
-    REQUIRE(mathsat->getBV(x_bv) == 3);
+    auto x_bv_res = mathsat->getBV(x_bv);
+    REQUIRE(x_bv_res);
+    REQUIRE(x_bv_res.value() == 3);
   }
 
   {
@@ -109,6 +115,8 @@ TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
     auto x_bool = mathsat->mkSymbol("x", mathsat->mkBoolSort());
     mathsat->addConstraint(mathsat->mkNot(x_bool));
     REQUIRE(mathsat->check() == camada::checkResult::SAT);
-    REQUIRE_FALSE(mathsat->getBool(x_bool));
+    auto x_bool_res = mathsat->getBool(x_bool);
+    REQUIRE(x_bool_res);
+    REQUIRE_FALSE(x_bool_res.value());
   }
 }

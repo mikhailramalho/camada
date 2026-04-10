@@ -201,8 +201,8 @@ SMTExprRef YicesSolver::rewrapExprImpl(const SMTExpr &Exp,
 
 SMTSortRef YicesSolver::mkBoolSortImpl() {
   return makeSortRef<YicesSort>(YicesSort(SMTSortKind::Bool, Context,
-                                         yices_bool_type(),
-                                         SMTSort::ScalarSortData{1}));
+                                          yices_bool_type(),
+                                          SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef YicesSolver::mkIntSortImpl() {
@@ -217,8 +217,8 @@ SMTSortRef YicesSolver::mkRealSortImpl() {
 
 SMTSortRef YicesSolver::mkBVSortImpl(unsigned BitWidth) {
   return makeSortRef<YicesSort>(YicesSort(SMTSortKind::BV, Context,
-                                         yices_bv_type(BitWidth),
-                                         SMTSort::ScalarSortData{BitWidth}));
+                                          yices_bv_type(BitWidth),
+                                          SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
@@ -230,8 +230,8 @@ SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
 
 SMTSortRef YicesSolver::mkBVRMSortImpl() {
   return makeSortRef<YicesSort>(YicesSort(SMTSortKind::BVRM, Context,
-                                         yices_bv_type(3),
-                                         SMTSort::ScalarSortData{3}));
+                                          yices_bv_type(3),
+                                          SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef YicesSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
@@ -671,7 +671,7 @@ SMTExprRef YicesSolver::mkApplyImpl(const SMTExprRef &Function,
                         ApplyArgs.size(), ApplyArgs.data()));
 }
 
-bool YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<bool> YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   int32_t val;
   auto res = yices_get_bool_value(yices_get_model(Context, 1),
                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
@@ -685,7 +685,7 @@ static inline void getYicesMPQValue(context_t *Context, term_t Expr,
   yicesCheckError(res, "Can't get rational value from Yices");
 }
 
-std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
   std::vector<int32_t> data(width);
@@ -702,12 +702,14 @@ std::string YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   return val;
 }
 
-std::string YicesSolver::getIntImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> YicesSolver::getIntImpl(const SMTExprRef &Exp) {
   if (Exp->isRealSort()) {
-    std::string Num, Den;
-    getRationalImpl(Exp, Num, Den);
-    assert(Den == "1" && "Real value is not integral");
-    return Num;
+    SMTResult<std::pair<std::string, std::string>> result =
+        getRationalImpl(Exp);
+    if (!result)
+      return result.error();
+    assert(result.value().second == "1" && "Real value is not integral");
+    return result.value().first;
   }
 
   int64_t val;
@@ -717,20 +719,21 @@ std::string YicesSolver::getIntImpl(const SMTExprRef &Exp) {
   return std::to_string(val);
 }
 
-void YicesSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
-                                  std::string &Den) {
+SMTResult<std::pair<std::string, std::string>>
+YicesSolver::getRationalImpl(const SMTExprRef &Exp) {
   mpq_t val;
   mpq_init(val);
   getYicesMPQValue(Context, toSolverExpr<YicesExpr>(*Exp).Expr, val);
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
-  Num = raw_num;
-  Den = raw_den;
+  std::string Num = raw_num;
+  std::string Den = raw_den;
   void (*gmp_free)(void *, std::size_t);
   mp_get_memory_functions(nullptr, nullptr, &gmp_free);
   gmp_free(raw_num, Num.size() + 1);
   gmp_free(raw_den, Den.size() + 1);
   mpq_clear(val);
+  return std::make_pair(Num, Den);
 }
 
 SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
@@ -738,15 +741,23 @@ SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
   const SMTExprRef &sel = mkArraySelect(Array, Index);
 
   const SMTSortRef &elementSort = Array->Sort->getElementSort();
-  if (elementSort->isBoolSort())
-    return mkBool(getBool(sel));
+  if (elementSort->isBoolSort()) {
+    SMTResult<bool> result = getBool(sel);
+    assert(result && "Failed to get Yices boolean array element");
+    return mkBool(result.value());
+  }
 
-  if (elementSort->isBVSort())
-    return SMTSolverImpl::mkBVFromBin(getBVInBin(sel));
+  if (elementSort->isBVSort()) {
+    SMTResult<std::string> result = getBVInBin(sel);
+    assert(result && "Failed to get Yices bit-vector array element");
+    return SMTSolverImpl::mkBVFromBin(result.value());
+  }
 
   assert(elementSort->isFPSort() && "Unknown array element type");
+  SMTResult<std::string> result = getFPInBin(sel);
+  assert(result && "Failed to get Yices FP array element");
   return SMTSolverImpl::mkFPFromBin(
-      getFPInBin(sel), elementSort->getFPExponentWidth(), FPEncoding::BV);
+      result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
 
 SMTExprRef YicesSolver::mkBoolImpl(const bool b) {

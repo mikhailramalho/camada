@@ -191,9 +191,9 @@ protected:
   SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                           const SMTExprRef &Body) override;
 
-  bool getBoolImpl(const SMTExprRef &Exp) override;
-  std::string getBVInBinImpl(const SMTExprRef &Exp) override;
-  std::string getFPInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 

@@ -148,8 +148,8 @@ SMTExprRef Z3Solver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
 
 SMTSortRef Z3Solver::mkBoolSortImpl() {
   return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::Bool, &Context,
-                                   Context.bool_sort(),
-                                   SMTSort::ScalarSortData{1}));
+                                    Context.bool_sort(),
+                                    SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef Z3Solver::mkIntSortImpl() {
@@ -164,14 +164,14 @@ SMTSortRef Z3Solver::mkRealSortImpl() {
 
 SMTSortRef Z3Solver::mkBVSortImpl(unsigned BitWidth) {
   return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::BV, &Context,
-                                   Context.bv_sort(BitWidth),
-                                   SMTSort::ScalarSortData{BitWidth}));
+                                    Context.bv_sort(BitWidth),
+                                    SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef Z3Solver::mkRMSortImpl() {
   return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::RM, &Context,
-                                   Context.fpa_rounding_mode_sort(),
-                                   SMTSort::ScalarSortData{3}));
+                                    Context.fpa_rounding_mode_sort(),
+                                    SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef Z3Solver::mkFPSortImpl(const unsigned ExpWidth,
@@ -190,8 +190,8 @@ SMTSortRef Z3Solver::mkBVFPSortImpl(const unsigned ExpWidth,
 
 SMTSortRef Z3Solver::mkBVRMSortImpl() {
   return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::BVRM, &Context,
-                                   Context.bv_sort(3),
-                                   SMTSort::ScalarSortData{3}));
+                                    Context.bv_sort(3),
+                                    SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef Z3Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
@@ -234,7 +234,7 @@ Z3Solver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
       Projs);
 
   return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::Tuple, &Context, Ctor.range(),
-                                   SMTSort::TupleSortData{ElementSorts}));
+                                    SMTSort::TupleSortData{ElementSorts}));
 }
 
 SMTExprRef Z3Solver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -748,7 +748,7 @@ SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
                                                        toZ3Expr(From))));
 }
 
-bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<bool> Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
   z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   switch (Value.bool_value()) {
   case Z3_L_TRUE:
@@ -758,10 +758,11 @@ bool Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
   case Z3_L_UNDEF:
     break;
   }
-  fatalError("Bool is neither true nor false");
+  return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                  "Bool model value is neither true nor false"};
 }
 
-std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   std::string bv;
   bool is_num = Value.as_binary(bv);
@@ -770,13 +771,15 @@ std::string Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   return bv;
 }
 
-std::string Z3Solver::getIntImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> Z3Solver::getIntImpl(const SMTExprRef &Exp) {
   z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
   if (Exp->isRealSort()) {
-    std::string Num, Den;
-    getRationalImpl(Exp, Num, Den);
-    assert(Den == "1" && "Real value is not integral");
-    return Num;
+    SMTResult<std::pair<std::string, std::string>> result =
+        getRationalImpl(Exp);
+    if (!result)
+      return result.error();
+    assert(result.value().second == "1" && "Real value is not integral");
+    return result.value().first;
   }
   assert(value.is_numeral() && "Expected integer numeral from Z3");
   std::string numeral;
@@ -786,8 +789,8 @@ std::string Z3Solver::getIntImpl(const SMTExprRef &Exp) {
   return numeral;
 }
 
-void Z3Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
-                               std::string &Den) {
+SMTResult<std::pair<std::string, std::string>>
+Z3Solver::getRationalImpl(const SMTExprRef &Exp) {
   z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
   assert(value.is_numeral() && "Expected rational numeral from Z3");
   std::string num;
@@ -797,11 +800,10 @@ void Z3Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
   (void)has_num;
   (void)has_den;
   assert(has_num && has_den && "Failed to get rational numeral from Z3");
-  Num = num;
-  Den = den;
+  return std::make_pair(num, den);
 }
 
-std::string Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   z3::expr fp_value = Solver.get_model().eval(Value.mk_to_ieee_bv(), true);
   std::string bv;

@@ -997,65 +997,74 @@ SMTExprRef SMTSolverImpl::mkExistsImpl(const std::vector<SMTExprRef> &,
   fatalError("Quantifiers");
 }
 
-bool SMTSolverImpl::getBool(const SMTExprRef &Exp) {
+SMTResult<bool> SMTSolverImpl::getBool(const SMTExprRef &Exp) {
   assert(Exp->isBoolSort());
   return getBoolImpl(Exp);
 }
 
-int64_t SMTSolverImpl::getBV(const SMTExprRef &Exp) {
+SMTResult<int64_t> SMTSolverImpl::getBV(const SMTExprRef &Exp) {
   assert(Exp->isBVSort());
   return getBVImpl(Exp);
 }
 
-std::string SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
   assert(Exp->isBVSort());
-  return addLeadingZeroes(getBVInBinImpl(Exp), Exp->getWidth());
+  SMTResult<std::string> result = getBVInBinImpl(Exp);
+  if (!result)
+    return result.error();
+  return addLeadingZeroes(result.value(), Exp->getWidth());
 }
 
-std::string SMTSolverImpl::getInt(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getInt(const SMTExprRef &Exp) {
   assert(Exp->isIntSort() || Exp->isRealSort());
   return getIntImpl(Exp);
 }
 
-void SMTSolverImpl::getRational(const SMTExprRef &Exp, std::string &Num,
-                                std::string &Den) {
+SMTResult<std::pair<std::string, std::string>>
+SMTSolverImpl::getRational(const SMTExprRef &Exp) {
   assert(Exp->isRealSort());
-  getRationalImpl(Exp, Num, Den);
+  return getRationalImpl(Exp);
 }
 
-void SMTSolverImpl::getRationalImpl(const SMTExprRef &, std::string &,
-                                    std::string &) {
-  fatalError("Real arithmetic");
+SMTResult<std::pair<std::string, std::string>>
+SMTSolverImpl::getRationalImpl(const SMTExprRef &Exp) {
+  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
+                  "Real arithmetic is not supported by this backend"};
 }
 
-std::string SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
   assert(Exp->isRealSort());
-  std::string Num, Den;
-  getRationalImpl(Exp, Num, Den);
-  return Num;
+  SMTResult<std::pair<std::string, std::string>> result = getRationalImpl(Exp);
+  if (!result)
+    return result.error();
+  return result.value().first;
 }
 
-std::string SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
+SMTResult<std::string>
+SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
   assert(Exp->isRealSort());
-  std::string Num, Den;
-  getRationalImpl(Exp, Num, Den);
-  return Den;
+  SMTResult<std::pair<std::string, std::string>> result = getRationalImpl(Exp);
+  if (!result)
+    return result.error();
+  return result.value().second;
 }
 
-std::string SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   assert(Exp->isFPSort());
-  return addLeadingZeroes(usesBVFPEncoding(Exp)
-                              ? SMTSolverImpl::getFPInBinImpl(Exp)
-                              : getFPInBinImpl(Exp),
-                          Exp->getWidth());
+  SMTResult<std::string> result = usesBVFPEncoding(Exp)
+                                      ? SMTSolverImpl::getFPInBinImpl(Exp)
+                                      : getFPInBinImpl(Exp);
+  if (!result)
+    return result.error();
+  return addLeadingZeroes(result.value(), Exp->getWidth());
 }
 
-float SMTSolverImpl::getFP32(const SMTExprRef &Exp) {
+SMTResult<float> SMTSolverImpl::getFP32(const SMTExprRef &Exp) {
   assert(Exp->isFPSort());
   return getFP32Impl(Exp);
 }
 
-double SMTSolverImpl::getFP64(const SMTExprRef &Exp) {
+SMTResult<double> SMTSolverImpl::getFP64(const SMTExprRef &Exp) {
   assert(Exp->isFPSort());
   return getFP64Impl(Exp);
 }
@@ -1479,8 +1488,9 @@ SMTExprRef SMTSolverImpl::mkTupleSelectImpl(const SMTExprRef &, unsigned) {
   fatalError("Tuples");
 }
 
-std::string SMTSolverImpl::getIntImpl(const SMTExprRef &) {
-  fatalError("Integer arithmetic");
+SMTResult<std::string> SMTSolverImpl::getIntImpl(const SMTExprRef &Exp) {
+  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
+                  "Integer arithmetic is not supported by this backend"};
 }
 
 SMTExprRef SMTSolverImpl::mkIntImpl(int64_t) {

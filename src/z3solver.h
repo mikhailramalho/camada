@@ -295,16 +295,16 @@ protected:
   SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
                                 const SMTExprRef &R) override;
 
-  bool getBoolImpl(const SMTExprRef &Exp) override;
+  SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
 
-  std::string getBVInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
 
-  std::string getIntImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getIntImpl(const SMTExprRef &Exp) override;
 
-  void getRationalImpl(const SMTExprRef &Exp, std::string &Num,
-                       std::string &Den) override;
+  SMTResult<std::pair<std::string, std::string>>
+  getRationalImpl(const SMTExprRef &Exp) override;
 
-  std::string getFPInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;

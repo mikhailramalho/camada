@@ -2162,7 +2162,7 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
   return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPtoIntegral);
 }
 
-std::string SMTSolverImpl::getFPInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getFPInBinImpl(const SMTExprRef &Exp) {
   return getBVInBin(Exp);
 }
 
@@ -2395,22 +2395,31 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
                       mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
-int64_t SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
-  const std::string bv = getBVInBin(Exp);
+SMTResult<int64_t> SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
+  SMTResult<std::string> result = getBVInBin(Exp);
+  if (!result)
+    return result.error();
+  const std::string &bv = result.value();
   uint64_t res = std::strtoull(bv.c_str(), nullptr, 2);
   if (res & (1ULL << (Exp->getWidth() - 1)))
     res |= ~((1ULL << Exp->getWidth()) - 1);
   return res;
 }
 
-float SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
+SMTResult<float> SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
+  SMTResult<std::string> result = getFPInBin(Exp);
+  if (!result)
+    return result.error();
   return IntAsFP<float, uint32_t>(
-      std::strtoul(getFPInBin(Exp).c_str(), nullptr, 2));
+      std::strtoul(result.value().c_str(), nullptr, 2));
 }
 
-double SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
+SMTResult<double> SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
+  SMTResult<std::string> result = getFPInBin(Exp);
+  if (!result)
+    return result.error();
   return IntAsFP<double, uint64_t>(
-      std::strtoull(getFPInBin(Exp).c_str(), nullptr, 2));
+      std::strtoull(result.value().c_str(), nullptr, 2));
 }
 
 SMTExprRef SMTSolverImpl::mkFP32Impl(const float Float, FPEncoding Encoding) {
