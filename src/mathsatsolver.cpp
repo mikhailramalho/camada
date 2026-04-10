@@ -184,7 +184,7 @@ static inline bool checkExprError(const SMTExpr &Exp) {
                       : checkExprError(*exp.Context, exp.getTerm());
 }
 
-SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) const {
+SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
   const auto &Wrapped = toSolverExpr<MathSATExpr>(Exp);
   if (Wrapped.isDecl())
@@ -196,7 +196,7 @@ SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) const {
 
 SMTExprRef MathSATSolver::rewrapExprImpl(const SMTExpr &Exp,
                                          const SMTSortRef &Sort,
-                                         SMTExprKind Kind) const {
+                                         SMTExprKind Kind) {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
   const auto &Wrapped = toSolverExpr<MathSATExpr>(Exp);
   if (Wrapped.isDecl())
