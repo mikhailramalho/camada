@@ -469,13 +469,23 @@ SMTExprRef SMTSolverImpl::mkFPAbsImpl(const SMTExprRef &Exp) {
 
 SMTExprRef SMTSolverImpl::mkFPNegImpl(const SMTExprRef &Exp,
                                       FPNegBehavior Behavior) {
-  // Extract everything but the sign bit
-  SMTExprRef ew_sw = extractExpSig(*this, Exp);
-  SMTExprRef sgn = extractSgn(*this, Exp);
-  SMTExprRef flipped = mkBVToIEEEFP(mkBVConcat(mkBVNot(sgn), ew_sw), Exp->Sort);
-  SMTExprRef result = Behavior == FPNegBehavior::FlipSignBit
-                          ? flipped
-                          : mkIte(mkFPIsNaN(Exp), Exp, flipped);
+  SMTExprRef result;
+  if (Behavior == FPNegBehavior::FlipSignBit) {
+    SMTExprRef ew_sw = extractExpSig(*this, Exp);
+    SMTExprRef sgn = extractSgn(*this, Exp);
+    result = mkBVToIEEEFP(mkBVConcat(mkBVNot(sgn), ew_sw), Exp->Sort);
+  } else {
+    // Preserve NaNs, negate everything else.
+    SMTExprRef sgn = extractSgn(*this, Exp);
+    SMTExprRef exp = extractExp(*this, Exp);
+    SMTExprRef sig = extractSig(*this, Exp);
+    SMTExprRef x_is_nan = mkFPIsNaN(Exp);
+    SMTExprRef nsgn = mkBVNot(sgn);
+    SMTExprRef nx =
+        mkBVToIEEEFP(mkBVConcat(nsgn, mkBVConcat(exp, sig)), Exp->Sort);
+    result = mkIte(x_is_nan, Exp, nx);
+  }
+
   return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPNeg);
 }
 
