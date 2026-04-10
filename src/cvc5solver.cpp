@@ -22,8 +22,18 @@
 #if SOLVER_CVC5_ENABLED
 
 #include "cvc5solver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
 
+#include <cassert>
 #include <cstdio>
+#include <cvc5/cvc5_kind.h>
+#include <cvc5/cvc5_types.h>
+#include <optional>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace camada {
 

@@ -22,15 +22,25 @@
 #ifndef CAMADAIMPL_H_
 #define CAMADAIMPL_H_
 
-#include "camada.h"
-#include "camadaarena.h"
-#include "camadaerror.h"
-
+#include <array>
 #include <cassert>
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "camada.h"
+#include "camadaarena.h"
+#include "camadacache.h"
+#include "camadaexpr.h"
+#include "camadasort.h"
+
 namespace camada {
+
+enum class FPEncoding;
+enum class RM;
 
 class SMTSolverImpl : public SMTSolver {
 public:

@@ -20,6 +20,7 @@
  **************************************************************************/
 
 #include "camadaimpl.h"
+#include "camadaerror.h"
 
 #include <bitset>
 #include <cmath>

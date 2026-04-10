@@ -22,9 +22,6 @@
 #include "camada.h"
 #include "ac_config.h"
 
-#include <cstdio>
-#include <cstdlib>
-
 #if SOLVER_Z3_ENABLED
 #include "z3solver.h"
 #endif

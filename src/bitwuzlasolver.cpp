@@ -22,11 +22,18 @@
 #if SOLVER_BITWUZLA_ENABLED
 
 #include "bitwuzlasolver.h"
+#include "camada.h"
+#include "camadacache.h"
+#include "camadaerror.h"
+#include "camadafp.h"
 #include "camadautil.h"
 
-#include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace camada {
 

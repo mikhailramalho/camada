@@ -19,12 +19,19 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #if SOLVER_Z3_ENABLED
 
 #include "z3solver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
 
+#include <cassert>
 #include <cstdio>
+#include <vector>
+#include <z3_api.h>
+#include <z3_ast_containers.h>
+#include <z3_fpa.h>
 
 namespace camada {
 

@@ -19,18 +19,18 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #if SOLVER_MATHSAT_ENABLED
 
-#include "camadautil.h"
 #include "mathsatsolver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
+#include "camadautil.h"
 
-#include <cassert>
-#include <cstddef>
 #include <cstdio>
-#include <cstdlib>
 #include <gmp.h>
 #include <type_traits>
+#include <vector>
 
 namespace camada {
 

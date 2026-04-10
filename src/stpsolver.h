@@ -22,11 +22,17 @@
 #ifndef STPSOLVER_H_
 #define STPSOLVER_H_
 
-#include "camadaimpl.h"
+#include <cstdint>
+#include <string>
+#include <utility>
 
 namespace STP {
 #include <stp/c_interface.h>
 }
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 

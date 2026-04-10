@@ -24,8 +24,6 @@
 
 #include "camadasort.h"
 
-#include <utility>
-
 namespace camada {
 
 class SMTExpr;

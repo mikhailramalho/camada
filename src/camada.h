@@ -22,18 +22,16 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
-#include <array>
+#include <cassert>
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include "camadacache.h"
 #include "camadaexpr.h"
-#include "camadafeatures.h"
 #include "camadafp.h"
+#include "camadasort.h"
 
 namespace camada {
 

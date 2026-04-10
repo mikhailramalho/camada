@@ -22,9 +22,13 @@
 #ifndef CVC5SOLVER_H_
 #define CVC5SOLVER_H_
 
-#include "camadaimpl.h"
-
+#include <cstdint>
 #include <cvc5/cvc5.h>
+#include <string>
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 

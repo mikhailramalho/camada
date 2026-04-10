@@ -1,4 +1,6 @@
 #include "camadaimpl.h"
+#include "camadaerror.h"
+#include "camadafp.h"
 
 #include <cstdio>
 

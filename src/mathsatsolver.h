@@ -22,10 +22,16 @@
 #ifndef MATHSATSOLVER_H_
 #define MATHSATSOLVER_H_
 
-#include "camadaimpl.h"
-
+#include <cassert>
+#include <cstdint>
 #include <mathsat.h>
+#include <string>
+#include <utility>
 #include <variant>
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 

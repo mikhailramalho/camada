@@ -22,9 +22,14 @@
 #ifndef Z3SOLVER_H_
 #define Z3SOLVER_H_
 
-#include "camadaimpl.h"
-
+#include <cstdint>
+#include <string>
+#include <utility>
 #include <z3++.h>
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 

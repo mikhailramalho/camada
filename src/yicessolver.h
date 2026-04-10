@@ -22,12 +22,16 @@
 #ifndef YICESSOLVER_H_
 #define YICESSOLVER_H_
 
-#include "camadaimpl.h"
-
+#include <cstddef>
+#include <cstdint>
 #include <gmp.h>
-#include <unordered_map>
+#include <string>
 #include <vector>
 #include <yices.h>
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 

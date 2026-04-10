@@ -19,16 +19,19 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #if SOLVER_YICES_ENABLED
 
 #include "yicessolver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
 
-#include <cassert>
 #include <cstdio>
 #include <gmp.h>
 #include <mutex>
+#include <utility>
 #include <vector>
+#include <yices.h>
 
 namespace camada {
 

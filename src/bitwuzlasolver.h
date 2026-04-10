@@ -22,13 +22,16 @@
 #ifndef BITWUZLASOLVER_H_
 #define BITWUZLASOLVER_H_
 
-#include "camadaimpl.h"
-
-#include <unordered_map>
+#include <cstdint>
+#include <string>
 
 extern "C" {
 #include <bitwuzla/c/bitwuzla.h>
 }
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 

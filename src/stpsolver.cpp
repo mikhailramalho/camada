@@ -19,15 +19,18 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #if SOLVER_STP_ENABLED
 
-#include "camadautil.h"
 #include "stpsolver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
+#include "camadautil.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 
 namespace camada {
 
