@@ -2374,17 +2374,14 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
   SMTExprRef inf_sig = mkBVFromDec(0, SWidth - 1);
   const SMTExprRef &inf_exp = top_exp;
 
-  SMTExprRef max_inf_exp_neg = mkIte(rm_zero_or_pos, max_exp, inf_exp);
-  SMTExprRef max_inf_exp_pos = mkIte(rm_zero_or_neg, max_exp, inf_exp);
-  SMTExprRef ovfl_exp = mkIte(sgn_is_zero, max_inf_exp_pos, max_inf_exp_neg);
+  SMTExprRef ovfl_to_max = mkIte(sgn_is_zero, rm_zero_or_neg, rm_zero_or_pos);
+  SMTExprRef ovfl_exp = mkIte(ovfl_to_max, max_exp, inf_exp);
   t_sig = mkBVExtract(SWidth - 1, SWidth - 1, Sig);
   SMTExprRef n_d_check = mkEqual(t_sig, nil_1);
   SMTExprRef n_d_exp = mkIte(n_d_check, bot_exp /* denormal */, biased_exp);
   Exp = mkIte(OVF, ovfl_exp, n_d_exp);
 
-  SMTExprRef max_inf_sig_neg = mkIte(rm_zero_or_pos, max_sig, inf_sig);
-  SMTExprRef max_inf_sig_pos = mkIte(rm_zero_or_neg, max_sig, inf_sig);
-  SMTExprRef ovfl_sig = mkIte(sgn_is_zero, max_inf_sig_pos, max_inf_sig_neg);
+  SMTExprRef ovfl_sig = mkIte(ovfl_to_max, max_sig, inf_sig);
   SMTExprRef rest_sig = mkBVExtract(SWidth - 2, 0, Sig);
   Sig = mkIte(OVF, ovfl_sig, rest_sig);
 
