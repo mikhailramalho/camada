@@ -35,6 +35,26 @@ inline void tuple_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(42, 8)));
   solver->addConstraint(solver->mkEqual(i, solver->mkInt(7)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
-  REQUIRE(solver->getBool(b));
-  REQUIRE(solver->getBV(bv) == 42);
+  auto b_res = solver->getBool(b);
+  auto bv_res = solver->getBV(bv);
+  REQUIRE(b_res);
+  REQUIRE(bv_res);
+  REQUIRE(b_res.value());
+  REQUIRE(bv_res.value() == 42);
+}
+
+inline void empty_tuple_semantics(const camada::SMTSolverRef &solver) {
+  auto tupleSort = solver->mkTupleSort({});
+  auto tupleValue = solver->mkTuple({});
+
+  REQUIRE(tupleSort->isTupleSort());
+  REQUIRE(tupleSort->getTupleElementSorts().empty());
+  REQUIRE(tupleValue->getKind() == camada::SMTExprKind::TupleConst);
+  REQUIRE(tupleValue->Sort == tupleSort);
+
+  auto tupleSymbol = solver->mkSymbol("empty_tuple", tupleSort);
+  REQUIRE(tupleSymbol->Sort == tupleSort);
+
+  solver->addConstraint(solver->mkEqual(tupleSymbol, tupleValue));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
 }

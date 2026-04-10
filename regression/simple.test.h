@@ -22,9 +22,12 @@ inline void equal_ten(const camada::SMTSolverRef &solver) {
   // And check for satisfiability
   REQUIRE(solver->check() == camada::checkResult::SAT);
 
-  int64_t f_res = solver->getBV(f);
-  REQUIRE(f_res == -10);
-  REQUIRE(f_res == solver->getBV(ten));
+  auto f_res = solver->getBV(f);
+  REQUIRE(f_res);
+  REQUIRE(f_res.value() == -10);
+  auto ten_res = solver->getBV(ten);
+  REQUIRE(ten_res);
+  REQUIRE(f_res.value() == ten_res.value());
 }
 
 inline void fp_equal(const camada::SMTSolverRef &solver,
@@ -49,8 +52,12 @@ inline void fp_equal(const camada::SMTSolverRef &solver,
 
   // And check for satisfiability
   REQUIRE(solver->check() == camada::checkResult::SAT);
-  REQUIRE(solver->getFP32(fx) == 0.06f);
-  REQUIRE(solver->getFP64(fy) == -7.0);
+  auto fx_res = solver->getFP32(fx);
+  auto fy_res = solver->getFP64(fy);
+  REQUIRE(fx_res);
+  REQUIRE(fy_res);
+  REQUIRE(fx_res.value() == 0.06f);
+  REQUIRE(fy_res.value() == -7.0);
 }
 
 inline void implies_semantics(const camada::SMTSolverRef &solver) {
@@ -100,7 +107,9 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
 
   solver->pop();
   REQUIRE(solver->check() == camada::checkResult::SAT);
-  REQUIRE(solver->getBV(x) == 1);
+  auto x_res = solver->getBV(x);
+  REQUIRE(x_res);
+  REQUIRE(x_res.value() == 1);
 }
 
 inline void
@@ -251,18 +260,28 @@ inline void arith_model_queries(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(r, solver->mkReal(3, 2)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 
-  REQUIRE(solver->getInt(x) == "5");
-  REQUIRE(solver->getInt(x_plus_two) == "7");
+  auto x_res = solver->getInt(x);
+  auto x_plus_two_res = solver->getInt(x_plus_two);
+  REQUIRE(x_res);
+  REQUIRE(x_plus_two_res);
+  REQUIRE(x_res.value() == "5");
+  REQUIRE(x_plus_two_res.value() == "7");
 
-  std::string num;
-  std::string den;
-  solver->getRational(r, num, den);
-  REQUIRE(num == "3");
-  REQUIRE(den == "2");
-  REQUIRE(solver->getRealNumerator(r) == "3");
-  REQUIRE(solver->getRealDenominator(r) == "2");
+  auto rational = solver->getRational(r);
+  REQUIRE(rational);
+  REQUIRE(rational.value().first == "3");
+  REQUIRE(rational.value().second == "2");
 
-  REQUIRE(solver->getInt(r_plus_half) == "2");
+  auto numerator = solver->getRealNumerator(r);
+  auto denominator = solver->getRealDenominator(r);
+  REQUIRE(numerator);
+  REQUIRE(denominator);
+  REQUIRE(numerator.value() == "3");
+  REQUIRE(denominator.value() == "2");
+
+  auto r_plus_half_res = solver->getInt(r_plus_half);
+  REQUIRE(r_plus_half_res);
+  REQUIRE(r_plus_half_res.value() == "2");
 }
 
 inline void arith_conversion_semantics(const camada::SMTSolverRef &solver) {

@@ -22,47 +22,30 @@
 #ifndef CAMADAIMPL_H_
 #define CAMADAIMPL_H_
 
-#include "camada.h"
-#include "camadaarena.h"
-#include "camadaerror.h"
-
+#include <array>
 #include <cassert>
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "camada.h"
+#include "camadaarena.h"
+#include "camadacache.h"
+#include "camadaexpr.h"
+#include "camadasort.h"
+
 namespace camada {
+
+enum class FPEncoding;
+enum class RM;
 
 class SMTSolverImpl : public SMTSolver {
 public:
   SMTSolverImpl() = default;
   virtual ~SMTSolverImpl() override = default;
-
-  SMTExprRef getBVZero1Expr() const { return CachedSmallBVZeroExprs[1]; }
-  SMTExprRef getBVOne1Expr() const { return CachedBVOne1Expr; }
-  SMTExprRef getBVZero2Expr() const { return CachedSmallBVZeroExprs[2]; }
-  SMTExprRef getBVZero3Expr() const { return CachedSmallBVZeroExprs[3]; }
-  SMTExprRef getBVZero4Expr() const { return CachedSmallBVZeroExprs[4]; }
-  SMTExprRef getRMExpr(RM R) const {
-    return CachedRMBVExprs[static_cast<std::size_t>(R)];
-  }
-  SMTExprRef getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
-                              FPSpecialValueKind Kind, bool Sign);
-
-  static bool usesBVFPEncoding(const SMTSortRef &Sort) {
-    return Sort->isBVFPSort();
-  }
-
-  static bool usesBVFPEncoding(const SMTExprRef &Exp) {
-    return usesBVFPEncoding(Exp->Sort);
-  }
-
-  static bool usesBVRMEncoding(const SMTSortRef &Sort) {
-    return Sort->isBVRMSort();
-  }
-
-  static bool usesBVRMEncoding(const SMTExprRef &Exp) {
-    return usesBVRMEncoding(Exp->Sort);
-  }
 
 protected:
   template <typename SolverExpr, typename... Args>
@@ -73,7 +56,7 @@ protected:
     return SMTExprRef(Exp, HandleState, HandleState->Generation);
   }
 
-  template <typename SolverSort> SMTSortRef newSortRef(SolverSort Sort) const {
+  template <typename SolverSort> SMTSortRef makeSortRef(SolverSort Sort) const {
     auto *OwnedSort = SortArena.create<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
 #ifndef NDEBUG
@@ -82,71 +65,10 @@ protected:
     return SMTSortRef(OwnedSort, HandleState, HandleState->Generation);
   }
 
-  void invalidateGeneratedObjects() {
-    clearSortCaches();
-    clearExprCaches();
-    ++HandleState->Generation;
-    ExprArena.clear();
-    SortArena.clear();
-  }
-
-  void clearSortCaches() {
-    CachedBoolSort = {};
-    CachedIntSort = {};
-    CachedRealSort = {};
-    CachedNativeRMSort = {};
-    CachedEncodedRMSort = {};
-    BVSortCache.clear();
-    NativeFPSortCache.clear();
-    EncodedFPSortCache.clear();
-    ArraySortCache.clear();
-    SmallFunctionSortCache.clear();
-    FunctionSortCache.clear();
-    SmallTupleSortCache.clear();
-    TupleSortCache.clear();
-  }
-
-  void clearExprCaches() {
-    CachedBoolExprs.fill({});
-    CachedBVOne1Expr = {};
-    CachedSmallBVZeroExprs.fill({});
-    CachedRMBVExprs.fill({});
-    CachedBVNegOneExprs.clear();
-    CachedBVZeroExprs.clear();
-    CachedBVOneExprs.clear();
-    SymbolExprCache.clear();
-    FPSpecialExprCache.clear();
-    FPConstExprCache.clear();
-  }
-
-  void initializeCommonSingletons() {
-    CachedBoolExprs[0] = mkBool(false);
-    CachedBoolExprs[1] = mkBool(true);
-    CachedBVOne1Expr = mkBVFromBin("1", 1);
-    CachedSmallBVZeroExprs[1] = mkBVFromBin("0", 1);
-    CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
-    CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
-    CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
-    CachedBVZeroExprs.resize(5);
-    CachedBVZeroExprs[1] = CachedSmallBVZeroExprs[1];
-    CachedBVZeroExprs[2] = CachedSmallBVZeroExprs[2];
-    CachedBVZeroExprs[3] = CachedSmallBVZeroExprs[3];
-    CachedBVZeroExprs[4] = CachedSmallBVZeroExprs[4];
-    CachedBVOneExprs.resize(2);
-    CachedBVOneExprs[1] = CachedBVOne1Expr;
-    CachedBVNegOneExprs.resize(2);
-    CachedBVNegOneExprs[1] = CachedBVOne1Expr;
-    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
-        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_EVEN);
-    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
-        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_AWAY);
-    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
-        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_PLUS_INF);
-    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
-        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_MINUS_INF);
-    CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
-        SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
-  }
+  void invalidateGeneratedObjects();
+  void clearSortCaches();
+  void clearExprCaches();
+  void initializeCommonSingletons();
 
   mutable ObjectArena SortArena;
   mutable ObjectArena ExprArena;
@@ -194,14 +116,16 @@ protected:
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 
-protected:
-  SMTExprRef newExprRef(const SMTExpr &Exp) const {
-    SMTExprRef theExp = newExprRefImpl(Exp);
-    assert(theExp->Sort->isWidthValidated());
-    return theExp;
-  }
-
 public:
+  SMTExprRef getBVZero1Expr() const;
+  SMTExprRef getBVOne1Expr() const;
+  SMTExprRef getBVZero2Expr() const;
+  SMTExprRef getBVZero3Expr() const;
+  SMTExprRef getBVZero4Expr() const;
+  SMTExprRef getRMExpr(RM R) const;
+  SMTExprRef getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
+                              FPSpecialValueKind Kind, bool Sign);
+
   SMTSortRef mkBoolSort() override final;
   SMTSortRef mkIntSort() override final;
   SMTSortRef mkRealSort() override final;
@@ -313,7 +237,9 @@ public:
   SMTExprRef mkBVRedOr(const SMTExprRef &Exp) override final;
   SMTExprRef mkBVRedAnd(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPAbs(const SMTExprRef &Exp) override final;
-  SMTExprRef mkFPNeg(const SMTExprRef &Exp) override final;
+  SMTExprRef
+  mkFPNeg(const SMTExprRef &Exp,
+          FPNegBehavior Behavior = FPNegBehavior::FlipSignBit) override final;
   SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override final;
 
@@ -367,17 +293,18 @@ public:
                       const SMTExprRef &Body) override final;
   SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
                       const SMTExprRef &Body) override final;
-  bool getBool(const SMTExprRef &Exp) override final;
-  int64_t getBV(const SMTExprRef &Exp) override final;
-  std::string getBVInBin(const SMTExprRef &Exp) override final;
-  std::string getInt(const SMTExprRef &Exp) override final;
-  void getRational(const SMTExprRef &Exp, std::string &Num,
-                   std::string &Den) override final;
-  std::string getRealNumerator(const SMTExprRef &Exp) override final;
-  std::string getRealDenominator(const SMTExprRef &Exp) override final;
-  std::string getFPInBin(const SMTExprRef &Exp) override final;
-  float getFP32(const SMTExprRef &Exp) override final;
-  double getFP64(const SMTExprRef &Exp) override final;
+  SMTResult<bool> getBool(const SMTExprRef &Exp) override final;
+  SMTResult<int64_t> getBV(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getBVInBin(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getInt(const SMTExprRef &Exp) override final;
+  SMTResult<std::pair<std::string, std::string>>
+  getRational(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getRealNumerator(const SMTExprRef &Exp) override final;
+  SMTResult<std::string>
+  getRealDenominator(const SMTExprRef &Exp) override final;
+  SMTResult<std::string> getFPInBin(const SMTExprRef &Exp) override final;
+  SMTResult<float> getFP32(const SMTExprRef &Exp) override final;
+  SMTResult<double> getFP64(const SMTExprRef &Exp) override final;
   SMTExprRef getArrayElement(const SMTExprRef &Array,
                              const SMTExprRef &Index) override final;
   SMTExprRef mkBool(const bool b) override final;
@@ -451,9 +378,7 @@ protected:
                                      const SMTSortRef &ElemSort) = 0;
 
   virtual SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &,
-                                        const SMTSortRef &) {
-    fatalError("Uninterpreted functions");
-  }
+                                        const SMTSortRef &);
 
   virtual SMTSortRef mkTupleSortImpl(const std::vector<SMTSortRef> &);
 
@@ -502,19 +427,11 @@ protected:
   virtual SMTExprRef mkBVAndImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
 
-  virtual SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS,
-                                  const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkBVNot(mkBVXor(LHS, RHS));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVXnor);
-  };
+  virtual SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
-  virtual SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
-                                  const SMTExprRef &RHS) {
-    SMTExprRef theExp = mkBVNot(mkBVAnd(LHS, RHS));
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNand);
-  };
+  virtual SMTExprRef mkBVNandImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkBVUltImpl(const SMTExprRef &LHS,
                                  const SMTExprRef &RHS) = 0;
@@ -542,11 +459,7 @@ protected:
                                  const SMTExprRef &RHS) = 0;
 
   virtual SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
-                                   const SMTExprRef &RHS) {
-    // This is: logical-or(logical-not(LHS), RHS)
-    SMTExprRef theExp = mkOr(mkNot(LHS), RHS);
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Implies);
-  }
+                                   const SMTExprRef &RHS);
 
   virtual SMTExprRef mkAndImpl(const SMTExprRef &LHS,
                                const SMTExprRef &RHS) = 0;
@@ -604,7 +517,7 @@ protected:
 
   virtual SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp);
 
-  virtual SMTExprRef mkFPNegImpl(const SMTExprRef &Exp);
+  virtual SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior Behavior);
 
   virtual SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp);
 
@@ -674,38 +587,30 @@ protected:
   virtual SMTExprRef mkTupleSelectImpl(const SMTExprRef &, unsigned);
 
   virtual SMTExprRef mkApplyImpl(const SMTExprRef &,
-                                 const std::vector<SMTExprRef> &) {
-    fatalError("Uninterpreted functions");
-  }
+                                 const std::vector<SMTExprRef> &);
 
   virtual SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &,
-                                  const SMTExprRef &) {
-    fatalError("Quantifiers");
-  }
+                                  const SMTExprRef &);
 
   virtual SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &,
-                                  const SMTExprRef &) {
-    fatalError("Quantifiers");
-  }
+                                  const SMTExprRef &);
 
-  virtual bool getBoolImpl(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) = 0;
 
-  int64_t getBVImpl(const SMTExprRef &Exp);
+  SMTResult<int64_t> getBVImpl(const SMTExprRef &Exp);
 
-  virtual std::string getBVInBinImpl(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) = 0;
 
-  virtual std::string getIntImpl(const SMTExprRef &);
+  virtual SMTResult<std::string> getIntImpl(const SMTExprRef &);
 
-  virtual void getRationalImpl(const SMTExprRef &, std::string &,
-                               std::string &) {
-    fatalError("Real arithmetic");
-  }
+  virtual SMTResult<std::pair<std::string, std::string>>
+  getRationalImpl(const SMTExprRef &);
 
-  virtual std::string getFPInBinImpl(const SMTExprRef &Exp);
+  virtual SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp);
 
-  float getFP32Impl(const SMTExprRef &Exp);
+  SMTResult<float> getFP32Impl(const SMTExprRef &Exp);
 
-  double getFP64Impl(const SMTExprRef &Exp);
+  SMTResult<double> getFP64Impl(const SMTExprRef &Exp);
 
   virtual SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                          const SMTExprRef &Index) = 0;

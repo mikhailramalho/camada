@@ -22,18 +22,16 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
-#include <array>
+#include <cassert>
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include "camadacache.h"
 #include "camadaexpr.h"
-#include "camadafeatures.h"
 #include "camadafp.h"
+#include "camadasort.h"
 
 namespace camada {
 
@@ -41,6 +39,72 @@ namespace camada {
 std::string getCamadaVersion();
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
+
+/// Coarse-grained error categories for operations that return `SMTResult<T>`.
+///
+/// These are intended for user-triggerable failures such as unsupported
+/// features or model-query failures, not internal invariant violations.
+enum class SMTErrorCode {
+  None,
+  BackendError,
+  InvalidModelValue,
+  UnsupportedOperation,
+};
+
+/// Structured error payload carried by `SMTResult<T>` on failure.
+struct SMTError {
+  SMTError() = default;
+
+  SMTError(SMTErrorCode TheCode, SMTBackendKind TheBackend,
+           std::string TheMessage)
+      : Code(TheCode), Backend(TheBackend), Message(std::move(TheMessage)) {}
+
+  SMTErrorCode Code = SMTErrorCode::None;
+  SMTBackendKind Backend{};
+  std::string Message;
+};
+
+/// Lightweight C++17 result type used by fallible Camada APIs.
+///
+/// A result either contains a value of type `T` or an `SMTError`.
+/// Successful results convert to `true`; failures convert to `false`.
+///
+/// Example:
+/// ```cpp
+/// auto value = solver->getBool(x);
+/// if (!value) {
+///   std::cerr << value.error().Message << "\n";
+/// } else {
+///   bool b = value.value();
+/// }
+/// ```
+template <typename T> class SMTResult {
+public:
+  SMTResult(T Value) : Value_(std::move(Value)), HasValue_(true) {}
+  SMTResult(SMTError Error) : Error_(std::move(Error)), HasValue_(false) {}
+
+  explicit operator bool() const noexcept { return HasValue_; }
+
+  const T &value() const {
+    assert(HasValue_);
+    return Value_;
+  }
+
+  T &value() {
+    assert(HasValue_);
+    return Value_;
+  }
+
+  const SMTError &error() const {
+    assert(!HasValue_);
+    return Error_;
+  }
+
+private:
+  T Value_{};
+  SMTError Error_{};
+  bool HasValue_ = false;
+};
 
 /// Generic base class for SMT Solvers
 ///
@@ -270,8 +334,13 @@ public:
   /// Creates a floating-point absolute operation
   virtual SMTExprRef mkFPAbs(const SMTExprRef &Exp) = 0;
 
-  /// Creates a floating-point negation operation
-  virtual SMTExprRef mkFPNeg(const SMTExprRef &Exp) = 0;
+  /// Creates a floating-point negation operation.
+  /// `FlipSignBit` preserves the full IEEE encoding and only toggles the sign
+  /// bit. `PreserveNaNPayload` follows the SMT floating-point standard and
+  /// leaves NaNs unchanged.
+  virtual SMTExprRef
+  mkFPNeg(const SMTExprRef &Exp,
+          FPNegBehavior Behavior = FPNegBehavior::FlipSignBit) = 0;
 
   /// Creates a floating-point isInfinite operation
   virtual SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) = 0;
@@ -387,48 +456,50 @@ public:
   virtual SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
                               const SMTExprRef &Body) = 0;
 
-  /// If a model is available, returns the value of a given boolean symbol
-  virtual bool getBool(const SMTExprRef &Exp) = 0;
+  /// If a model is available, returns the value of a given boolean symbol.
+  ///
+  /// On failure, returns an `SMTError` instead of aborting.
+  virtual SMTResult<bool> getBool(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given bitvector
-  /// symbol as a 64-bits int
-  virtual int64_t getBV(const SMTExprRef &Exp) = 0;
+  /// symbol as a 64-bits int.
+  virtual SMTResult<int64_t> getBV(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given bitvector
-  /// symbol as a 2-complement form binary string
-  virtual std::string getBVInBin(const SMTExprRef &Exp) = 0;
+  /// symbol as a 2-complement form binary string.
+  virtual SMTResult<std::string> getBVInBin(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given integer expression
   /// as a decimal string.
-  virtual std::string getInt(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<std::string> getInt(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given real expression
   /// as a rational numerator/denominator in decimal string form.
-  virtual void getRational(const SMTExprRef &Exp, std::string &Num,
-                           std::string &Den) = 0;
+  virtual SMTResult<std::pair<std::string, std::string>>
+  getRational(const SMTExprRef &Exp) = 0;
 
   /// Convenience method to get the numerator of a real expression value.
-  virtual std::string getRealNumerator(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<std::string> getRealNumerator(const SMTExprRef &Exp) = 0;
 
   /// Convenience method to get the denominator of a real expression value.
-  virtual std::string getRealDenominator(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<std::string> getRealDenominator(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given floating-point
   /// symbol as a binary string in the IEEE-754 format: 1 bit for the sign + N
-  /// bits for the exponent + M bits for the significand
-  virtual std::string getFPInBin(const SMTExprRef &Exp) = 0;
+  /// bits for the exponent + M bits for the significand.
+  virtual SMTResult<std::string> getFPInBin(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given floating-point
   /// symbol as float. We assume the floating-point is using the IEEE-754
   /// format: 1 bit for the sign + 8 bits for the exponent + 23 bits for the
   /// significand and 1 hidden bit in the significand
-  virtual float getFP32(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<float> getFP32(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given floating-point
   /// symbol as double. We assume the floating-point is using the IEEE-754
   /// format: 1 bit for the sign + 11 bits for the exponent + 52 bits for the
   /// significand and 1 hidden bit in the significand
-  virtual double getFP64(const SMTExprRef &Exp) = 0;
+  virtual SMTResult<double> getFP64(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the Expr in position Index of Array
   virtual SMTExprRef getArrayElement(const SMTExprRef &Array,

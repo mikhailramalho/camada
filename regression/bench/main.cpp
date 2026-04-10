@@ -374,6 +374,19 @@ void benchmarkFPFMAOnly(camada::SMTSolver &solver, std::size_t iterations) {
   (void)sink;
 }
 
+void benchmarkFPRemOnly(camada::SMTSolver &solver, std::size_t iterations) {
+  auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
+  auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+  auto x = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto y = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  volatile std::size_t sink = 0;
+
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkFPRem(x, y)->getWidth();
+
+  (void)sink;
+}
+
 void printUsage(const char *argv0) {
   std::fprintf(stderr,
                "Usage: %s [backend] [iterations]\n"
@@ -412,6 +425,7 @@ int main(int argc, char **argv) {
     runCase(backend, "fp_ieee_to_bv_only", iterations, benchmarkFPIEEEToBVOnly);
     runCase(backend, "fp_sqrt_only", iterations, benchmarkFPSqrtOnly);
     runCase(backend, "fp_fma_only", iterations, benchmarkFPFMAOnly);
+    runCase(backend, "fp_rem_only", iterations, benchmarkFPRemOnly);
     runCase(backend, "fp_construct", iterations, benchmarkFPConstruct);
     return 0;
   } catch (const std::exception &Exn) {

@@ -22,11 +22,17 @@
 #ifndef STPSOLVER_H_
 #define STPSOLVER_H_
 
-#include "camadaimpl.h"
+#include <cstdint>
+#include <string>
+#include <utility>
 
 namespace STP {
 #include <stp/c_interface.h>
 }
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 
@@ -181,9 +187,9 @@ protected:
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
 
-  bool getBoolImpl(const SMTExprRef &Exp) override;
+  SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
 
-  std::string getBVInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;

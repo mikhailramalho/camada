@@ -22,13 +22,16 @@
 #ifndef BITWUZLASOLVER_H_
 #define BITWUZLASOLVER_H_
 
-#include "camadaimpl.h"
-
-#include <unordered_map>
+#include <cstdint>
+#include <string>
 
 extern "C" {
 #include <bitwuzla/c/bitwuzla.h>
 }
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 
@@ -146,7 +149,7 @@ protected:
   SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
   SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
@@ -191,9 +194,9 @@ protected:
   SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                           const SMTExprRef &Body) override;
 
-  bool getBoolImpl(const SMTExprRef &Exp) override;
-  std::string getBVInBinImpl(const SMTExprRef &Exp) override;
-  std::string getFPInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 

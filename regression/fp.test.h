@@ -5,6 +5,106 @@
 #include <cmath>
 #include <limits>
 
+inline void fp_native_bv_predicate_parity(const camada::SMTSolverRef &solver) {
+  const auto backend = solver->mkBool(true)->getBackendKind();
+  if (backend != camada::SMTBackendKind::Bitwuzla &&
+      backend != camada::SMTBackendKind::CVC5 &&
+      backend != camada::SMTBackendKind::MathSAT &&
+      backend != camada::SMTBackendKind::Z3) {
+    return;
+  }
+
+  const auto check_predicate = [&](const std::string &name, auto predicate) {
+    solver->reset();
+
+    auto bits = solver->mkSymbol(name + "_bits", solver->mkBVSort(32));
+    auto native_fp = solver->mkBVToIEEEFP(
+        bits, solver->mkFP32Sort(camada::FPEncoding::Native));
+    auto bv_fp =
+        solver->mkBVToIEEEFP(bits, solver->mkFP32Sort(camada::FPEncoding::BV));
+
+    auto native_pred = predicate(native_fp);
+    auto bv_pred = predicate(bv_fp);
+
+    REQUIRE(native_pred->getKind() == bv_pred->getKind());
+    solver->addConstraint(solver->mkNot(solver->mkEqual(native_pred, bv_pred)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  };
+
+  check_predicate("is_nan", [&](const camada::SMTExprRef &fp) {
+    return solver->mkFPIsNaN(fp);
+  });
+  check_predicate("is_inf", [&](const camada::SMTExprRef &fp) {
+    return solver->mkFPIsInfinite(fp);
+  });
+  check_predicate("is_zero", [&](const camada::SMTExprRef &fp) {
+    return solver->mkFPIsZero(fp);
+  });
+  check_predicate("is_denormal", [&](const camada::SMTExprRef &fp) {
+    return solver->mkFPIsDenormal(fp);
+  });
+  check_predicate("is_normal", [&](const camada::SMTExprRef &fp) {
+    return solver->mkFPIsNormal(fp);
+  });
+}
+
+inline void fp_neg_nan_native_bv_parity(const camada::SMTSolverRef &solver) {
+  const auto backend = solver->mkBool(true)->getBackendKind();
+  if (backend != camada::SMTBackendKind::Bitwuzla &&
+      backend != camada::SMTBackendKind::CVC5 &&
+      backend != camada::SMTBackendKind::MathSAT &&
+      backend != camada::SMTBackendKind::Z3) {
+    return;
+  }
+
+  const auto check_neg = [&](const std::string &name,
+                             camada::FPNegBehavior behavior) {
+    solver->reset();
+
+    auto bits = solver->mkSymbol(name + "_bits", solver->mkBVSort(32));
+    auto native_fp = solver->mkBVToIEEEFP(
+        bits, solver->mkFP32Sort(camada::FPEncoding::Native));
+    auto bv_fp =
+        solver->mkBVToIEEEFP(bits, solver->mkFP32Sort(camada::FPEncoding::BV));
+
+    auto native_neg = solver->mkFPNeg(native_fp, behavior);
+    auto bv_neg = solver->mkFPNeg(bv_fp, behavior);
+    auto flipped_bits =
+        solver->mkBVConcat(solver->mkBVNot(solver->mkBVExtract(31, 31, bits)),
+                           solver->mkBVExtract(30, 0, bits));
+    auto expected_bits =
+        behavior == camada::FPNegBehavior::FlipSignBit
+            ? flipped_bits
+            : solver->mkIte(solver->mkFPIsNaN(bv_fp), bits, flipped_bits);
+    auto expected_native = solver->mkBVToIEEEFP(expected_bits, native_fp->Sort);
+    auto expected_bv = solver->mkBVToIEEEFP(expected_bits, bv_fp->Sort);
+
+    INFO(name);
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(native_neg, expected_native)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+    solver->reset();
+    bits = solver->mkSymbol(name + "_bits_bv_expected", solver->mkBVSort(32));
+    bv_fp =
+        solver->mkBVToIEEEFP(bits, solver->mkFP32Sort(camada::FPEncoding::BV));
+    bv_neg = solver->mkFPNeg(bv_fp, behavior);
+    flipped_bits =
+        solver->mkBVConcat(solver->mkBVNot(solver->mkBVExtract(31, 31, bits)),
+                           solver->mkBVExtract(30, 0, bits));
+    expected_bits =
+        behavior == camada::FPNegBehavior::FlipSignBit
+            ? flipped_bits
+            : solver->mkIte(solver->mkFPIsNaN(bv_fp), bits, flipped_bits);
+    expected_bv = solver->mkBVToIEEEFP(expected_bits, bv_fp->Sort);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(bv_neg, expected_bv)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  };
+
+  check_neg("fp_neg_flip_sign", camada::FPNegBehavior::FlipSignBit);
+  check_neg("fp_neg_standard", camada::FPNegBehavior::PreserveNaNPayload);
+}
+
 inline void fp_arithmetics(const camada::SMTSolverRef &solver,
                            camada::FPEncoding Encoding) {
   auto x = solver->mkFP32(0.750000059604644775390625f, Encoding);

@@ -19,15 +19,18 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #if SOLVER_STP_ENABLED
 
-#include "camadautil.h"
 #include "stpsolver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
+#include "camadautil.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 
 namespace camada {
 
@@ -118,36 +121,36 @@ SMTExprRef STPSolver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
 }
 
 SMTSortRef STPSolver::mkBoolSortImpl() {
-  return newSortRef<STPSort>(STPSort(SMTSortKind::Bool, &Context,
-                                     STP::vc_boolType(Context),
-                                     SMTSort::ScalarSortData{1}));
+  return makeSortRef<STPSort>(STPSort(SMTSortKind::Bool, &Context,
+                                      STP::vc_boolType(Context),
+                                      SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef STPSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<STPSort>(STPSort(SMTSortKind::BV, &Context,
-                                     STP::vc_bvType(Context, BitWidth),
-                                     SMTSort::ScalarSortData{BitWidth}));
+  return makeSortRef<STPSort>(STPSort(SMTSortKind::BV, &Context,
+                                      STP::vc_bvType(Context, BitWidth),
+                                      SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef STPSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                      const unsigned SigWidth) {
-  return newSortRef<STPSort>(STPSort(
+  return makeSortRef<STPSort>(STPSort(
       SMTSortKind::BVFP, &Context,
       STP::vc_bvType(Context, ExpWidth + SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef STPSolver::mkBVRMSortImpl() {
-  return newSortRef<STPSort>(STPSort(SMTSortKind::BVRM, &Context,
-                                     STP::vc_bvType(Context, 3),
-                                     SMTSort::ScalarSortData{3}));
+  return makeSortRef<STPSort>(STPSort(SMTSortKind::BVRM, &Context,
+                                      STP::vc_bvType(Context, 3),
+                                      SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
   const SMTSortRef &backend_elem_sort =
       ElemSort->isBoolSort() ? mkBVSort(1) : ElemSort;
-  return newSortRef<STPSort>(
+  return makeSortRef<STPSort>(
       STPSort(SMTSortKind::Array, &Context,
               STP::vc_arrayType(Context, toSolverSort<STPSort>(*IndexSort).Sort,
                                 toSolverSort<STPSort>(*backend_elem_sort).Sort),
@@ -482,7 +485,7 @@ SMTExprRef STPSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                               written);
 }
 
-bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<bool> STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(Context, toSolverExpr<STPExpr>(*Exp).Expr);
   STP::Expr bv_value = STP::vc_boolToBVExpr(Context, value);
@@ -492,7 +495,7 @@ bool STPSolver::getBoolImpl(const SMTExprRef &Exp) {
   return result;
 }
 
-std::string STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   STP::Expr value =
       STP::vc_getCounterExample(Context, toSolverExpr<STPExpr>(*Exp).Expr);
   char *buf;
@@ -509,15 +512,23 @@ SMTExprRef STPSolver::getArrayElementImpl(const SMTExprRef &Array,
   const SMTExprRef &sel = mkArraySelect(Array, Index);
 
   const SMTSortRef &elementSort = Array->Sort->getElementSort();
-  if (elementSort->isBoolSort())
-    return mkBool(getBool(sel));
+  if (elementSort->isBoolSort()) {
+    SMTResult<bool> result = getBool(sel);
+    assert(result && "Failed to get STP boolean array element");
+    return mkBool(result.value());
+  }
 
-  if (elementSort->isBVSort())
-    return SMTSolverImpl::mkBVFromBin(getBVInBin(sel));
+  if (elementSort->isBVSort()) {
+    SMTResult<std::string> result = getBVInBin(sel);
+    assert(result && "Failed to get STP bit-vector array element");
+    return SMTSolverImpl::mkBVFromBin(result.value());
+  }
 
   assert(elementSort->isFPSort() && "Unknown array element type");
+  SMTResult<std::string> result = getFPInBin(sel);
+  assert(result && "Failed to get STP FP array element");
   return SMTSolverImpl::mkFPFromBin(
-      getFPInBin(sel), elementSort->getFPExponentWidth(), FPEncoding::BV);
+      result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
 
 SMTExprRef STPSolver::mkBoolImpl(const bool b) {
@@ -562,7 +573,12 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   const std::string name = "__CAMADA_arr" + std::to_string(ConstArrayCounter++);
   SMTExprRef arr = mkSymbol(name, mkArraySort(IndexSort, InitValue->Sort));
 
-  uint64_t size = 1ULL << IndexSort->getWidth();
+  const unsigned width = IndexSort->getWidth();
+  if (width >= 64)
+    fatalError(
+        "STP constant-array lowering does not support index widths >= 64");
+
+  uint64_t size = uint64_t{1} << width;
   for (uint64_t i = 0; i < size; i++)
     arr = mkArrayStore(arr, mkBVFromDec(i, IndexSort), InitValue);
 

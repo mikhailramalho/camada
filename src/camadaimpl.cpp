@@ -1,4 +1,6 @@
 #include "camadaimpl.h"
+#include "camadaerror.h"
+#include "camadafp.h"
 
 #include <cstdio>
 
@@ -33,7 +35,111 @@ std::string addLeadingZeroes(const std::string &Str, const unsigned Width) {
   return std::string(Width - Str.length(), '0') + Str;
 }
 
+static bool usesBVFPEncoding(const SMTSortRef &Sort) {
+  return Sort->isBVFPSort();
+}
+
+static bool usesBVFPEncoding(const SMTExprRef &Exp) {
+  return usesBVFPEncoding(Exp->Sort);
+}
+
+static bool usesBVRMEncoding(const SMTSortRef &Sort) {
+  return Sort->isBVRMSort();
+}
+
+static bool usesBVRMEncoding(const SMTExprRef &Exp) {
+  return usesBVRMEncoding(Exp->Sort);
+}
+
 } // namespace
+
+SMTExprRef SMTSolverImpl::getBVZero1Expr() const {
+  return CachedSmallBVZeroExprs[1];
+}
+
+SMTExprRef SMTSolverImpl::getBVOne1Expr() const { return CachedBVOne1Expr; }
+
+SMTExprRef SMTSolverImpl::getBVZero2Expr() const {
+  return CachedSmallBVZeroExprs[2];
+}
+
+SMTExprRef SMTSolverImpl::getBVZero3Expr() const {
+  return CachedSmallBVZeroExprs[3];
+}
+
+SMTExprRef SMTSolverImpl::getBVZero4Expr() const {
+  return CachedSmallBVZeroExprs[4];
+}
+
+SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
+  return CachedRMBVExprs[static_cast<std::size_t>(R)];
+}
+
+void SMTSolverImpl::invalidateGeneratedObjects() {
+  clearSortCaches();
+  clearExprCaches();
+  ++HandleState->Generation;
+  ExprArena.clear();
+  SortArena.clear();
+}
+
+void SMTSolverImpl::clearSortCaches() {
+  CachedBoolSort = {};
+  CachedIntSort = {};
+  CachedRealSort = {};
+  CachedNativeRMSort = {};
+  CachedEncodedRMSort = {};
+  BVSortCache.clear();
+  NativeFPSortCache.clear();
+  EncodedFPSortCache.clear();
+  ArraySortCache.clear();
+  SmallFunctionSortCache.clear();
+  FunctionSortCache.clear();
+  SmallTupleSortCache.clear();
+  TupleSortCache.clear();
+}
+
+void SMTSolverImpl::clearExprCaches() {
+  CachedBoolExprs.fill({});
+  CachedBVOne1Expr = {};
+  CachedSmallBVZeroExprs.fill({});
+  CachedRMBVExprs.fill({});
+  CachedBVNegOneExprs.clear();
+  CachedBVZeroExprs.clear();
+  CachedBVOneExprs.clear();
+  SymbolExprCache.clear();
+  FPSpecialExprCache.clear();
+  FPConstExprCache.clear();
+}
+
+void SMTSolverImpl::initializeCommonSingletons() {
+  CachedBoolExprs[0] = mkBool(false);
+  CachedBoolExprs[1] = mkBool(true);
+  CachedBVOne1Expr = mkBVFromBin("1", 1);
+  CachedSmallBVZeroExprs[1] = mkBVFromBin("0", 1);
+  CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
+  CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
+  CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
+  CachedBVZeroExprs.resize(5);
+  CachedBVZeroExprs[1] = CachedSmallBVZeroExprs[1];
+  CachedBVZeroExprs[2] = CachedSmallBVZeroExprs[2];
+  CachedBVZeroExprs[3] = CachedSmallBVZeroExprs[3];
+  CachedBVZeroExprs[4] = CachedSmallBVZeroExprs[4];
+  CachedBVOneExprs.resize(2);
+  CachedBVOneExprs[1] = CachedBVOne1Expr;
+  CachedBVNegOneExprs.resize(2);
+  CachedBVNegOneExprs[1] = CachedBVOne1Expr;
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
+      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_EVEN);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
+      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_AWAY);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
+      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_PLUS_INF);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
+      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_MINUS_INF);
+  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
+      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
+}
 
 SMTSortRef SMTSolverImpl::mkBoolSort() {
   if (CachedBoolSort)
@@ -179,7 +285,6 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
 
 SMTSortRef
 SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
-  assert(!ElementSorts.empty());
   if (ElementSorts.size() <= 4) {
     SmallTupleSortCacheKey SmallKey{};
     SmallKey.Size = static_cast<uint8_t>(ElementSorts.size());
@@ -210,6 +315,11 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
   assert(theSort->getTupleElementSorts() == ElementSorts);
   TupleSortCache.emplace(std::move(Key), theSort);
   return theSort;
+}
+
+SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
+                                             const SMTSortRef &) {
+  fatalError("Uninterpreted functions");
 }
 
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
@@ -413,6 +523,26 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithGe,
                                     assert(LHS->Sort == RHS->Sort),
                                     mkArithGeImpl(LHS, RHS),
                                     assert(theExp->isBoolSort()))
+
+SMTExprRef SMTSolverImpl::mkBVXnorImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkBVNot(mkBVXor(LHS, RHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVXnor);
+}
+
+SMTExprRef SMTSolverImpl::mkBVNandImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  SMTExprRef theExp = mkBVNot(mkBVAnd(LHS, RHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNand);
+}
+
+SMTExprRef SMTSolverImpl::mkImpliesImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  // This is: logical-or(logical-not(LHS), RHS)
+  SMTExprRef theExp = mkOr(mkNot(LHS), RHS);
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Implies);
+}
+
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkFPLt, assert(LHS->isFPSort());
                                     assert(LHS->Sort == RHS->Sort),
                                     usesBVFPEncoding(LHS)
@@ -578,10 +708,12 @@ SMTExprRef SMTSolverImpl::mkFPAbs(const SMTExprRef &Exp) {
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp) {
+SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
+                                  FPNegBehavior Behavior) {
   assert(Exp->isFPSort());
-  SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPNegImpl(Exp)
-                                            : mkFPNegImpl(Exp);
+  SMTExprRef theExp = usesBVFPEncoding(Exp)
+                          ? SMTSolverImpl::mkFPNegImpl(Exp, Behavior)
+                          : mkFPNegImpl(Exp, Behavior);
   assert(theExp->Sort == Exp->Sort);
   return theExp;
 }
@@ -808,7 +940,6 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
-  assert(!Elements.empty());
   std::vector<SMTSortRef> ElementSorts;
   ElementSorts.reserve(Elements.size());
   for (const auto &Element : Elements)
@@ -839,12 +970,22 @@ SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
   return theExp;
 }
 
+SMTExprRef SMTSolverImpl::mkApplyImpl(const SMTExprRef &,
+                                      const std::vector<SMTExprRef> &) {
+  fatalError("Uninterpreted functions");
+}
+
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   assert(Body->isBoolSort());
   SMTExprRef theExp = mkForallImpl(Vars, Body);
   assert(theExp->isBoolSort());
   return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkForallImpl(const std::vector<SMTExprRef> &,
+                                       const SMTExprRef &) {
+  fatalError("Quantifiers");
 }
 
 SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
@@ -855,60 +996,79 @@ SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
   return theExp;
 }
 
-bool SMTSolverImpl::getBool(const SMTExprRef &Exp) {
+SMTExprRef SMTSolverImpl::mkExistsImpl(const std::vector<SMTExprRef> &,
+                                       const SMTExprRef &) {
+  fatalError("Quantifiers");
+}
+
+SMTResult<bool> SMTSolverImpl::getBool(const SMTExprRef &Exp) {
   assert(Exp->isBoolSort());
   return getBoolImpl(Exp);
 }
 
-int64_t SMTSolverImpl::getBV(const SMTExprRef &Exp) {
+SMTResult<int64_t> SMTSolverImpl::getBV(const SMTExprRef &Exp) {
   assert(Exp->isBVSort());
   return getBVImpl(Exp);
 }
 
-std::string SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
   assert(Exp->isBVSort());
-  return addLeadingZeroes(getBVInBinImpl(Exp), Exp->getWidth());
+  SMTResult<std::string> result = getBVInBinImpl(Exp);
+  if (!result)
+    return result.error();
+  return addLeadingZeroes(result.value(), Exp->getWidth());
 }
 
-std::string SMTSolverImpl::getInt(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getInt(const SMTExprRef &Exp) {
   assert(Exp->isIntSort() || Exp->isRealSort());
   return getIntImpl(Exp);
 }
 
-void SMTSolverImpl::getRational(const SMTExprRef &Exp, std::string &Num,
-                                std::string &Den) {
+SMTResult<std::pair<std::string, std::string>>
+SMTSolverImpl::getRational(const SMTExprRef &Exp) {
   assert(Exp->isRealSort());
-  getRationalImpl(Exp, Num, Den);
+  return getRationalImpl(Exp);
 }
 
-std::string SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
-  assert(Exp->isRealSort());
-  std::string Num, Den;
-  getRationalImpl(Exp, Num, Den);
-  return Num;
+SMTResult<std::pair<std::string, std::string>>
+SMTSolverImpl::getRationalImpl(const SMTExprRef &Exp) {
+  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
+                  "Real arithmetic is not supported by this backend"};
 }
 
-std::string SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
   assert(Exp->isRealSort());
-  std::string Num, Den;
-  getRationalImpl(Exp, Num, Den);
-  return Den;
+  SMTResult<std::pair<std::string, std::string>> result = getRationalImpl(Exp);
+  if (!result)
+    return result.error();
+  return result.value().first;
 }
 
-std::string SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
+SMTResult<std::string>
+SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
+  assert(Exp->isRealSort());
+  SMTResult<std::pair<std::string, std::string>> result = getRationalImpl(Exp);
+  if (!result)
+    return result.error();
+  return result.value().second;
+}
+
+SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   assert(Exp->isFPSort());
-  return addLeadingZeroes(usesBVFPEncoding(Exp)
-                              ? SMTSolverImpl::getFPInBinImpl(Exp)
-                              : getFPInBinImpl(Exp),
-                          Exp->getWidth());
+  SMTResult<std::string> result = usesBVFPEncoding(Exp)
+                                      ? SMTSolverImpl::getFPInBinImpl(Exp)
+                                      : getFPInBinImpl(Exp);
+  if (!result)
+    return result.error();
+  return addLeadingZeroes(result.value(), Exp->getWidth());
 }
 
-float SMTSolverImpl::getFP32(const SMTExprRef &Exp) {
+SMTResult<float> SMTSolverImpl::getFP32(const SMTExprRef &Exp) {
   assert(Exp->isFPSort());
   return getFP32Impl(Exp);
 }
 
-double SMTSolverImpl::getFP64(const SMTExprRef &Exp) {
+SMTResult<double> SMTSolverImpl::getFP64(const SMTExprRef &Exp) {
   assert(Exp->isFPSort());
   return getFP64Impl(Exp);
 }
@@ -1332,8 +1492,9 @@ SMTExprRef SMTSolverImpl::mkTupleSelectImpl(const SMTExprRef &, unsigned) {
   fatalError("Tuples");
 }
 
-std::string SMTSolverImpl::getIntImpl(const SMTExprRef &) {
-  fatalError("Integer arithmetic");
+SMTResult<std::string> SMTSolverImpl::getIntImpl(const SMTExprRef &Exp) {
+  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
+                  "Integer arithmetic is not supported by this backend"};
 }
 
 SMTExprRef SMTSolverImpl::mkIntImpl(int64_t) {

@@ -22,8 +22,18 @@
 #if SOLVER_CVC5_ENABLED
 
 #include "cvc5solver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
 
+#include <cassert>
 #include <cstdio>
+#include <cvc5/cvc5_kind.h>
+#include <cvc5/cvc5_types.h>
+#include <optional>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace camada {
 
@@ -122,36 +132,36 @@ SMTExprRef CVC5Solver::rewrapExprImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef CVC5Solver::mkBoolSortImpl() {
-  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::Bool, &Context,
-                                       Terms.getBooleanSort(),
-                                       SMTSort::ScalarSortData{1}));
+  return makeSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::Bool, &Context,
+                                        Terms.getBooleanSort(),
+                                        SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef CVC5Solver::mkIntSortImpl() {
-  return newSortRef<CVC5Sort>(
+  return makeSortRef<CVC5Sort>(
       CVC5Sort(SMTSortKind::Int, &Context, Terms.getIntegerSort()));
 }
 
 SMTSortRef CVC5Solver::mkRealSortImpl() {
-  return newSortRef<CVC5Sort>(
+  return makeSortRef<CVC5Sort>(
       CVC5Sort(SMTSortKind::Real, &Context, Terms.getRealSort()));
 }
 
 SMTSortRef CVC5Solver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::BV, &Context,
-                                       Terms.mkBitVectorSort(BitWidth),
-                                       SMTSort::ScalarSortData{BitWidth}));
+  return makeSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::BV, &Context,
+                                        Terms.mkBitVectorSort(BitWidth),
+                                        SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef CVC5Solver::mkRMSortImpl() {
-  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::RM, &Context,
-                                       Terms.getRoundingModeSort(),
-                                       SMTSort::ScalarSortData{3}));
+  return makeSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::RM, &Context,
+                                        Terms.getRoundingModeSort(),
+                                        SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef CVC5Solver::mkFPSortImpl(const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  return newSortRef<CVC5Sort>(CVC5Sort(
+  return makeSortRef<CVC5Sort>(CVC5Sort(
       SMTSortKind::FP, &Context,
       Terms.mkFloatingPointSort(ExpWidth, SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
@@ -159,21 +169,21 @@ SMTSortRef CVC5Solver::mkFPSortImpl(const unsigned ExpWidth,
 
 SMTSortRef CVC5Solver::mkBVFPSortImpl(const unsigned ExpWidth,
                                       const unsigned SigWidth) {
-  return newSortRef<CVC5Sort>(CVC5Sort(
+  return makeSortRef<CVC5Sort>(CVC5Sort(
       SMTSortKind::BVFP, &Context,
       Terms.mkBitVectorSort(ExpWidth + SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef CVC5Solver::mkBVRMSortImpl() {
-  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::BVRM, &Context,
-                                       Terms.mkBitVectorSort(3),
-                                       SMTSort::ScalarSortData{3}));
+  return makeSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::BVRM, &Context,
+                                        Terms.mkBitVectorSort(3),
+                                        SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef CVC5Solver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                        const SMTSortRef &ElemSort) {
-  return newSortRef<CVC5Sort>(
+  return makeSortRef<CVC5Sort>(
       CVC5Sort(SMTSortKind::Array, &Context,
                Terms.mkArraySort(toSolverSort<CVC5Sort>(*IndexSort).Sort,
                                  toSolverSort<CVC5Sort>(*ElemSort).Sort),
@@ -187,7 +197,7 @@ CVC5Solver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
   Domain.reserve(DomainSorts.size());
   for (const auto &Sort : DomainSorts)
     Domain.push_back(toSolverSort<CVC5Sort>(*Sort).Sort);
-  return newSortRef<CVC5Sort>(CVC5Sort(
+  return makeSortRef<CVC5Sort>(CVC5Sort(
       SMTSortKind::Function, &Context,
       Terms.mkFunctionSort(Domain, toSolverSort<CVC5Sort>(*CodomainSort).Sort),
       SMTSort::FunctionSortData{DomainSorts, CodomainSort}));
@@ -199,9 +209,9 @@ CVC5Solver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
   Elements.reserve(ElementSorts.size());
   for (const auto &Sort : ElementSorts)
     Elements.push_back(toSolverSort<CVC5Sort>(*Sort).Sort);
-  return newSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::Tuple, &Context,
-                                       Terms.mkTupleSort(Elements),
-                                       SMTSort::TupleSortData{ElementSorts}));
+  return makeSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::Tuple, &Context,
+                                        Terms.mkTupleSort(Elements),
+                                        SMTSort::TupleSortData{ElementSorts}));
 }
 
 SMTExprRef CVC5Solver::mkBVNegImpl(const SMTExprRef &Exp) {
@@ -690,7 +700,7 @@ SMTExprRef CVC5Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkFPNegImpl(const SMTExprRef &Exp) {
+SMTExprRef CVC5Solver::mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) {
   return makeExprRef<CVC5Expr>(
       SMTExprKind::FPNeg, &Context, Exp->Sort,
       Terms.mkTerm(cvc5::Kind::FLOATINGPOINT_NEG,
@@ -911,35 +921,39 @@ SMTExprRef CVC5Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
-bool CVC5Solver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<bool> CVC5Solver::getBoolImpl(const SMTExprRef &Exp) {
   return Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr).getBooleanValue();
 }
 
-std::string CVC5Solver::getBVInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> CVC5Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   return Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr)
       .getBitVectorValue();
 }
 
-std::string CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
   cvc5::Term value = Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
   if (Exp->isRealSort()) {
-    std::string num, den;
-    getRationalImpl(Exp, num, den);
-    assert(den == "1" && "Real value is not integral");
-    return num;
+    SMTResult<std::pair<std::string, std::string>> result =
+        getRationalImpl(Exp);
+    if (!result)
+      return result.error();
+    assert(result.value().second == "1" && "Real value is not integral");
+    return result.value().first;
   }
   assert(value.isIntegerValue() && "Expected integer model value");
   return value.getIntegerValue();
 }
 
-void CVC5Solver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
-                                 std::string &Den) {
+SMTResult<std::pair<std::string, std::string>>
+CVC5Solver::getRationalImpl(const SMTExprRef &Exp) {
   cvc5::Term value = Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
   assert(value.isRealValue() && "Expected rational model value");
+  std::string Num, Den;
   parseCVC5RationalValue(value.getRealValue(), Num, Den);
+  return std::make_pair(Num, Den);
 }
 
-std::string CVC5Solver::getFPInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> CVC5Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   std::tuple<uint32_t, uint32_t, cvc5::Term> fp =
       Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr)
           .getFloatingPointValue();

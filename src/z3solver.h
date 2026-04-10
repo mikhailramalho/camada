@@ -22,9 +22,14 @@
 #ifndef Z3SOLVER_H_
 #define Z3SOLVER_H_
 
-#include "camadaimpl.h"
-
+#include <cstdint>
+#include <string>
+#include <utility>
 #include <z3++.h>
+
+#include "camadaexpr.h"
+#include "camadaimpl.h"
+#include "camadasort.h"
 
 namespace camada {
 
@@ -237,7 +242,7 @@ protected:
 
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
 
   SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
 
@@ -295,16 +300,16 @@ protected:
   SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
                                 const SMTExprRef &R) override;
 
-  bool getBoolImpl(const SMTExprRef &Exp) override;
+  SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
 
-  std::string getBVInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
 
-  std::string getIntImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getIntImpl(const SMTExprRef &Exp) override;
 
-  void getRationalImpl(const SMTExprRef &Exp, std::string &Num,
-                       std::string &Den) override;
+  SMTResult<std::pair<std::string, std::string>>
+  getRationalImpl(const SMTExprRef &Exp) override;
 
-  std::string getFPInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;

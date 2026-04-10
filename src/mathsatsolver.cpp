@@ -19,18 +19,18 @@
  *
  **************************************************************************/
 
-#include "ac_config.h"
 #if SOLVER_MATHSAT_ENABLED
 
-#include "camadautil.h"
 #include "mathsatsolver.h"
+#include "camada.h"
+#include "camadaerror.h"
+#include "camadafp.h"
+#include "camadautil.h"
 
-#include <cassert>
-#include <cstddef>
 #include <cstdio>
-#include <cstdlib>
 #include <gmp.h>
 #include <type_traits>
+#include <vector>
 
 namespace camada {
 
@@ -207,59 +207,59 @@ SMTExprRef MathSATSolver::rewrapExprImpl(const SMTExpr &Exp,
 }
 
 SMTSortRef MathSATSolver::mkBoolSortImpl() {
-  return newSortRef<MathSATSort>(MathSATSort(SMTSortKind::Bool, &Context,
-                                             msat_get_bool_type(Context),
-                                             SMTSort::ScalarSortData{1}));
+  return makeSortRef<MathSATSort>(MathSATSort(SMTSortKind::Bool, &Context,
+                                              msat_get_bool_type(Context),
+                                              SMTSort::ScalarSortData{1}));
 }
 
 SMTSortRef MathSATSolver::mkIntSortImpl() {
-  return newSortRef<MathSATSort>(
+  return makeSortRef<MathSATSort>(
       MathSATSort(SMTSortKind::Int, &Context, msat_get_integer_type(Context)));
 }
 
 SMTSortRef MathSATSolver::mkRealSortImpl() {
-  return newSortRef<MathSATSort>(MathSATSort(SMTSortKind::Real, &Context,
-                                             msat_get_rational_type(Context)));
+  return makeSortRef<MathSATSort>(MathSATSort(SMTSortKind::Real, &Context,
+                                              msat_get_rational_type(Context)));
 }
 
 SMTSortRef MathSATSolver::mkBVSortImpl(unsigned BitWidth) {
-  return newSortRef<MathSATSort>(MathSATSort(
+  return makeSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::BV, &Context, msat_get_bv_type(Context, BitWidth),
       SMTSort::ScalarSortData{BitWidth}));
 }
 
 SMTSortRef MathSATSolver::mkRMSortImpl() {
-  return newSortRef<MathSATSort>(MathSATSort(
+  return makeSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::RM, &Context, msat_get_fp_roundingmode_type(Context),
       SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef MathSATSolver::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
-  return newSortRef<MathSATSort>(MathSATSort(
+  return makeSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::FP, &Context, msat_get_fp_type(Context, ExpWidth, SigWidth),
       SMTSort::FPSortData{1 + ExpWidth + SigWidth, ExpWidth, SigWidth}));
 }
 
 SMTSortRef MathSATSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                          const unsigned SigWidth) {
-  return newSortRef<MathSATSort>(MathSATSort(
+  return makeSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::BVFP, &Context,
       msat_get_bv_type(Context, ExpWidth + SigWidth + 1),
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
 SMTSortRef MathSATSolver::mkBVRMSortImpl() {
-  return newSortRef<MathSATSort>(MathSATSort(SMTSortKind::BVRM, &Context,
-                                             msat_get_bv_type(Context, 3),
-                                             SMTSort::ScalarSortData{3}));
+  return makeSortRef<MathSATSort>(MathSATSort(SMTSortKind::BVRM, &Context,
+                                              msat_get_bv_type(Context, 3),
+                                              SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef MathSATSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                           const SMTSortRef &ElemSort) {
   const SMTSortRef &backend_elem_sort =
       ElemSort->isBoolSort() ? mkBVSort(1) : ElemSort;
-  return newSortRef<MathSATSort>(MathSATSort(
+  return makeSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::Array, &Context,
       msat_get_array_type(Context, toSolverSort<MathSATSort>(*IndexSort).Sort,
                           toSolverSort<MathSATSort>(*backend_elem_sort).Sort),
@@ -273,7 +273,7 @@ MathSATSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
   Domain.reserve(DomainSorts.size());
   for (const auto &Sort : DomainSorts)
     Domain.push_back(toSolverSort<MathSATSort>(*Sort).Sort);
-  return newSortRef<MathSATSort>(MathSATSort(
+  return makeSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::Function, &Context,
       msat_get_function_type(Context, Domain.data(), Domain.size(),
                              toSolverSort<MathSATSort>(*CodomainSort).Sort),
@@ -619,7 +619,7 @@ SMTExprRef MathSATSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
       msat_make_fp_abs(Context, toMathSATTerm(Exp)));
 }
 
-SMTExprRef MathSATSolver::mkFPNegImpl(const SMTExprRef &Exp) {
+SMTExprRef MathSATSolver::mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) {
   return makeExprRef<MathSATExpr>(
       SMTExprKind::FPNeg, &Context, Exp->Sort,
       msat_make_fp_neg(Context, toMathSATTerm(Exp)));
@@ -826,7 +826,7 @@ SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
                                 toMathSATTerm(From)));
 }
 
-bool MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<bool> MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
   const SMTExprRef &Value = makeExprRef<MathSATExpr>(
       SMTExprKind::BoolConst, &Context, mkBoolSort(),
       msat_get_model_value(Context, toMathSATTerm(Exp)));
@@ -837,7 +837,8 @@ bool MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
   if (msat_term_is_false(Context, toMathSATTerm(Value)))
     return false;
 
-  fatalError("Bool model value is neither true nor false");
+  return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                  "Bool model value is neither true nor false"};
 }
 
 static inline std::string getGMPVal(const SMTExprRef &t) {
@@ -861,19 +862,21 @@ static inline void getMathSATModelRational(const SMTExprRef &t, mpq_t val) {
                       val);
 }
 
-std::string MathSATSolver::getBVInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> MathSATSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   const SMTExprRef &t = makeExprRef<MathSATExpr>(
       Exp->getKind(), &Context, Exp->Sort,
       msat_get_model_value(Context, toMathSATTerm(Exp)));
   return getGMPVal(t);
 }
 
-std::string MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
   if (Exp->isRealSort()) {
-    std::string Num, Den;
-    getRationalImpl(Exp, Num, Den);
-    assert(Den == "1" && "Real value is not integral");
-    return Num;
+    SMTResult<std::pair<std::string, std::string>> result =
+        getRationalImpl(Exp);
+    if (!result)
+      return result.error();
+    assert(result.value().second == "1" && "Real value is not integral");
+    return result.value().first;
   }
 
   mpq_t val;
@@ -892,8 +895,8 @@ std::string MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
   return num;
 }
 
-void MathSATSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
-                                    std::string &Den) {
+SMTResult<std::pair<std::string, std::string>>
+MathSATSolver::getRationalImpl(const SMTExprRef &Exp) {
   mpq_t val;
   mpq_init(val);
   const SMTExprRef &t = makeExprRef<MathSATExpr>(
@@ -902,16 +905,17 @@ void MathSATSolver::getRationalImpl(const SMTExprRef &Exp, std::string &Num,
   getMathSATModelRational(t, val);
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
-  Num = raw_num;
-  Den = raw_den;
+  std::string Num = raw_num;
+  std::string Den = raw_den;
   void (*gmp_free)(void *, std::size_t);
   mp_get_memory_functions(nullptr, nullptr, &gmp_free);
   gmp_free(raw_num, Num.size() + 1);
   gmp_free(raw_den, Den.size() + 1);
   mpq_clear(val);
+  return std::make_pair(Num, Den);
 }
 
-std::string MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {
   const SMTExprRef &t = makeExprRef<MathSATExpr>(
       Exp->getKind(), &Context, Exp->Sort,
       msat_get_model_value(Context, toMathSATTerm(Exp)));
@@ -1002,12 +1006,13 @@ SMTExprRef MathSATSolver::mkFPFromBinImpl(const std::string &FP,
 SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
   msat_term e;
   switch (R) {
+  default:
+    fatalError("Unsupported floating-point semantics.");
   case RM::ROUND_TO_EVEN:
     e = msat_make_fp_roundingmode_nearest_even(Context);
     break;
   case RM::ROUND_TO_AWAY:
-    std::fprintf(stderr, "MathSAT Error ROUND_TO_AWAY is not supported.\n");
-    std::abort();
+    fatalError("MathSAT Error ROUND_TO_AWAY is not supported.");
   case RM::ROUND_TO_PLUS_INF:
     e = msat_make_fp_roundingmode_plus_inf(Context);
     break;
