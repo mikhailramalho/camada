@@ -809,9 +809,6 @@ SMTExprRef YicesSolver::mkBVFromBinImpl(const std::string &Int,
 
 SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
                                      const SMTSortRef &Sort) {
-  if (yices_get_term_by_name(Name.c_str()) != NULL_TERM)
-    fatalError("Trying to create a symbol but it already exists");
-
   term_t t = yicesCheckTerm(
       yices_new_uninterpreted_term(toSolverSort<YicesSort>(*Sort).Sort),
       "Error when trying to create a new Yices symbol");
