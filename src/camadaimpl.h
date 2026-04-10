@@ -76,14 +76,11 @@ protected:
   SMTExprRef CachedBVOne1Expr;
   std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
   std::array<SMTExprRef, 5> CachedRMBVExprs;
-  std::vector<SMTExprRef> CachedBVNegOneExprs;
-  std::vector<SMTExprRef> CachedBVZeroExprs;
-  std::vector<SMTExprRef> CachedBVOneExprs;
+  std::array<std::vector<SMTExprRef>, 3> CachedSmallBVExprs;
   SMTSortRef CachedBoolSort;
   SMTSortRef CachedIntSort;
   SMTSortRef CachedRealSort;
-  SMTSortRef CachedNativeRMSort;
-  SMTSortRef CachedEncodedRMSort;
+  std::array<SMTSortRef, 2> CachedRMSorts;
   std::unordered_map<SymbolExprCacheKey, SMTExprRef, SymbolExprCacheKeyHash>
       SymbolExprCache;
   std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
@@ -92,10 +89,9 @@ protected:
   std::unordered_map<FPConstExprCacheKey, SMTExprRef, FPConstExprCacheKeyHash>
       FPConstExprCache;
   std::unordered_map<unsigned, SMTSortRef> BVSortCache;
-  std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
-      NativeFPSortCache;
-  std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
-      EncodedFPSortCache;
+  std::array<std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>,
+             2>
+      FPSortCaches;
   std::unordered_map<ArraySortCacheKey, SMTSortRef, ArraySortCacheKeyHash>
       ArraySortCache;
   std::unordered_map<SmallFunctionSortCacheKey, SMTSortRef,
