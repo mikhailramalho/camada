@@ -19,8 +19,8 @@
  *
  **************************************************************************/
 
-#include "camadaimpl.h"
 #include "camadaerror.h"
+#include "camadaimpl.h"
 
 #include <bitset>
 #include <cmath>
@@ -779,7 +779,6 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
 
   SMTExprRef x_is_nan = mkFPIsNaN(LHS);
   SMTExprRef x_is_zero = mkFPIsZero(LHS);
-  SMTExprRef x_is_pos = mkIsPos(*this, LHS);
   SMTExprRef x_is_inf = mkFPIsInfinite(LHS);
   SMTExprRef y_is_nan = mkFPIsNaN(RHS);
   SMTExprRef y_is_zero = mkFPIsZero(RHS);
@@ -814,10 +813,11 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
 
   // else the actual remainder.
   // max. exponent difference is (2^ebits) - 3
+  SMTExprRef zero_ebits = mkBVFromDec(0, ebits);
   SMTExprRef one_ebits = mkBVFromDec(1, ebits);
   SMTExprRef y_exp_m1 = mkBVSub(y_exp, one_ebits);
   SMTExprRef xe_lt_yem1 = mkBVUlt(x_exp, y_exp_m1);
-  SMTExprRef ye_neq_zero = mkNot(mkEqual(y_exp, mkBVFromDec(0, ebits)));
+  SMTExprRef ye_neq_zero = mkNot(mkEqual(y_exp, zero_ebits));
   SMTExprRef c6 = mkAnd(ye_neq_zero, xe_lt_yem1);
   const SMTExprRef &v6 = LHS;
 
@@ -839,7 +839,10 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef exp_diff =
       mkBVSub(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
   SMTExprRef neg_exp_diff = mkBVNeg(exp_diff);
-  SMTExprRef exp_diff_is_neg = mkBVSle(exp_diff, mkBVFromDec(0, ebits + 2));
+  SMTExprRef zero_ebits_p2 = mkBVFromDec(0, ebits + 2);
+  SMTExprRef one_ebits_p2 = mkBVFromDec(1, ebits + 2);
+  SMTExprRef two_ebits_p2 = mkBVFromDec(2, ebits + 2);
+  SMTExprRef exp_diff_is_neg = mkBVSle(exp_diff, zero_ebits_p2);
 
   // CMW: This creates huge bit-vectors, which is potentially sub-optimal, but
   // the iterative remainder encodings are also very expensive. Lazy lowering
@@ -890,10 +893,8 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef rne_bv = mkRM(RM::ROUND_TO_EVEN, FPEncoding::BV);
   SMTExprRef rndd_sig_lz = mkLeadingZeros(*this, rndd_sig, ebits + 2);
 
-  SMTExprRef rndd_exp_eq_y_exp =
-      mkEqual(rndd_sig_lz, mkBVFromDec(1, ebits + 2));
-  SMTExprRef rndd_exp_eq_y_exp_m1 =
-      mkEqual(rndd_sig_lz, mkBVFromDec(2, ebits + 2));
+  SMTExprRef rndd_exp_eq_y_exp = mkEqual(rndd_sig_lz, one_ebits_p2);
+  SMTExprRef rndd_exp_eq_y_exp_m1 = mkEqual(rndd_sig_lz, two_ebits_p2);
 
   SMTExprRef y_sig_ext = mkBVConcat(mkBVZeroExt(2, b_sig), mkBVZero2(*this));
   SMTExprRef y_sig_le_rndd_sig = mkBVSle(y_sig_ext, rndd_sig);
@@ -909,10 +910,9 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
                  mkNot(huge_div_is_even)));
 
   SMTExprRef rndd = round(rne_bv, rndd_sgn, rndd_sig, rndd_exp, ebits, sbits);
-  SMTExprRef rounded_sub_y = mkFPSub(rndd, RHS, rne_bv);
-  SMTExprRef rounded_add_y = mkFPAdd(rndd, RHS, rne_bv);
   SMTExprRef add_cnd = mkNot(mkEqual(rndd_sgn, b_sgn));
-  SMTExprRef adjusted = mkIte(add_cnd, rounded_add_y, rounded_sub_y);
+  SMTExprRef adjusted_rhs = mkIte(add_cnd, RHS, mkFPNeg(RHS));
+  SMTExprRef adjusted = mkFPAdd(rndd, adjusted_rhs, rne_bv);
   SMTExprRef v7 = mkIte(adj_cnd, adjusted, rndd);
 
   SMTExprRef result = mkIte(c6, v6, v7);
@@ -924,7 +924,7 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
 
   // IEEE remainder keeps the sign of the dividend, including signed zero.
   SMTExprRef result_is_zero = mkFPIsZero(result);
-  SMTExprRef zeros = mkIte(x_is_pos, pzero, nzero);
+  SMTExprRef zeros = mkIte(mkEqual(x_sgn, mkBVZero1(*this)), pzero, nzero);
   result = mkIte(result_is_zero, zeros, result);
   return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPRem);
 }
