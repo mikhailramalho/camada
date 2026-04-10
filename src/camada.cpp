@@ -64,9 +64,8 @@ SMTSolverRef createMathSATSolver() {
 #if SOLVER_MATHSAT_ENABLED
   return std::make_unique<MathSATSolver>();
 #else
-  std::fprintf(stderr,
-               "Camada was not compiled with MathSAT support, rebuild with "
-               "-DCAMADA_ENABLE_SOLVER_MATHSAT=ON\n");
+  std::fprintf(stderr, "Camada was not compiled with MathSAT support, rebuild "
+                       "with -DCAMADA_ENABLE_SOLVER_MATHSAT=ON\n");
   abort();
 #endif
 }
@@ -75,9 +74,8 @@ SMTSolverRef createCVC5Solver() {
 #if SOLVER_CVC5_ENABLED
   return std::make_unique<CVC5Solver>();
 #else
-  std::fprintf(stderr,
-               "Camada was not compiled with CVC5 support, rebuild with "
-               "-DCAMADA_ENABLE_SOLVER_CVC5=ON\n");
+  std::fprintf(stderr, "Camada was not compiled with CVC5 support, rebuild "
+                       "with -DCAMADA_ENABLE_SOLVER_CVC5=ON\n");
   abort();
 #endif
 }
@@ -86,9 +84,8 @@ SMTSolverRef createBitwuzlaSolver() {
 #if SOLVER_BITWUZLA_ENABLED
   return std::make_unique<BitwuzlaSolver>();
 #else
-  std::fprintf(stderr,
-               "Camada was not compiled with Bitwuzla support, rebuild with "
-               "-DCAMADA_ENABLE_SOLVER_BITWUZLA=ON\n");
+  std::fprintf(stderr, "Camada was not compiled with Bitwuzla support, rebuild "
+                       "with -DCAMADA_ENABLE_SOLVER_BITWUZLA=ON\n");
   abort();
 #endif
 }
@@ -97,9 +94,8 @@ SMTSolverRef createYicesSolver() {
 #if SOLVER_YICES_ENABLED
   return std::make_unique<YicesSolver>();
 #else
-  std::fprintf(stderr,
-               "Camada was not compiled with YICES support, rebuild with "
-               "-DCAMADA_ENABLE_SOLVER_YICES=ON\n");
+  std::fprintf(stderr, "Camada was not compiled with YICES support, rebuild "
+                       "with -DCAMADA_ENABLE_SOLVER_YICES=ON\n");
   abort();
 #endif
 }
