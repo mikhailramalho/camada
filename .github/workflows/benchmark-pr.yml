@@ -124,8 +124,8 @@ jobs:
         run: |
           set -o pipefail
           hyperfine --warmup 3 --runs 50 \
-            -n baseline './build-baseline/bin/camada-bench bitwuzla 200' \
-            -n current './build/bin/camada-bench bitwuzla 200' \
+            -n baseline './build-baseline/bin/camada-bench bitwuzla 1000' \
+            -n current './build/bin/camada-bench bitwuzla 1000' \
             | tee benchmark-master-comment.txt
 
       - name: Create previous-commit worktree
@@ -154,8 +154,8 @@ jobs:
         run: |
           set -o pipefail
           hyperfine --warmup 3 --runs 50 \
-            -n previous '../camada-prev/build/bin/camada-bench bitwuzla 200' \
-            -n current './build/bin/camada-bench bitwuzla 200' \
+            -n previous '../camada-prev/build/bin/camada-bench bitwuzla 1000' \
+            -n current './build/bin/camada-bench bitwuzla 1000' \
             | tee benchmark-prev-comment.txt
 
       - name: Update PR comment

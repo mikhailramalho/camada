@@ -387,20 +387,21 @@ Typical local workflow:
 
 ```bash
 hyperfine --warmup 3 --runs 50 \
-  -n baseline './build-baseline/bin/camada-bench bitwuzla 200' \
-  -n current './build/bin/camada-bench bitwuzla 200'
+  -n baseline './build-baseline/bin/camada-bench bitwuzla 1000' \
+  -n current './build/bin/camada-bench bitwuzla 1000'
 ```
 
 This compares the whole benchmark driver runtime between a baseline build and
 the current build. The `--warmup 3 --runs 50` values are pragmatic defaults:
 three warmups usually absorb one-time loader/cache effects, while 50 measured
 runs give hyperfine enough samples for a steadier comparison without being
-excessive for optimization checks.
+excessive for optimization checks. The `1000` benchmark iterations keep each
+sample long enough that process startup and scheduler noise are less dominant.
 
 For quick smoke checks, reduce the measured samples:
 
 ```bash
 hyperfine --warmup 1 --runs 5 \
-  -n baseline './build-baseline/bin/camada-bench bitwuzla 200' \
-  -n current './build/bin/camada-bench bitwuzla 200'
+  -n baseline './build-baseline/bin/camada-bench bitwuzla 1000' \
+  -n current './build/bin/camada-bench bitwuzla 1000'
 ```
