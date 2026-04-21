@@ -384,16 +384,25 @@ Backend-specific feature coverage is also demonstrated in:
 Camada includes a standalone benchmark driver:
 
 - [`regression/bench/main.cpp`](/home/mgadelha/tools/camada/regression/bench/main.cpp)
-- [`scripts/compare-bench.py`](/home/mgadelha/tools/camada/scripts/compare-bench.py)
 
 Typical local workflow:
 
 ```bash
-schedtool -a 5 -n 20 -e ./build/bin/camada-bench bitwuzla 200
-python3 scripts/compare-bench.py ./build/bin/camada-bench 200
+hyperfine --warmup 3 --runs 50 \
+  -n baseline './build-baseline/bin/camada-bench bitwuzla 200' \
+  -n current './build/bin/camada-bench bitwuzla 200'
 ```
 
-This runs repeated pinned benchmark samples, computes medians, and compares the
-result against [`scripts/baseline.txt`](/home/mgadelha/tools/camada/scripts/baseline.txt).
-The benchmark output also records retained RSS (`rss_after_kb` and
-`rss_delta_kb`) alongside timing data.
+This compares the whole benchmark driver runtime between a baseline build and
+the current build. The `--warmup 3 --runs 50` values are pragmatic defaults:
+three warmups usually absorb one-time loader/cache effects, while 50 measured
+runs give hyperfine enough samples for a steadier comparison without being
+excessive for optimization checks.
+
+For quick smoke checks, reduce the measured samples:
+
+```bash
+hyperfine --warmup 1 --runs 5 \
+  -n baseline './build-baseline/bin/camada-bench bitwuzla 200' \
+  -n current './build/bin/camada-bench bitwuzla 200'
+```
