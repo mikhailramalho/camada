@@ -49,14 +49,14 @@ public:
 
 protected:
   template <typename SolverExpr, typename... Args>
-  SMTExprRef makeExprRef(SMTExprKind Kind, Args &&...ArgsV) {
+  SMTExprRef makeExprRef(SMTExprKind Kind, Args &&...ArgsV) const {
     auto *Exp =
         ExprArena.create<SolverExpr>(Kind, std::forward<Args>(ArgsV)...);
     assert(Exp->Sort->isWidthValidated());
     return SMTExprRef(Exp, HandleState, HandleState->Generation);
   }
 
-  template <typename SolverSort> SMTSortRef makeSortRef(SolverSort Sort) {
+  template <typename SolverSort> SMTSortRef makeSortRef(SolverSort Sort) const {
     auto *OwnedSort = SortArena.create<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
 #ifndef NDEBUG
@@ -70,39 +70,48 @@ protected:
   void clearExprCaches();
   void initializeCommonSingletons();
 
-  ObjectArena SortArena;
-  ObjectArena ExprArena;
-  std::array<SMTExprRef, 2> CachedBoolExprs;
-  SMTExprRef CachedBVOne1Expr;
-  std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
-  std::array<SMTExprRef, 5> CachedRMBVExprs;
-  std::array<std::vector<SMTExprRef>, 3> CachedSmallBVExprs;
-  SMTSortRef CachedBoolSort;
-  SMTSortRef CachedIntSort;
-  SMTSortRef CachedRealSort;
-  std::array<SMTSortRef, 2> CachedRMSorts;
-  std::unordered_map<SymbolExprCacheKey, SMTExprRef, SymbolExprCacheKeyHash>
+  mutable ObjectArena SortArena;
+  mutable ObjectArena ExprArena;
+  mutable std::array<SMTExprRef, 2> CachedBoolExprs;
+  mutable SMTExprRef CachedBVOne1Expr;
+  mutable std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
+  mutable std::array<SMTExprRef, 5> CachedRMBVExprs;
+  mutable std::vector<SMTExprRef> CachedBVNegOneExprs;
+  mutable std::vector<SMTExprRef> CachedBVZeroExprs;
+  mutable std::vector<SMTExprRef> CachedBVOneExprs;
+  mutable SMTSortRef CachedBoolSort;
+  mutable SMTSortRef CachedIntSort;
+  mutable SMTSortRef CachedRealSort;
+  mutable SMTSortRef CachedNativeRMSort;
+  mutable SMTSortRef CachedEncodedRMSort;
+  mutable std::unordered_map<SymbolExprCacheKey, SMTExprRef,
+                             SymbolExprCacheKeyHash>
       SymbolExprCache;
-  std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
-                     FPSpecialExprCacheKeyHash>
+  mutable std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
+                             FPSpecialExprCacheKeyHash>
       FPSpecialExprCache;
-  std::unordered_map<FPConstExprCacheKey, SMTExprRef, FPConstExprCacheKeyHash>
+  mutable std::unordered_map<FPConstExprCacheKey, SMTExprRef,
+                             FPConstExprCacheKeyHash>
       FPConstExprCache;
-  std::unordered_map<unsigned, SMTSortRef> BVSortCache;
-  std::array<std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>,
-             2>
-      FPSortCaches;
-  std::unordered_map<ArraySortCacheKey, SMTSortRef, ArraySortCacheKeyHash>
+  mutable std::unordered_map<unsigned, SMTSortRef> BVSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      NativeFPSortCache;
+  mutable std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>
+      EncodedFPSortCache;
+  mutable std::unordered_map<ArraySortCacheKey, SMTSortRef,
+                             ArraySortCacheKeyHash>
       ArraySortCache;
-  std::unordered_map<SmallFunctionSortCacheKey, SMTSortRef,
-                     SmallFunctionSortCacheKeyHash>
+  mutable std::unordered_map<SmallFunctionSortCacheKey, SMTSortRef,
+                             SmallFunctionSortCacheKeyHash>
       SmallFunctionSortCache;
-  std::unordered_map<FunctionSortCacheKey, SMTSortRef, FunctionSortCacheKeyHash>
+  mutable std::unordered_map<FunctionSortCacheKey, SMTSortRef,
+                             FunctionSortCacheKeyHash>
       FunctionSortCache;
-  std::unordered_map<SmallTupleSortCacheKey, SMTSortRef,
-                     SmallTupleSortCacheKeyHash>
+  mutable std::unordered_map<SmallTupleSortCacheKey, SMTSortRef,
+                             SmallTupleSortCacheKeyHash>
       SmallTupleSortCache;
-  std::unordered_map<TupleSortCacheKey, SMTSortRef, TupleSortCacheKeyHash>
+  mutable std::unordered_map<TupleSortCacheKey, SMTSortRef,
+                             TupleSortCacheKeyHash>
       TupleSortCache;
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
@@ -342,7 +351,7 @@ public:
   void dumpModel(std::string &Out) override final;
 
 protected:
-  virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) = 0;
+  virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) const = 0;
 
   // Rewrap an existing backend payload with a different Camada-facing
   // sort/kind. This is still needed for lowered/common-layer operations where
@@ -350,7 +359,7 @@ protected:
   // though backend-native operations should construct expressions with the
   // final kind directly.
   virtual SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
-                                    SMTExprKind Kind) = 0;
+                                    SMTExprKind Kind) const = 0;
 
   virtual SMTSortRef mkBoolSortImpl() = 0;
 

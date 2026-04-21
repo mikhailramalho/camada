@@ -39,14 +39,6 @@ static bool usesBVFPEncoding(const SMTSortRef &Sort) {
   return Sort->isBVFPSort();
 }
 
-constexpr std::size_t fpEncodingIndex(FPEncoding Encoding) {
-  return Encoding == FPEncoding::BV ? 1u : 0u;
-}
-
-constexpr std::size_t cachedSmallBVExprIndex(int64_t Value) {
-  return static_cast<std::size_t>(Value + 1);
-}
-
 static bool usesBVFPEncoding(const SMTExprRef &Exp) {
   return usesBVFPEncoding(Exp->Sort);
 }
@@ -95,10 +87,11 @@ void SMTSolverImpl::clearSortCaches() {
   CachedBoolSort = {};
   CachedIntSort = {};
   CachedRealSort = {};
-  CachedRMSorts.fill({});
+  CachedNativeRMSort = {};
+  CachedEncodedRMSort = {};
   BVSortCache.clear();
-  for (auto &Cache : FPSortCaches)
-    Cache.clear();
+  NativeFPSortCache.clear();
+  EncodedFPSortCache.clear();
   ArraySortCache.clear();
   SmallFunctionSortCache.clear();
   FunctionSortCache.clear();
@@ -111,8 +104,9 @@ void SMTSolverImpl::clearExprCaches() {
   CachedBVOne1Expr = {};
   CachedSmallBVZeroExprs.fill({});
   CachedRMBVExprs.fill({});
-  for (auto &Cache : CachedSmallBVExprs)
-    Cache.clear();
+  CachedBVNegOneExprs.clear();
+  CachedBVZeroExprs.clear();
+  CachedBVOneExprs.clear();
   SymbolExprCache.clear();
   FPSpecialExprCache.clear();
   FPConstExprCache.clear();
@@ -126,9 +120,6 @@ void SMTSolverImpl::initializeCommonSingletons() {
   CachedSmallBVZeroExprs[2] = mkBVFromBin("00", 2);
   CachedSmallBVZeroExprs[3] = mkBVFromBin("000", 3);
   CachedSmallBVZeroExprs[4] = mkBVFromBin("0000", 4);
-  auto &CachedBVNegOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(-1)];
-  auto &CachedBVZeroExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(0)];
-  auto &CachedBVOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(1)];
   CachedBVZeroExprs.resize(5);
   CachedBVZeroExprs[1] = CachedSmallBVZeroExprs[1];
   CachedBVZeroExprs[2] = CachedSmallBVZeroExprs[2];
@@ -195,7 +186,8 @@ SMTSortRef SMTSolverImpl::mkBVSort(const unsigned BitWidth) {
 }
 
 SMTSortRef SMTSolverImpl::mkRMSort(FPEncoding Encoding) {
-  SMTSortRef &CachedSort = CachedRMSorts[fpEncodingIndex(Encoding)];
+  SMTSortRef &CachedSort =
+      Encoding == FPEncoding::BV ? CachedEncodedRMSort : CachedNativeRMSort;
   if (CachedSort)
     return CachedSort;
 
@@ -211,7 +203,8 @@ SMTSortRef SMTSolverImpl::mkFPSort(const unsigned ExpWidth,
                                    const unsigned SigWidth,
                                    FPEncoding Encoding) {
   assert(ExpWidth && SigWidth);
-  auto &Cache = FPSortCaches[fpEncodingIndex(Encoding)];
+  auto &Cache =
+      Encoding == FPEncoding::BV ? EncodedFPSortCache : NativeFPSortCache;
   FPSortCacheKey Key{ExpWidth, SigWidth};
   auto It = Cache.find(Key);
   if (It != Cache.end())
@@ -1142,11 +1135,26 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
   }
 
   if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
-    auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
-    if (Cache.size() <= Sort->getWidth())
-      Cache.resize(Sort->getWidth() + 1);
+    std::vector<SMTExprRef> *Cache = nullptr;
+    switch (Int) {
+    case -1:
+      Cache = &CachedBVNegOneExprs;
+      break;
+    case 0:
+      Cache = &CachedBVZeroExprs;
+      break;
+    case 1:
+      Cache = &CachedBVOneExprs;
+      break;
+    default:
+      break;
+    }
 
-    SMTExprRef &CachedExpr = Cache[Sort->getWidth()];
+    assert(Cache);
+    if (Cache->size() <= Sort->getWidth())
+      Cache->resize(Sort->getWidth() + 1);
+
+    SMTExprRef &CachedExpr = (*Cache)[Sort->getWidth()];
     if (CachedExpr)
       return CachedExpr;
 

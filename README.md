@@ -213,8 +213,6 @@ limitations still matter in day-to-day use.
 - Use explicit `FPEncoding` when creating floating-point and rounding-mode
   sorts/constants so the chosen native-vs-BV representation is obvious at the
   call site.
-- Treat each solver instance as thread-confined. Camada does not support
-  concurrent use of a single solver object from multiple threads.
 
 ## Design Notes
 

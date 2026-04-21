@@ -105,7 +105,7 @@ void STPSolver::addConstraintImpl(const SMTExprRef &Exp) {
   STP::vc_assertFormula(Context, toSolverExpr<STPExpr>(*Exp).Expr);
 }
 
-SMTExprRef STPSolver::newExprRefImpl(const SMTExpr &Exp) {
+SMTExprRef STPSolver::newExprRefImpl(const SMTExpr &Exp) const {
   // Store a fresh wrapper that owns the underlying STP term. STP leaks
   // ordinary constructed terms unless the final arena-held wrapper deletes
   // them via `vc_DeleteExpr`.
@@ -115,7 +115,7 @@ SMTExprRef STPSolver::newExprRefImpl(const SMTExpr &Exp) {
 }
 
 SMTExprRef STPSolver::rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
-                                     SMTExprKind Kind) {
+                                     SMTExprKind Kind) const {
   const auto &Wrapped = toSolverExpr<STPExpr>(Exp);
   return makeExprRef<STPExpr>(Kind, Wrapped.Context, Sort, Wrapped.Expr, false);
 }

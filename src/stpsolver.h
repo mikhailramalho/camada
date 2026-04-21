@@ -89,9 +89,9 @@ protected:
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) override;
+  SMTExprRef newExprRefImpl(const SMTExpr &Exp) const override;
   SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
-                            SMTExprKind Kind) override;
+                            SMTExprKind Kind) const override;
 
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
