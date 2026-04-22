@@ -23,8 +23,7 @@ jobs:
             ninja-build \
             pkg-config \
             libgmp-dev \
-            libmpfr-dev \
-            schedtool
+            libmpfr-dev
 
       - name: Cache deps
         id: cache-deps-bench-v2
@@ -52,15 +51,9 @@ jobs:
       - name: Build Benchmark
         run: cmake --build build --target camada-bench
 
-      - name: Generate baseline-master.txt
-        run: >
-          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
-          --baseline scripts/baseline-master.txt
-          --write-baseline
-
-      - name: Upload baseline-master artifact
+      - name: Upload master benchmark artifact
         uses: actions/upload-artifact@v4
         with:
-          name: baseline-master
-          path: scripts/baseline-master.txt
+          name: camada-bench-master
+          path: build/bin/camada-bench
           if-no-files-found: error

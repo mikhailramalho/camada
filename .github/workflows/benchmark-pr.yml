@@ -30,11 +30,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             cmake \
+            hyperfine \
             ninja-build \
             pkg-config \
             libgmp-dev \
-            libmpfr-dev \
-            schedtool
+            libmpfr-dev
 
       - name: Cache deps
         id: cache-deps-bench-v2
@@ -45,15 +45,56 @@ jobs:
             build/_deps
           key: ${{ runner.os }}-bench-deps-v2
 
-      - name: Download latest master baseline
+      - name: Download latest master benchmark
+        id: download-master-benchmark
+        continue-on-error: true
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: benchmark-master.yml
           branch: master
-          name: baseline-master
-          path: scripts
+          name: camada-bench-master
+          path: build-baseline/bin
           github_token: ${{ secrets.GITHUB_TOKEN }}
           if_no_artifact_found: fail
+
+      - name: Prepare master benchmark
+        if: steps.download-master-benchmark.outcome == 'success'
+        run: chmod +x build-baseline/bin/camada-bench
+
+      - name: Fetch master for benchmark fallback
+        if: steps.download-master-benchmark.outcome != 'success'
+        run: git fetch origin master
+
+      - name: Create master benchmark worktree fallback
+        if: steps.download-master-benchmark.outcome != 'success'
+        run: git worktree add ../camada-master origin/master
+
+      - name: Configure master benchmark fallback
+        if: steps.download-master-benchmark.outcome != 'success'
+        working-directory: ../camada-master
+        run: >
+          cmake -S . -B build -GNinja
+          -DCAMADA_ENABLE_REGRESSION=ON
+          -DBUILD_SHARED_LIBS=OFF
+          -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL
+          -DCAMADA_SOLVER_BITWUZLA_ENABLE=ON
+          -DCAMADA_SOLVER_CVC5_ENABLE=OFF
+          -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF
+          -DCAMADA_SOLVER_STP_ENABLE=OFF
+          -DCAMADA_SOLVER_YICES_ENABLE=OFF
+          -DCAMADA_SOLVER_Z3_ENABLE=OFF
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build master benchmark fallback
+        if: steps.download-master-benchmark.outcome != 'success'
+        working-directory: ../camada-master
+        run: cmake --build build --target camada-bench
+
+      - name: Install master benchmark fallback
+        if: steps.download-master-benchmark.outcome != 'success'
+        run: |
+          mkdir -p build-baseline/bin
+          cp ../camada-master/build/bin/camada-bench build-baseline/bin/camada-bench
 
       - name: Determine previous commit
         id: previous
@@ -80,10 +121,12 @@ jobs:
         run: cmake --build build --target camada-bench
 
       - name: Compare current against master baseline
-        run: >
-          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
-          --baseline scripts/baseline-master.txt
-          > benchmark-master-comment.txt
+        run: |
+          set -o pipefail
+          hyperfine --warmup 3 --runs 50 \
+            -n baseline './build-baseline/bin/camada-bench bitwuzla 1000' \
+            -n current './build/bin/camada-bench bitwuzla 1000' \
+            | tee benchmark-master-comment.txt
 
       - name: Create previous-commit worktree
         run: git worktree add ../camada-prev ${{ steps.previous.outputs.sha }}
@@ -107,18 +150,13 @@ jobs:
         working-directory: ../camada-prev
         run: cmake --build build --target camada-bench
 
-      - name: Generate previous-commit baseline
-        working-directory: ../camada-prev
-        run: >
-          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
-          --baseline scripts/baseline-prev.txt
-          --write-baseline
-
       - name: Compare current against previous commit
-        run: >
-          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
-          --baseline ../camada-prev/scripts/baseline-prev.txt
-          > benchmark-prev-comment.txt
+        run: |
+          set -o pipefail
+          hyperfine --warmup 3 --runs 50 \
+            -n previous '../camada-prev/build/bin/camada-bench bitwuzla 1000' \
+            -n current './build/bin/camada-bench bitwuzla 1000' \
+            | tee benchmark-prev-comment.txt
 
       - name: Update PR comment
         uses: actions/github-script@v7
@@ -139,7 +177,7 @@ jobs:
               '',
               '### Against master baseline',
               '',
-              'Compared against `baseline-master.txt` generated from the latest successful `master` benchmark run.',
+              'Compared against the latest `master` benchmark artifact when available; otherwise against a fresh `origin/master` build.',
               '',
               '```text',
               masterResult,
