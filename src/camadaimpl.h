@@ -39,9 +39,6 @@
 
 namespace camada {
 
-enum class FPEncoding;
-enum class RM;
-
 class SMTSolverImpl : public SMTSolver {
 public:
   SMTSolverImpl() = default;

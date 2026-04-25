@@ -28,7 +28,6 @@
 namespace camada {
 
 class SMTExpr;
-class SMTSolverImpl;
 
 enum class SMTExprKind {
   Unknown,
