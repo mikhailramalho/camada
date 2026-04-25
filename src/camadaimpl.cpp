@@ -3,6 +3,7 @@
 #include "camadafp.h"
 
 #include <cstdio>
+#include <limits>
 
 namespace camada {
 
@@ -45,6 +46,14 @@ constexpr std::size_t fpEncodingIndex(FPEncoding Encoding) {
 
 constexpr std::size_t cachedSmallBVExprIndex(int64_t Value) {
   return static_cast<std::size_t>(Value + 1);
+}
+
+static bool isBinaryLiteral(const std::string &Value) {
+  for (char C : Value) {
+    if (C != '0' && C != '1')
+      return false;
+  }
+  return true;
 }
 
 static bool usesBVFPEncoding(const SMTExprRef &Exp) {
@@ -181,7 +190,7 @@ SMTSortRef SMTSolverImpl::mkRealSort() {
 }
 
 SMTSortRef SMTSolverImpl::mkBVSort(const unsigned BitWidth) {
-  assert(BitWidth);
+  fatalErrorIf(BitWidth == 0, "Bit-vector sort width must be non-zero");
   auto It = BVSortCache.find(BitWidth);
   if (It != BVSortCache.end())
     return It->second;
@@ -210,7 +219,12 @@ SMTSortRef SMTSolverImpl::mkRMSort(FPEncoding Encoding) {
 SMTSortRef SMTSolverImpl::mkFPSort(const unsigned ExpWidth,
                                    const unsigned SigWidth,
                                    FPEncoding Encoding) {
-  assert(ExpWidth && SigWidth);
+  fatalErrorIf(ExpWidth == 0, "Floating-point exponent width must be non-zero");
+  fatalErrorIf(SigWidth == 0,
+               "Floating-point significand width must be non-zero");
+  constexpr unsigned MaxWidth = std::numeric_limits<unsigned>::max();
+  fatalErrorIf(SigWidth > MaxWidth - 1 || ExpWidth > MaxWidth - 1 - SigWidth,
+               "Floating-point sort width overflow");
   auto &Cache = FPSortCaches[fpEncodingIndex(Encoding)];
   FPSortCacheKey Key{ExpWidth, SigWidth};
   auto It = Cache.find(Key);
@@ -253,7 +267,8 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
 SMTSortRef
 SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
                               const SMTSortRef &CodomainSort) {
-  assert(!DomainSorts.empty());
+  fatalErrorIf(DomainSorts.empty(),
+               "Function sort must have at least one domain sort");
   if (DomainSorts.size() <= 4) {
     SmallFunctionSortCacheKey SmallKey{};
     SmallKey.CodomainSort = CodomainSort.get();
@@ -1132,7 +1147,8 @@ SMTExprRef SMTSolverImpl::mkReal(int64_t num, int64_t den) {
 
 SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
-  assert(Sort->isBVSort());
+  fatalErrorIf(!Sort->isBVSort(),
+               "Bit-vector decimal literal sort must be bit-vector");
   if (Sort->getSortKind() == SMTSortKind::BV) {
     const unsigned Width = Sort->getWidth();
     if (Int == 0 && Width < CachedSmallBVZeroExprs.size())
@@ -1169,7 +1185,13 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int, unsigned BitWidth) {
 
 SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int,
                                       const SMTSortRef &Sort) {
-  assert(Sort->isBVSort());
+  fatalErrorIf(!Sort->isBVSort(),
+               "Bit-vector binary literal sort must be bit-vector");
+  fatalErrorIf(Int.empty(), "Bit-vector binary literal must be non-empty");
+  fatalErrorIf(!isBinaryLiteral(Int),
+               "Bit-vector binary literal must contain only 0 or 1");
+  fatalErrorIf(Int.length() != Sort->getWidth(),
+               "Bit-vector binary literal width must match sort width");
   SMTExprRef theExp = mkBVFromBinImpl(Int, Sort);
   assert(theExp->isBVSort());
   assert(theExp->getWidth() == Sort->getWidth());
@@ -1182,6 +1204,9 @@ SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int,
 }
 
 SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int) {
+  fatalErrorIf(Int.length() > static_cast<std::size_t>(
+                                  std::numeric_limits<unsigned>::max()),
+               "Bit-vector binary literal width is too large");
   return mkBVFromBin(Int, Int.length());
 }
 
@@ -1200,7 +1225,17 @@ SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
 
 SMTExprRef SMTSolverImpl::mkFPFromBin(const std::string &FP, unsigned EWidth,
                                       FPEncoding Encoding) {
-  SMTSortRef Sort = mkFPSort(EWidth, FP.length() - EWidth - 1, Encoding);
+  fatalErrorIf(EWidth == 0, "Floating-point exponent width must be non-zero");
+  fatalErrorIf(FP.length() <= static_cast<std::size_t>(EWidth) + 1,
+               "Floating-point binary literal must include sign, exponent, and "
+               "significand bits");
+  fatalErrorIf(!isBinaryLiteral(FP),
+               "Floating-point binary literal must contain only 0 or 1");
+  const std::size_t SigWidth = FP.length() - EWidth - 1;
+  fatalErrorIf(
+      SigWidth > static_cast<std::size_t>(std::numeric_limits<unsigned>::max()),
+      "Floating-point significand width is too large");
+  SMTSortRef Sort = mkFPSort(EWidth, static_cast<unsigned>(SigWidth), Encoding);
   FPConstExprCacheKey Key{Sort.get(), FP};
   auto Cached = FPConstExprCache.find(Key);
   if (Cached != FPConstExprCache.end())
@@ -1238,7 +1273,8 @@ SMTExprRef SMTSolverImpl::mkRM(const RM &R, FPEncoding Encoding) {
 
 SMTExprRef SMTSolverImpl::mkNaN(const bool Sgn, const unsigned ExpWidth,
                                 const unsigned SigWidth, FPEncoding Encoding) {
-  assert(SigWidth);
+  fatalErrorIf(SigWidth == 0,
+               "Floating-point significand width must be non-zero");
   SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);
   SMTExprRef theExp = usesBVFPEncoding(Sort)
                           ? SMTSolverImpl::mkNaNImpl(Sgn, ExpWidth, SigWidth)
@@ -1259,7 +1295,8 @@ SMTExprRef SMTSolverImpl::mkNaN64(const bool Sgn, FPEncoding Encoding) {
 
 SMTExprRef SMTSolverImpl::mkInf(const bool Sgn, const unsigned ExpWidth,
                                 const unsigned SigWidth, FPEncoding Encoding) {
-  assert(SigWidth);
+  fatalErrorIf(SigWidth == 0,
+               "Floating-point significand width must be non-zero");
   SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);
   SMTExprRef theExp = usesBVFPEncoding(Sort)
                           ? SMTSolverImpl::mkInfImpl(Sgn, ExpWidth, SigWidth)

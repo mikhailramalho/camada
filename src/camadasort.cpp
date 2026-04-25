@@ -22,7 +22,6 @@
 #include "camadasort.h"
 #include "camadaerror.h"
 
-#include <cassert>
 #include <cstdio>
 #include <string>
 #include <type_traits>
@@ -120,9 +119,10 @@ void SMTSort::dump(std::string &Out) const {
 }
 
 unsigned SMTSort::getWidth() const {
-  assert(
-      !isArraySort() && !isFunctionSort() && !isTupleSort() && !isArithSort() &&
-      "Width is not defined for array, function, tuple, or arithmetic sorts");
+  fatalErrorIf(isArraySort() || isFunctionSort() || isTupleSort() ||
+                   isArithSort(),
+               "Width is not defined for array, function, tuple, or "
+               "arithmetic sorts");
   if (isFPSort())
     return std::get<FPSortData>(Data).Width;
 
@@ -134,40 +134,40 @@ unsigned SMTSort::getWidthFromSolver() const {
 }
 
 unsigned SMTSort::getFPSignificandWidth() const {
-  assert(isFPSort() && "Significand width is only defined for FP sorts");
+  fatalErrorIf(!isFPSort(), "Significand width is only defined for FP sorts");
   return std::get<FPSortData>(Data).SigWidth;
 }
 
 unsigned SMTSort::getFPExponentWidth() const {
-  assert(isFPSort() && "Exponent width is only defined for FP sorts");
+  fatalErrorIf(!isFPSort(), "Exponent width is only defined for FP sorts");
   return std::get<FPSortData>(Data).ExpWidth;
 }
 
 SMTSortRef SMTSort::getIndexSort() const {
-  assert(isArraySort() && "Index sort is only defined for array sorts");
+  fatalErrorIf(!isArraySort(), "Index sort is only defined for array sorts");
   return std::get<ArraySortData>(Data).IndexSort;
 }
 
 SMTSortRef SMTSort::getElementSort() const {
-  assert(isArraySort() && "Element sort is only defined for array sorts");
+  fatalErrorIf(!isArraySort(), "Element sort is only defined for array sorts");
   return std::get<ArraySortData>(Data).ElementSort;
 }
 
 const std::vector<SMTSortRef> &SMTSort::getDomainSorts() const {
-  assert(isFunctionSort() &&
-         "Domain sorts are only defined for function sorts");
+  fatalErrorIf(!isFunctionSort(),
+               "Domain sorts are only defined for function sorts");
   return std::get<FunctionSortData>(Data).DomainSorts;
 }
 
 SMTSortRef SMTSort::getCodomainSort() const {
-  assert(isFunctionSort() &&
-         "Codomain sort is only defined for function sorts");
+  fatalErrorIf(!isFunctionSort(),
+               "Codomain sort is only defined for function sorts");
   return std::get<FunctionSortData>(Data).CodomainSort;
 }
 
 const std::vector<SMTSortRef> &SMTSort::getTupleElementSorts() const {
-  assert(isTupleSort() &&
-         "Tuple element sorts are only defined for tuple sorts");
+  fatalErrorIf(!isTupleSort(),
+               "Tuple element sorts are only defined for tuple sorts");
   return std::get<TupleSortData>(Data).ElementSorts;
 }
 

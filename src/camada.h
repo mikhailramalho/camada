@@ -22,13 +22,13 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
-#include <cassert>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "camadaerror.h"
 #include "camadaexpr.h"
 #include "camadafp.h"
 #include "camadasort.h"
@@ -86,17 +86,17 @@ public:
   explicit operator bool() const noexcept { return HasValue_; }
 
   const T &value() const {
-    assert(HasValue_);
+    fatalErrorIf(!HasValue_, "Accessing value of failed SMTResult");
     return Value_;
   }
 
   T &value() {
-    assert(HasValue_);
+    fatalErrorIf(!HasValue_, "Accessing value of failed SMTResult");
     return Value_;
   }
 
   const SMTError &error() const {
-    assert(!HasValue_);
+    fatalErrorIf(HasValue_, "Accessing error of successful SMTResult");
     return Error_;
   }
 
