@@ -22,6 +22,7 @@
 #ifndef CAMADAEXPR_H_
 #define CAMADAEXPR_H_
 
+#include "camadaerror.h"
 #include "camadasort.h"
 
 namespace camada {
@@ -158,10 +159,11 @@ private:
       : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
 
   void validate() const {
-    assert(Ptr && "Dereferencing null expression handle");
-    assert(State && "Dereferencing expression handle after solver destruction");
-    assert(State->Generation == Generation &&
-           "Dereferencing stale expression handle after solver reset");
+    fatalErrorIf(!Ptr, "Dereferencing null expression handle");
+    fatalErrorIf(!State, "Dereferencing moved-from expression handle");
+    fatalErrorIf(State->Generation != Generation,
+                 "Dereferencing stale expression handle (solver was reset or "
+                 "destroyed)");
   }
 
   friend class SMTSolver;

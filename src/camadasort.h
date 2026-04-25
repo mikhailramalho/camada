@@ -30,6 +30,8 @@
 #include <variant>
 #include <vector>
 
+#include "camadaerror.h"
+
 namespace camada {
 
 enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3 };
@@ -82,10 +84,11 @@ private:
       : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
 
   void validate() const {
-    assert(Ptr && "Dereferencing null sort handle");
-    assert(State && "Dereferencing sort handle after solver destruction");
-    assert(State->Generation == Generation &&
-           "Dereferencing stale sort handle after solver reset");
+    fatalErrorIf(!Ptr, "Dereferencing null sort handle");
+    fatalErrorIf(!State, "Dereferencing moved-from sort handle");
+    fatalErrorIf(State->Generation != Generation,
+                 "Dereferencing stale sort handle (solver was reset or "
+                 "destroyed)");
   }
 
   friend class SMTSolver;

@@ -32,6 +32,12 @@ namespace camada {
   std::abort();
 }
 
+static inline void fatalErrorIf(bool Cond, const char *Message) {
+  if (!Cond)
+    return;
+  fatalError(Message);
+}
+
 } // namespace camada
 
 #endif
