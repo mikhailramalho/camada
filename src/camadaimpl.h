@@ -45,7 +45,11 @@ enum class RM;
 class SMTSolverImpl : public SMTSolver {
 public:
   SMTSolverImpl() = default;
-  virtual ~SMTSolverImpl() override = default;
+  virtual ~SMTSolverImpl() override {
+    // Bump generation so outstanding handles become invalid before the
+    // arenas destroy the underlying objects.
+    ++HandleState->Generation;
+  }
 
 protected:
   template <typename SolverExpr, typename... Args>
