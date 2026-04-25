@@ -69,10 +69,8 @@ public:
     for (auto It = Destructors.rbegin(); It != Destructors.rend(); ++It)
       It->Destroy(It->Ptr);
     Destructors.clear();
-    if (Blocks.size() > 1) {
-      Blocks.front() = std::move(Blocks.back());
+    if (Blocks.size() > 1)
       Blocks.resize(1);
-    }
     if (!Blocks.empty())
       Blocks.front().Offset = 0;
   }
