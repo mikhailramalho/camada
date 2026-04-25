@@ -55,6 +55,8 @@ public:
 
   /// Construct an object inside the arena and return its stable address.
   template <typename T, typename... Args> T *create(Args &&...ArgsV) {
+    fatalErrorIf(Destructors.size() == std::numeric_limits<std::size_t>::max(),
+                 "Arena destructor record overflow");
     Destructors.reserve(Destructors.size() + 1);
     void *Storage = allocate(sizeof(T), alignof(T));
     T *Object = new (Storage) T(std::forward<Args>(ArgsV)...);
@@ -63,8 +65,8 @@ public:
     return Object;
   }
 
-  /// Destroy all live objects and reset block offsets so future allocations
-  /// can reuse the existing storage.
+  /// Destroy all live objects, release growth blocks, and reset the initial
+  /// block offset so future allocations can reuse its storage.
   void clear() {
     for (auto It = Destructors.rbegin(); It != Destructors.rend(); ++It)
       It->Destroy(It->Ptr);
@@ -88,10 +90,13 @@ private:
   };
 
   void *allocate(std::size_t Size, std::size_t Alignment) {
+    fatalErrorIf(Alignment == 0, "Arena allocation alignment is zero");
     if (Blocks.empty() || !hasCapacity(Blocks.back(), Size, Alignment))
       addBlock(Size, Alignment);
 
     Block &Block = Blocks.back();
+    fatalErrorIf(!hasCapacity(Block, Size, Alignment),
+                 "Arena allocation does not fit in selected block");
     auto Base =
         reinterpret_cast<std::uintptr_t>(Block.Storage.get() + Block.Offset);
     auto Padding = alignmentPadding(Base, Alignment);
@@ -103,6 +108,8 @@ private:
 
   static bool hasCapacity(const Block &Block, std::size_t Size,
                           std::size_t Alignment) {
+    if (Block.Offset > Block.Capacity)
+      return false;
     auto Base =
         reinterpret_cast<std::uintptr_t>(Block.Storage.get() + Block.Offset);
     auto Padding = alignmentPadding(Base, Alignment);
