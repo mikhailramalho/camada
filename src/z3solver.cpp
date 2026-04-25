@@ -37,28 +37,13 @@ namespace camada {
 
 namespace {
 
-static inline const z3::ast &toZ3Ast(const SMTExpr &Exp) {
-  return toSolverExpr<Z3Expr>(Exp).Expr;
-}
-
 static inline const z3::ast &toZ3Ast(const SMTExprRef &Exp) {
   return toSolverExpr<Z3Expr>(*Exp).Expr;
-}
-
-static inline z3::expr toZ3Expr(const SMTExpr &Exp) {
-  auto const &ZE = toSolverExpr<Z3Expr>(Exp);
-  return z3::to_expr(*ZE.Context, ZE.Expr);
 }
 
 static inline z3::expr toZ3Expr(const SMTExprRef &Exp) {
   auto const &ZE = toSolverExpr<Z3Expr>(*Exp);
   return z3::to_expr(*ZE.Context, ZE.Expr);
-}
-
-static inline z3::func_decl toZ3FuncDecl(const SMTExpr &Exp) {
-  auto const &ZE = toSolverExpr<Z3Expr>(Exp);
-  return z3::func_decl(*ZE.Context, reinterpret_cast<Z3_func_decl>(
-                                        static_cast<Z3_ast>(ZE.Expr)));
 }
 
 static inline z3::func_decl toZ3FuncDecl(const SMTExprRef &Exp) {

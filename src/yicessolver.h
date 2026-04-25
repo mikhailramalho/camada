@@ -279,7 +279,6 @@ private:
   void releaseSymbolNames();
 
   YicesContextRef Context = nullptr;
-  unsigned int ConstArrayCounter = 0;
   std::vector<std::string> NamedSymbols;
 
 }; // namespace camada
