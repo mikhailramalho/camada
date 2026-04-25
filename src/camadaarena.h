@@ -22,11 +22,15 @@
 #ifndef CAMADAARENA_H_
 #define CAMADAARENA_H_
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include "camadaerror.h"
 
 namespace camada {
 
@@ -104,14 +108,22 @@ private:
     auto Base =
         reinterpret_cast<std::uintptr_t>(Block.Storage.get() + Block.Offset);
     auto Padding = alignmentPadding(Base, Alignment);
-    return Block.Offset + Padding + Size <= Block.Capacity;
+    if (Padding > Block.Capacity - Block.Offset)
+      return false;
+    return Size <= Block.Capacity - Block.Offset - Padding;
   }
 
   void addBlock(std::size_t Size, std::size_t Alignment) {
     std::size_t Capacity = InitialBlockSize;
-    if (!Blocks.empty())
+    if (!Blocks.empty()) {
+      fatalErrorIf(Blocks.back().Capacity >
+                       std::numeric_limits<std::size_t>::max() / 2,
+                   "Arena block capacity overflow");
       Capacity = Blocks.back().Capacity * 2;
+    }
 
+    fatalErrorIf(Size > std::numeric_limits<std::size_t>::max() - Alignment,
+                 "Arena allocation size overflow");
     Capacity = std::max(Capacity, Size + Alignment);
     Blocks.push_back(
         Block{std::make_unique<std::byte[]>(Capacity), Capacity, 0});
