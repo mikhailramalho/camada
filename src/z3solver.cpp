@@ -773,8 +773,9 @@ SMTResult<std::string> Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   std::string bv;
   bool is_num = Value.as_binary(bv);
-  (void)is_num;
-  assert(is_num && "Failed to get bitvector from Z3");
+  if (!is_num)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to get bit-vector model value from Z3"};
   return bv;
 }
 
@@ -785,28 +786,35 @@ SMTResult<std::string> Z3Solver::getIntImpl(const SMTExprRef &Exp) {
         getRationalImpl(Exp);
     if (!result)
       return result.error();
-    assert(result.value().second == "1" && "Real value is not integral");
+    if (result.value().second != "1")
+      return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                      "Real model value is not integral"};
     return result.value().first;
   }
-  assert(value.is_numeral() && "Expected integer numeral from Z3");
+  if (!value.is_numeral())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Expected integer numeral from Z3"};
   std::string numeral;
   bool is_num = value.is_numeral(numeral);
-  (void)is_num;
-  assert(is_num && "Failed to get integer numeral from Z3");
+  if (!is_num)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to get integer numeral from Z3"};
   return numeral;
 }
 
 SMTResult<std::pair<std::string, std::string>>
 Z3Solver::getRationalImpl(const SMTExprRef &Exp) {
   z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
-  assert(value.is_numeral() && "Expected rational numeral from Z3");
+  if (!value.is_numeral())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Expected rational numeral from Z3"};
   std::string num;
   std::string den;
   bool has_num = value.numerator().is_numeral(num);
   bool has_den = value.denominator().is_numeral(den);
-  (void)has_num;
-  (void)has_den;
-  assert(has_num && has_den && "Failed to get rational numeral from Z3");
+  if (!has_num || !has_den)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to get rational numeral from Z3"};
   return std::make_pair(num, den);
 }
 
@@ -815,8 +823,9 @@ SMTResult<std::string> Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   z3::expr fp_value = Solver.get_model().eval(Value.mk_to_ieee_bv(), true);
   std::string bv;
   bool is_num = fp_value.as_binary(bv);
-  (void)is_num;
-  assert(is_num && "Failed to convert FP to BV in Z3");
+  if (!is_num)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to convert FP model value to BV in Z3"};
   return bv;
 }
 

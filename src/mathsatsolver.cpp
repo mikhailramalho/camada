@@ -875,7 +875,9 @@ SMTResult<std::string> MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
         getRationalImpl(Exp);
     if (!result)
       return result.error();
-    assert(result.value().second == "1" && "Real value is not integral");
+    if (result.value().second != "1")
+      return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                      "Real model value is not integral"};
     return result.value().first;
   }
 
@@ -885,7 +887,11 @@ SMTResult<std::string> MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
       Exp->getKind(), &Context, Exp->Sort,
       msat_get_model_value(Context, toMathSATTerm(Exp)));
   getMathSATModelRational(t, val);
-  assert(mpz_cmp_ui(mpq_denref(val), 1) == 0 && "Expected integer value");
+  if (mpz_cmp_ui(mpq_denref(val), 1) != 0) {
+    mpq_clear(val);
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                    "Expected integer model value from MathSAT"};
+  }
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   std::string num = raw_num;
   void (*gmp_free)(void *, std::size_t);

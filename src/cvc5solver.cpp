@@ -937,17 +937,23 @@ SMTResult<std::string> CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
         getRationalImpl(Exp);
     if (!result)
       return result.error();
-    assert(result.value().second == "1" && "Real value is not integral");
+    if (result.value().second != "1")
+      return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::CVC5,
+                      "Real model value is not integral"};
     return result.value().first;
   }
-  assert(value.isIntegerValue() && "Expected integer model value");
+  if (!value.isIntegerValue())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::CVC5,
+                    "Expected integer model value from CVC5"};
   return value.getIntegerValue();
 }
 
 SMTResult<std::pair<std::string, std::string>>
 CVC5Solver::getRationalImpl(const SMTExprRef &Exp) {
   cvc5::Term value = Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
-  assert(value.isRealValue() && "Expected rational model value");
+  if (!value.isRealValue())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::CVC5,
+                    "Expected rational model value from CVC5"};
   std::string Num, Den;
   parseCVC5RationalValue(value.getRealValue(), Num, Den);
   return std::make_pair(Num, Den);

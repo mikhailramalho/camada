@@ -514,19 +514,19 @@ SMTExprRef STPSolver::getArrayElementImpl(const SMTExprRef &Array,
   const SMTSortRef &elementSort = Array->Sort->getElementSort();
   if (elementSort->isBoolSort()) {
     SMTResult<bool> result = getBool(sel);
-    assert(result && "Failed to get STP boolean array element");
+    fatalErrorIf(!result, "Failed to get STP boolean array element");
     return mkBool(result.value());
   }
 
   if (elementSort->isBVSort()) {
     SMTResult<std::string> result = getBVInBin(sel);
-    assert(result && "Failed to get STP bit-vector array element");
+    fatalErrorIf(!result, "Failed to get STP bit-vector array element");
     return SMTSolverImpl::mkBVFromBin(result.value());
   }
 
-  assert(elementSort->isFPSort() && "Unknown array element type");
+  fatalErrorIf(!elementSort->isFPSort(), "Unknown STP array element type");
   SMTResult<std::string> result = getFPInBin(sel);
-  assert(result && "Failed to get STP FP array element");
+  fatalErrorIf(!result, "Failed to get STP FP array element");
   return SMTSolverImpl::mkFPFromBin(
       result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
