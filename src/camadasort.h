@@ -23,14 +23,13 @@
 #define CAMADASORT_H_
 
 #include <cassert>
-#include <cstdint>
-#include <memory>
 #include <string>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include "camadaerror.h"
+#include "camadahandle.h"
 
 namespace camada {
 
@@ -50,48 +49,33 @@ enum class SMTSortKind {
 };
 
 class SMTSort;
-struct SMTHandleState {
-  uint64_t Generation = 1;
+
+/// Diagnostic strings used by the shared handle base for sort handles.
+struct SMTSortRefTraits {
+  static constexpr const char *nullMessage() {
+    return "Dereferencing null sort handle";
+  }
+  static constexpr const char *movedFromMessage() {
+    return "Dereferencing moved-from sort handle";
+  }
+  static constexpr const char *staleMessage() {
+    return "Dereferencing stale sort handle (solver was reset or destroyed)";
+  }
 };
 
-class SMTSortRef {
+/// Public handle for a solver-owned sort.
+///
+/// The handle is nullable by default and does not own the sort. Dereferencing a
+/// null, moved-from, or stale handle aborts through fatalError(). Only solver
+/// internals may construct live handles; public code receives them from factory
+/// methods such as SMTSolver::mkBVSort().
+class SMTSortRef : public SMTRefBase<SMTSort, SMTSortRefTraits> {
 public:
   SMTSortRef() = default;
 
-  const SMTSort *get() const {
-    validate();
-    return Ptr;
-  }
-
-  const SMTSort &operator*() const { return *get(); }
-
-  const SMTSort *operator->() const { return get(); }
-
-  explicit operator bool() const { return isValid(); }
-
-  bool isValid() const {
-    return Ptr != nullptr && State && State->Generation == Generation;
-  }
-
 private:
-  const SMTSort *Ptr = nullptr;
-  std::shared_ptr<const SMTHandleState> State;
-  uint64_t Generation = 0;
-
-  SMTSortRef(const SMTSort *ThePtr,
-             std::shared_ptr<const SMTHandleState> TheState,
-             uint64_t TheGeneration)
-      : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
-
-  void validate() const {
-    if (Ptr && State && State->Generation == Generation)
-      return;
-    fatalErrorIf(!Ptr, "Dereferencing null sort handle");
-    fatalErrorIf(!State, "Dereferencing moved-from sort handle");
-    fatalErrorIf(
-        State->Generation != Generation,
-        "Dereferencing stale sort handle (solver was reset or destroyed)");
-  }
+  /// Inherit the live-handle constructor privately so only friends can call it.
+  using SMTRefBase<SMTSort, SMTSortRefTraits>::SMTRefBase;
 
   friend class SMTSolver;
   friend class SMTSolverImpl;
@@ -100,26 +84,40 @@ private:
 /// Generic base class for SMT sorts
 class SMTSort {
 public:
+  /// Width payload for scalar sorts whose identity is determined by a single
+  /// bit width, such as Bool, BV, RM, and BVRM.
   struct ScalarSortData {
     unsigned Width = 0;
   };
 
+  /// Width payload for floating-point sorts.
+  ///
+  /// Width is the total encoded width. ExpWidth is the exponent width. SigWidth
+  /// follows Camada's public convention for the specific sort kind: native FP
+  /// sorts store the public significand-width argument, while BVFP sorts store
+  /// the encoded significand width used by the bit-vector representation.
   struct FPSortData {
     unsigned Width = 0;
     unsigned ExpWidth = 0;
     unsigned SigWidth = 0;
   };
 
+  /// Payload for array sorts: index sort and element sort.
   struct ArraySortData {
     SMTSortRef IndexSort;
     SMTSortRef ElementSort;
   };
 
+  /// Payload for uninterpreted-function sorts.
+  ///
+  /// DomainSorts is ordered by argument position and CodomainSort is the return
+  /// sort.
   struct FunctionSortData {
     std::vector<SMTSortRef> DomainSorts;
     SMTSortRef CodomainSort;
   };
 
+  /// Payload for tuple sorts, ordered by tuple element index.
   struct TupleSortData {
     std::vector<SMTSortRef> ElementSorts;
   };

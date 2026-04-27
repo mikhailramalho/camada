@@ -45,6 +45,7 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camadaexpr.h
     camadaerror.h
     camadafp.h
+    camadahandle.h
     camadaimpl.h
     camadasort.h)
 
