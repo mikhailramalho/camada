@@ -22,7 +22,6 @@
 #ifndef CAMADAEXPR_H_
 #define CAMADAEXPR_H_
 
-#include "camadaerror.h"
 #include "camadasort.h"
 
 namespace camada {

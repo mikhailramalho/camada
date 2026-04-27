@@ -28,7 +28,6 @@
 #include <variant>
 #include <vector>
 
-#include "camadaerror.h"
 #include "camadahandle.h"
 
 namespace camada {
