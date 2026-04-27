@@ -104,12 +104,15 @@ private:
     if (Destructors.size() < Destructors.capacity())
       return;
 
-    constexpr std::size_t MinDestructorCapacity = 64;
+    // Seed the vector at 64 entries on the first reserve, then double from
+    // there. The constant is only used on the empty path; subsequent growth
+    // doubles the existing capacity.
+    constexpr std::size_t InitialDestructorCapacity = 64;
     fatalErrorIf(Destructors.capacity() >
                      std::numeric_limits<std::size_t>::max() / 2,
                  "Arena destructor record capacity overflow");
     std::size_t NewCapacity = Destructors.capacity() == 0
-                                  ? MinDestructorCapacity
+                                  ? InitialDestructorCapacity
                                   : Destructors.capacity() * 2;
     Destructors.reserve(NewCapacity);
   }
