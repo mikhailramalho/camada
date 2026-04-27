@@ -119,10 +119,9 @@ void SMTSort::dump(std::string &Out) const {
 }
 
 unsigned SMTSort::getWidth() const {
-  fatalErrorIf(isArraySort() || isFunctionSort() || isTupleSort() ||
-                   isArithSort(),
-               "Width is not defined for array, function, tuple, or "
-               "arithmetic sorts");
+  fatalErrorIf(
+      isArraySort() || isFunctionSort() || isTupleSort() || isArithSort(),
+      "Width is not defined for array, function, tuple, or arithmetic sorts");
   if (isFPSort())
     return std::get<FPSortData>(Data).Width;
 

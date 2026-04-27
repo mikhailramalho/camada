@@ -130,9 +130,9 @@ static void requireRMSort(const SMTExprRef &Exp, const char *Message) {
 static void requireMatchingFPAndRMEncoding(const SMTExprRef &FP,
                                            const SMTExprRef &RM) {
   requireRMSort(RM, "Expected rounding-mode expression");
-  fatalErrorIf(usesBVFPEncoding(FP) != usesBVRMEncoding(RM),
-               "Floating-point expression and rounding mode use different "
-               "encodings");
+  fatalErrorIf(
+      usesBVFPEncoding(FP) != usesBVRMEncoding(RM),
+      "Floating-point expression and rounding mode use different encodings");
 }
 
 static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -587,20 +587,20 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithGe,
 
 SMTExprRef SMTSolverImpl::mkBVXnorImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkBVNot(mkBVXor(LHS, RHS));
+  SMTExprRef theExp = mkBVNotImpl(mkBVXorImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVXnor);
 }
 
 SMTExprRef SMTSolverImpl::mkBVNandImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkBVNot(mkBVAnd(LHS, RHS));
+  SMTExprRef theExp = mkBVNotImpl(mkBVAndImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNand);
 }
 
 SMTExprRef SMTSolverImpl::mkImpliesImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
   // This is: logical-or(logical-not(LHS), RHS)
-  SMTExprRef theExp = mkOr(mkNot(LHS), RHS);
+  SMTExprRef theExp = mkOrImpl(mkNotImpl(LHS), RHS);
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Implies);
 }
 
@@ -908,9 +908,9 @@ SMTExprRef SMTSolverImpl::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
   requireRMSort(R, "Expected rounding-mode expression");
   fatalErrorIf(usesBVFPEncoding(From) != usesBVFPEncoding(To),
                "Floating-point source and target use different encodings");
-  fatalErrorIf(usesBVFPEncoding(To) != usesBVRMEncoding(R),
-               "Floating-point target and rounding mode use different "
-               "encodings");
+  fatalErrorIf(
+      usesBVFPEncoding(To) != usesBVRMEncoding(R),
+      "Floating-point target and rounding mode use different encodings");
   SMTExprRef theExp = usesBVFPEncoding(To)
                           ? SMTSolverImpl::mkFPtoFPImpl(From, To, R)
                           : mkFPtoFPImpl(From, To, R);
@@ -923,9 +923,9 @@ SMTExprRef SMTSolverImpl::mkSBVtoFP(const SMTExprRef &From,
   requireBVSort(From, "Expected bit-vector expression");
   requireFPSort(To, "Expected floating-point target sort");
   requireRMSort(R, "Expected rounding-mode expression");
-  fatalErrorIf(usesBVFPEncoding(To) != usesBVRMEncoding(R),
-               "Floating-point target and rounding mode use different "
-               "encodings");
+  fatalErrorIf(
+      usesBVFPEncoding(To) != usesBVRMEncoding(R),
+      "Floating-point target and rounding mode use different encodings");
   SMTExprRef theExp = usesBVFPEncoding(To)
                           ? SMTSolverImpl::mkSBVtoFPImpl(From, To, R)
                           : mkSBVtoFPImpl(From, To, R);
@@ -938,9 +938,9 @@ SMTExprRef SMTSolverImpl::mkUBVtoFP(const SMTExprRef &From,
   requireBVSort(From, "Expected bit-vector expression");
   requireFPSort(To, "Expected floating-point target sort");
   requireRMSort(R, "Expected rounding-mode expression");
-  fatalErrorIf(usesBVFPEncoding(To) != usesBVRMEncoding(R),
-               "Floating-point target and rounding mode use different "
-               "encodings");
+  fatalErrorIf(
+      usesBVFPEncoding(To) != usesBVRMEncoding(R),
+      "Floating-point target and rounding mode use different encodings");
   SMTExprRef theExp = usesBVFPEncoding(To)
                           ? SMTSolverImpl::mkUBVtoFPImpl(From, To, R)
                           : mkUBVtoFPImpl(From, To, R);
@@ -1428,37 +1428,38 @@ SMTSortRef SMTSolverImpl::mkTupleSortImpl(const std::vector<SMTSortRef> &) {
 
 SMTExprRef SMTSolverImpl::mkBVNorImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkBVNot(mkBVOr(LHS, RHS));
+  SMTExprRef theExp = mkBVNotImpl(mkBVOrImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNor);
 }
 
 SMTExprRef SMTSolverImpl::mkBVUgtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNot(mkBVUle(LHS, RHS));
+  SMTExprRef theExp = mkNotImpl(mkBVUleImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUgt);
 }
 
 SMTExprRef SMTSolverImpl::mkBVSgtImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNot(mkBVSle(LHS, RHS));
+  SMTExprRef theExp = mkNotImpl(mkBVSleImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSgt);
 }
 
 SMTExprRef SMTSolverImpl::mkBVUgeImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNot(mkBVUlt(LHS, RHS));
+  SMTExprRef theExp = mkNotImpl(mkBVUltImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUge);
 }
 
 SMTExprRef SMTSolverImpl::mkBVSgeImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNot(mkBVSlt(LHS, RHS));
+  SMTExprRef theExp = mkNotImpl(mkBVSltImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSge);
 }
 
 SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkAnd(mkOr(LHS, RHS), mkNot(mkAnd(LHS, RHS)));
+  SMTExprRef theExp =
+      mkAndImpl(mkOrImpl(LHS, RHS), mkNotImpl(mkAndImpl(LHS, RHS)));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Xor);
 }
 
@@ -1493,7 +1494,7 @@ SMTExprRef SMTSolverImpl::mkArithModImpl(const SMTExprRef &,
 
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
                                          unsigned Amount) {
-  SMTExprRef TheExp = mkArithMul(Exp, mkInt(power2Dec(Amount)));
+  SMTExprRef TheExp = mkArithMulImpl(Exp, mkInt(power2Dec(Amount)));
   return rewrapExprImpl(*TheExp, TheExp->Sort, SMTExprKind::ArithShl);
 }
 
@@ -1536,29 +1537,30 @@ SMTExprRef SMTSolverImpl::mkIsIntImpl(const SMTExprRef &) {
 
 SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
   // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
-  SMTExprRef comp = mkEqual(Exp, mkBVFromDec(0, Exp->getWidth()));
+  SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(0, Exp->getWidth()));
   SMTExprRef theExp =
-      mkIte(mkNot(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+      mkIteImpl(mkNotImpl(comp), CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
   // bvredand = bvcomp(x,-1) ? bv1 : bv0;
-  SMTExprRef comp = mkEqual(Exp, mkBVFromDec(-1, Exp->getWidth()));
-  SMTExprRef theExp = mkIte(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
+  SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(-1, Exp->getWidth()));
+  SMTExprRef theExp =
+      mkIteImpl(comp, CachedBVOne1Expr, CachedSmallBVZeroExprs[1]);
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
 }
 
 SMTExprRef SMTSolverImpl::mkFPGtImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkFPLt(RHS, LHS);
+  SMTExprRef theExp = SMTSolverImpl::mkFPLtImpl(RHS, LHS);
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGt);
 }
 
 SMTExprRef SMTSolverImpl::mkFPGeImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   // (a >= b) iff (b <= a)
-  SMTExprRef theExp = mkFPLe(RHS, LHS);
+  SMTExprRef theExp = SMTSolverImpl::mkFPLeImpl(RHS, LHS);
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGe);
 }
 
