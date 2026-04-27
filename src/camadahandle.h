@@ -71,6 +71,19 @@ struct SMTHandleState {
 /// arena destroys their backing objects. Do not add ownership semantics
 /// (ref-counting, RAII cleanup) to this base without auditing the reset and
 /// destructor paths in SMTSolverImpl.
+
+// GCC 13+ emits a false-positive -Wmaybe-uninitialized for SMTRefBase's
+// implicitly-generated move constructor when CAMADA_ALWAYS_INLINE causes the
+// inliner to expand SMTRefBase moves through std::variant<..., SortData, ...>
+// templates deeply enough that flow analysis loses track of the source object's
+// initialized state. The data members all have NSDMIs (Generation = 0, Ptr =
+// nullptr, State = default-constructed) so the warning is bogus, but it would
+// otherwise turn into an error under -Werror. Suppress narrowly here.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 template <typename T, typename Traits> class SMTRefBase {
 public:
   SMTRefBase() = default;
@@ -121,6 +134,10 @@ private:
   std::shared_ptr<const SMTHandleState> State;
   uint64_t Generation = 0;
 };
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 } // namespace camada
 
