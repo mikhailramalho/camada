@@ -89,7 +89,8 @@ STPSolver::STPSolver() : Context(STP::vc_createValidityChecker()) {
   initializeCommonSingletons();
 }
 
-STPSolver::STPSolver(STPContextRef C) : Context(*C) {
+STPSolver::STPSolver(STP::VC C) : Context(C) {
+  STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }
 

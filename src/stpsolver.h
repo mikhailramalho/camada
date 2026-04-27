@@ -81,7 +81,7 @@ public:
 class STPSolver : public SMTSolverImpl {
 public:
   STPSolver();
-  explicit STPSolver(STPContextRef C);
+  explicit STPSolver(STP::VC C);
   ~STPSolver() override;
 
 protected:
