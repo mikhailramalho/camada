@@ -57,7 +57,7 @@ public:
   template <typename T, typename... Args> T *create(Args &&...ArgsV) {
     fatalErrorIf(Destructors.size() == std::numeric_limits<std::size_t>::max(),
                  "Arena destructor record overflow");
-    Destructors.reserve(Destructors.size() + 1);
+    reserveDestructorRecord();
     void *Storage = allocate(sizeof(T), alignof(T));
     T *Object = new (Storage) T(std::forward<Args>(ArgsV)...);
     Destructors.push_back(DestructorRecord{
@@ -88,6 +88,20 @@ private:
     void *Ptr;
     void (*Destroy)(void *);
   };
+
+  void reserveDestructorRecord() {
+    if (Destructors.size() < Destructors.capacity())
+      return;
+
+    constexpr std::size_t MinDestructorCapacity = 64;
+    fatalErrorIf(Destructors.capacity() >
+                     std::numeric_limits<std::size_t>::max() / 2,
+                 "Arena destructor record capacity overflow");
+    std::size_t NewCapacity = Destructors.capacity() == 0
+                                  ? MinDestructorCapacity
+                                  : Destructors.capacity() * 2;
+    Destructors.reserve(NewCapacity);
+  }
 
   void *allocate(std::size_t Size, std::size_t Alignment) {
     fatalErrorIf(Alignment == 0, "Arena allocation alignment is zero");
