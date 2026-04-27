@@ -306,6 +306,13 @@ higher layer on top of Camada, with the application owning the larger
 expression cache while Camada stays focused on backend adaptation and
 common-layer encodings.
 
+Symbols are cached by `(name, sort)` for the solver's lifetime, so `mkSymbol`
+returns the same handle even across `push`/`pop`. This matches every supported
+backend's actual C/C++ API behavior — terms outlive the assertion-stack scope
+that introduced them — but it diverges from strict SMT-LIB semantics where a
+`(declare-const)` inside a pushed scope is removed on pop. Code that relies on
+fresh-symbol-per-scope should call `solver->reset()` between scopes instead.
+
 ## Implementation Details
 
 Camada is designed as a wrapper library to simplify the usage of multiple SMT solvers. It provides a common interface for interacting with these solvers, allowing developers to switch between them seamlessly without changing their codebase.
