@@ -76,7 +76,6 @@ private:
   /// Inherit the live-handle constructor privately so only friends can call it.
   using SMTRefBase<SMTSort, SMTSortRefTraits>::SMTRefBase;
 
-  friend class SMTSolver;
   friend class SMTSolverImpl;
 };
 
