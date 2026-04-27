@@ -44,8 +44,14 @@ struct SMTHandleState {
   /// Bump the generation, aborting before it would wrap to zero. Wrapping is
   /// unsafe because Generation == 0 is the value carried by default-constructed
   /// handles, so a stale handle could collide with a freshly-bumped state.
+  ///
+  /// The store uses release ordering so that any writes the owning solver
+  /// performs before the bump (cache clears, destructor sequencing) become
+  /// observable to a reader that uses acquire — though the standard handle
+  /// liveness check uses relaxed, since it only needs to detect the change in
+  /// value, not synchronize with prior writes.
   void bumpGeneration() {
-    uint64_t Prev = Generation.fetch_add(1, std::memory_order_acq_rel);
+    uint64_t Prev = Generation.fetch_add(1, std::memory_order_release);
     fatalErrorIf(Prev == std::numeric_limits<uint64_t>::max(),
                  "SMT handle generation counter overflow");
   }
@@ -82,7 +88,7 @@ public:
 
   bool isValid() const {
     return Ptr != nullptr && State &&
-           State->Generation.load(std::memory_order_acquire) == Generation;
+           State->Generation.load(std::memory_order_relaxed) == Generation;
   }
 
 protected:
@@ -95,11 +101,11 @@ protected:
 private:
   void validate() const {
     if (Ptr && State &&
-        State->Generation.load(std::memory_order_acquire) == Generation)
+        State->Generation.load(std::memory_order_relaxed) == Generation)
       return;
     fatalErrorIf(!Ptr, Traits::nullMessage());
     fatalErrorIf(!State, Traits::movedFromMessage());
-    fatalErrorIf(State->Generation.load(std::memory_order_acquire) !=
+    fatalErrorIf(State->Generation.load(std::memory_order_relaxed) !=
                      Generation,
                  Traits::staleMessage());
   }
