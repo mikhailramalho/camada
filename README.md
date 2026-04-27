@@ -66,8 +66,8 @@ Useful configure options:
 
 - `-DCMAKE_BUILD_TYPE=Release`
 - `-DBUILD_SHARED_LIBS=ON/OFF`
-- `-DENABLE_WARNINGS=ON/OFF`
-- `-DENABLE_WERROR=ON/OFF`
+- `-DENABLE_WARNINGS=ON/OFF` (default: ON; adds `-Wall -Wextra -pedantic`)
+- `-DENABLE_WERROR=ON/OFF` (default: OFF; treat warnings as errors — used by CI)
 - `-DCAMADA_ENABLE_REGRESSION=ON/OFF`
 - `-DCAMADA_DOWNLOAD_DEPENDENCIES=ALL`
 - `-DCAMADA_SOLVER_<NAME>_ENABLE=IFAVAILABLE/ON/OFF` to control enabled

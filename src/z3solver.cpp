@@ -119,6 +119,10 @@ Z3Solver::Z3Solver(z3::context C, z3::solver S)
   initializeCommonSingletons();
 }
 
+// Context (z3::context) and Solver (z3::solver) are RAII value members; their
+// destructors release the underlying Z3 resources after this body returns, so
+// only invalidateGeneratedObjects() is needed here to honor the SMTSolverImpl
+// teardown contract before backend resources go away.
 Z3Solver::~Z3Solver() { invalidateGeneratedObjects(); }
 
 void Z3Solver::addConstraintImpl(const SMTExprRef &Exp) {

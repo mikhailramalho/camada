@@ -111,6 +111,10 @@ CVC5Solver::CVC5Solver() : Context(Terms) {
   initializeCommonSingletons();
 }
 
+// Context (cvc5::Solver) and Terms (cvc5::TermManager) are RAII value members;
+// their destructors release the underlying cvc5 resources after this body
+// returns, so only invalidateGeneratedObjects() is needed here to honor the
+// SMTSolverImpl teardown contract before backend resources go away.
 CVC5Solver::~CVC5Solver() { invalidateGeneratedObjects(); }
 
 void CVC5Solver::addConstraintImpl(const SMTExprRef &Exp) {
