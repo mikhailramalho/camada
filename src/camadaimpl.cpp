@@ -189,7 +189,7 @@ SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
 void SMTSolverImpl::invalidateGeneratedObjects() {
   clearSortCaches();
   clearExprCaches();
-  ++HandleState->Generation;
+  HandleState->bumpGeneration();
   ExprArena.clear();
   SortArena.clear();
 }

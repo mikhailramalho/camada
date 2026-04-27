@@ -23,6 +23,7 @@
 #define CAMADAHANDLE_H_
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -32,6 +33,15 @@ namespace camada {
 
 struct SMTHandleState {
   uint64_t Generation = 1;
+
+  /// Bump the generation, aborting before it would wrap to zero. Wrapping is
+  /// unsafe because Generation == 0 is the value carried by default-constructed
+  /// handles, so a stale handle could collide with a freshly-bumped state.
+  void bumpGeneration() {
+    fatalErrorIf(Generation == std::numeric_limits<uint64_t>::max(),
+                 "SMT handle generation counter overflow");
+    ++Generation;
+  }
 };
 
 /// Shared implementation for public solver-owned object handles.
@@ -41,6 +51,13 @@ struct SMTHandleState {
 /// generation state from the owning solver so dereferencing a handle after
 /// reset or destruction fails deterministically instead of reading freed arena
 /// memory.
+///
+/// The non-ownership invariant is load-bearing: handle destruction must not
+/// touch the pointed-to object, because cached handles inside the owning
+/// solver are destroyed *after* the solver bumps its generation and after the
+/// arena destroys their backing objects. Do not add ownership semantics
+/// (ref-counting, RAII cleanup) to this base without auditing the reset and
+/// destructor paths in SMTSolverImpl.
 template <typename T, typename Traits> class SMTRefBase {
 public:
   SMTRefBase() = default;
