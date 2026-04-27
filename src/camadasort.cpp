@@ -118,7 +118,7 @@ void SMTSort::dump(std::string &Out) const {
       Data);
 }
 
-unsigned SMTSort::getWidth() const {
+unsigned SMTSort::getStoredWidth() const {
   fatalErrorIf(
       isArraySort() || isFunctionSort() || isTupleSort() || isArithSort(),
       "Width is not defined for array, function, tuple, or arithmetic sorts");
@@ -126,6 +126,16 @@ unsigned SMTSort::getWidth() const {
     return std::get<FPSortData>(Data).Width;
 
   return std::get<ScalarSortData>(Data).Width;
+}
+
+unsigned SMTSort::getWidth() const {
+  if (SolverWidth == 0) {
+    SolverWidth = getWidthFromSolver();
+    fatalErrorIf(SolverWidth != getStoredWidth(),
+                 "Solver sort width does not match stored sort width");
+  }
+
+  return SolverWidth;
 }
 
 unsigned SMTSort::getWidthFromSolver() const {
@@ -175,7 +185,7 @@ bool SMTSort::validateSortWidth() const {
   if (isArraySort() || isFunctionSort() || isTupleSort() || isArithSort())
     return true;
 
-  return getWidthFromSolver() == getWidth();
+  return getWidth() == getStoredWidth();
 }
 
 bool SMTSort::operator==(SMTSort const &Other) const {
@@ -200,12 +210,12 @@ bool SMTSort::operator==(SMTSort const &Other) const {
           return true;
         } else if constexpr (std::is_same_v<T, ScalarSortData>) {
           return ThisData.Width == OtherData.Width &&
-                 getWidthFromSolver() == Other.getWidthFromSolver();
+                 getWidth() == Other.getWidth();
         } else if constexpr (std::is_same_v<T, FPSortData>) {
           return ThisData.Width == OtherData.Width &&
                  ThisData.ExpWidth == OtherData.ExpWidth &&
                  ThisData.SigWidth == OtherData.SigWidth &&
-                 getWidthFromSolver() == Other.getWidthFromSolver();
+                 getWidth() == Other.getWidth();
         } else if constexpr (std::is_same_v<T, ArraySortData>) {
           return ThisData.IndexSort == OtherData.IndexSort &&
                  ThisData.ElementSort == OtherData.ElementSort;

@@ -223,8 +223,11 @@ public:
   virtual void dump(std::string &Out) const;
 
 protected:
+  unsigned getStoredWidth() const;
+
   SMTSortKind Kind;
   SortData Data;
+  mutable unsigned SolverWidth = 0;
 #ifndef NDEBUG
   bool WidthValidated = false;
 #endif

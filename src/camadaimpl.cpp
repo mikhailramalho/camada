@@ -70,7 +70,7 @@ static bool usesBVRMEncoding(const SMTExprRef &Exp) {
 
 static void requireSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS,
                             const char *Message) {
-  fatalErrorIf(LHS->Sort.get() != RHS->Sort.get(), Message);
+  fatalErrorIf(LHS->Sort != RHS->Sort, Message);
 }
 
 static void requireBVSort(const SMTExprRef &Exp, const char *Message) {
@@ -982,7 +982,7 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegral(const SMTExprRef &From,
 SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
                                         const SMTExprRef &Index) {
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort().get() != Index->Sort.get(),
+  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
   SMTExprRef theExp = mkArraySelectImpl(Array, Index);
   assert(theExp->Sort == Array->Sort->getElementSort());
@@ -993,9 +993,9 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
                                        const SMTExprRef &Index,
                                        const SMTExprRef &Element) {
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort().get() != Index->Sort.get(),
+  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
-  fatalErrorIf(Array->Sort->getElementSort().get() != Element->Sort.get(),
+  fatalErrorIf(Array->Sort->getElementSort() != Element->Sort,
                "Expected array element with matching sort");
   SMTExprRef theExp = mkArrayStoreImpl(Array, Index, Element);
   assert(theExp->Sort == Array->Sort);
@@ -1029,8 +1029,7 @@ SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
   fatalErrorIf(Function->Sort->getDomainSorts().size() != Args.size(),
                "Function application argument count mismatch");
   for (std::size_t i = 0; i < Args.size(); ++i)
-    fatalErrorIf(Function->Sort->getDomainSorts()[i].get() !=
-                     Args[i]->Sort.get(),
+    fatalErrorIf(Function->Sort->getDomainSorts()[i] != Args[i]->Sort,
                  "Function application argument sort mismatch");
   SMTExprRef theExp = mkApplyImpl(Function, Args);
   assert(theExp->Sort == Function->Sort->getCodomainSort());
@@ -1144,7 +1143,7 @@ SMTResult<double> SMTSolverImpl::getFP64(const SMTExprRef &Exp) {
 SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
                                           const SMTExprRef &Index) {
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort().get() != Index->Sort.get(),
+  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
   SMTExprRef theExp = getArrayElementImpl(Array, Index);
   assert(theExp->Sort == Array->Sort->getElementSort());
