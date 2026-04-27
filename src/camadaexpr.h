@@ -158,6 +158,8 @@ private:
       : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
 
   void validate() const {
+    if (Ptr && State && State->Generation == Generation)
+      return;
     fatalErrorIf(!Ptr, "Dereferencing null expression handle");
     fatalErrorIf(!State, "Dereferencing moved-from expression handle");
     fatalErrorIf(State->Generation != Generation,
