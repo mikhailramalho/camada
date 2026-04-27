@@ -225,9 +225,7 @@ protected:
   void popImpl(unsigned nscopes) override;
 
   std::string getSolverNameAndVersion() const override;
-  void dumpImpl() override;
   void dumpImpl(std::string &Out) override;
-  void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 
 private:

@@ -1173,12 +1173,6 @@ std::string CVC5Solver::getSolverNameAndVersion() const {
   return std::string("CVC5 v").append(Context.getVersion());
 }
 
-void CVC5Solver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void CVC5Solver::dumpImpl(std::string &Out) {
   Out.clear();
   auto const &assertions = Context.getAssertions();
@@ -1186,12 +1180,6 @@ void CVC5Solver::dumpImpl(std::string &Out) {
     Out += a.toString();
     Out += "\n";
   }
-}
-
-void CVC5Solver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void CVC5Solver::dumpModelImpl(std::string &Out) {

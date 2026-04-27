@@ -1119,12 +1119,6 @@ std::string MathSATSolver::getSolverNameAndVersion() const {
   return std::string("MathSAT v").append(ver);
 }
 
-void MathSATSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void MathSATSolver::dumpImpl(std::string &Out) {
   Out.clear();
   size_t num_of_asserted;
@@ -1138,12 +1132,6 @@ void MathSATSolver::dumpImpl(std::string &Out) {
     msat_free(tmp);
   }
   msat_free(asserted_formulas);
-}
-
-void MathSATSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void MathSATSolver::dumpModelImpl(std::string &Out) {

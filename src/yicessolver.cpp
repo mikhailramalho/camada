@@ -872,12 +872,6 @@ std::string YicesSolver::getSolverNameAndVersion() const {
   return std::string("Yices v").append(yices_version);
 }
 
-void YicesSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void YicesSolver::dumpImpl(std::string &Out) {
   Out.clear();
   for (auto const &a : Assertions) {
@@ -885,12 +879,6 @@ void YicesSolver::dumpImpl(std::string &Out) {
     a->dump(Assertion);
     Out += Assertion;
   }
-}
-
-void YicesSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void YicesSolver::dumpModelImpl(std::string &Out) {

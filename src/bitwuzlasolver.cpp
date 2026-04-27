@@ -943,12 +943,6 @@ std::string BitwuzlaSolver::getSolverNameAndVersion() const {
   return std::string("Bitwuzla v").append(bitwuzla_version());
 }
 
-void BitwuzlaSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void BitwuzlaSolver::dumpImpl(std::string &Out) {
   char *Buffer = nullptr;
   size_t Size = 0;
@@ -959,12 +953,6 @@ void BitwuzlaSolver::dumpImpl(std::string &Out) {
   fclose(Stream);
   Out.assign(Buffer, Size);
   free(Buffer);
-}
-
-void BitwuzlaSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {

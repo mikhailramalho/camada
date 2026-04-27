@@ -1013,21 +1013,9 @@ std::string Z3Solver::getSolverNameAndVersion() const {
       .append(std::to_string(revision));
 }
 
-void Z3Solver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void Z3Solver::dumpImpl(std::string &Out) {
   Out = Solver.to_smt2();
   Out += "\n";
-}
-
-void Z3Solver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void Z3Solver::dumpModelImpl(std::string &Out) {

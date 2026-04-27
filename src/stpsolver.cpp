@@ -619,12 +619,6 @@ std::string STPSolver::getSolverNameAndVersion() const {
   return std::string("STP v").append(STP::get_git_version_tag());
 }
 
-void STPSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void STPSolver::dumpImpl(std::string &Out) {
   char *buf = nullptr;
   unsigned long len = 0;
@@ -633,12 +627,6 @@ void STPSolver::dumpImpl(std::string &Out) {
   STP::vc_DeleteExpr(query);
   Out.assign(buf, len);
   free(buf);
-}
-
-void STPSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void STPSolver::dumpModelImpl(std::string &Out) {
