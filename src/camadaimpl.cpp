@@ -1216,28 +1216,29 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector decimal literal sort must be bit-vector");
-  if (Sort->getSortKind() == SMTSortKind::BV) {
+  const bool IsBV = Sort->getSortKind() == SMTSortKind::BV;
+  if (IsBV) {
     const unsigned Width = Sort->getWidth();
     if (Int == 0 && Width < CachedSmallBVZeroExprs.size())
       return CachedSmallBVZeroExprs[Width];
     if (Int == 1 && Width == 1)
       return CachedBVOne1Expr;
-  }
 
-  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
-    auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
-    if (Cache.size() <= Sort->getWidth())
-      Cache.resize(Sort->getWidth() + 1);
+    if (Int >= -1 && Int <= 1) {
+      auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
+      if (Cache.size() <= Width)
+        Cache.resize(Width + 1);
 
-    SMTExprRef &CachedExpr = Cache[Sort->getWidth()];
-    if (CachedExpr)
+      SMTExprRef &CachedExpr = Cache[Width];
+      if (CachedExpr)
+        return CachedExpr;
+
+      SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
+      assert(theExp->isBVSort());
+      assert(theExp->getWidth() == Width);
+      CachedExpr = theExp;
       return CachedExpr;
-
-    SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
-    assert(theExp->isBVSort());
-    assert(theExp->getWidth() == Sort->getWidth());
-    CachedExpr = theExp;
-    return CachedExpr;
+    }
   }
 
   SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
