@@ -19,11 +19,31 @@
  *
  **************************************************************************/
 
-#ifndef CAMADAERROR_H_
-#define CAMADAERROR_H_
+#ifndef CAMADACOMMON_H_
+#define CAMADACOMMON_H_
 
+#include <bitset>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
+
+// Compiler-specific function attributes used to keep small hot helpers (handle
+// liveness checks, etc.) inlined into every call site, and to keep cold error
+// paths out of that inlined hot code. GCC and Clang accept the C++11 attribute
+// syntax; MSVC has its own spellings; unknown compilers fall back to the
+// standard hint-only `inline` and an empty cold/noinline (correct, if less
+// performant).
+#if defined(__GNUC__) || defined(__clang__)
+#define CAMADA_ALWAYS_INLINE [[gnu::always_inline]] inline
+#define CAMADA_COLD_NOINLINE [[gnu::cold, gnu::noinline]]
+#elif defined(_MSC_VER)
+#define CAMADA_ALWAYS_INLINE __forceinline
+#define CAMADA_COLD_NOINLINE __declspec(noinline)
+#else
+#define CAMADA_ALWAYS_INLINE inline
+#define CAMADA_COLD_NOINLINE
+#endif
 
 namespace camada {
 
@@ -41,6 +61,16 @@ static inline void fatalErrorIf(bool Cond, const char *Message) {
   if (!Cond)
     return;
   fatalError(Message);
+}
+
+static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
+  const uint64_t RawBits = static_cast<uint64_t>(Value);
+  std::string Bits = std::bitset<64>(RawBits).to_string();
+  if (Width < 64)
+    Bits = Bits.substr(64 - Width);
+  else if (Width > 64)
+    Bits.insert(Bits.begin(), Width - 64, Value < 0 ? '1' : '0');
+  return Bits;
 }
 
 } // namespace camada

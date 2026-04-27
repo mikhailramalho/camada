@@ -19,7 +19,7 @@
  *
  **************************************************************************/
 
-#include "camadaerror.h"
+#include "camadacommon.h"
 #include "camadaimpl.h"
 
 #include <bitset>

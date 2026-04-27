@@ -30,7 +30,7 @@
 #include <utility>
 #include <vector>
 
-#include "camadaerror.h"
+#include "camadacommon.h"
 
 namespace camada {
 

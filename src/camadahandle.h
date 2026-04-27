@@ -28,7 +28,7 @@
 #include <memory>
 #include <utility>
 
-#include "camadaerror.h"
+#include "camadacommon.h"
 
 namespace camada {
 
@@ -75,18 +75,18 @@ template <typename T, typename Traits> class SMTRefBase {
 public:
   SMTRefBase() = default;
 
-  const T *get() const {
+  CAMADA_ALWAYS_INLINE const T *get() const {
     validate();
     return Ptr;
   }
 
-  const T &operator*() const { return *get(); }
+  CAMADA_ALWAYS_INLINE const T &operator*() const { return *get(); }
 
-  const T *operator->() const { return get(); }
+  CAMADA_ALWAYS_INLINE const T *operator->() const { return get(); }
 
   explicit operator bool() const { return isValid(); }
 
-  bool isValid() const {
+  CAMADA_ALWAYS_INLINE bool isValid() const {
     return Ptr != nullptr && State &&
            State->Generation.load(std::memory_order_relaxed) == Generation;
   }
@@ -99,10 +99,17 @@ protected:
       : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
 
 private:
-  void validate() const {
+  CAMADA_ALWAYS_INLINE void validate() const {
     if (Ptr && State &&
         State->Generation.load(std::memory_order_relaxed) == Generation)
       return;
+    reportInvalid();
+  }
+
+  // Cold slow path — kept out of the inlined fast path so every dereference
+  // site only pays for the hot Ptr/State/Generation check, not the three
+  // diagnostic branches.
+  CAMADA_COLD_NOINLINE void reportInvalid() const {
     fatalErrorIf(!Ptr, Traits::nullMessage());
     fatalErrorIf(!State, Traits::movedFromMessage());
     fatalErrorIf(State->Generation.load(std::memory_order_relaxed) !=

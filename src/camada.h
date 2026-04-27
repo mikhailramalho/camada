@@ -28,12 +28,27 @@
 #include <utility>
 #include <vector>
 
-#include "camadaerror.h"
+#include "camadacommon.h"
 #include "camadaexpr.h"
-#include "camadafp.h"
 #include "camadasort.h"
 
 namespace camada {
+
+enum class FPEncoding { Native, BV };
+
+enum class FPNegBehavior {
+  FlipSignBit,
+  // Follows SMT-LIB FP semantics: fp.neg leaves NaNs unchanged.
+  PreserveNaNPayload,
+};
+
+enum class RM {
+  ROUND_TO_EVEN = 0,
+  ROUND_TO_AWAY = 1,
+  ROUND_TO_PLUS_INF = 2,
+  ROUND_TO_MINUS_INF = 3,
+  ROUND_TO_ZERO = 4,
+};
 
 /// Return camada version
 std::string getCamadaVersion();

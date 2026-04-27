@@ -23,9 +23,7 @@
 
 #include "stpsolver.h"
 #include "camada.h"
-#include "camadaerror.h"
-#include "camadafp.h"
-#include "camadautil.h"
+#include "camadacommon.h"
 
 #include <algorithm>
 #include <cstdio>

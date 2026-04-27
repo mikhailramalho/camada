@@ -20,8 +20,7 @@
  **************************************************************************/
 
 #include "camadaimpl.h"
-#include "camadaerror.h"
-#include "camadafp.h"
+#include "camadacommon.h"
 
 #include <cstdio>
 #include <limits>

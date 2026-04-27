@@ -23,8 +23,7 @@
 
 #include "cvc5solver.h"
 #include "camada.h"
-#include "camadaerror.h"
-#include "camadafp.h"
+#include "camadacommon.h"
 
 #include <cassert>
 #include <cstdio>
