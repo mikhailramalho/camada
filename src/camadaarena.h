@@ -53,6 +53,11 @@ public:
 
   ~ObjectArena() { clear(); }
 
+  /// Returns true if no live objects are currently held by the arena. Used by
+  /// SMTSolverImpl to assert that derived destructors drained the arena while
+  /// backend resources were still alive.
+  bool empty() const { return Destructors.empty(); }
+
   /// Construct an object inside the arena and return its stable address.
   template <typename T, typename... Args> T *create(Args &&...ArgsV) {
     fatalErrorIf(Destructors.size() == std::numeric_limits<std::size_t>::max(),

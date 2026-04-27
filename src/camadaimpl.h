@@ -42,7 +42,17 @@ namespace camada {
 class SMTSolverImpl : public SMTSolver {
 public:
   SMTSolverImpl() = default;
+  /// Backend destructors MUST call invalidateGeneratedObjects() before
+  /// releasing backend resources (contexts, term managers, etc.). The arena
+  /// destructors run during base-class teardown, after derived members are
+  /// already gone, so any expression or sort still held by the arena would
+  /// destruct against a dead backend. The check below catches a missed call
+  /// before it becomes a use-after-free.
   virtual ~SMTSolverImpl() override {
+    fatalErrorIf(
+        !SortArena.empty() || !ExprArena.empty(),
+        "Derived solver destructor must call invalidateGeneratedObjects() "
+        "before releasing backend resources");
     // Bump generation so outstanding handles become invalid before the
     // arenas destroy the underlying objects.
     HandleState->bumpGeneration();
