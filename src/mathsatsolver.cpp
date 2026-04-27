@@ -53,6 +53,12 @@ static inline char *checkMathSATString(char *Str, const char *Message) {
   return nullptr;
 }
 
+static inline void mathsatCheckError(int Res, const char *Message) {
+  if (Res == 0)
+    return;
+  fatalError(Message);
+}
+
 } // namespace
 
 unsigned MathSATSort::getWidthFromSolver() const {
@@ -1102,12 +1108,14 @@ void MathSATSolver::resetImpl() {
 
 void MathSATSolver::pushImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i)
-    msat_push_backtrack_point(Context);
+    mathsatCheckError(msat_push_backtrack_point(Context),
+                      "Could not push MathSAT context");
 }
 
 void MathSATSolver::popImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i)
-    msat_pop_backtrack_point(Context);
+    mathsatCheckError(msat_pop_backtrack_point(Context),
+                      "Could not pop MathSAT context");
 }
 
 std::string MathSATSolver::getSolverNameAndVersion() const {
