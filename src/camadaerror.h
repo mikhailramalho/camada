@@ -27,7 +27,12 @@
 
 namespace camada {
 
-[[noreturn]] static inline void fatalError(const char *Feature) {
+[[noreturn]] static inline void fatalError(const char *Message) {
+  std::fprintf(stderr, "%s\n", Message);
+  std::abort();
+}
+
+[[noreturn]] static inline void unsupportedFeature(const char *Feature) {
   std::fprintf(stderr, "%s is not supported by this backend\n", Feature);
   std::abort();
 }

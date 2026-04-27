@@ -448,9 +448,13 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
 
 SMTSortRef SMTSolverImpl::mkRMSortImpl() { return mkBVRMSortImpl(); }
 
-SMTSortRef SMTSolverImpl::mkIntSortImpl() { fatalError("Integer arithmetic"); }
+SMTSortRef SMTSolverImpl::mkIntSortImpl() {
+  unsupportedFeature("Integer arithmetic");
+}
 
-SMTSortRef SMTSolverImpl::mkRealSortImpl() { fatalError("Real arithmetic"); }
+SMTSortRef SMTSolverImpl::mkRealSortImpl() {
+  unsupportedFeature("Real arithmetic");
+}
 
 SMTSortRef SMTSolverImpl::mkFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {

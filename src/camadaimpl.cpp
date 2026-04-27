@@ -435,7 +435,7 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
 
 SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
                                              const SMTSortRef &) {
-  fatalError("Uninterpreted functions");
+  unsupportedFeature("Uninterpreted functions");
 }
 
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
@@ -1059,7 +1059,7 @@ SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
 
 SMTExprRef SMTSolverImpl::mkApplyImpl(const SMTExprRef &,
                                       const std::vector<SMTExprRef> &) {
-  fatalError("Uninterpreted functions");
+  unsupportedFeature("Uninterpreted functions");
 }
 
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
@@ -1072,7 +1072,7 @@ SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
 
 SMTExprRef SMTSolverImpl::mkForallImpl(const std::vector<SMTExprRef> &,
                                        const SMTExprRef &) {
-  fatalError("Quantifiers");
+  unsupportedFeature("Quantifiers");
 }
 
 SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
@@ -1085,7 +1085,7 @@ SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
 
 SMTExprRef SMTSolverImpl::mkExistsImpl(const std::vector<SMTExprRef> &,
                                        const SMTExprRef &) {
-  fatalError("Quantifiers");
+  unsupportedFeature("Quantifiers");
 }
 
 SMTResult<bool> SMTSolverImpl::getBool(const SMTExprRef &Exp) {
@@ -1444,7 +1444,7 @@ void SMTSolverImpl::dumpModel() {
 void SMTSolverImpl::dumpModel(std::string &Out) { return dumpModelImpl(Out); }
 
 SMTSortRef SMTSolverImpl::mkTupleSortImpl(const std::vector<SMTSortRef> &) {
-  fatalError("Tuples");
+  unsupportedFeature("Tuples");
 }
 
 SMTExprRef SMTSolverImpl::mkBVNorImpl(const SMTExprRef &LHS,
@@ -1485,32 +1485,32 @@ SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTSolverImpl::mkArithNegImpl(const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithAddImpl(const SMTExprRef &,
                                          const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithSubImpl(const SMTExprRef &,
                                          const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithMulImpl(const SMTExprRef &,
                                          const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithDivImpl(const SMTExprRef &,
                                          const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithModImpl(const SMTExprRef &,
                                          const SMTExprRef &) {
-  fatalError("Integer arithmetic");
+  unsupportedFeature("Integer arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
@@ -1521,39 +1521,39 @@ SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
 
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &,
                                          const SMTExprRef &) {
-  fatalError("Integer arithmetic");
+  unsupportedFeature("Integer arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithLtImpl(const SMTExprRef &,
                                         const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithGtImpl(const SMTExprRef &,
                                         const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithLeImpl(const SMTExprRef &,
                                         const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkArithGeImpl(const SMTExprRef &,
                                         const SMTExprRef &) {
-  fatalError("Arithmetic");
+  unsupportedFeature("Arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkInt2RealImpl(const SMTExprRef &) {
-  fatalError("Real arithmetic");
+  unsupportedFeature("Real arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkReal2IntImpl(const SMTExprRef &) {
-  fatalError("Integer arithmetic");
+  unsupportedFeature("Integer arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkIsIntImpl(const SMTExprRef &) {
-  fatalError("Integer arithmetic");
+  unsupportedFeature("Integer arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
@@ -1586,11 +1586,11 @@ SMTExprRef SMTSolverImpl::mkFPGeImpl(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTSolverImpl::mkTupleImpl(const std::vector<SMTExprRef> &) {
-  fatalError("Tuples");
+  unsupportedFeature("Tuples");
 }
 
 SMTExprRef SMTSolverImpl::mkTupleSelectImpl(const SMTExprRef &, unsigned) {
-  fatalError("Tuples");
+  unsupportedFeature("Tuples");
 }
 
 SMTResult<std::string> SMTSolverImpl::getIntImpl(const SMTExprRef &Exp) {
@@ -1599,21 +1599,23 @@ SMTResult<std::string> SMTSolverImpl::getIntImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef SMTSolverImpl::mkIntImpl(int64_t) {
-  fatalError("Integer arithmetic");
+  unsupportedFeature("Integer arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkIntImpl(const std::string &) {
-  fatalError("Integer arithmetic");
+  unsupportedFeature("Integer arithmetic");
 }
 
 SMTExprRef SMTSolverImpl::mkRealImpl(const std::string &) {
-  fatalError("Real arithmetic");
+  unsupportedFeature("Real arithmetic");
 }
 
-SMTExprRef SMTSolverImpl::mkRealImpl(int64_t) { fatalError("Real arithmetic"); }
+SMTExprRef SMTSolverImpl::mkRealImpl(int64_t) {
+  unsupportedFeature("Real arithmetic");
+}
 
 SMTExprRef SMTSolverImpl::mkRealImpl(int64_t, int64_t) {
-  fatalError("Real arithmetic");
+  unsupportedFeature("Real arithmetic");
 }
 
 void SMTSolverImpl::dumpImpl() {

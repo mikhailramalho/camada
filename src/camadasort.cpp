@@ -139,7 +139,7 @@ unsigned SMTSort::getWidth() const {
 }
 
 unsigned SMTSort::getWidthFromSolver() const {
-  fatalError("Unimplemented for current type");
+  unsupportedFeature("Unimplemented for current type");
 }
 
 unsigned SMTSort::getFPSignificandWidth() const {
