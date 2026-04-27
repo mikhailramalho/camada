@@ -84,11 +84,13 @@ private:
       : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
 
   void validate() const {
+    if (Ptr && State && State->Generation == Generation)
+      return;
     fatalErrorIf(!Ptr, "Dereferencing null sort handle");
     fatalErrorIf(!State, "Dereferencing moved-from sort handle");
-    fatalErrorIf(State->Generation != Generation,
-                 "Dereferencing stale sort handle (solver was reset or "
-                 "destroyed)");
+    fatalErrorIf(
+        State->Generation != Generation,
+        "Dereferencing stale sort handle (solver was reset or destroyed)");
   }
 
   friend class SMTSolver;
