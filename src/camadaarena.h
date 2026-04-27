@@ -65,16 +65,22 @@ public:
     return Object;
   }
 
-  /// Destroy all live objects, release growth blocks, and reset the initial
-  /// block offset so future allocations can reuse its storage.
+  /// Destroy all live objects, release growth blocks, and reset the offset of
+  /// the retained block so future allocations can reuse its storage. Keeps the
+  /// largest existing block to preserve grown capacity across clear() cycles.
   void clear() {
     for (auto It = Destructors.rbegin(); It != Destructors.rend(); ++It)
       It->Destroy(It->Ptr);
     Destructors.clear();
-    if (Blocks.size() > 1)
-      Blocks.resize(1);
-    if (!Blocks.empty())
-      Blocks.front().Offset = 0;
+    if (Blocks.empty())
+      return;
+    auto Largest = std::max_element(
+        Blocks.begin(), Blocks.end(),
+        [](const Block &A, const Block &B) { return A.Capacity < B.Capacity; });
+    if (Largest != Blocks.begin())
+      *Blocks.begin() = std::move(*Largest);
+    Blocks.resize(1);
+    Blocks.front().Offset = 0;
   }
 
 private:
