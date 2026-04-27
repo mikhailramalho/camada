@@ -20,18 +20,26 @@
  *
  * Currently available common-layer features include:
  * - floating-point fallback using bit-vectors
- * - partial array support
+ * - tuples (native on CVC5 and Z3)
+ * - array support, including backend-specific gaps such as Array<Idx, Bool>
  *
  * Planned future extensions include:
- * - tuples
+ * - tuple support on backends that lack native tuples
  * - full tuple-aware array support
- * - integers/reals
  * - further structured common-layer encodings
  *
  * \section design Design Notes
  *
- * Expression and sort handles are solver-owned. Any handle obtained from a
- * solver becomes invalid after \c reset() or solver destruction.
+ * Expression and sort handles (camada::SMTExprRef, camada::SMTSortRef) are
+ * solver-owned, lightweight, and copyable. Any handle obtained from a solver
+ * becomes invalid after \c reset() or solver destruction; dereferencing an
+ * invalid handle aborts deterministically via fatalError() rather than
+ * reading freed memory.
+ *
+ * Solvers are not thread-safe: a single camada::SMTSolver must be used from
+ * one thread at a time. Handles can be read from any thread as long as the
+ * owning solver outlives the read; the liveness check is race-free against
+ * \c reset() or destruction on another thread.
  *
  * When a backend lacks native support for a feature, Camada may encode that
  * feature in the common layer. The main current example is floating-point
@@ -43,9 +51,6 @@
  * - regression/simple.test.h
  * - regression/array.test.h
  * - regression/fp.test.h
- *
- * Additional design notes live in:
- * - doc/tuple-plan.md
- * - doc/overhead-reduction-plan.md
+ * - regression/tuple.test.h
  *
  */
