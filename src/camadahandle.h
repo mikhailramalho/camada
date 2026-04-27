@@ -22,6 +22,7 @@
 #ifndef CAMADAHANDLE_H_
 #define CAMADAHANDLE_H_
 
+#include <atomic>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -31,16 +32,22 @@
 
 namespace camada {
 
+/// Shared liveness state for handles to solver-owned objects. Generation is
+/// atomic so that a handle held by one thread can be safely dereferenced
+/// (or asked isValid()) while the owning solver is reset or destroyed on
+/// another. Note that this only makes the handle's liveness check race-free;
+/// it does not make the underlying SMTSolver thread-safe — see camada.h for
+/// the full threading contract.
 struct SMTHandleState {
-  uint64_t Generation = 1;
+  std::atomic<uint64_t> Generation{1};
 
   /// Bump the generation, aborting before it would wrap to zero. Wrapping is
   /// unsafe because Generation == 0 is the value carried by default-constructed
   /// handles, so a stale handle could collide with a freshly-bumped state.
   void bumpGeneration() {
-    fatalErrorIf(Generation == std::numeric_limits<uint64_t>::max(),
+    uint64_t Prev = Generation.fetch_add(1, std::memory_order_acq_rel);
+    fatalErrorIf(Prev == std::numeric_limits<uint64_t>::max(),
                  "SMT handle generation counter overflow");
-    ++Generation;
   }
 };
 
@@ -74,7 +81,8 @@ public:
   explicit operator bool() const { return isValid(); }
 
   bool isValid() const {
-    return Ptr != nullptr && State && State->Generation == Generation;
+    return Ptr != nullptr && State &&
+           State->Generation.load(std::memory_order_acquire) == Generation;
   }
 
 protected:
@@ -86,11 +94,14 @@ protected:
 
 private:
   void validate() const {
-    if (Ptr && State && State->Generation == Generation)
+    if (Ptr && State &&
+        State->Generation.load(std::memory_order_acquire) == Generation)
       return;
     fatalErrorIf(!Ptr, Traits::nullMessage());
     fatalErrorIf(!State, Traits::movedFromMessage());
-    fatalErrorIf(State->Generation != Generation, Traits::staleMessage());
+    fatalErrorIf(State->Generation.load(std::memory_order_acquire) !=
+                     Generation,
+                 Traits::staleMessage());
   }
 
   const T *Ptr = nullptr;

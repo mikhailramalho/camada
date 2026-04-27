@@ -110,6 +110,18 @@ private:
 ///
 /// This class is responsible for wrapping all sorts and expression generation,
 /// through the mk* methods.
+///
+/// Threading contract:
+///   * An SMTSolver instance is NOT thread-safe. All mutating and querying
+///     methods (mk*, addConstraint, push/pop, check, get*, reset, dump...)
+///     must be serialized by the caller; a single solver is intended for use
+///     from one thread at a time. Concurrent solving should be done with one
+///     solver per thread.
+///   * SMTExprRef and SMTSortRef handles are nullable, copyable, and safe to
+///     read concurrently from any thread as long as the owning solver
+///     outlives the read. The handle's liveness check is race-free against
+///     reset()/destruction on another thread: a stale handle deterministically
+///     aborts via fatalError() rather than reading freed memory.
 class SMTSolver {
 public:
   SMTSolver() = default;
