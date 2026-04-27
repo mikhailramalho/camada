@@ -66,8 +66,8 @@ Useful configure options:
 
 - `-DCMAKE_BUILD_TYPE=Release`
 - `-DBUILD_SHARED_LIBS=ON/OFF`
-- `-DENABLE_WARNINGS=ON/OFF`
-- `-DENABLE_WERROR=ON/OFF`
+- `-DENABLE_WARNINGS=ON/OFF` (default: ON; adds `-Wall -Wextra -pedantic`)
+- `-DENABLE_WERROR=ON/OFF` (default: OFF; treat warnings as errors — used by CI)
 - `-DCAMADA_ENABLE_REGRESSION=ON/OFF`
 - `-DCAMADA_DOWNLOAD_DEPENDENCIES=ALL`
 - `-DCAMADA_SOLVER_<NAME>_ENABLE=IFAVAILABLE/ON/OFF` to control enabled
@@ -214,7 +214,9 @@ limitations still matter in day-to-day use.
   sorts/constants so the chosen native-vs-BV representation is obvious at the
   call site.
 - Treat each solver instance as thread-confined. Camada does not support
-  concurrent use of a single solver object from multiple threads.
+  concurrent use of a single solver object from multiple threads. Handles
+  (`SMTExprRef`, `SMTSortRef`) are safe to read from any thread as long as
+  the owning solver outlives the read — see *Handle Lifetime* below.
 
 ## Design Notes
 
@@ -226,7 +228,16 @@ obtained from a solver becomes invalid after:
 - `solver->reset()`
 - solver destruction
 
-Handles must not be reused across those boundaries.
+Handles must not be reused across those boundaries. Misuse is detected rather
+than silently corrupted: each handle carries a generation tag from the owning
+solver, and dereferencing a stale, null, or moved-from handle aborts via
+`fatalError()` with a diagnostic message instead of reading freed memory.
+
+The liveness check is race-free: a handle held by one thread can be safely
+dereferenced or queried with `isValid()` while the owning solver is reset or
+destroyed on another thread, and the stale handle will deterministically
+abort. This does not make the solver itself thread-safe — see *Recommended
+Usage* for the threading contract.
 
 ### Floating-Point Fallback
 
@@ -294,6 +305,13 @@ If a client needs broader structural caching, it is expected to build that at a
 higher layer on top of Camada, with the application owning the larger
 expression cache while Camada stays focused on backend adaptation and
 common-layer encodings.
+
+Symbols are cached by `(name, sort)` for the solver's lifetime, so `mkSymbol`
+returns the same handle even across `push`/`pop`. This matches every supported
+backend's actual C/C++ API behavior — terms outlive the assertion-stack scope
+that introduced them — but it diverges from strict SMT-LIB semantics where a
+`(declare-const)` inside a pushed scope is removed on pop. Code that relies on
+fresh-symbol-per-scope should call `solver->reset()` between scopes instead.
 
 ## Implementation Details
 

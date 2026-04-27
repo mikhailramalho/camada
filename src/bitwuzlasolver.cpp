@@ -24,14 +24,12 @@
 #include "bitwuzlasolver.h"
 #include "camada.h"
 #include "camadacache.h"
-#include "camadaerror.h"
-#include "camadafp.h"
-#include "camadautil.h"
+#include "camadacommon.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <unordered_map>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -77,7 +75,22 @@ BitwuzlaTerm mkTerm4(BitwuzlaTermManager *tm, BitwuzlaKind kind,
 
 } // namespace
 
-unsigned BitwSort::getWidthFromSolver() const { return getWidth(); }
+unsigned BitwSort::getWidthFromSolver() const {
+  uint64_t Width = 0;
+  if (bitwuzla_sort_is_bool(Sort))
+    Width = 1;
+  else if (bitwuzla_sort_is_bv(Sort))
+    Width = bitwuzla_sort_bv_get_size(Sort);
+  else if (bitwuzla_sort_is_fp(Sort))
+    Width = bitwuzla_sort_fp_get_exp_size(Sort) +
+            bitwuzla_sort_fp_get_sig_size(Sort);
+  else if (bitwuzla_sort_is_rm(Sort))
+    Width = 3;
+
+  fatalErrorIf(Width > std::numeric_limits<unsigned>::max(),
+               "Bitwuzla sort width is too large");
+  return static_cast<unsigned>(Width);
+}
 
 void BitwSort::dump(std::string &Out) const {
   Out = bitwuzla_sort_to_string(Sort);
@@ -928,12 +941,6 @@ std::string BitwuzlaSolver::getSolverNameAndVersion() const {
   return std::string("Bitwuzla v").append(bitwuzla_version());
 }
 
-void BitwuzlaSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void BitwuzlaSolver::dumpImpl(std::string &Out) {
   char *Buffer = nullptr;
   size_t Size = 0;
@@ -944,12 +951,6 @@ void BitwuzlaSolver::dumpImpl(std::string &Out) {
   fclose(Stream);
   Out.assign(Buffer, Size);
   free(Buffer);
-}
-
-void BitwuzlaSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {

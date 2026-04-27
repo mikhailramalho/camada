@@ -46,6 +46,7 @@ jobs:
           key: ${{ runner.os }}-bench-deps-v2
 
       - name: Download latest master baseline
+        id: download-master-baseline
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: benchmark-master.yml
@@ -53,7 +54,10 @@ jobs:
           name: baseline-master
           path: scripts
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          if_no_artifact_found: fail
+          # Don't fail the PR job if no successful master benchmark run has
+          # produced the artifact yet — the master comparison step is skipped
+          # below in that case, but the previous-commit comparison still runs.
+          if_no_artifact_found: warn
 
       - name: Determine previous commit
         id: previous
@@ -78,6 +82,56 @@ jobs:
 
       - name: Build Benchmark
         run: cmake --build build --target camada-bench
+
+      - name: Check master baseline availability
+        id: master-baseline
+        run: |
+          if [ -f scripts/baseline-master.txt ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+       # When the master artifact is missing (no recent master run, expired
+       # retention, or first time), fall back to building the baseline from a
+       # master worktree on the runner. Slower than the cached artifact path,
+       # but keeps the PR comparison working without manual intervention.
+      - name: Fetch master for fallback baseline
+        if: steps.master-baseline.outputs.available != 'true'
+        run: git fetch --no-tags --depth=1 origin master:refs/remotes/origin/master
+
+      - name: Create master worktree (fallback)
+        if: steps.master-baseline.outputs.available != 'true'
+        run: git worktree add ../camada-master origin/master
+
+      - name: Configure master worktree (fallback)
+        if: steps.master-baseline.outputs.available != 'true'
+        working-directory: ../camada-master
+        run: >
+          cmake -S . -B build -GNinja
+          -DCAMADA_ENABLE_REGRESSION=ON
+          -DBUILD_SHARED_LIBS=OFF
+          -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL
+          -DCAMADA_SOLVER_BITWUZLA_ENABLE=ON
+          -DCAMADA_SOLVER_CVC5_ENABLE=OFF
+          -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF
+          -DCAMADA_SOLVER_STP_ENABLE=OFF
+          -DCAMADA_SOLVER_YICES_ENABLE=OFF
+          -DCAMADA_SOLVER_Z3_ENABLE=OFF
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build master worktree benchmark (fallback)
+        if: steps.master-baseline.outputs.available != 'true'
+        working-directory: ../camada-master
+        run: cmake --build build --target camada-bench
+
+      - name: Generate master baseline (fallback)
+        if: steps.master-baseline.outputs.available != 'true'
+        working-directory: ../camada-master
+        run: >
+          python3 scripts/compare-bench.py ./build/bin/camada-bench 200
+          --baseline ${{ github.workspace }}/scripts/baseline-master.txt
+          --write-baseline
 
       - name: Compare current against master baseline
         run: >

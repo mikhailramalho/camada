@@ -23,12 +23,9 @@
 
 #include "stpsolver.h"
 #include "camada.h"
-#include "camadaerror.h"
-#include "camadafp.h"
-#include "camadautil.h"
+#include "camadacommon.h"
 
 #include <algorithm>
-#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 
@@ -90,7 +87,8 @@ STPSolver::STPSolver() : Context(STP::vc_createValidityChecker()) {
   initializeCommonSingletons();
 }
 
-STPSolver::STPSolver(STPContextRef C) : Context(*C) {
+STPSolver::STPSolver(STP::VC C) : Context(C) {
+  STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }
 
@@ -514,19 +512,19 @@ SMTExprRef STPSolver::getArrayElementImpl(const SMTExprRef &Array,
   const SMTSortRef &elementSort = Array->Sort->getElementSort();
   if (elementSort->isBoolSort()) {
     SMTResult<bool> result = getBool(sel);
-    assert(result && "Failed to get STP boolean array element");
+    fatalErrorIf(!result, "Failed to get STP boolean array element");
     return mkBool(result.value());
   }
 
   if (elementSort->isBVSort()) {
     SMTResult<std::string> result = getBVInBin(sel);
-    assert(result && "Failed to get STP bit-vector array element");
+    fatalErrorIf(!result, "Failed to get STP bit-vector array element");
     return SMTSolverImpl::mkBVFromBin(result.value());
   }
 
-  assert(elementSort->isFPSort() && "Unknown array element type");
+  fatalErrorIf(!elementSort->isFPSort(), "Unknown STP array element type");
   SMTResult<std::string> result = getFPInBin(sel);
-  assert(result && "Failed to get STP FP array element");
+  fatalErrorIf(!result, "Failed to get STP FP array element");
   return SMTSolverImpl::mkFPFromBin(
       result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
@@ -620,12 +618,6 @@ std::string STPSolver::getSolverNameAndVersion() const {
   return std::string("STP v").append(STP::get_git_version_tag());
 }
 
-void STPSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void STPSolver::dumpImpl(std::string &Out) {
   char *buf = nullptr;
   unsigned long len = 0;
@@ -634,12 +626,6 @@ void STPSolver::dumpImpl(std::string &Out) {
   STP::vc_DeleteExpr(query);
   Out.assign(buf, len);
   free(buf);
-}
-
-void STPSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void STPSolver::dumpModelImpl(std::string &Out) {

@@ -23,8 +23,7 @@
 
 #include "z3solver.h"
 #include "camada.h"
-#include "camadaerror.h"
-#include "camadafp.h"
+#include "camadacommon.h"
 
 #include <cassert>
 #include <cstdio>
@@ -37,28 +36,13 @@ namespace camada {
 
 namespace {
 
-static inline const z3::ast &toZ3Ast(const SMTExpr &Exp) {
-  return toSolverExpr<Z3Expr>(Exp).Expr;
-}
-
 static inline const z3::ast &toZ3Ast(const SMTExprRef &Exp) {
   return toSolverExpr<Z3Expr>(*Exp).Expr;
-}
-
-static inline z3::expr toZ3Expr(const SMTExpr &Exp) {
-  auto const &ZE = toSolverExpr<Z3Expr>(Exp);
-  return z3::to_expr(*ZE.Context, ZE.Expr);
 }
 
 static inline z3::expr toZ3Expr(const SMTExprRef &Exp) {
   auto const &ZE = toSolverExpr<Z3Expr>(*Exp);
   return z3::to_expr(*ZE.Context, ZE.Expr);
-}
-
-static inline z3::func_decl toZ3FuncDecl(const SMTExpr &Exp) {
-  auto const &ZE = toSolverExpr<Z3Expr>(Exp);
-  return z3::func_decl(*ZE.Context, reinterpret_cast<Z3_func_decl>(
-                                        static_cast<Z3_ast>(ZE.Expr)));
 }
 
 static inline z3::func_decl toZ3FuncDecl(const SMTExprRef &Exp) {
@@ -135,6 +119,10 @@ Z3Solver::Z3Solver(z3::context C, z3::solver S)
   initializeCommonSingletons();
 }
 
+// Context (z3::context) and Solver (z3::solver) are RAII value members; their
+// destructors release the underlying Z3 resources after this body returns, so
+// only invalidateGeneratedObjects() is needed here to honor the SMTSolverImpl
+// teardown contract before backend resources go away.
 Z3Solver::~Z3Solver() { invalidateGeneratedObjects(); }
 
 void Z3Solver::addConstraintImpl(const SMTExprRef &Exp) {
@@ -773,8 +761,9 @@ SMTResult<std::string> Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   std::string bv;
   bool is_num = Value.as_binary(bv);
-  (void)is_num;
-  assert(is_num && "Failed to get bitvector from Z3");
+  if (!is_num)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to get bit-vector model value from Z3"};
   return bv;
 }
 
@@ -785,28 +774,35 @@ SMTResult<std::string> Z3Solver::getIntImpl(const SMTExprRef &Exp) {
         getRationalImpl(Exp);
     if (!result)
       return result.error();
-    assert(result.value().second == "1" && "Real value is not integral");
+    if (result.value().second != "1")
+      return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                      "Real model value is not integral"};
     return result.value().first;
   }
-  assert(value.is_numeral() && "Expected integer numeral from Z3");
+  if (!value.is_numeral())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Expected integer numeral from Z3"};
   std::string numeral;
   bool is_num = value.is_numeral(numeral);
-  (void)is_num;
-  assert(is_num && "Failed to get integer numeral from Z3");
+  if (!is_num)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to get integer numeral from Z3"};
   return numeral;
 }
 
 SMTResult<std::pair<std::string, std::string>>
 Z3Solver::getRationalImpl(const SMTExprRef &Exp) {
   z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
-  assert(value.is_numeral() && "Expected rational numeral from Z3");
+  if (!value.is_numeral())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Expected rational numeral from Z3"};
   std::string num;
   std::string den;
   bool has_num = value.numerator().is_numeral(num);
   bool has_den = value.denominator().is_numeral(den);
-  (void)has_num;
-  (void)has_den;
-  assert(has_num && has_den && "Failed to get rational numeral from Z3");
+  if (!has_num || !has_den)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to get rational numeral from Z3"};
   return std::make_pair(num, den);
 }
 
@@ -815,8 +811,9 @@ SMTResult<std::string> Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   z3::expr fp_value = Solver.get_model().eval(Value.mk_to_ieee_bv(), true);
   std::string bv;
   bool is_num = fp_value.as_binary(bv);
-  (void)is_num;
-  assert(is_num && "Failed to convert FP to BV in Z3");
+  if (!is_num)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
+                    "Failed to convert FP model value to BV in Z3"};
   return bv;
 }
 
@@ -1019,21 +1016,9 @@ std::string Z3Solver::getSolverNameAndVersion() const {
       .append(std::to_string(revision));
 }
 
-void Z3Solver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void Z3Solver::dumpImpl(std::string &Out) {
   Out = Solver.to_smt2();
   Out += "\n";
-}
-
-void Z3Solver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void Z3Solver::dumpModelImpl(std::string &Out) {

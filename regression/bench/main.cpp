@@ -387,6 +387,62 @@ void benchmarkFPRemOnly(camada::SMTSolver &solver, std::size_t iterations) {
   (void)sink;
 }
 
+void benchmarkResetCycleMemory(camada::SMTSolver &solver,
+                               std::size_t iterations) {
+  volatile std::size_t sink = 0;
+
+  for (std::size_t cycle = 0; cycle < iterations; ++cycle) {
+    auto x = solver.mkSymbol("reset_x", solver.mkBVSort(32));
+    auto y = solver.mkSymbol("reset_y", solver.mkBVSort(32));
+    auto expr = x;
+
+    // Build a moderate expression tree each cycle to force arena growth.
+    for (std::size_t i = 0; i < 200; ++i) {
+      auto c = solver.mkBVFromDec(static_cast<int64_t>(i & 0x7f), 32);
+      expr = solver.mkBVAdd(expr, y);
+      expr = solver.mkBVXor(expr, c);
+      expr = solver.mkBVMul(expr, solver.mkBVFromDec(3, 32));
+    }
+
+    sink += expr->getWidth();
+    solver.reset();
+  }
+
+  (void)sink;
+}
+
+void benchmarkResetCycleExprChain(camada::SMTSolver &solver,
+                                  std::size_t iterations) {
+  volatile std::size_t sink = 0;
+
+  for (std::size_t cycle = 0; cycle < iterations; ++cycle) {
+    auto x = solver.mkSymbol("chain_x", solver.mkBVSort(32));
+    auto y = solver.mkSymbol("chain_y", solver.mkBVSort(32));
+
+    // Build a wider expression tree to stress arena allocation.
+    for (std::size_t i = 0; i < 200; ++i) {
+      auto c0 = solver.mkBVFromDec(static_cast<int64_t>(i & 0xff), 32);
+      auto c1 = solver.mkBVFromDec(static_cast<int64_t>((i + 1) & 0xff), 32);
+      auto c2 = solver.mkBVFromDec(static_cast<int64_t>((i + 3) & 0xff), 32);
+
+      auto add = solver.mkBVAdd(x, c0);
+      auto mul = solver.mkBVMul(add, y);
+      auto xor_term = solver.mkBVXor(mul, c1);
+      auto sub = solver.mkBVSub(xor_term, c2);
+      auto and_term = solver.mkBVAnd(sub, solver.mkBVNot(c0));
+      auto eq = solver.mkEqual(and_term, solver.mkBVOr(c1, c2));
+      auto ite = solver.mkIte(eq, solver.mkBVAdd(and_term, c1),
+                              solver.mkBVXor(and_term, c2));
+
+      sink += ite->getWidth() + eq->isBoolSort();
+    }
+
+    solver.reset();
+  }
+
+  (void)sink;
+}
+
 void printUsage(const char *argv0) {
   std::fprintf(stderr,
                "Usage: %s [backend] [iterations]\n"
@@ -427,6 +483,10 @@ int main(int argc, char **argv) {
     runCase(backend, "fp_fma_only", iterations, benchmarkFPFMAOnly);
     runCase(backend, "fp_rem_only", iterations, benchmarkFPRemOnly);
     runCase(backend, "fp_construct", iterations, benchmarkFPConstruct);
+    runCase(backend, "reset_cycle_memory", iterations,
+            benchmarkResetCycleMemory);
+    runCase(backend, "reset_cycle_expr_chain", iterations,
+            benchmarkResetCycleExprChain);
     return 0;
   } catch (const std::exception &Exn) {
     std::fprintf(stderr, "%s\n", Exn.what());

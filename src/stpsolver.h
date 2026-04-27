@@ -81,7 +81,7 @@ public:
 class STPSolver : public SMTSolverImpl {
 public:
   STPSolver();
-  explicit STPSolver(STPContextRef C);
+  explicit STPSolver(STP::VC C);
   ~STPSolver() override;
 
 protected:
@@ -215,10 +215,8 @@ protected:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl() override;
   void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 
 private:

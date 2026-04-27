@@ -23,9 +23,7 @@
 
 #include "mathsatsolver.h"
 #include "camada.h"
-#include "camadaerror.h"
-#include "camadafp.h"
-#include "camadautil.h"
+#include "camadacommon.h"
 
 #include <cstdio>
 #include <gmp.h>
@@ -53,6 +51,12 @@ static inline char *checkMathSATString(char *Str, const char *Message) {
     return Str;
   fatalError(Message);
   return nullptr;
+}
+
+static inline void mathsatCheckError(int Res, const char *Message) {
+  if (Res == 0)
+    return;
+  fatalError(Message);
 }
 
 } // namespace
@@ -875,7 +879,9 @@ SMTResult<std::string> MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
         getRationalImpl(Exp);
     if (!result)
       return result.error();
-    assert(result.value().second == "1" && "Real value is not integral");
+    if (result.value().second != "1")
+      return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                      "Real model value is not integral"};
     return result.value().first;
   }
 
@@ -885,7 +891,11 @@ SMTResult<std::string> MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
       Exp->getKind(), &Context, Exp->Sort,
       msat_get_model_value(Context, toMathSATTerm(Exp)));
   getMathSATModelRational(t, val);
-  assert(mpz_cmp_ui(mpq_denref(val), 1) == 0 && "Expected integer value");
+  if (mpz_cmp_ui(mpq_denref(val), 1) != 0) {
+    mpq_clear(val);
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                    "Expected integer model value from MathSAT"};
+  }
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   std::string num = raw_num;
   void (*gmp_free)(void *, std::size_t);
@@ -1098,12 +1108,14 @@ void MathSATSolver::resetImpl() {
 
 void MathSATSolver::pushImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i)
-    msat_push_backtrack_point(Context);
+    mathsatCheckError(msat_push_backtrack_point(Context),
+                      "Could not push MathSAT context");
 }
 
 void MathSATSolver::popImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i)
-    msat_pop_backtrack_point(Context);
+    mathsatCheckError(msat_pop_backtrack_point(Context),
+                      "Could not pop MathSAT context");
 }
 
 std::string MathSATSolver::getSolverNameAndVersion() const {
@@ -1111,12 +1123,6 @@ std::string MathSATSolver::getSolverNameAndVersion() const {
   std::string ver = tmp;
   msat_free(tmp);
   return std::string("MathSAT v").append(ver);
-}
-
-void MathSATSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void MathSATSolver::dumpImpl(std::string &Out) {
@@ -1132,12 +1138,6 @@ void MathSATSolver::dumpImpl(std::string &Out) {
     msat_free(tmp);
   }
   msat_free(asserted_formulas);
-}
-
-void MathSATSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void MathSATSolver::dumpModelImpl(std::string &Out) {
