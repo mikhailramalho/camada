@@ -321,6 +321,10 @@ static inline SMTExprRef mkRoundingDecision(SMTSolver &S, const SMTExprRef &R,
                                             const SMTExprRef &Last,
                                             const SMTExprRef &Round,
                                             const SMTExprRef &Sticky) {
+  assert(Sgn->getWidth() == 1 && "mkRoundingDecision: Sgn must be 1-bit");
+  assert(Last->getWidth() == 1 && "mkRoundingDecision: Last must be 1-bit");
+  assert(Round->getWidth() == 1 && "mkRoundingDecision: Round must be 1-bit");
+  assert(Sticky->getWidth() == 1 && "mkRoundingDecision: Sticky must be 1-bit");
   SMTExprRef last_or_sticky = S.mkBVOr(Last, Sticky);
   SMTExprRef round_or_sticky = S.mkBVOr(Round, Sticky);
 
@@ -357,6 +361,10 @@ mkRoundingDecision(SMTSolver &S, const SMTExprRef &R, const SMTExprRef &RMNeg,
                    const SMTExprRef &RMEven, const SMTExprRef &Sgn,
                    const SMTExprRef &Last, const SMTExprRef &Round,
                    const SMTExprRef &Sticky) {
+  assert(Sgn->getWidth() == 1 && "mkRoundingDecision: Sgn must be 1-bit");
+  assert(Last->getWidth() == 1 && "mkRoundingDecision: Last must be 1-bit");
+  assert(Round->getWidth() == 1 && "mkRoundingDecision: Round must be 1-bit");
+  assert(Sticky->getWidth() == 1 && "mkRoundingDecision: Sticky must be 1-bit");
   SMTExprRef last_or_sticky = S.mkBVOr(Last, Sticky);
   SMTExprRef round_or_sticky = S.mkBVOr(Round, Sticky);
 
@@ -2249,6 +2257,15 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
 
   assert(Sig->getWidth() == SWidth + 4);
   assert(Exp->getWidth() == EWidth + 2);
+
+  // Round() makes width-dependent extracts that underflow for degenerate
+  // sorts (line 2259 reads Exp[EWidth-1] and line 2403 reads Sig[SWidth-2:0]).
+  // Camada's public mkFPSort enforces user-visible widths >= 1, and BVFP
+  // sorts store SigWidth = user_sig + 1, so the invariants below hold for
+  // every reachable FP arithmetic call today. The asserts encode the
+  // contract for any future caller.
+  assert(EWidth >= 1 && "round() requires EWidth >= 1");
+  assert(SWidth >= 2 && "round() requires SWidth >= 2");
 
   SMTExprRef e_min = mkMinExp(*this, EWidth);
   SMTExprRef e_max = mkMaxExp(*this, EWidth);
