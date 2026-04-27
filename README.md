@@ -214,7 +214,9 @@ limitations still matter in day-to-day use.
   sorts/constants so the chosen native-vs-BV representation is obvious at the
   call site.
 - Treat each solver instance as thread-confined. Camada does not support
-  concurrent use of a single solver object from multiple threads.
+  concurrent use of a single solver object from multiple threads. Handles
+  (`SMTExprRef`, `SMTSortRef`) are safe to read from any thread as long as
+  the owning solver outlives the read — see *Handle Lifetime* below.
 
 ## Design Notes
 
@@ -226,7 +228,16 @@ obtained from a solver becomes invalid after:
 - `solver->reset()`
 - solver destruction
 
-Handles must not be reused across those boundaries.
+Handles must not be reused across those boundaries. Misuse is detected rather
+than silently corrupted: each handle carries a generation tag from the owning
+solver, and dereferencing a stale, null, or moved-from handle aborts via
+`fatalError()` with a diagnostic message instead of reading freed memory.
+
+The liveness check is race-free: a handle held by one thread can be safely
+dereferenced or queried with `isValid()` while the owning solver is reset or
+destroyed on another thread, and the stale handle will deterministically
+abort. This does not make the solver itself thread-safe — see *Recommended
+Usage* for the threading contract.
 
 ### Floating-Point Fallback
 
