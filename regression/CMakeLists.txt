@@ -37,9 +37,18 @@ endif()
 # add each solver specific implementation, if it is enabled
 compile_test("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
-add_executable(${REGRESSION_TARGET_NAME} main.cpp "${solver_test_files}")
+add_executable(${REGRESSION_TARGET_NAME} main.cpp smtlib.test.cpp
+                                         "${solver_test_files}")
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME}
                                                         Catch2::Catch2)
+
+# Hint for the SMT-LIB pipeline test: prefer the locally-staged z3 binary if
+# Camada's dependency download produced one, otherwise fall back to PATH.
+if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/z3")
+  target_compile_definitions(
+    ${REGRESSION_TARGET_NAME}
+    PRIVATE "CAMADA_TEST_Z3_BIN=\"${CAMADA_DEPS_INSTALL_DIR}/bin/z3\"")
+endif()
 
 add_executable(${BENCH_TARGET_NAME} bench/main.cpp)
 target_link_libraries(${BENCH_TARGET_NAME} PRIVATE ${PROJECT_NAME})
@@ -91,6 +100,12 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
+  # Tell the regression sources whether Z3 was compiled in. Per-backend test
+  # files (z3.test.cpp etc.) are only included in the build when their backend
+  # is enabled, so they don't need this guard, but cross-backend tests
+  # (smtlib.test.cpp) do.
+  target_compile_definitions(${REGRESSION_TARGET_NAME}
+                             PRIVATE SOLVER_Z3_ENABLED)
   target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
   get_filename_component(CAMADA_Z3_LIB_DIR "${CAMADA_Z3_LIB}" DIRECTORY)
   if(EXISTS "${CAMADA_Z3_LIB_DIR}")

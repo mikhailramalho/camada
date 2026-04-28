@@ -32,6 +32,7 @@ set(${LIBRARY_TARGET_NAME}_SRC
     bitwuzlasolver.cpp
     cvc5solver.cpp
     mathsatsolver.cpp
+    smtlibsolver.cpp
     stpsolver.cpp
     yicessolver.cpp
     z3solver.cpp)
@@ -46,7 +47,8 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camadaexpr.h
     camadahandle.h
     camadaimpl.h
-    camadasort.h)
+    camadasort.h
+    smtlibsolver.h)
 
 # add each solver specific header, if it is enabled
 add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")

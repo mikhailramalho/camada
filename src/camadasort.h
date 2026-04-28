@@ -32,7 +32,7 @@
 
 namespace camada {
 
-enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3 };
+enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3, SMTLIB };
 enum class SMTSortKind {
   Bool,
   Int,
