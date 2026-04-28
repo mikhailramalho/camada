@@ -78,6 +78,7 @@ TEST_CASE("SMTLIB write-only emits a minimal script", "[SMTLIB]") {
 
   const std::string Expected = "(set-option :print-success false)\n"
                                "(set-option :produce-models true)\n"
+                               "(set-option :global-declarations true)\n"
                                "(set-info :status unknown)\n"
                                "(set-logic QF_AUFBV)\n"
                                "(declare-fun |x| () (_ BitVec 8))\n"
@@ -456,4 +457,49 @@ TEST_CASE("SMTLIB interactive: push/pop returns sat/unsat/sat from check()",
   Solver->pop();
 
   REQUIRE(Solver->check() == camada::checkResult::SAT);
+}
+
+TEST_CASE("SMTLIB interactive: symbol declared in pushed scope survives pop",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  // Without (set-option :global-declarations true), declarations made inside
+  // a (push) are dropped on (pop) and a follow-up reference to the symbol
+  // would fail with "unknown constant" in the child solver.
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+
+  Solver->push();
+  auto X = Solver->mkSymbol("x", BV8);
+  Solver->pop();
+
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(9, BV8)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+  auto Bin = Solver->getBVInBin(X);
+  REQUIRE(Bin);
+  REQUIRE(Bin.value() == "00001001");
+}
+
+TEST_CASE("SMTLIB interactive: getBVInBin handles 128-bit decimal model value",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  // Some solvers (e.g. MathSAT) emit BV model values in `(_ bv<n> <w>)` decimal
+  // form. Widths above 64 must still parse correctly.
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV128 = Solver->mkBVSort(128);
+  auto X = Solver->mkSymbol("x", BV128);
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(42, BV128)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Bin = Solver->getBVInBin(X);
+  REQUIRE(Bin);
+  // 42 = 0b101010, zero-extended to 128 bits.
+  std::string Expected(128, '0');
+  Expected.replace(Expected.size() - 6, 6, "101010");
+  REQUIRE(Bin.value() == Expected);
 }

@@ -22,6 +22,7 @@
 #include "smtlibsolver.h"
 #include "camadacommon.h"
 
+#include <algorithm>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -30,6 +31,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <utility>
+#include <vector>
 
 namespace camada {
 
@@ -350,6 +352,13 @@ void SMTLIBSolver::emitPreamble() {
   // explicitly enabled; z3 and yices-smt2 default to producing models. Set
   // the option unconditionally for protocol portability.
   emitLine("(set-option :produce-models true)");
+  // Without :global-declarations true, declarations made inside a (push) are
+  // discarded on (pop). Camada's API lets a caller mkSymbol() inside a pushed
+  // scope and use the returned expression after pop(); without this option,
+  // the next (assert ...) or (get-value ...) referring to that symbol would
+  // hit "unknown constant" in the child solver. All solvers in the verified
+  // matrix accept this option.
+  emitLine("(set-option :global-declarations true)");
   emitLine("(set-info :status unknown)");
   // Phase 2 only emits BV/Bool/arrays, so QF_AUFBV is the tightest fit and is
   // the broadest logic STP accepts. Phase 3 (FP/Int/Real) will need to revisit
@@ -709,17 +718,38 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
     if (End == std::string::npos)
       return {};
     std::string Decimal = Value.substr(Start, End - Start);
-    // Convert decimal to a Width-bit binary. We use a simple shift-and-add
-    // approach without big-integer support — caps at 64 bits.
-    if (Width > 64)
+    if (Decimal.empty())
       return {};
-    char *EndPtr = nullptr;
-    unsigned long long N = std::strtoull(Decimal.c_str(), &EndPtr, 10);
-    if (EndPtr == Decimal.c_str())
-      return {};
-    std::string Bits(Width, '0');
-    for (unsigned I = 0; I < Width; ++I)
-      Bits[Width - 1 - I] = ((N >> I) & 1ULL) ? '1' : '0';
+    for (char C : Decimal)
+      if (C < '0' || C > '9')
+        return {};
+    // Repeated long-division by 2 over the decimal string, reading the
+    // remainders out from least to most significant. This works at any width
+    // without pulling in big-integer libraries.
+    std::vector<unsigned char> Digits(Decimal.size());
+    for (std::size_t I = 0; I < Decimal.size(); ++I)
+      Digits[I] = Decimal[I] - '0';
+    std::string Bits;
+    Bits.reserve(Width);
+    while (true) {
+      bool NonZero = false;
+      unsigned Carry = 0;
+      for (unsigned char &D : Digits) {
+        unsigned Cur = Carry * 10 + D;
+        D = Cur / 2;
+        Carry = Cur % 2;
+        if (D != 0)
+          NonZero = true;
+      }
+      Bits.push_back(Carry ? '1' : '0');
+      if (!NonZero)
+        break;
+    }
+    if (Bits.size() > Width)
+      Bits.resize(Width); // truncate high bits beyond declared width
+    while (Bits.size() < Width)
+      Bits.push_back('0');
+    std::reverse(Bits.begin(), Bits.end());
     return Bits;
   }
   return {};

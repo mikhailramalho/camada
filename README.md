@@ -159,10 +159,11 @@ test over each binary it can find on disk):
 | mathsat      | `mathsat`                        | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
 
 The Camada preamble unconditionally sends `(set-option :print-success true)`,
-`(set-option :produce-models true)`, `(set-info :status unknown)`, and
-`(set-logic QF_AUFBV)` at startup, so any solver that honors the SMT-LIB
-option contract should work. Other solvers should be straightforward to plug
-in via the `createSMTLIBSolver(cmd)` factory.
+`(set-option :produce-models true)`, `(set-option :global-declarations true)`,
+`(set-info :status unknown)`, and `(set-logic QF_AUFBV)` at startup, so any
+solver that honors the SMT-LIB option contract should work. Other solvers
+should be straightforward to plug in via the `createSMTLIBSolver(cmd)`
+factory.
 
 The backend currently covers the BV/Bool fragment plus arrays; integer/real
 arithmetic, native FP, and quantifier APIs are not yet wired into the SMT-LIB
