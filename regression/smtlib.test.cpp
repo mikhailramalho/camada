@@ -633,6 +633,40 @@ TEST_CASE("SMTLIB interactive: native FP infinity model parses correctly",
   REQUIRE(Bin.value() == "01111111100000000000000000000000");
 }
 
+TEST_CASE("SMTLIB interactive: native FP neg FlipSignBit toggles NaN sign",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_FP(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
+
+  // Take an arbitrary NaN, neg it with FlipSignBit, and verify that the IEEE
+  // bit pattern matches the input with bit [31] xored. (fp.neg with the
+  // standard PreserveNaNPayload semantics is allowed to leave NaNs unchanged,
+  // so this property is the distinguishing one.)
+  auto X = Solver->mkSymbol("x", FP32);
+  Solver->addConstraint(Solver->mkFPIsNaN(X));
+
+  auto Negged = Solver->mkFPNeg(X, camada::FPNegBehavior::FlipSignBit);
+  auto XBits = Solver->mkIEEEFPToBV(X);
+  auto NeggedBits = Solver->mkIEEEFPToBV(Negged);
+
+  // bit [31] of NeggedBits must be the complement of bit [31] of XBits.
+  auto XSign = Solver->mkBVExtract(31, 31, XBits);
+  auto NSign = Solver->mkBVExtract(31, 31, NeggedBits);
+  Solver->addConstraint(Solver->mkEqual(NSign, Solver->mkBVNot(XSign)));
+
+  // bits [30:0] must match.
+  auto XRest = Solver->mkBVExtract(30, 0, XBits);
+  auto NRest = Solver->mkBVExtract(30, 0, NeggedBits);
+  Solver->addConstraint(Solver->mkEqual(NRest, XRest));
+
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+}
+
 TEST_CASE("SMTLIB interactive: native FP NaN model parses correctly",
           "[SMTLIB][pipeline]") {
   CAMADA_SMTLIB_FOREACH_SOLVER(S);

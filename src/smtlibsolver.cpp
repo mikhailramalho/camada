@@ -678,11 +678,26 @@ SMTExprRef SMTLIBSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
 }
 
 SMTExprRef SMTLIBSolver::mkFPNegImpl(const SMTExprRef &Exp,
-                                     FPNegBehavior /*Behavior*/) {
-  // SMT-LIB fp.neg has PreserveNaNPayload semantics. Other native backends
-  // (cvc5, bitwuzla) also ignore the FPNegBehavior argument here.
-  return makeSMTLIBExpr(SMTExprKind::FPNeg, Exp->Sort,
-                        "(fp.neg " + textOf(Exp) + ")");
+                                     FPNegBehavior Behavior) {
+  // SMT-LIB's fp.neg has PreserveNaNPayload semantics — sign bit flipped on
+  // non-NaNs, NaN payload preserved. That maps directly.
+  if (Behavior == FPNegBehavior::PreserveNaNPayload)
+    return makeSMTLIBExpr(SMTExprKind::FPNeg, Exp->Sort,
+                          "(fp.neg " + textOf(Exp) + ")");
+
+  // FlipSignBit must flip the top bit unconditionally, NaN included. SMT-LIB
+  // has no direct op for that, so round-trip through the IEEE BV view: pull
+  // the bits out, flip bit [N-1], reinterpret. mkIEEEFPToBV materializes a
+  // fresh BV symbol constrained to Exp's bit pattern; mkBVToIEEEFP reads them
+  // back as an FP value.
+  unsigned Width =
+      Exp->Sort->getFPExponentWidth() + Exp->Sort->getFPSignificandWidth() + 1;
+  SMTExprRef Bits = mkIEEEFPToBV(Exp);
+  SMTExprRef Sign = mkBVExtract(Width - 1, Width - 1, Bits);
+  SMTExprRef Rest = mkBVExtract(Width - 2, 0, Bits);
+  SMTExprRef Flipped = mkBVConcat(mkBVNot(Sign), Rest);
+  return rewrapExprImpl(*mkBVToIEEEFP(Flipped, Exp->Sort), Exp->Sort,
+                        SMTExprKind::FPNeg);
 }
 
 SMTExprRef SMTLIBSolver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
