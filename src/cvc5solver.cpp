@@ -23,8 +23,7 @@
 
 #include "cvc5solver.h"
 #include "camada.h"
-#include "camadaerror.h"
-#include "camadafp.h"
+#include "camadacommon.h"
 
 #include <cassert>
 #include <cstdio>
@@ -112,6 +111,10 @@ CVC5Solver::CVC5Solver() : Context(Terms) {
   initializeCommonSingletons();
 }
 
+// Context (cvc5::Solver) and Terms (cvc5::TermManager) are RAII value members;
+// their destructors release the underlying cvc5 resources after this body
+// returns, so only invalidateGeneratedObjects() is needed here to honor the
+// SMTSolverImpl teardown contract before backend resources go away.
 CVC5Solver::~CVC5Solver() { invalidateGeneratedObjects(); }
 
 void CVC5Solver::addConstraintImpl(const SMTExprRef &Exp) {
@@ -937,17 +940,23 @@ SMTResult<std::string> CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
         getRationalImpl(Exp);
     if (!result)
       return result.error();
-    assert(result.value().second == "1" && "Real value is not integral");
+    if (result.value().second != "1")
+      return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::CVC5,
+                      "Real model value is not integral"};
     return result.value().first;
   }
-  assert(value.isIntegerValue() && "Expected integer model value");
+  if (!value.isIntegerValue())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::CVC5,
+                    "Expected integer model value from CVC5"};
   return value.getIntegerValue();
 }
 
 SMTResult<std::pair<std::string, std::string>>
 CVC5Solver::getRationalImpl(const SMTExprRef &Exp) {
   cvc5::Term value = Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
-  assert(value.isRealValue() && "Expected rational model value");
+  if (!value.isRealValue())
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::CVC5,
+                    "Expected rational model value from CVC5"};
   std::string Num, Den;
   parseCVC5RationalValue(value.getRealValue(), Num, Den);
   return std::make_pair(Num, Den);
@@ -1167,12 +1176,6 @@ std::string CVC5Solver::getSolverNameAndVersion() const {
   return std::string("CVC5 v").append(Context.getVersion());
 }
 
-void CVC5Solver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void CVC5Solver::dumpImpl(std::string &Out) {
   Out.clear();
   auto const &assertions = Context.getAssertions();
@@ -1180,12 +1183,6 @@ void CVC5Solver::dumpImpl(std::string &Out) {
     Out += a.toString();
     Out += "\n";
   }
-}
-
-void CVC5Solver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void CVC5Solver::dumpModelImpl(std::string &Out) {

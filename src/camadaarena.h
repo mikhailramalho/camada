@@ -22,11 +22,15 @@
 #ifndef CAMADAARENA_H_
 #define CAMADAARENA_H_
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include "camadacommon.h"
 
 namespace camada {
 
@@ -49,8 +53,16 @@ public:
 
   ~ObjectArena() { clear(); }
 
+  /// Returns true if no live objects are currently held by the arena. Used by
+  /// SMTSolverImpl to assert that derived destructors drained the arena while
+  /// backend resources were still alive.
+  bool empty() const { return Destructors.empty(); }
+
   /// Construct an object inside the arena and return its stable address.
   template <typename T, typename... Args> T *create(Args &&...ArgsV) {
+    fatalErrorIf(Destructors.size() == std::numeric_limits<std::size_t>::max(),
+                 "Arena destructor record overflow");
+    reserveDestructorRecord();
     void *Storage = allocate(sizeof(T), alignof(T));
     T *Object = new (Storage) T(std::forward<Args>(ArgsV)...);
     Destructors.push_back(DestructorRecord{
@@ -58,14 +70,22 @@ public:
     return Object;
   }
 
-  /// Destroy all live objects and reset block offsets so future allocations
-  /// can reuse the existing storage.
+  /// Destroy all live objects, release growth blocks, and reset the offset of
+  /// the retained block so future allocations can reuse its storage. Keeps the
+  /// largest existing block to preserve grown capacity across clear() cycles.
   void clear() {
     for (auto It = Destructors.rbegin(); It != Destructors.rend(); ++It)
       It->Destroy(It->Ptr);
     Destructors.clear();
-    for (auto &Block : Blocks)
-      Block.Offset = 0;
+    if (Blocks.empty())
+      return;
+    auto Largest = std::max_element(
+        Blocks.begin(), Blocks.end(),
+        [](const Block &A, const Block &B) { return A.Capacity < B.Capacity; });
+    if (Largest != Blocks.begin())
+      *Blocks.begin() = std::move(*Largest);
+    Blocks.resize(1);
+    Blocks.front().Offset = 0;
   }
 
 private:
@@ -80,11 +100,31 @@ private:
     void (*Destroy)(void *);
   };
 
+  void reserveDestructorRecord() {
+    if (Destructors.size() < Destructors.capacity())
+      return;
+
+    // Seed the vector at 64 entries on the first reserve, then double from
+    // there. The constant is only used on the empty path; subsequent growth
+    // doubles the existing capacity.
+    constexpr std::size_t InitialDestructorCapacity = 64;
+    fatalErrorIf(Destructors.capacity() >
+                     std::numeric_limits<std::size_t>::max() / 2,
+                 "Arena destructor record capacity overflow");
+    std::size_t NewCapacity = Destructors.capacity() == 0
+                                  ? InitialDestructorCapacity
+                                  : Destructors.capacity() * 2;
+    Destructors.reserve(NewCapacity);
+  }
+
   void *allocate(std::size_t Size, std::size_t Alignment) {
+    fatalErrorIf(Alignment == 0, "Arena allocation alignment is zero");
     if (Blocks.empty() || !hasCapacity(Blocks.back(), Size, Alignment))
       addBlock(Size, Alignment);
 
     Block &Block = Blocks.back();
+    fatalErrorIf(!hasCapacity(Block, Size, Alignment),
+                 "Arena allocation does not fit in selected block");
     auto Base =
         reinterpret_cast<std::uintptr_t>(Block.Storage.get() + Block.Offset);
     auto Padding = alignmentPadding(Base, Alignment);
@@ -96,17 +136,27 @@ private:
 
   static bool hasCapacity(const Block &Block, std::size_t Size,
                           std::size_t Alignment) {
+    if (Block.Offset > Block.Capacity)
+      return false;
     auto Base =
         reinterpret_cast<std::uintptr_t>(Block.Storage.get() + Block.Offset);
     auto Padding = alignmentPadding(Base, Alignment);
-    return Block.Offset + Padding + Size <= Block.Capacity;
+    if (Padding > Block.Capacity - Block.Offset)
+      return false;
+    return Size <= Block.Capacity - Block.Offset - Padding;
   }
 
   void addBlock(std::size_t Size, std::size_t Alignment) {
     std::size_t Capacity = InitialBlockSize;
-    if (!Blocks.empty())
+    if (!Blocks.empty()) {
+      fatalErrorIf(Blocks.back().Capacity >
+                       std::numeric_limits<std::size_t>::max() / 2,
+                   "Arena block capacity overflow");
       Capacity = Blocks.back().Capacity * 2;
+    }
 
+    fatalErrorIf(Size > std::numeric_limits<std::size_t>::max() - Alignment,
+                 "Arena allocation size overflow");
     Capacity = std::max(Capacity, Size + Alignment);
     Blocks.push_back(
         Block{std::make_unique<std::byte[]>(Capacity), Capacity, 0});

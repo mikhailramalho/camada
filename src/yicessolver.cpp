@@ -23,8 +23,7 @@
 
 #include "yicessolver.h"
 #include "camada.h"
-#include "camadaerror.h"
-#include "camadafp.h"
+#include "camadacommon.h"
 
 #include <cstdio>
 #include <gmp.h>
@@ -711,7 +710,9 @@ SMTResult<std::string> YicesSolver::getIntImpl(const SMTExprRef &Exp) {
         getRationalImpl(Exp);
     if (!result)
       return result.error();
-    assert(result.value().second == "1" && "Real value is not integral");
+    if (result.value().second != "1")
+      return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Yices,
+                      "Real model value is not integral"};
     return result.value().first;
   }
 
@@ -746,19 +747,19 @@ SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
   const SMTSortRef &elementSort = Array->Sort->getElementSort();
   if (elementSort->isBoolSort()) {
     SMTResult<bool> result = getBool(sel);
-    assert(result && "Failed to get Yices boolean array element");
+    fatalErrorIf(!result, "Failed to get Yices boolean array element");
     return mkBool(result.value());
   }
 
   if (elementSort->isBVSort()) {
     SMTResult<std::string> result = getBVInBin(sel);
-    assert(result && "Failed to get Yices bit-vector array element");
+    fatalErrorIf(!result, "Failed to get Yices bit-vector array element");
     return SMTSolverImpl::mkBVFromBin(result.value());
   }
 
-  assert(elementSort->isFPSort() && "Unknown array element type");
+  fatalErrorIf(!elementSort->isFPSort(), "Unknown Yices array element type");
   SMTResult<std::string> result = getFPInBin(sel);
-  assert(result && "Failed to get Yices FP array element");
+  fatalErrorIf(!result, "Failed to get Yices FP array element");
   return SMTSolverImpl::mkFPFromBin(
       result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
@@ -870,12 +871,6 @@ std::string YicesSolver::getSolverNameAndVersion() const {
   return std::string("Yices v").append(yices_version);
 }
 
-void YicesSolver::dumpImpl() {
-  std::string Out;
-  dumpImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void YicesSolver::dumpImpl(std::string &Out) {
   Out.clear();
   for (auto const &a : Assertions) {
@@ -883,12 +878,6 @@ void YicesSolver::dumpImpl(std::string &Out) {
     a->dump(Assertion);
     Out += Assertion;
   }
-}
-
-void YicesSolver::dumpModelImpl() {
-  std::string Out;
-  dumpModelImpl(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void YicesSolver::dumpModelImpl(std::string &Out) {

@@ -112,6 +112,37 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   REQUIRE(x_res.value() == 1);
 }
 
+// Locks in the documented behavior that symbols are cached by (name, sort) for
+// the solver's lifetime, including across push/pop. mkSymbol returns the same
+// handle as before the push, even though SMT-LIB strict semantics would scope
+// declarations to the popped frame. This matches every supported backend's
+// actual C/C++ API behavior.
+inline void symbol_cache_survives_push_pop(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto x_before = solver->mkSymbol("cached", bv8);
+  REQUIRE(x_before.isValid());
+
+  solver->push();
+  REQUIRE(x_before.isValid());
+
+  auto x_in_scope = solver->mkSymbol("cached", bv8);
+  REQUIRE(x_in_scope.get() == x_before.get());
+
+  solver->pop();
+  REQUIRE(x_before.isValid());
+
+  auto x_after = solver->mkSymbol("cached", bv8);
+  REQUIRE(x_after.get() == x_before.get());
+
+  // Confirm the cached symbol still participates in solving correctly after
+  // the pop discarded the in-scope assertion.
+  solver->addConstraint(solver->mkEqual(x_after, solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto v = solver->getBV(x_before);
+  REQUIRE(v);
+  REQUIRE(v.value() == 7);
+}
+
 inline void
 handle_invalidation_after_reset(const camada::SMTSolverRef &solver) {
   auto sort = solver->mkBVSort(8);

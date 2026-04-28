@@ -22,18 +22,33 @@
 #ifndef CAMADA_H_
 #define CAMADA_H_
 
-#include <cassert>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "camadacommon.h"
 #include "camadaexpr.h"
-#include "camadafp.h"
 #include "camadasort.h"
 
 namespace camada {
+
+enum class FPEncoding { Native, BV };
+
+enum class FPNegBehavior {
+  FlipSignBit,
+  // Follows SMT-LIB FP semantics: fp.neg leaves NaNs unchanged.
+  PreserveNaNPayload,
+};
+
+enum class RM {
+  ROUND_TO_EVEN = 0,
+  ROUND_TO_AWAY = 1,
+  ROUND_TO_PLUS_INF = 2,
+  ROUND_TO_MINUS_INF = 3,
+  ROUND_TO_ZERO = 4,
+};
 
 /// Return camada version
 std::string getCamadaVersion();
@@ -86,17 +101,17 @@ public:
   explicit operator bool() const noexcept { return HasValue_; }
 
   const T &value() const {
-    assert(HasValue_);
+    fatalErrorIf(!HasValue_, "Accessing value of failed SMTResult");
     return Value_;
   }
 
   T &value() {
-    assert(HasValue_);
+    fatalErrorIf(!HasValue_, "Accessing value of failed SMTResult");
     return Value_;
   }
 
   const SMTError &error() const {
-    assert(!HasValue_);
+    fatalErrorIf(HasValue_, "Accessing error of successful SMTResult");
     return Error_;
   }
 
@@ -110,6 +125,18 @@ private:
 ///
 /// This class is responsible for wrapping all sorts and expression generation,
 /// through the mk* methods.
+///
+/// Threading contract:
+///   * An SMTSolver instance is NOT thread-safe. All mutating and querying
+///     methods (mk*, addConstraint, push/pop, check, get*, reset, dump...)
+///     must be serialized by the caller; a single solver is intended for use
+///     from one thread at a time. Concurrent solving should be done with one
+///     solver per thread.
+///   * SMTExprRef and SMTSortRef handles are nullable, copyable, and safe to
+///     read concurrently from any thread as long as the owning solver
+///     outlives the read. The handle's liveness check is race-free against
+///     reset()/destruction on another thread: a stale handle deterministically
+///     aborts via fatalError() rather than reading freed memory.
 class SMTSolver {
 public:
   SMTSolver() = default;

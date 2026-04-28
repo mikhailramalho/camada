@@ -21,7 +21,6 @@
 
 #include "camada.h"
 #include "ac_config.h"
-#include "camadaerror.h"
 
 #if SOLVER_Z3_ENABLED
 #include "z3solver.h"

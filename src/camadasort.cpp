@@ -20,9 +20,8 @@
  **************************************************************************/
 
 #include "camadasort.h"
-#include "camadaerror.h"
+#include "camadacommon.h"
 
-#include <cassert>
 #include <cstdio>
 #include <string>
 #include <type_traits>
@@ -119,9 +118,9 @@ void SMTSort::dump(std::string &Out) const {
       Data);
 }
 
-unsigned SMTSort::getWidth() const {
-  assert(
-      !isArraySort() && !isFunctionSort() && !isTupleSort() && !isArithSort() &&
+unsigned SMTSort::getStoredWidth() const {
+  fatalErrorIf(
+      isArraySort() || isFunctionSort() || isTupleSort() || isArithSort(),
       "Width is not defined for array, function, tuple, or arithmetic sorts");
   if (isFPSort())
     return std::get<FPSortData>(Data).Width;
@@ -129,45 +128,55 @@ unsigned SMTSort::getWidth() const {
   return std::get<ScalarSortData>(Data).Width;
 }
 
+unsigned SMTSort::getWidth() const {
+  if (SolverWidth == 0) {
+    SolverWidth = getWidthFromSolver();
+    fatalErrorIf(SolverWidth != getStoredWidth(),
+                 "Solver sort width does not match stored sort width");
+  }
+
+  return SolverWidth;
+}
+
 unsigned SMTSort::getWidthFromSolver() const {
-  fatalError("Unimplemented for current type");
+  unsupportedFeature("Unimplemented for current type");
 }
 
 unsigned SMTSort::getFPSignificandWidth() const {
-  assert(isFPSort() && "Significand width is only defined for FP sorts");
+  fatalErrorIf(!isFPSort(), "Significand width is only defined for FP sorts");
   return std::get<FPSortData>(Data).SigWidth;
 }
 
 unsigned SMTSort::getFPExponentWidth() const {
-  assert(isFPSort() && "Exponent width is only defined for FP sorts");
+  fatalErrorIf(!isFPSort(), "Exponent width is only defined for FP sorts");
   return std::get<FPSortData>(Data).ExpWidth;
 }
 
 SMTSortRef SMTSort::getIndexSort() const {
-  assert(isArraySort() && "Index sort is only defined for array sorts");
+  fatalErrorIf(!isArraySort(), "Index sort is only defined for array sorts");
   return std::get<ArraySortData>(Data).IndexSort;
 }
 
 SMTSortRef SMTSort::getElementSort() const {
-  assert(isArraySort() && "Element sort is only defined for array sorts");
+  fatalErrorIf(!isArraySort(), "Element sort is only defined for array sorts");
   return std::get<ArraySortData>(Data).ElementSort;
 }
 
 const std::vector<SMTSortRef> &SMTSort::getDomainSorts() const {
-  assert(isFunctionSort() &&
-         "Domain sorts are only defined for function sorts");
+  fatalErrorIf(!isFunctionSort(),
+               "Domain sorts are only defined for function sorts");
   return std::get<FunctionSortData>(Data).DomainSorts;
 }
 
 SMTSortRef SMTSort::getCodomainSort() const {
-  assert(isFunctionSort() &&
-         "Codomain sort is only defined for function sorts");
+  fatalErrorIf(!isFunctionSort(),
+               "Codomain sort is only defined for function sorts");
   return std::get<FunctionSortData>(Data).CodomainSort;
 }
 
 const std::vector<SMTSortRef> &SMTSort::getTupleElementSorts() const {
-  assert(isTupleSort() &&
-         "Tuple element sorts are only defined for tuple sorts");
+  fatalErrorIf(!isTupleSort(),
+               "Tuple element sorts are only defined for tuple sorts");
   return std::get<TupleSortData>(Data).ElementSorts;
 }
 
@@ -176,7 +185,7 @@ bool SMTSort::validateSortWidth() const {
   if (isArraySort() || isFunctionSort() || isTupleSort() || isArithSort())
     return true;
 
-  return getWidthFromSolver() == getWidth();
+  return getWidth() == getStoredWidth();
 }
 
 bool SMTSort::operator==(SMTSort const &Other) const {
@@ -201,12 +210,12 @@ bool SMTSort::operator==(SMTSort const &Other) const {
           return true;
         } else if constexpr (std::is_same_v<T, ScalarSortData>) {
           return ThisData.Width == OtherData.Width &&
-                 getWidthFromSolver() == Other.getWidthFromSolver();
+                 getWidth() == Other.getWidth();
         } else if constexpr (std::is_same_v<T, FPSortData>) {
           return ThisData.Width == OtherData.Width &&
                  ThisData.ExpWidth == OtherData.ExpWidth &&
                  ThisData.SigWidth == OtherData.SigWidth &&
-                 getWidthFromSolver() == Other.getWidthFromSolver();
+                 getWidth() == Other.getWidth();
         } else if constexpr (std::is_same_v<T, ArraySortData>) {
           return ThisData.IndexSort == OtherData.IndexSort &&
                  ThisData.ElementSort == OtherData.ElementSort;

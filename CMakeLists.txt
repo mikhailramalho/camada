@@ -115,7 +115,7 @@ include(OptimizationCCache)
 option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 
 option(ENABLE_WARNINGS
-       "Enable -Wall, -Wextra, and -pedantic when compiling (default: OFF)" OFF)
+       "Enable -Wall, -Wextra, and -pedantic when compiling (default: ON)" ON)
 if(ENABLE_WARNINGS)
   add_definitions(-Wall -Wextra -pedantic)
 endif()

@@ -264,10 +264,8 @@ protected:
 
   std::string getSolverNameAndVersion() const override;
 
-  void dumpImpl() override;
   void dumpImpl(std::string &Out) override;
 
-  void dumpModelImpl() override;
   void dumpModelImpl(std::string &Out) override;
 
 protected:
@@ -279,7 +277,6 @@ private:
   void releaseSymbolNames();
 
   YicesContextRef Context = nullptr;
-  unsigned int ConstArrayCounter = 0;
   std::vector<std::string> NamedSymbols;
 
 }; // namespace camada

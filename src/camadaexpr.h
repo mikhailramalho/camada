@@ -27,7 +27,6 @@
 namespace camada {
 
 class SMTExpr;
-class SMTSolverImpl;
 
 enum class SMTExprKind {
   Unknown,
@@ -128,43 +127,34 @@ enum class SMTExprKind {
   IEEEFPToBV,
 };
 
-class SMTExprRef {
+/// Diagnostic strings used by the shared handle base for expression handles.
+struct SMTExprRefTraits {
+  static constexpr const char *nullMessage() {
+    return "Dereferencing null expression handle";
+  }
+  static constexpr const char *movedFromMessage() {
+    return "Dereferencing moved-from expression handle";
+  }
+  static constexpr const char *staleMessage() {
+    return "Dereferencing stale expression handle (solver was reset or "
+           "destroyed)";
+  }
+};
+
+/// Public handle for a solver-owned expression.
+///
+/// The handle is nullable by default and does not own the expression.
+/// Dereferencing a null, moved-from, or stale handle aborts through
+/// fatalError(). Only solver internals may construct live handles; public code
+/// receives them from factory methods such as SMTSolver::mkSymbol().
+class SMTExprRef : public SMTRefBase<SMTExpr, SMTExprRefTraits> {
 public:
   SMTExprRef() = default;
 
-  const SMTExpr *get() const {
-    validate();
-    return Ptr;
-  }
-
-  const SMTExpr &operator*() const { return *get(); }
-
-  const SMTExpr *operator->() const { return get(); }
-
-  explicit operator bool() const { return isValid(); }
-
-  bool isValid() const {
-    return Ptr != nullptr && State && State->Generation == Generation;
-  }
-
 private:
-  const SMTExpr *Ptr = nullptr;
-  std::shared_ptr<const SMTHandleState> State;
-  uint64_t Generation = 0;
+  /// Inherit the live-handle constructor privately so only friends can call it.
+  using SMTRefBase<SMTExpr, SMTExprRefTraits>::SMTRefBase;
 
-  SMTExprRef(const SMTExpr *ThePtr,
-             std::shared_ptr<const SMTHandleState> TheState,
-             uint64_t TheGeneration)
-      : Ptr(ThePtr), State(std::move(TheState)), Generation(TheGeneration) {}
-
-  void validate() const {
-    assert(Ptr && "Dereferencing null expression handle");
-    assert(State && "Dereferencing expression handle after solver destruction");
-    assert(State->Generation == Generation &&
-           "Dereferencing stale expression handle after solver reset");
-  }
-
-  friend class SMTSolver;
   friend class SMTSolverImpl;
 };
 
