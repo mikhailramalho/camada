@@ -77,9 +77,9 @@ TEST_CASE("SMTLIB write-only emits a minimal script", "[SMTLIB]") {
   } // Solver dtor flushes via FileEmitter dtor.
 
   const std::string Expected = "(set-option :print-success false)\n"
-                               "(set-option :global-declarations true)\n"
+                               "(set-option :produce-models true)\n"
                                "(set-info :status unknown)\n"
-                               "(set-logic ALL)\n"
+                               "(set-logic QF_AUFBV)\n"
                                "(declare-fun |x| () (_ BitVec 8))\n"
                                "(assert (= |x| #b00000101))\n"
                                "(check-sat)\n";
@@ -222,25 +222,37 @@ TEST_CASE("SMTLIB write-only emits 32-bit -1 literal as 32 ones", "[SMTLIB]") {
 }
 
 // ---------------------------------------------------------------------------
-// End-to-end pipeline tests
+// Phase 2: interactive child-process pipe
 //
-// Phase 1 acceptance gate: emitted SMT-LIB must be syntactically valid. The
-// cleanest way to assert this is to run the script through a real solver and
-// check the result matches what Camada's native Z3 backend says. We use Z3
-// because it's already on PATH for the build (deps download stages it under
-// build/deps/install/bin/z3), or we fall back to whatever is on PATH.
+// SMTLIBSolver constructed with the SMTLIBProcessTag spawns a child solver
+// via `sh -c <cmd>` and round-trips check()/get* through bidirectional pipes.
+// Camada's verified solver matrix at the time of writing: z3, cvc5, bitwuzla,
+// yices-smt2, mathsat. Each test below is parameterized over every binary
+// actually found on disk; tests gracefully SKIP when no usable binary is
+// available.
 // ---------------------------------------------------------------------------
+
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
 namespace {
 
-// Find a usable z3 binary. Returns empty string if none.
-std::string findZ3() {
-#ifdef CAMADA_TEST_Z3_BIN
-  if (::access(CAMADA_TEST_Z3_BIN, X_OK) == 0)
-    return CAMADA_TEST_Z3_BIN;
-#endif
-  // Fall back to PATH lookup via popen("which z3").
-  if (FILE *P = ::popen("command -v z3", "r")) {
+struct SolverDescriptor {
+  std::string Name;    // human-readable, e.g. "z3"
+  std::string Command; // shell-ready: full path + flags
+};
+
+bool isExecutable(const std::string &Path) {
+  return ::access(Path.c_str(), X_OK) == 0;
+}
+
+// Try the compile-time hint (CAMADA_TEST_<NAME>_BIN), falling back to the
+// system PATH. Returns empty string if neither resolves to an executable.
+std::string findInPath(const std::string &Name, const char *HintBin) {
+  if (HintBin && isExecutable(HintBin))
+    return HintBin;
+  std::string Cmd = "command -v " + Name;
+  if (FILE *P = ::popen(Cmd.c_str(), "r")) {
     char Buf[4096];
     std::string Out;
     while (std::fgets(Buf, sizeof(Buf), P))
@@ -248,170 +260,200 @@ std::string findZ3() {
     ::pclose(P);
     while (!Out.empty() && (Out.back() == '\n' || Out.back() == '\r'))
       Out.pop_back();
-    if (!Out.empty() && ::access(Out.c_str(), X_OK) == 0)
+    if (!Out.empty() && isExecutable(Out))
       return Out;
   }
   return {};
 }
 
-// Run `z3 -smt2 <Path>` and return the first whitespace-trimmed line of
-// stdout. Empty string means z3 didn't produce a parseable answer.
-std::string runZ3OnFile(const std::string &Z3, const std::string &Path) {
-  std::string Cmd = Z3 + " -smt2 " + Path + " 2>&1";
-  FILE *P = ::popen(Cmd.c_str(), "r");
-  if (!P)
-    return {};
-  char Buf[4096];
-  std::string Out;
-  while (std::fgets(Buf, sizeof(Buf), P))
-    Out.append(Buf);
-  ::pclose(P);
-  // Take the first non-empty line.
-  std::stringstream Ss(Out);
-  std::string Line;
-  while (std::getline(Ss, Line)) {
-    while (!Line.empty() && (Line.back() == '\r' || Line.back() == ' '))
-      Line.pop_back();
-    if (!Line.empty())
-      return Line;
-  }
-  return {};
+// Discover every SMT-LIB-speaking solver this build can reach. Each entry's
+// command is ready to be passed to camada::createSMTLIBSolver().
+std::vector<SolverDescriptor> discoverSolvers() {
+  std::vector<SolverDescriptor> Result;
+#ifdef CAMADA_TEST_Z3_BIN
+  if (std::string Bin = findInPath("z3", CAMADA_TEST_Z3_BIN); !Bin.empty())
+    Result.push_back({"z3", Bin + " -in"});
+#else
+  if (std::string Bin = findInPath("z3", nullptr); !Bin.empty())
+    Result.push_back({"z3", Bin + " -in"});
+#endif
+#ifdef CAMADA_TEST_CVC5_BIN
+  if (std::string Bin = findInPath("cvc5", CAMADA_TEST_CVC5_BIN); !Bin.empty())
+    Result.push_back({"cvc5", Bin + " --lang smt2 --incremental"});
+#else
+  if (std::string Bin = findInPath("cvc5", nullptr); !Bin.empty())
+    Result.push_back({"cvc5", Bin + " --lang smt2 --incremental"});
+#endif
+#ifdef CAMADA_TEST_BITWUZLA_BIN
+  if (std::string Bin = findInPath("bitwuzla", CAMADA_TEST_BITWUZLA_BIN);
+      !Bin.empty())
+    Result.push_back({"bitwuzla", Bin});
+#else
+  if (std::string Bin = findInPath("bitwuzla", nullptr); !Bin.empty())
+    Result.push_back({"bitwuzla", Bin});
+#endif
+#ifdef CAMADA_TEST_YICES_SMT2_BIN
+  if (std::string Bin = findInPath("yices-smt2", CAMADA_TEST_YICES_SMT2_BIN);
+      !Bin.empty())
+    Result.push_back({"yices-smt2", Bin + " --incremental"});
+#else
+  if (std::string Bin = findInPath("yices-smt2", nullptr); !Bin.empty())
+    Result.push_back({"yices-smt2", Bin + " --incremental"});
+#endif
+#ifdef CAMADA_TEST_MATHSAT_BIN
+  if (std::string Bin = findInPath("mathsat", CAMADA_TEST_MATHSAT_BIN);
+      !Bin.empty())
+    Result.push_back({"mathsat", Bin});
+#else
+  if (std::string Bin = findInPath("mathsat", nullptr); !Bin.empty())
+    Result.push_back({"mathsat", Bin});
+#endif
+  // STP is intentionally absent: its interactive SMT-LIB front-end has two
+  // structural issues that the verified matrix can't paper over —
+  // (get-value ...) returns junk unless `-p` is passed, and `-p` causes STP
+  // to emit an unsolicited `(model ...)` block after every `(check-sat)`,
+  // which desyncs the line-oriented response pipe. Camada still supports STP
+  // through its native C-API backend (camada::createSTPSolver()).
+  return Result;
+}
+
+const std::vector<SolverDescriptor> &availableSolvers() {
+  static const std::vector<SolverDescriptor> Solvers = discoverSolvers();
+  return Solvers;
 }
 
 } // namespace
 
-// Cross-validates the SMTLIBSolver-emitted script against the native Z3
-// backend. Skipped when the library was built without Z3 support — the rest
-// of the pipeline tests (unsat, BV-mix, push/pop) don't use Z3Solver and
-// keep running unconditionally as long as a z3 binary is present.
-#ifdef SOLVER_Z3_ENABLED
-TEST_CASE("SMTLIB pipeline: SAT problem matches z3 -in", "[SMTLIB][pipeline]") {
-  const std::string Z3 = findZ3();
-  if (Z3.empty())
-    SKIP("No z3 binary found on PATH or in deps install dir");
+// Test-helper macro: pull a SolverDescriptor for the current iteration, or
+// SKIP the case if no solver is reachable. Catch2's GENERATE_REF requires the
+// vector to outlive the test (the static cache from availableSolvers()
+// satisfies that).
+#define CAMADA_SMTLIB_FOREACH_SOLVER(VarName)                                  \
+  if (availableSolvers().empty())                                              \
+    SKIP("No SMT-LIB-speaking solver found on PATH or in deps install dir");   \
+  auto VarName = GENERATE_REF(Catch::Generators::from_range(availableSolvers()))
 
-  // Native check via Z3Solver, for cross-validation.
-  auto Native = camada::createZ3Solver();
-  auto BV8 = Native->mkBVSort(8);
-  auto X = Native->mkSymbol("x", BV8);
-  auto Five = Native->mkBVFromDec(5, BV8);
-  Native->addConstraint(Native->mkEqual(X, Five));
-  auto NativeResult = Native->check();
-  REQUIRE(NativeResult == camada::checkResult::SAT);
-
-  // Same problem through SMTLIBSolver to a temp file.
-  std::string Path = makeTempPath();
-  {
-    auto Solver = std::make_unique<camada::SMTLIBSolver>(Path);
-    auto SBV8 = Solver->mkBVSort(8);
-    auto SX = Solver->mkSymbol("x", SBV8);
-    auto SFive = Solver->mkBVFromDec(5, SBV8);
-    Solver->addConstraint(Solver->mkEqual(SX, SFive));
-    Solver->check();
-  }
-
-  std::string Z3Says = runZ3OnFile(Z3, Path);
-  std::remove(Path.c_str());
-
-  REQUIRE(Z3Says == "sat");
-}
-#endif // SOLVER_Z3_ENABLED
-
-TEST_CASE("SMTLIB pipeline: UNSAT problem matches z3 -in",
+TEST_CASE("SMTLIB interactive: public factory works against every solver",
           "[SMTLIB][pipeline]") {
-  const std::string Z3 = findZ3();
-  if (Z3.empty())
-    SKIP("No z3 binary found on PATH or in deps install dir");
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  auto Solver = camada::createSMTLIBSolver(S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto X = Solver->mkSymbol("x", BV8);
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(1, BV8)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+}
+
+TEST_CASE("SMTLIB interactive: dual emitter logs to file too",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
 
   std::string Path = makeTempPath();
   {
-    auto Solver = std::make_unique<camada::SMTLIBSolver>(Path);
+    auto Solver = camada::createSMTLIBSolver(S.Command, Path);
     auto BV8 = Solver->mkBVSort(8);
     auto X = Solver->mkSymbol("x", BV8);
-    Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(5, BV8)));
-    Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(7, BV8)));
-    Solver->check();
+    Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(3, BV8)));
+    REQUIRE(Solver->check() == camada::checkResult::SAT);
   }
-
-  std::string Z3Says = runZ3OnFile(Z3, Path);
+  std::string Got = readFile(Path);
   std::remove(Path.c_str());
 
-  REQUIRE(Z3Says == "unsat");
+  // The script should contain the declarations and the assertion.
+  REQUIRE(Got.find("(declare-fun |x| () (_ BitVec 8))\n") != std::string::npos);
+  REQUIRE(Got.find("(assert (= |x| #b00000011))\n") != std::string::npos);
+  REQUIRE(Got.find("(check-sat)\n") != std::string::npos);
 }
 
-TEST_CASE("SMTLIB pipeline: BV ops mix matches z3 -in", "[SMTLIB][pipeline]") {
-  const std::string Z3 = findZ3();
-  if (Z3.empty())
-    SKIP("No z3 binary found on PATH or in deps install dir");
-
-  std::string Path = makeTempPath();
-  {
-    auto Solver = std::make_unique<camada::SMTLIBSolver>(Path);
-    auto BV32 = Solver->mkBVSort(32);
-    auto X = Solver->mkSymbol("x", BV32);
-    auto Y = Solver->mkSymbol("y", BV32);
-    auto Sum = Solver->mkBVAdd(X, Y);
-    auto Diff = Solver->mkBVSub(X, Y);
-    auto Three = Solver->mkBVFromDec(3, BV32);
-    auto One = Solver->mkBVFromDec(1, BV32);
-    // x + y = 3 AND x - y = 1  =>  x = 2, y = 1
-    Solver->addConstraint(Solver->mkEqual(Sum, Three));
-    Solver->addConstraint(Solver->mkEqual(Diff, One));
-    Solver->check();
-  }
-
-  std::string Z3Says = runZ3OnFile(Z3, Path);
-  std::remove(Path.c_str());
-
-  REQUIRE(Z3Says == "sat");
-}
-
-TEST_CASE("SMTLIB pipeline: push/pop scoping matches z3 -in",
+TEST_CASE("SMTLIB interactive: SAT problem returns SAT from check()",
           "[SMTLIB][pipeline]") {
-  const std::string Z3 = findZ3();
-  if (Z3.empty())
-    SKIP("No z3 binary found on PATH or in deps install dir");
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
 
-  std::string Path = makeTempPath();
-  {
-    auto Solver = std::make_unique<camada::SMTLIBSolver>(Path);
-    auto BV8 = Solver->mkBVSort(8);
-    auto X = Solver->mkSymbol("x", BV8);
-    auto Five = Solver->mkBVFromDec(5, BV8);
-    auto Seven = Solver->mkBVFromDec(7, BV8);
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto X = Solver->mkSymbol("x", BV8);
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(5, BV8)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+}
 
-    Solver->addConstraint(Solver->mkEqual(X, Five));
-    Solver->check(); // expected sat
+TEST_CASE("SMTLIB interactive: UNSAT problem returns UNSAT from check()",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
 
-    Solver->push();
-    Solver->addConstraint(Solver->mkEqual(X, Seven));
-    Solver->check(); // expected unsat (x = 5 AND x = 7)
-    Solver->pop();
-    Solver->check(); // expected sat again
-  }
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto X = Solver->mkSymbol("x", BV8);
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(5, BV8)));
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(7, BV8)));
+  REQUIRE(Solver->check() == camada::checkResult::UNSAT);
+}
 
-  std::string Cmd = Z3 + " -smt2 " + Path + " 2>&1";
-  FILE *P = ::popen(Cmd.c_str(), "r");
-  REQUIRE(P != nullptr);
-  char Buf[4096];
-  std::string Out;
-  while (std::fgets(Buf, sizeof(Buf), P))
-    Out.append(Buf);
-  ::pclose(P);
-  std::remove(Path.c_str());
+TEST_CASE("SMTLIB interactive: getBV round-trips a concrete value",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
 
-  // Expect three lines: sat, unsat, sat (in that order).
-  std::stringstream Ss(Out);
-  std::vector<std::string> Lines;
-  std::string Line;
-  while (std::getline(Ss, Line)) {
-    while (!Line.empty() && (Line.back() == '\r' || Line.back() == ' '))
-      Line.pop_back();
-    if (!Line.empty())
-      Lines.push_back(Line);
-  }
-  REQUIRE(Lines.size() == 3);
-  REQUIRE(Lines[0] == "sat");
-  REQUIRE(Lines[1] == "unsat");
-  REQUIRE(Lines[2] == "sat");
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto X = Solver->mkSymbol("x", BV8);
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(42, BV8)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getBV(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == 42);
+}
+
+TEST_CASE("SMTLIB interactive: getBV round-trips a 1-bit value",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV1 = Solver->mkBVSort(1);
+  auto B = Solver->mkSymbol("b", BV1);
+  Solver->addConstraint(Solver->mkEqual(B, Solver->mkBVFromBin("1", 1)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  // 1-bit BV with the high (and only) bit set is -1 in two's complement,
+  // which is what Camada's getBV() returns (signed interpretation).
+  auto Result = Solver->getBV(B);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == -1);
+
+  // The unsigned/binary form should be exactly "1".
+  auto Bin = Solver->getBVInBin(B);
+  REQUIRE(Bin);
+  REQUIRE(Bin.value() == "1");
+}
+
+TEST_CASE("SMTLIB interactive: push/pop returns sat/unsat/sat from check()",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto X = Solver->mkSymbol("x", BV8);
+  auto Five = Solver->mkBVFromDec(5, BV8);
+  auto Seven = Solver->mkBVFromDec(7, BV8);
+
+  Solver->addConstraint(Solver->mkEqual(X, Five));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  Solver->push();
+  Solver->addConstraint(Solver->mkEqual(X, Seven));
+  REQUIRE(Solver->check() == camada::checkResult::UNSAT);
+  Solver->pop();
+
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
 }

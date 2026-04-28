@@ -667,6 +667,23 @@ SMTSolverRef createYicesSolver();
 /// Convenience method to create a STPSolver object
 SMTSolverRef createSTPSolver();
 
+/// Create an SMT-LIB-backed solver that drives an external solver process.
+///
+/// Cmd is passed to `sh -c`, so any shell-friendly invocation works:
+///   - "z3 -in"
+///   - "cvc5 --lang smt2"
+///   - "/path/to/solver --some-flags"
+///
+/// The child must speak standard SMT-LIB on stdin/stdout. Camada speaks
+/// `(set-option :print-success true)` to it at startup, so any solver that
+/// honors that contract works.
+SMTSolverRef createSMTLIBSolver(const std::string &Cmd);
+
+/// Same as `createSMTLIBSolver(Cmd)` but also tees the emitted SMT-LIB script
+/// to OutputPath (or stdout if OutputPath is "-") for offline reproduction.
+SMTSolverRef createSMTLIBSolver(const std::string &Cmd,
+                                const std::string &OutputPath);
+
 } // namespace camada
 
 #endif

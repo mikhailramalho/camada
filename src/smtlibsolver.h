@@ -94,8 +94,11 @@ private:
 
 /// Drives an external SMT-LIB-speaking solver via stdin/stdout pipes.
 ///
-/// Phase 2 only. Phase 1 ships this class as a stub — every method throws to
-/// keep the API signatures stable while bodies are deferred.
+/// Spawns the child via `sh -c <cmd>`, so callers can pass shell-friendly
+/// commands like `z3 -in` or `cvc5 --lang smt2`. The constructor sends
+/// `(set-option :print-success true)` at startup so every non-query command
+/// produces a `success`/`error` response, which gives a deterministic way to
+/// resynchronize with the child after each emitted line.
 class ProcessEmitter {
 public:
   explicit ProcessEmitter(const std::string &Cmd);
@@ -103,24 +106,61 @@ public:
   ProcessEmitter &operator=(const ProcessEmitter &) = delete;
   ~ProcessEmitter() noexcept;
 
+  /// Write a chunk of SMT-LIB text to the child's stdin. The caller is
+  /// responsible for terminating each command with a newline.
   void emitRaw(const std::string &Text) const;
+
+  /// Flush the write side. Must be called before reading a response.
   void flush() const;
+
+  /// Read one SMT-LIB response from the child. Returns the text with leading
+  /// and trailing whitespace trimmed. Handles three shapes:
+  ///   - bare token: `success`, `sat`, `unsat`, `unknown`
+  ///   - parenthesized: `((<symbol> <value>))`
+  ///   - error: `(error "...")`
   std::string readResponse() const;
 
-  bool isOpen() const;
+  bool isOpen() const { return Out != nullptr; }
+
+private:
+  std::FILE *In = nullptr;  // read side: child's stdout
+  std::FILE *Out = nullptr; // write side: child's stdin
+  long Pid = -1;            // typed as long to avoid leaking <sys/types.h>
+  void *OldSigpipeHandler = nullptr;
 };
+
+/// Tag type used to disambiguate the SMTLIBSolver constructor that spawns a
+/// child solver process from the one that writes to a file.
+struct SMTLIBProcessTag {};
 
 /// Camada backend that emits SMT-LIB instead of calling a native solver.
 ///
-/// Phase 1: write-only — the constructor takes an output path; check() and
-/// model queries error out. There is no public createSMTLIBSolver() factory
-/// in camada.h. Tests construct SMTLIBSolver directly.
+/// Two construction modes:
+///
+///   - Write-only (Phase 1): the script is appended to a file (or stdout if
+///     the path is "-"). check() emits `(check-sat)` and returns UNKNOWN;
+///     get* queries return UnsupportedOperation errors.
+///
+///   - Interactive (Phase 2): a child solver process is spawned via
+///     `sh -c <cmd>`. check() sends `(check-sat)` and reads sat/unsat/unknown
+///     back. The interactive mode also supports an optional output path to
+///     log the same script to disk for offline reproduction.
 class SMTLIBSolver : public SMTSolverImpl {
 public:
-  /// Phase 1 constructor: write the emitted SMT-LIB script to OutputPath.
-  /// Pass "-" for stdout. The instance is write-only; check() and model
-  /// queries will abort.
+  /// Write-only constructor: write the emitted SMT-LIB script to OutputPath.
+  /// Pass "-" for stdout. check() returns UNKNOWN; get* queries error.
   explicit SMTLIBSolver(const std::string &OutputPath);
+
+  /// Interactive constructor: spawn a child solver via `sh -c <Cmd>`. The
+  /// solver must speak standard SMT-LIB on stdin/stdout (z3, cvc5, etc.).
+  /// check() and get* queries round-trip through the child.
+  SMTLIBSolver(SMTLIBProcessTag, const std::string &Cmd);
+
+  /// Combined constructor: spawn a child solver *and* log the script to a
+  /// file. Useful when you want both an interactive answer and a reproducer
+  /// to hand to another tool.
+  SMTLIBSolver(SMTLIBProcessTag, const std::string &Cmd,
+               const std::string &OutputPath);
 
   ~SMTLIBSolver() override;
 
@@ -220,6 +260,7 @@ private:
   void emitPreamble();
 
   std::unique_ptr<FileEmitter> File;
+  std::unique_ptr<ProcessEmitter> Proc;
 
   // Counter for fresh let-bound names (?x0, ?x1, ...). Phase 1 does not
   // currently emit lets — the printer is straight-line — but the counter

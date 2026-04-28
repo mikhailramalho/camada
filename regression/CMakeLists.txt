@@ -42,12 +42,47 @@ add_executable(${REGRESSION_TARGET_NAME} main.cpp smtlib.test.cpp
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME}
                                                         Catch2::Catch2)
 
-# Hint for the SMT-LIB pipeline test: prefer the locally-staged z3 binary if
-# Camada's dependency download produced one, otherwise fall back to PATH.
+# Hints for the SMT-LIB pipeline tests: prefer locally-staged solver binaries if
+# Camada's dependency download produced them. The pipeline tests are
+# parameterized over every binary that's actually on disk, falling back to PATH
+# for missing ones. Each macro is defined only when the binary is present; the
+# test code uses #ifdef to discover them.
 if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/z3")
   target_compile_definitions(
     ${REGRESSION_TARGET_NAME}
     PRIVATE "CAMADA_TEST_Z3_BIN=\"${CAMADA_DEPS_INSTALL_DIR}/bin/z3\"")
+endif()
+if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/cvc5")
+  target_compile_definitions(
+    ${REGRESSION_TARGET_NAME}
+    PRIVATE "CAMADA_TEST_CVC5_BIN=\"${CAMADA_DEPS_INSTALL_DIR}/bin/cvc5\"")
+endif()
+if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/bitwuzla")
+  target_compile_definitions(
+    ${REGRESSION_TARGET_NAME}
+    PRIVATE
+      "CAMADA_TEST_BITWUZLA_BIN=\"${CAMADA_DEPS_INSTALL_DIR}/bin/bitwuzla\"")
+endif()
+if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/yices-smt2")
+  target_compile_definitions(
+    ${REGRESSION_TARGET_NAME}
+    PRIVATE
+      "CAMADA_TEST_YICES_SMT2_BIN=\"${CAMADA_DEPS_INSTALL_DIR}/bin/yices-smt2\""
+  )
+endif()
+
+# MathSAT ships a binary inside its vendor archive but does not stage it into
+# ${CAMADA_DEPS_INSTALL_DIR}/bin. Search the unpacked source tree for any
+# mathsat-*/bin/mathsat. CONFIGURE_DEPENDS makes CMake re-evaluate the glob on
+# every build so a dep version bump (e.g. 5.6.15 -> 5.6.16) is picked up without
+# needing to manually re-run `cmake -S . -B build`.
+file(GLOB CAMADA_MATHSAT_BIN_CANDIDATES CONFIGURE_DEPENDS
+     "${CAMADA_DEPS_SRC_DIR}/mathsat-*/bin/mathsat")
+if(CAMADA_MATHSAT_BIN_CANDIDATES)
+  list(GET CAMADA_MATHSAT_BIN_CANDIDATES 0 CAMADA_MATHSAT_BIN_PATH)
+  target_compile_definitions(
+    ${REGRESSION_TARGET_NAME}
+    PRIVATE "CAMADA_TEST_MATHSAT_BIN=\"${CAMADA_MATHSAT_BIN_PATH}\"")
 endif()
 
 add_executable(${BENCH_TARGET_NAME} bench/main.cpp)
