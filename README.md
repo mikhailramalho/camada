@@ -98,7 +98,7 @@ When CMake downloads dependencies itself:
 - `Yices` uses a source build.
 - `GMP` uses a source build when it is needed by downloaded dependencies and no
   suitable staged copy is already available.
-- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.15`.
+- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.16`.
 - `STP` still falls back to a source build. The `2.3.4_cadical` GitHub release
   only ships a standalone `stp` executable, not the headers and libraries that
   Camada needs to link against the STP C++ API.

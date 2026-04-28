@@ -70,19 +70,19 @@ set(CAMADA_BITWUZLA_MACOS_ARM64_URL
     CACHE STRING
           "URL used to download the prebuilt Bitwuzla archive for macOS arm64")
 set(CAMADA_MATHSAT_VERSION
-    "5.6.15"
+    "5.6.16"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
 set(CAMADA_MATHSAT_LINUX_X86_64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.15-linux-x86_64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.16-linux-x86_64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux x86_64")
 set(CAMADA_MATHSAT_LINUX_AARCH64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.15-linux-aarch64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.16-linux-aarch64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux aarch64")
 set(CAMADA_MATHSAT_MACOS_X86_64_URL
-    "https://mathsat.fbk.eu/download.php?file=mathsat-5.6.15-osx.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.16-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS x86_64")
 set(CAMADA_MATHSAT_MACOS_ARM64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.15-macos.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.16-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS arm64")
 
 function(camada_ensure_deps_dirs)
@@ -435,10 +435,10 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
           "${CAMADA_MATHSAT_MACOS_X86_64_URL}"
           PARENT_SCOPE)
       set(${output_archive_var}
-          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-osx.tar.gz"
+          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-macos.tar.gz"
           PARENT_SCOPE)
       set(${output_source_dir_var}
-          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-osx"
+          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-macos"
           PARENT_SCOPE)
       return()
     endif()
