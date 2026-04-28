@@ -360,11 +360,13 @@ void SMTLIBSolver::emitPreamble() {
   // matrix accept this option.
   emitLine("(set-option :global-declarations true)");
   emitLine("(set-info :status unknown)");
-  // Phase 2 only emits BV/Bool/arrays, so QF_AUFBV is the tightest fit and is
-  // the broadest logic STP accepts. Phase 3 (FP/Int/Real) will need to revisit
-  // — STP would drop out of the matrix at that point, since it is BV/arrays
-  // only.
-  emitLine("(set-logic QF_AUFBV)");
+  // ALL covers BV/Bool/arrays/FP/Int/Real, which is everything Phase 3
+  // exercises. Children that don't support a particular sort will reject the
+  // first command that uses it (yices-smt2 has no FP, for example). Callers
+  // who want a portable script across heterogeneous solvers should pick
+  // FPEncoding::BV at sort-construction time — that already routes every FP
+  // op through the common-layer bit-blast path.
+  emitLine("(set-logic ALL)");
 }
 
 void SMTLIBSolver::emitLine(const std::string &Text) const {
@@ -431,6 +433,23 @@ SMTSortRef SMTLIBSolver::mkBVFPSortImpl(unsigned ExpWidth, unsigned SigWidth) {
 SMTSortRef SMTLIBSolver::mkBVRMSortImpl() {
   return makeSortRef<SMTLIBSort>(SMTLIBSort(
       SMTSortKind::BVRM, this, "(_ BitVec 3)", SMTSort::ScalarSortData{3}));
+}
+
+// Native FP. Camada's API takes SigWidth excluding the hidden bit (matches the
+// CVC5 backend's convention: mkFPSortImpl(8, 23) → 32-bit FP). SMT-LIB's
+// (_ FloatingPoint eb sb) counts the hidden bit, so we emit sb+1.
+SMTSortRef SMTLIBSolver::mkFPSortImpl(unsigned ExpWidth, unsigned SigWidth) {
+  unsigned Width = ExpWidth + SigWidth + 1;
+  std::string Text =
+      "(_ FloatingPoint " + utoa(ExpWidth) + " " + utoa(SigWidth + 1) + ")";
+  return makeSortRef<SMTLIBSort>(
+      SMTLIBSort(SMTSortKind::FP, this, std::move(Text),
+                 SMTSort::FPSortData{Width, ExpWidth, SigWidth}));
+}
+
+SMTSortRef SMTLIBSolver::mkRMSortImpl() {
+  return makeSortRef<SMTLIBSort>(SMTLIBSort(
+      SMTSortKind::RM, this, "RoundingMode", SMTSort::ScalarSortData{3}));
 }
 
 SMTSortRef SMTLIBSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
@@ -582,6 +601,269 @@ SMTExprRef SMTLIBSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   return makeSMTLIBExpr(SMTExprKind::ArrayConst, Arr,
                         "((as const " + textOf(Arr) + ") " + textOf(InitValue) +
                             ")");
+}
+
+// --- native FP literals + RM ---
+
+// Camada's mkFPFromBin convention: FP is the full IEEE-754 bit string
+// (sign + exponent + trailing-significand-without-hidden-bit). For FP32 that's
+// 32 bits with a 23-bit trailing significand. SMT-LIB's (fp #b<s> #b<e> #b<m>)
+// takes the same three components — the hidden bit is implicit there too.
+SMTExprRef SMTLIBSolver::mkFPFromBinImpl(const std::string &FP,
+                                         unsigned EWidth) {
+  fatalErrorIf(FP.size() <= 1 + EWidth,
+               "SMTLIBSolver: FP literal too short for declared widths");
+  // Camada's mkFPSort(eb, sb) takes the trailing significand width (no hidden
+  // bit), matching the cvc5 backend convention. The FP string is exactly
+  // `1 + EWidth + SigWidth` bits long, so SigWidth = FP.size() - 1 - EWidth.
+  unsigned SigWidth = FP.size() - 1 - EWidth;
+  SMTSortRef Sort = mkFPSort(EWidth, SigWidth, FPEncoding::Native);
+  std::string Sign = FP.substr(0, 1);
+  std::string Exp = FP.substr(1, EWidth);
+  std::string Sig = FP.substr(1 + EWidth);
+  std::string Text = "(fp #b" + Sign + " #b" + Exp + " #b" + Sig + ")";
+  return makeSMTLIBExpr(SMTExprKind::FPConst, Sort, std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkRMImpl(const RM &R) {
+  const char *Name = nullptr;
+  switch (R) {
+  case RM::ROUND_TO_EVEN:
+    Name = "roundNearestTiesToEven";
+    break;
+  case RM::ROUND_TO_AWAY:
+    Name = "roundNearestTiesToAway";
+    break;
+  case RM::ROUND_TO_PLUS_INF:
+    Name = "roundTowardPositive";
+    break;
+  case RM::ROUND_TO_MINUS_INF:
+    Name = "roundTowardNegative";
+    break;
+  case RM::ROUND_TO_ZERO:
+    Name = "roundTowardZero";
+    break;
+  }
+  fatalErrorIf(!Name, "SMTLIBSolver: unknown rounding mode");
+  return makeSMTLIBExpr(SMTExprKind::RMConst, mkRMSort(FPEncoding::Native),
+                        Name);
+}
+
+SMTExprRef SMTLIBSolver::mkNaNImpl(bool Sgn, unsigned ExpWidth,
+                                   unsigned SigWidth) {
+  // (_ NaN eb sb) — sb here includes the hidden bit. Camada's mkNaN passes
+  // SigWidth already including the hidden bit.
+  SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
+  std::string Text = "(_ NaN " + utoa(ExpWidth) + " " + utoa(SigWidth) + ")";
+  // SMT-LIB has no signed-NaN literal — there is exactly one canonical NaN.
+  // Callers that pass Sgn=true get the same value; that matches the cvc5 /
+  // bitwuzla behavior (their NaN literals also ignore the sign).
+  (void)Sgn;
+  return makeSMTLIBExpr(SMTExprKind::FPConst, Sort, std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkInfImpl(bool Sgn, unsigned ExpWidth,
+                                   unsigned SigWidth) {
+  SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
+  std::string Text = std::string("(_ ") + (Sgn ? "-" : "+") + "oo " +
+                     utoa(ExpWidth) + " " + utoa(SigWidth) + ")";
+  return makeSMTLIBExpr(SMTExprKind::FPConst, Sort, std::move(Text));
+}
+
+// --- native FP arithmetic + predicates ---
+
+SMTExprRef SMTLIBSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::FPAbs, Exp->Sort,
+                        "(fp.abs " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPNegImpl(const SMTExprRef &Exp,
+                                     FPNegBehavior /*Behavior*/) {
+  // SMT-LIB fp.neg has PreserveNaNPayload semantics. Other native backends
+  // (cvc5, bitwuzla) also ignore the FPNegBehavior argument here.
+  return makeSMTLIBExpr(SMTExprKind::FPNeg, Exp->Sort,
+                        "(fp.neg " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::FPIsInfinite, mkBoolSort(),
+                        "(fp.isInfinite " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::FPIsNaN, mkBoolSort(),
+                        "(fp.isNaN " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::FPIsDenormal, mkBoolSort(),
+                        "(fp.isSubnormal " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPIsNormalImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::FPIsNormal, mkBoolSort(),
+                        "(fp.isNormal " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::FPIsZero, mkBoolSort(),
+                        "(fp.isZero " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPMulImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS,
+                                     const SMTExprRef &R) {
+  return makeSMTLIBExpr(SMTExprKind::FPMul, LHS->Sort,
+                        "(fp.mul " + textOf(R) + " " + textOf(LHS) + " " +
+                            textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPDivImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS,
+                                     const SMTExprRef &R) {
+  return makeSMTLIBExpr(SMTExprKind::FPDiv, LHS->Sort,
+                        "(fp.div " + textOf(R) + " " + textOf(LHS) + " " +
+                            textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPRemImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::FPRem, LHS->Sort,
+                        "(fp.rem " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPAddImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS,
+                                     const SMTExprRef &R) {
+  return makeSMTLIBExpr(SMTExprKind::FPAdd, LHS->Sort,
+                        "(fp.add " + textOf(R) + " " + textOf(LHS) + " " +
+                            textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPSubImpl(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS,
+                                     const SMTExprRef &R) {
+  return makeSMTLIBExpr(SMTExprKind::FPSub, LHS->Sort,
+                        "(fp.sub " + textOf(R) + " " + textOf(LHS) + " " +
+                            textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
+                                      const SMTExprRef &R) {
+  return makeSMTLIBExpr(SMTExprKind::FPSqrt, Exp->Sort,
+                        "(fp.sqrt " + textOf(R) + " " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
+                                     const SMTExprRef &Z, const SMTExprRef &R) {
+  return makeSMTLIBExpr(SMTExprKind::FPFMA, X->Sort,
+                        "(fp.fma " + textOf(R) + " " + textOf(X) + " " +
+                            textOf(Y) + " " + textOf(Z) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPLtImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::FPLt, mkBoolSort(),
+                        "(fp.lt " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPGtImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::FPGt, mkBoolSort(),
+                        "(fp.gt " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPLeImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::FPLe, mkBoolSort(),
+                        "(fp.leq " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPGeImpl(const SMTExprRef &LHS,
+                                    const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::FPGe, mkBoolSort(),
+                        "(fp.geq " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPEqualImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::FPEqual, mkBoolSort(),
+                        "(fp.eq " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkFPtoFPImpl(const SMTExprRef &From,
+                                      const SMTSortRef &To,
+                                      const SMTExprRef &R) {
+  std::string Text = "((_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
+                     utoa(To->getFPSignificandWidth() + 1) + ") " + textOf(R) +
+                     " " + textOf(From) + ")";
+  return makeSMTLIBExpr(SMTExprKind::FPtoFP, To, std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkSBVtoFPImpl(const SMTExprRef &From,
+                                       const SMTSortRef &To,
+                                       const SMTExprRef &R) {
+  // Same opcode as fp→fp; SMT-LIB disambiguates by argument sort.
+  std::string Text = "((_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
+                     utoa(To->getFPSignificandWidth() + 1) + ") " + textOf(R) +
+                     " " + textOf(From) + ")";
+  return makeSMTLIBExpr(SMTExprKind::SBVtoFP, To, std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkUBVtoFPImpl(const SMTExprRef &From,
+                                       const SMTSortRef &To,
+                                       const SMTExprRef &R) {
+  std::string Text = "((_ to_fp_unsigned " + utoa(To->getFPExponentWidth()) +
+                     " " + utoa(To->getFPSignificandWidth() + 1) + ") " +
+                     textOf(R) + " " + textOf(From) + ")";
+  return makeSMTLIBExpr(SMTExprKind::UBVtoFP, To, std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkFPtoSBVImpl(const SMTExprRef &From,
+                                       unsigned ToWidth) {
+  const SMTExprRef &R = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
+  std::string Text = "((_ fp.to_sbv " + utoa(ToWidth) + ") " + textOf(R) + " " +
+                     textOf(From) + ")";
+  return makeSMTLIBExpr(SMTExprKind::FPtoSBV, mkBVSort(ToWidth),
+                        std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkFPtoUBVImpl(const SMTExprRef &From,
+                                       unsigned ToWidth) {
+  const SMTExprRef &R = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
+  std::string Text = "((_ fp.to_ubv " + utoa(ToWidth) + ") " + textOf(R) + " " +
+                     textOf(From) + ")";
+  return makeSMTLIBExpr(SMTExprKind::FPtoUBV, mkBVSort(ToWidth),
+                        std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
+                                            const SMTExprRef &R) {
+  return makeSMTLIBExpr(SMTExprKind::FPtoIntegral, From->Sort,
+                        "(fp.roundToIntegral " + textOf(R) + " " +
+                            textOf(From) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
+                                          const SMTSortRef &To) {
+  // ((_ to_fp eb sb) bv) form (no rounding mode) reinterprets a same-width BV
+  // as an IEEE FP.
+  std::string Text = "((_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
+                     utoa(To->getFPSignificandWidth() + 1) + ") " +
+                     textOf(Exp) + ")";
+  return makeSMTLIBExpr(SMTExprKind::BVToIEEEFP, To, std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
+  // Same trick as the cvc5 backend: SMT-LIB has no direct fp→bv that
+  // preserves the IEEE bit pattern, so introduce a fresh BV symbol and tie it
+  // back via the inverse direction.
+  const std::string Name = "__CAMADA_ieeebv" + std::to_string(NextIEEEBVId++);
+  SMTSortRef BVSort = mkBVSort(Exp->Sort->getFPExponentWidth() +
+                               Exp->Sort->getFPSignificandWidth() + 1);
+  SMTExprRef NewSymbol = mkSymbol(Name, BVSort);
+  addConstraint(mkEqual(Exp, mkBVToIEEEFP(NewSymbol, Exp->Sort)));
+  return NewSymbol;
 }
 
 // --- write-only model queries / check ---
@@ -755,6 +1037,136 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
   return {};
 }
 
+// Skip ASCII whitespace.
+std::size_t skipWhitespace(const std::string &S, std::size_t I) {
+  while (I < S.size() &&
+         (S[I] == ' ' || S[I] == '\t' || S[I] == '\n' || S[I] == '\r'))
+    ++I;
+  return I;
+}
+
+// Parse a `#b<bits>` or `#x<hex>` token starting at `I`, append `Width` bits
+// to `Out` (left-padded with zeros if the literal is shorter, truncated if
+// longer). Returns the index just past the token, or std::string::npos on
+// failure. Z3 emits some FP components as `#x80` instead of `#b10000000`, so
+// the parser must handle both forms.
+std::size_t parseBVLiteralAppend(const std::string &S, std::size_t I,
+                                 unsigned Width, std::string &Out) {
+  if (I + 1 >= S.size() || S[I] != '#')
+    return std::string::npos;
+  std::string Bits;
+  if (S[I + 1] == 'b') {
+    I += 2;
+    while (I < S.size() && (S[I] == '0' || S[I] == '1'))
+      Bits.push_back(S[I++]);
+  } else if (S[I + 1] == 'x') {
+    I += 2;
+    while (I < S.size()) {
+      char C = S[I];
+      int N = 0;
+      if (C >= '0' && C <= '9')
+        N = C - '0';
+      else if (C >= 'a' && C <= 'f')
+        N = 10 + (C - 'a');
+      else if (C >= 'A' && C <= 'F')
+        N = 10 + (C - 'A');
+      else
+        break;
+      for (int B = 3; B >= 0; --B)
+        Bits.push_back(((N >> B) & 1) ? '1' : '0');
+      ++I;
+    }
+  } else {
+    return std::string::npos;
+  }
+  if (Bits.size() > Width)
+    Bits = Bits.substr(Bits.size() - Width);
+  while (Bits.size() < Width)
+    Bits.insert(Bits.begin(), '0');
+  Out += Bits;
+  return I;
+}
+
+// Convert an SMT-LIB native FP value literal into an IEEE-754 binary string
+// of width `ExpWidth + EncodedSigWidth + 1` (sign + exp + significand without
+// hidden bit). Handles `(fp #b<s> #b<e> #b<m>)` and `(_ {+,-}oo {+,-}zero NaN
+// eb sb)` forms. SigWidth here is the encoded width (already excludes the
+// hidden bit). Returns empty on parse failure.
+std::string fpValueToBinary(const std::string &Value, unsigned ExpWidth,
+                            unsigned SigWidth) {
+  // (fp #b<s> #b<e> #b<m>): concat the three operands. Z3 may emit any of the
+  // three components in #x... hex form when its bit width is a multiple of 4
+  // (e.g. an 8-bit exponent comes back as #x80, not #b10000000).
+  if (Value.size() >= 4 && Value.substr(0, 4) == "(fp ") {
+    std::size_t I = 4;
+    std::string Out;
+    I = skipWhitespace(Value, I);
+    I = parseBVLiteralAppend(Value, I, 1, Out);
+    if (I == std::string::npos)
+      return {};
+    I = skipWhitespace(Value, I);
+    I = parseBVLiteralAppend(Value, I, ExpWidth, Out);
+    if (I == std::string::npos)
+      return {};
+    I = skipWhitespace(Value, I);
+    I = parseBVLiteralAppend(Value, I, SigWidth, Out);
+    if (I == std::string::npos)
+      return {};
+    if (Out.size() != 1 + ExpWidth + SigWidth)
+      return {};
+    return Out;
+  }
+  // (_ +oo eb sb), (_ -oo eb sb), (_ +zero eb sb), (_ -zero eb sb),
+  // (_ NaN eb sb). Total width = 1 + eb + (sb - 1) since sb in this notation
+  // includes the hidden bit.
+  if (Value.size() >= 3 && Value.substr(0, 3) == "(_ ") {
+    std::size_t I = skipWhitespace(Value, 3);
+    std::size_t WordStart = I;
+    while (I < Value.size() && Value[I] != ' ' && Value[I] != ')')
+      ++I;
+    std::string Tag = Value.substr(WordStart, I - WordStart);
+    bool Sign = false;
+    bool IsZero = false;
+    bool IsInf = false;
+    bool IsNaN = false;
+    if (Tag == "+oo") {
+      Sign = false;
+      IsInf = true;
+    } else if (Tag == "-oo") {
+      Sign = true;
+      IsInf = true;
+    } else if (Tag == "+zero") {
+      Sign = false;
+      IsZero = true;
+    } else if (Tag == "-zero") {
+      Sign = true;
+      IsZero = true;
+    } else if (Tag == "NaN") {
+      IsNaN = true;
+    } else {
+      return {};
+    }
+    std::string Bits;
+    Bits.push_back(Sign ? '1' : '0');
+    if (IsZero) {
+      Bits.append(ExpWidth, '0');
+      Bits.append(SigWidth, '0');
+    } else if (IsInf) {
+      Bits.append(ExpWidth, '1');
+      Bits.append(SigWidth, '0');
+    } else if (IsNaN) {
+      Bits.append(ExpWidth, '1');
+      // Canonical NaN: top significand bit set, rest zero. (Camada's signed
+      // NaN convention reads the sign bit as 0.)
+      Bits.push_back('1');
+      if (SigWidth >= 1)
+        Bits.append(SigWidth - 1, '0');
+    }
+    return Bits;
+  }
+  return {};
+}
+
 } // namespace
 
 SMTResult<bool> SMTLIBSolver::getBoolImpl(const SMTExprRef &Exp) {
@@ -793,6 +1205,30 @@ SMTResult<std::string> SMTLIBSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   if (Bits.empty())
     return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
                     "SMTLIBSolver: could not parse BV value: " + Resp};
+  return Bits;
+}
+
+SMTResult<std::string> SMTLIBSolver::getFPInBinImpl(const SMTExprRef &Exp) {
+  // For BV-encoded FP, the base-class default routes through getBVInBin and
+  // works fine. This override is only reached for native FP sorts.
+  if (!Proc)
+    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver write-only mode does not support get*"};
+
+  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
+  if (File)
+    File->emitRaw(Cmd);
+  Proc->emitRaw(Cmd);
+  Proc->flush();
+  std::string Resp = Proc->readResponse();
+  std::string Value = extractValueFromGetValue(Resp);
+
+  unsigned ExpWidth = Exp->Sort->getFPExponentWidth();
+  unsigned SigWidth = Exp->Sort->getFPSignificandWidth(); // excludes hidden bit
+  std::string Bits = fpValueToBinary(Value, ExpWidth, SigWidth);
+  if (Bits.empty())
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver: could not parse FP value: " + Resp};
   return Bits;
 }
 

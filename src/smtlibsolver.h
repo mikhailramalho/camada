@@ -176,6 +176,8 @@ protected:
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
   SMTSortRef mkBVFPSortImpl(unsigned ExpWidth, unsigned SigWidth) override;
   SMTSortRef mkBVRMSortImpl() override;
+  SMTSortRef mkFPSortImpl(unsigned ExpWidth, unsigned SigWidth) override;
+  SMTSortRef mkRMSortImpl() override;
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;
 
@@ -231,9 +233,57 @@ protected:
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 
+  // --- native FP literals + RM ---
+  SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
+  SMTExprRef mkRMImpl(const RM &R) override;
+  SMTExprRef mkNaNImpl(bool Sgn, unsigned ExpWidth, unsigned SigWidth) override;
+  SMTExprRef mkInfImpl(bool Sgn, unsigned ExpWidth, unsigned SigWidth) override;
+
+  // --- native FP arithmetic + predicates ---
+  SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp,
+                         FPNegBehavior Behavior) override;
+  SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+  SMTExprRef mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+  SMTExprRef mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+  SMTExprRef mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+  SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const SMTExprRef &R) override;
+  SMTExprRef mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
+                         const SMTExprRef &Z, const SMTExprRef &R) override;
+  SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                          const SMTExprRef &R) override;
+  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const SMTExprRef &R) override;
+  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const SMTExprRef &R) override;
+  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
+                                const SMTExprRef &R) override;
+  SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
+                              const SMTSortRef &To) override;
+  SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
+
   // --- model queries: write-only mode aborts on these ---
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
   SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 
@@ -267,6 +317,11 @@ private:
   // is wired in so the let-binding visitor can be added without churning
   // the rest of the class.
   uint64_t NextLetId = 0;
+
+  // Counter for fresh symbols introduced by mkIEEEFPToBVImpl. SMT-LIB has no
+  // direct fp→bv same-encoding op, so we materialize a fresh BV symbol and
+  // constrain it via the inverse fp.from-IEEE-bv direction.
+  uint64_t NextIEEEBVId = 0;
 };
 
 } // namespace camada

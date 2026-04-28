@@ -80,7 +80,7 @@ TEST_CASE("SMTLIB write-only emits a minimal script", "[SMTLIB]") {
                                "(set-option :produce-models true)\n"
                                "(set-option :global-declarations true)\n"
                                "(set-info :status unknown)\n"
-                               "(set-logic QF_AUFBV)\n"
+                               "(set-logic ALL)\n"
                                "(declare-fun |x| () (_ BitVec 8))\n"
                                "(assert (= |x| #b00000101))\n"
                                "(check-sat)\n";
@@ -334,6 +334,16 @@ const std::vector<SolverDescriptor> &availableSolvers() {
     SKIP("No SMT-LIB-speaking solver found on PATH or in deps install dir");   \
   auto VarName = GENERATE_REF(Catch::Generators::from_range(availableSolvers()))
 
+// yices-smt2 in our matrix doesn't support FP. Native FP tests SKIP for it.
+// Callers who want a portable script across heterogeneous solvers should pick
+// FPEncoding::BV — that path goes through the common-layer bit-blast and works
+// against every solver in the matrix.
+#define CAMADA_SMTLIB_SKIP_NON_FP(S)                                           \
+  do {                                                                         \
+    if ((S).Name == "yices-smt2")                                              \
+      SKIP("yices-smt2 does not support floating-point");                      \
+  } while (0)
+
 TEST_CASE("SMTLIB interactive: public factory works against every solver",
           "[SMTLIB][pipeline]") {
   CAMADA_SMTLIB_FOREACH_SOLVER(S);
@@ -538,6 +548,110 @@ TEST_CASE("SMTLIB interactive: getFP64 round-trips a concrete double",
   auto Result = Solver->getFP64(X);
   REQUIRE(Result);
   REQUIRE(Result.value() == -3.14);
+}
+
+TEST_CASE("SMTLIB interactive: native FP32 round-trips a concrete float",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_FP(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
+  auto X = Solver->mkSymbol("x", FP32);
+  Solver->addConstraint(
+      Solver->mkEqual(X, Solver->mkFP32(2.5f, camada::FPEncoding::Native)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getFP32(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == 2.5f);
+}
+
+TEST_CASE("SMTLIB interactive: native FP64 round-trips a concrete double",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_FP(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP64 = Solver->mkFP64Sort(camada::FPEncoding::Native);
+  auto X = Solver->mkSymbol("x", FP64);
+  Solver->addConstraint(
+      Solver->mkEqual(X, Solver->mkFP64(-3.14, camada::FPEncoding::Native)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getFP64(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == -3.14);
+}
+
+TEST_CASE("SMTLIB interactive: native FP arithmetic works through fp.add",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_FP(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
+  auto X = Solver->mkSymbol("x", FP32);
+  auto RM = Solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::Native);
+  auto OnePointFive = Solver->mkFP32(1.5f, camada::FPEncoding::Native);
+  auto Two = Solver->mkFP32(2.0f, camada::FPEncoding::Native);
+  // x = 1.5 + 2.0 = 3.5
+  Solver->addConstraint(
+      Solver->mkEqual(X, Solver->mkFPAdd(OnePointFive, Two, RM)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getFP32(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == 3.5f);
+}
+
+TEST_CASE("SMTLIB interactive: native FP infinity model parses correctly",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_FP(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
+  auto X = Solver->mkSymbol("x", FP32);
+  // Constrain x to +infinity. SigWidth here includes the hidden bit (FP32 is
+  // 8 + 24).
+  Solver->addConstraint(Solver->mkEqual(
+      X, Solver->mkInf(false, 8, 24, camada::FPEncoding::Native)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Bin = Solver->getFPInBin(X);
+  REQUIRE(Bin);
+  // +inf in IEEE-754 single precision: 0 11111111 00000000000000000000000.
+  REQUIRE(Bin.value() == "01111111100000000000000000000000");
+}
+
+TEST_CASE("SMTLIB interactive: native FP NaN model parses correctly",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_FP(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
+  auto X = Solver->mkSymbol("x", FP32);
+  Solver->addConstraint(Solver->mkFPIsNaN(X));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Bin = Solver->getFPInBin(X);
+  REQUIRE(Bin);
+  // Some valid NaN encoding: sign 0, exp all-ones, significand non-zero.
+  REQUIRE(Bin.value().substr(0, 9) == "011111111");
+  // At least one significand bit set (otherwise it's +inf).
+  REQUIRE(Bin.value().substr(9).find('1') != std::string::npos);
 }
 
 TEST_CASE("SMTLIB interactive: getArrayElement returns the stored value",

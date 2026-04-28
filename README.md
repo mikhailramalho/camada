@@ -155,19 +155,22 @@ test over each binary it can find on disk):
 | z3           | `z3 -in`                         | default |
 | cvc5         | `cvc5 --lang smt2 --incremental` | `--incremental` is required for `(push)` / `(pop)`. |
 | bitwuzla     | `bitwuzla`                       | speaks SMT-LIB on stdin without extra flags |
-| yices-smt2   | `yices-smt2 --incremental`       | `--incremental` is required for `(push)` / `(pop)`. |
+| yices-smt2   | `yices-smt2 --incremental`       | `--incremental` is required for `(push)` / `(pop)`. No floating-point support — callers using native FP get an `unsupported` from the child. Use `FPEncoding::BV` to route every FP op through the common-layer bit-blast path, which works against yices. |
 | mathsat      | `mathsat`                        | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
 
 The Camada preamble unconditionally sends `(set-option :print-success true)`,
 `(set-option :produce-models true)`, `(set-option :global-declarations true)`,
-`(set-info :status unknown)`, and `(set-logic QF_AUFBV)` at startup, so any
-solver that honors the SMT-LIB option contract should work. Other solvers
-should be straightforward to plug in via the `createSMTLIBSolver(cmd)`
-factory.
+`(set-info :status unknown)`, and `(set-logic ALL)` at startup, so any solver
+that honors the SMT-LIB option contract should work. Other solvers should be
+straightforward to plug in via the `createSMTLIBSolver(cmd)` factory.
 
-The backend currently covers the BV/Bool fragment plus arrays; integer/real
-arithmetic, native FP, and quantifier APIs are not yet wired into the SMT-LIB
-output and will fall through to the base-class "unsupported" defaults.
+The backend covers BV/Bool/arrays and native floating-point (FP arithmetic,
+predicates, conversions, and `(_ +oo …)` / `(_ NaN …)` / `(fp …)` model
+parsing). Integer, real, quantifier, and tuple APIs are not yet wired and fall
+through to the base-class "unsupported" defaults. Callers that need FP against
+a child solver that doesn't speak it should ask Camada for `FPEncoding::BV` at
+sort-construction time — that routes every FP op through the common-layer
+bit-blast path and emits BV-only SMT-LIB.
 
 ## API Overview
 
