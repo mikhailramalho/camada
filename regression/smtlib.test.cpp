@@ -503,3 +503,66 @@ TEST_CASE("SMTLIB interactive: getBVInBin handles 128-bit decimal model value",
   Expected.replace(Expected.size() - 6, 6, "101010");
   REQUIRE(Bin.value() == Expected);
 }
+
+TEST_CASE("SMTLIB interactive: getFP32 round-trips a concrete float",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::BV);
+  auto X = Solver->mkSymbol("x", FP32);
+  Solver->addConstraint(
+      Solver->mkEqual(X, Solver->mkFP32(2.5f, camada::FPEncoding::BV)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getFP32(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == 2.5f);
+}
+
+TEST_CASE("SMTLIB interactive: getFP64 round-trips a concrete double",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto FP64 = Solver->mkFP64Sort(camada::FPEncoding::BV);
+  auto X = Solver->mkSymbol("x", FP64);
+  Solver->addConstraint(
+      Solver->mkEqual(X, Solver->mkFP64(-3.14, camada::FPEncoding::BV)));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getFP64(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == -3.14);
+}
+
+TEST_CASE("SMTLIB interactive: getArrayElement returns the stored value",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto IdxSort = Solver->mkBVSort(3);
+  auto ElemSort = Solver->mkBVSort(8);
+  auto ArrSort = Solver->mkArraySort(IdxSort, ElemSort);
+
+  auto Arr = Solver->mkSymbol("a", ArrSort);
+  auto Idx = Solver->mkBVFromDec(2, IdxSort);
+  auto Val = Solver->mkBVFromDec(99, ElemSort);
+  auto Updated = Solver->mkArrayStore(Arr, Idx, Val);
+
+  Solver->addConstraint(
+      Solver->mkEqual(Solver->mkArraySelect(Updated, Idx), Val));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Selected = Solver->getArrayElement(Updated, Idx);
+  REQUIRE(Selected->Sort == ElemSort);
+  auto Bin = Solver->getBVInBin(Selected);
+  REQUIRE(Bin);
+  REQUIRE(Bin.value() == "01100011"); // 99 in 8-bit binary
+}

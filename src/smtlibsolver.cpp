@@ -796,9 +796,14 @@ SMTResult<std::string> SMTLIBSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   return Bits;
 }
 
-SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef & /*Array*/,
-                                             const SMTExprRef & /*Index*/) {
-  unsupportedFeature("SMTLIBSolver array model parsing (Phase 3)");
+SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
+                                             const SMTExprRef &Index) {
+  // The native backends evaluate (select Array Index) against their cached
+  // model. Over the SMT-LIB pipe we don't have a cached model — but the
+  // child solver does, so building a (select ...) expression and letting the
+  // caller's subsequent get* call dispatch (get-value ((select ...))) gives
+  // the same observable result.
+  return mkArraySelect(Array, Index);
 }
 
 checkResult SMTLIBSolver::checkImpl() {
