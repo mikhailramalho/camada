@@ -219,6 +219,13 @@ ProcessEmitter::ProcessEmitter(const std::string &Cmd) {
   In = ::fdopen(InPipe[0], "r");
   fatalErrorIf(Out == nullptr || In == nullptr,
                "ProcessEmitter: fdopen() failed on pipe ends");
+  // Disable stdio's read-buffering on the input stream. We use fgetc to
+  // parse responses byte-by-byte, but we ALSO want select()-based polling
+  // (in drainResponses) to accurately report whether more data is available.
+  // With a stdio read buffer in the way, fgetc may have already pulled
+  // bytes into libc, leaving select() unable to see them. Unbuffered
+  // reads keep stdio and the kernel pipe in sync.
+  ::setvbuf(In, nullptr, _IONBF, 0);
   Pid = static_cast<long>(Child);
 
   // If the child dies, writes to its closed stdin would otherwise raise
@@ -266,10 +273,14 @@ unsigned ProcessEmitter::drainResponses(unsigned TimeoutMs) const {
     return 0;
   unsigned Drained = 0;
   // Loop: poll the FD with select(); if data is available within the timeout,
-  // read one response and try again. The first iteration tolerates an
-  // already-buffered-but-not-yet-arrived response by giving the child up to
-  // TimeoutMs to flush. Subsequent iterations behave the same — the timeout
-  // is the point at which we declare the buffer drained.
+  // read one response and try again.
+  //
+  // Caveat: readOneSmtlibResponse uses fgetc which fills a stdio buffer, and
+  // select() only sees the underlying FD. We work around this by calling
+  // fflush(In) before the select to make stdio's notion of "buffered data"
+  // and the kernel's notion of "ready FD" line up — fflush on an input
+  // stream is implementation-defined, but on glibc it discards any buffered-
+  // but-unread bytes, forcing the next fgetc to actually read from the FD.
   int Fd = ::fileno(In);
   while (true) {
     fd_set ReadFds;
@@ -700,9 +711,22 @@ SMTExprRef SMTLIBSolver::mkSymbolImpl(const std::string &Name,
 SMTExprRef SMTLIBSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                           const SMTExprRef &InitValue) {
   SMTSortRef Arr = mkArraySort(IndexSort, InitValue->Sort);
-  return makeSMTLIBExpr(SMTExprKind::ArrayConst, Arr,
-                        "((as const " + textOf(Arr) + ") " + textOf(InitValue) +
-                            ")");
+  // Materialize through a fresh symbol rather than inlining. mathsat's
+  // SMT-LIB parser rejects `(as const ...)` inside `(get-value ...)`, and
+  // Camada's expression printer is inline-only — once the const-array is
+  // wrapped in any larger expression that we later try to query, we'd hit
+  // that parser bug. By binding the literal to a fresh symbol here, every
+  // downstream expression refers to the bare symbol name and the
+  // `((as const ...))` form only appears in the up-front (assert (= sym
+  // ...)).
+  const std::string Name = "__CAMADA_aconst" + std::to_string(NextIEEEBVId++);
+  std::string Quoted = quoteSymbol(Name);
+  std::string Decl = "(declare-fun " + Quoted + " () " + textOf(Arr) + ")";
+  emitLine(Decl);
+  std::string LiteralText =
+      "((as const " + textOf(Arr) + ") " + textOf(InitValue) + ")";
+  emitLine("(assert (= " + Quoted + " " + LiteralText + "))");
+  return makeSMTLIBExpr(SMTExprKind::ArrayConst, Arr, std::move(Quoted));
 }
 
 // --- native FP literals + RM ---

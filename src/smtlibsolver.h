@@ -385,6 +385,12 @@ private:
   // datatype per distinct tuple shape (Camada caches sort identity, so the
   // declaration runs at most once per shape).
   uint64_t NextTupleId = 0;
+
+  // Counter for fresh symbols introduced by mkArrayConstImpl. mathsat's
+  // SMT-LIB parser rejects `((as const ...))` inside `(get-value ...)`, so
+  // we bind every const-array literal to a fresh symbol up front and
+  // reference the symbol from then on.
+  uint64_t NextArrConstId = 0;
 };
 
 } // namespace camada

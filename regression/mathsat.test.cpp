@@ -173,17 +173,15 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("incremental_push_pop",
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
                                   symbol_cache_survives_push_pop(solver))
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array", array(solver))
-// Several fixtures are absent for mathsat over the SMT-LIB pipe:
-//  - bool_array_const_store_semantics: mathsat rejects arrays whose element
-//    sort is Bool ("Arrays with Bool as argument are not supported").
-//  - array_const_store_semantics: uses `((as const ...) ...)` const-array
-//    literals, which mathsat doesn't recognise on the wire.
-//  - int_arithmetic_semantics / real_arithmetic_semantics: mathsat's reset/
-//    set-logic handling under the pipe yields `unknown` rather than the
-//    expected sat/unsat for these formulas. Native mathsat handles the same
-//    formulas fine via its custom QF_UFLIRA logic configured in `Arith
-//    MathSAT test`.
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array_const_store_semantics",
+                                  array_const_store_semantics(solver))
+// bool_array_const_store_semantics is absent: mathsat rejects arrays whose
+// element sort is Bool ("Arrays with Bool as argument are not supported").
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
+                                  int_arithmetic_semantics(solver))
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
+                                  real_arithmetic_semantics(solver))
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_model_queries",
                                   arith_model_queries(solver))
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_conversion_semantics",
