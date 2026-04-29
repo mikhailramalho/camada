@@ -169,10 +169,10 @@ CAMADA_YICES_SMTLIB_SHARED_TEST("incremental_push_pop",
                                 incremental_push_pop(solver))
 CAMADA_YICES_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
                                 symbol_cache_survives_push_pop(solver))
-// Array fixtures absent for yices: they use `mkArrayConst`, which emits
-// `((as const ...) ...)`. yices-smt2 doesn't recognise that syntax on the
-// wire ("undefined term: const"). Native yices supports const-arrays via a
-// different API path.
+// Array fixtures absent for yices: they all use `mkArrayConst`, which Camada
+// emits as `((as const ...) ...)`. yices-smt2 rejects this syntax outright
+// ("undefined term: const"); native yices supports const-arrays via a
+// different C-API path, but there's no SMT-LIB-wire equivalent.
 CAMADA_YICES_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
 CAMADA_YICES_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
                                 int_arithmetic_semantics(solver))
