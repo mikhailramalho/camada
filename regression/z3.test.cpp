@@ -84,17 +84,13 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
     camada_smtlib_pipeline::RunFn(Cmd);                                        \
   }
 
+// Pipeline-only scenarios — no native counterpart in tests.h. The
+// model-value parsing edge cases (wide BV, FP +oo, FP NaN) and the
+// FlipSignBit-on-NaN round-trip are now polymorphic fixtures in
+// simple.test.h / fp.test.h and run via tests(solver) below.
 CAMADA_Z3_SMTLIB_PIPELINE_TEST("public factory works", runSMTLIBPublicFactory)
 CAMADA_Z3_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
                                runSMTLIBDualEmitter)
-CAMADA_Z3_SMTLIB_PIPELINE_TEST("getBVInBin handles 128-bit decimal model value",
-                               runSMTLIBGetBVInBin128)
-CAMADA_Z3_SMTLIB_PIPELINE_TEST("native FP infinity model parses",
-                               runSMTLIBNativeFPInfinity)
-CAMADA_Z3_SMTLIB_PIPELINE_TEST("native FP NaN model parses",
-                               runSMTLIBNativeFPNaNModel)
-CAMADA_Z3_SMTLIB_PIPELINE_TEST("native FP neg FlipSignBit toggles NaN sign",
-                               runSMTLIBNativeFPNegFlipNaN)
 
 #undef CAMADA_Z3_SMTLIB_PIPELINE_TEST
 

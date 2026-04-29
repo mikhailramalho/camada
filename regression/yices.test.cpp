@@ -145,8 +145,6 @@ CAMADA_YICES_SMTLIB_PIPELINE_TEST("public factory works",
                                   runSMTLIBPublicFactory)
 CAMADA_YICES_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
                                   runSMTLIBDualEmitter)
-CAMADA_YICES_SMTLIB_PIPELINE_TEST(
-    "getBVInBin handles 128-bit decimal model value", runSMTLIBGetBVInBin128)
 
 #undef CAMADA_YICES_SMTLIB_PIPELINE_TEST
 

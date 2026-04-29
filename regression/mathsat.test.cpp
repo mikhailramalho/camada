@@ -140,14 +140,6 @@ CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST("public factory works",
                                     runSMTLIBPublicFactory)
 CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
                                     runSMTLIBDualEmitter)
-CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST(
-    "getBVInBin handles 128-bit decimal model value", runSMTLIBGetBVInBin128)
-CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST("native FP infinity model parses",
-                                    runSMTLIBNativeFPInfinity)
-CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST("native FP NaN model parses",
-                                    runSMTLIBNativeFPNaNModel)
-CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST(
-    "native FP neg FlipSignBit toggles NaN sign", runSMTLIBNativeFPNegFlipNaN)
 
 #undef CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST
 

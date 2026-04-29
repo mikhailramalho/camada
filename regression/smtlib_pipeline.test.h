@@ -26,7 +26,6 @@
 #define CAMADA_REGRESSION_SMTLIB_PIPELINE_TEST_H_
 
 #include "camada.h"
-#include "smtlibsolver.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -176,74 +175,6 @@ inline void runSMTLIBDualEmitter(const std::string &Cmd) {
   REQUIRE(Got.find("(declare-fun |x| () (_ BitVec 8))\n") != std::string::npos);
   REQUIRE(Got.find("(assert (= |x| #b00000011))\n") != std::string::npos);
   REQUIRE(Got.find("(check-sat)\n") != std::string::npos);
-}
-
-// Some children (mathsat) emit BV model values in `(_ bv<n> <w>)` decimal
-// form. Widths above 64 must still parse correctly through SMTLIBSolver's
-// arbitrary-precision long-division path.
-inline void runSMTLIBGetBVInBin128(const std::string &Cmd) {
-  auto Solver =
-      std::make_unique<camada::SMTLIBSolver>(camada::SMTLIBProcessTag{}, Cmd);
-  auto BV128 = Solver->mkBVSort(128);
-  auto X = Solver->mkSymbol("x", BV128);
-  Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(42, BV128)));
-  REQUIRE(Solver->check() == camada::checkResult::SAT);
-  auto Bin = Solver->getBVInBin(X);
-  REQUIRE(Bin);
-  std::string Expected(128, '0');
-  Expected.replace(Expected.size() - 6, 6, "101010");
-  REQUIRE(Bin.value() == Expected);
-}
-
-// Native-FP model parsing: `(_ +oo eb sb)` must round-trip into the IEEE-754
-// binary form Camada expects.
-inline void runSMTLIBNativeFPInfinity(const std::string &Cmd) {
-  auto Solver =
-      std::make_unique<camada::SMTLIBSolver>(camada::SMTLIBProcessTag{}, Cmd);
-  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
-  auto X = Solver->mkSymbol("x", FP32);
-  Solver->addConstraint(Solver->mkEqual(
-      X, Solver->mkInf(false, 8, 24, camada::FPEncoding::Native)));
-  REQUIRE(Solver->check() == camada::checkResult::SAT);
-  auto Bin = Solver->getFPInBin(X);
-  REQUIRE(Bin);
-  REQUIRE(Bin.value() == "01111111100000000000000000000000");
-}
-
-// Native-FP model parsing: `(_ NaN eb sb)` decodes to a valid NaN bit pattern.
-inline void runSMTLIBNativeFPNaNModel(const std::string &Cmd) {
-  auto Solver =
-      std::make_unique<camada::SMTLIBSolver>(camada::SMTLIBProcessTag{}, Cmd);
-  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
-  auto X = Solver->mkSymbol("x", FP32);
-  Solver->addConstraint(Solver->mkFPIsNaN(X));
-  REQUIRE(Solver->check() == camada::checkResult::SAT);
-  auto Bin = Solver->getFPInBin(X);
-  REQUIRE(Bin);
-  REQUIRE(Bin.value().substr(0, 9) == "011111111");
-  REQUIRE(Bin.value().substr(9).find('1') != std::string::npos);
-}
-
-// FlipSignBit on a NaN must toggle the sign bit unconditionally, not just for
-// non-NaNs (as `fp.neg`'s SMT-LIB-standard PreserveNaNPayload semantics
-// would). The implementation rounds-trips through mkIEEEFPToBV; this test
-// pins that path.
-inline void runSMTLIBNativeFPNegFlipNaN(const std::string &Cmd) {
-  auto Solver =
-      std::make_unique<camada::SMTLIBSolver>(camada::SMTLIBProcessTag{}, Cmd);
-  auto FP32 = Solver->mkFP32Sort(camada::FPEncoding::Native);
-  auto X = Solver->mkSymbol("x", FP32);
-  Solver->addConstraint(Solver->mkFPIsNaN(X));
-  auto Negged = Solver->mkFPNeg(X, camada::FPNegBehavior::FlipSignBit);
-  auto XBits = Solver->mkIEEEFPToBV(X);
-  auto NeggedBits = Solver->mkIEEEFPToBV(Negged);
-  auto XSign = Solver->mkBVExtract(31, 31, XBits);
-  auto NSign = Solver->mkBVExtract(31, 31, NeggedBits);
-  Solver->addConstraint(Solver->mkEqual(NSign, Solver->mkBVNot(XSign)));
-  auto XRest = Solver->mkBVExtract(30, 0, XBits);
-  auto NRest = Solver->mkBVExtract(30, 0, NeggedBits);
-  Solver->addConstraint(Solver->mkEqual(NRest, XRest));
-  REQUIRE(Solver->check() == camada::checkResult::SAT);
 }
 
 } // namespace camada_smtlib_pipeline

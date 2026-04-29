@@ -45,6 +45,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(implies_semantics);
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
+  RESETANDTEST(wide_bv_decimal_model_value);
   RESETANDTEST(incremental_push_pop);
   RESETANDTEST(symbol_cache_survives_push_pop);
   RESETANDTEST(handle_invalidation_after_reset);
@@ -56,6 +57,9 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_neg_nan_native_bv_parity);
   RESETANDFPTEST(fp_equal, NativeFP);
   RESETANDFPTEST(fp_equal, BVFP);
+  RESETANDFPTEST(fp_infinity_model_value, NativeFP);
+  RESETANDFPTEST(fp_nan_model_value, NativeFP);
+  RESETANDFPTEST(fp_neg_flip_nan_via_bv_round_trip, BVFP);
   RESETANDFPTEST(fp_arithmetics, NativeFP);
   RESETANDFPTEST(fp_arithmetics, BVFP);
   RESETANDFPTEST(fp_round_to_away, NativeFP);
