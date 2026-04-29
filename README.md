@@ -12,6 +12,7 @@ multiple SMT solvers. It exposes a unified API across:
 - STP
 - Yices
 - Z3
+- SMT-LIB (any external solver speaking SMT-LIB v2 on stdin/stdout)
 
 The library is designed to make solver switching cheap while still filling
 feature gaps in backends that are missing parts of the SMT-LIB surface.
@@ -167,11 +168,26 @@ The Camada preamble unconditionally sends `(set-option :print-success true)`,
 that honors the SMT-LIB option contract should work. Other solvers should be
 straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
 
-The backend covers BV/Bool/arrays and native floating-point (FP arithmetic,
-predicates, conversions, and `(_ +oo …)` / `(_ NaN …)` / `(fp …)` model
-parsing). Integer, real, quantifier, and tuple APIs are not yet wired and fall
-through to the base-class "unsupported" defaults. Callers that need FP against
-a child solver that doesn't speak it should ask Camada for `FPEncoding::BV` at
+Caveats:
+
+- `mkIEEEFPToBV` is scoped to the current `(push)`/`(pop)` level. SMT-LIB
+  has no portable same-encoding `fp→bv` op, so the backend materializes a
+  fresh BV symbol and constrains it via the inverse direction — the
+  constraint is unwound by `(pop)`, same as the cvc5 and bitwuzla native
+  backends.
+- The child is spawned with `execvp`, so argv strings are interpreted
+  verbatim by the kernel — not by a shell. Spaces, quotes, and `$` in
+  individual argv entries are safe, but you cannot rely on shell
+  redirection or environment expansion.
+
+The backend covers the full Camada surface: BV/Bool, arrays, native
+floating-point (FP arithmetic, predicates, conversions, and `(_ +oo …)` /
+`(_ NaN …)` / `(fp …)` model parsing), Int/Real, uninterpreted functions,
+quantifiers, and tuples (via `(declare-datatypes ...)`). Capability subsetting
+is per-solver — for example yices-smt2 doesn't speak native FP and bitwuzla
+doesn't speak Int/Real or tuples — and the regression matrix exercises only
+the operations each child supports. Callers that need FP against a child
+solver that doesn't speak it should ask Camada for `FPEncoding::BV` at
 sort-construction time — that routes every FP op through the common-layer
 bit-blast path and emits BV-only SMT-LIB.
 
