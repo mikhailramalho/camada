@@ -351,6 +351,15 @@ const std::vector<SolverDescriptor> &availableSolvers() {
       SKIP("bitwuzla does not support Int/Real arithmetic");                   \
   } while (0)
 
+// mathsat rejects (forall ...) / (exists ...) outright. yices-smt2 rejects
+// quantifiers under logic ALL specifically. z3, cvc5, and bitwuzla accept
+// BV-quantified formulas.
+#define CAMADA_SMTLIB_SKIP_NON_QUANT(S)                                        \
+  do {                                                                         \
+    if ((S).Name == "mathsat" || (S).Name == "yices-smt2")                     \
+      SKIP((S).Name + " does not support quantifiers in logic ALL");           \
+  } while (0)
+
 TEST_CASE("SMTLIB interactive: public factory works against every solver",
           "[SMTLIB][pipeline]") {
   CAMADA_SMTLIB_FOREACH_SOLVER(S);
@@ -840,5 +849,61 @@ TEST_CASE("SMTLIB interactive: int/real conversion and isInt",
   auto SevenHalf = Solver->mkReal(int64_t{15}, int64_t{2}); // 15/2 = 7.5
   auto Seven = Solver->mkReal2Int(SevenHalf);
   Solver->addConstraint(Solver->mkEqual(Seven, Solver->mkInt(int64_t{7})));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+}
+
+TEST_CASE("SMTLIB interactive: uninterpreted function with BV domain/codomain",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+
+  // f : BV8 -> BV8.  Constrain f(0) = 5, then check f's value at 0 in the
+  // model. Use BV sorts so every solver in the matrix (including bitwuzla,
+  // which is BV-only) can run this.
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto FuncSort = Solver->mkFunctionSort({BV8}, BV8);
+  auto F = Solver->mkSymbol("f", FuncSort);
+  auto Zero = Solver->mkBVFromDec(0, BV8);
+  auto Five = Solver->mkBVFromDec(5, BV8);
+  auto FZero = Solver->mkApply(F, {Zero});
+  Solver->addConstraint(Solver->mkEqual(FZero, Five));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Bin = Solver->getBVInBin(FZero);
+  REQUIRE(Bin);
+  REQUIRE(Bin.value() == "00000101");
+}
+
+TEST_CASE("SMTLIB interactive: forall quantifier over BV",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_QUANT(S);
+
+  // (forall ((x BV8)) (= x x))  is trivially valid → asserting it must be SAT.
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto X = Solver->mkSymbol("x", BV8);
+  auto Body = Solver->mkEqual(X, X);
+  Solver->addConstraint(Solver->mkForall({X}, Body));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+}
+
+TEST_CASE("SMTLIB interactive: exists quantifier finds witness",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_QUANT(S);
+
+  // (exists ((x BV8)) (= x #x05)) is satisfiable, witness x = 5.
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BV8 = Solver->mkBVSort(8);
+  auto X = Solver->mkSymbol("x", BV8);
+  auto Body = Solver->mkEqual(X, Solver->mkBVFromDec(5, BV8));
+  Solver->addConstraint(Solver->mkExists({X}, Body));
   REQUIRE(Solver->check() == camada::checkResult::SAT);
 }

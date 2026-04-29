@@ -460,6 +460,27 @@ SMTSortRef SMTLIBSolver::mkRealSortImpl() {
   return makeSortRef<SMTLIBSort>(SMTLIBSort(SMTSortKind::Real, this, "Real"));
 }
 
+// Function sort. SMT-LIB has no first-class function-sort syntax to put on
+// the wire — function sorts only appear in (declare-fun name (D1 ...) Cod).
+// We still need a SortRef the rest of Camada can carry around, so emit a
+// placeholder text that is never spliced into wire output. mkSymbolImpl
+// destructures the FunctionSortData when emitting the actual declaration.
+SMTSortRef
+SMTLIBSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                                 const SMTSortRef &CodomainSort) {
+  std::string Text = "(";
+  for (std::size_t I = 0; I < DomainSorts.size(); ++I) {
+    if (I)
+      Text += " ";
+    Text += textOf(DomainSorts[I]);
+  }
+  Text += ") ";
+  Text += textOf(CodomainSort);
+  return makeSortRef<SMTLIBSort>(
+      SMTLIBSort(SMTSortKind::Function, this, std::move(Text),
+                 SMTSort::FunctionSortData{DomainSorts, CodomainSort}));
+}
+
 SMTSortRef SMTLIBSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                          const SMTSortRef &ElemSort) {
   std::string Text =
@@ -599,7 +620,22 @@ SMTExprRef SMTLIBSolver::mkSymbolImpl(const std::string &Name,
                                       const SMTSortRef &Sort) {
   // Eagerly emit the declaration.
   std::string Quoted = quoteSymbol(Name);
-  emitLine("(declare-fun " + Quoted + " () " + textOf(Sort) + ")");
+  if (Sort->isFunctionSort()) {
+    // (declare-fun f (D1 D2 ...) Codomain)
+    std::string Decl = "(declare-fun " + Quoted + " (";
+    const auto &Domain = Sort->getDomainSorts();
+    for (std::size_t I = 0; I < Domain.size(); ++I) {
+      if (I)
+        Decl += " ";
+      Decl += textOf(Domain[I]);
+    }
+    Decl += ") ";
+    Decl += textOf(Sort->getCodomainSort());
+    Decl += ")";
+    emitLine(Decl);
+  } else {
+    emitLine("(declare-fun " + Quoted + " () " + textOf(Sort) + ")");
+  }
   return makeSMTLIBExpr(SMTExprKind::Symbol, Sort, std::move(Quoted));
 }
 
@@ -1041,6 +1077,59 @@ SMTExprRef SMTLIBSolver::mkReal2IntImpl(const SMTExprRef &Exp) {
 SMTExprRef SMTLIBSolver::mkIsIntImpl(const SMTExprRef &Exp) {
   return makeSMTLIBExpr(SMTExprKind::IsInt, mkBoolSort(),
                         "(is_int " + textOf(Exp) + ")");
+}
+
+// --- UF + quantifiers ---
+
+// (FuncName arg1 arg2 ...). The Function expression's text already carries
+// the function symbol name (set when the symbol was declared).
+SMTExprRef SMTLIBSolver::mkApplyImpl(const SMTExprRef &Function,
+                                     const std::vector<SMTExprRef> &Args) {
+  std::string Text = "(" + textOf(Function);
+  for (const auto &Arg : Args) {
+    Text += " ";
+    Text += textOf(Arg);
+  }
+  Text += ")";
+  return makeSMTLIBExpr(SMTExprKind::Apply, Function->Sort->getCodomainSort(),
+                        std::move(Text));
+}
+
+// Render a quantifier's bound-variable list `((v1 S1) (v2 S2) ...)`. Each var
+// is a Symbol expression whose textOf() is the already-quoted variable name.
+//
+// Camada's regression tests pass quantifier vars that were created via
+// mkSymbol — which means we already emitted `(declare-fun v () S)` at the
+// global scope. The native backends silently accept this (Z3 ignores the
+// redundant declaration; cvc5 shadows it inside the quantifier). The SMT-LIB
+// pipeline mirrors that: the declaration was already emitted, we just
+// reference the same name here in the binder list.
+static std::string renderBinders(const std::vector<SMTExprRef> &Vars) {
+  std::string Out;
+  for (std::size_t I = 0; I < Vars.size(); ++I) {
+    if (I)
+      Out += " ";
+    Out += "(";
+    Out += static_cast<const SMTLIBExpr &>(*Vars[I]).Expr;
+    Out += " ";
+    Out += static_cast<const SMTLIBSort &>(*Vars[I]->Sort).Sort;
+    Out += ")";
+  }
+  return Out;
+}
+
+SMTExprRef SMTLIBSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                                      const SMTExprRef &Body) {
+  std::string Text =
+      "(forall (" + renderBinders(Vars) + ") " + textOf(Body) + ")";
+  return makeSMTLIBExpr(SMTExprKind::Forall, mkBoolSort(), std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                                      const SMTExprRef &Body) {
+  std::string Text =
+      "(exists (" + renderBinders(Vars) + ") " + textOf(Body) + ")";
+  return makeSMTLIBExpr(SMTExprKind::Exists, mkBoolSort(), std::move(Text));
 }
 
 // --- write-only model queries / check ---

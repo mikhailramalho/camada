@@ -182,6 +182,8 @@ protected:
   SMTSortRef mkRealSortImpl() override;
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;
+  SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
+                                const SMTSortRef &CodomainSort) override;
 
   // --- expressions: bare minimum for the Phase 1 smoke test ---
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
@@ -310,6 +312,14 @@ protected:
   SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
+
+  // --- UF + quantifiers ---
+  SMTExprRef mkApplyImpl(const SMTExprRef &Function,
+                         const std::vector<SMTExprRef> &Args) override;
+  SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
+  SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
 
   // --- model queries: write-only mode aborts on these ---
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
