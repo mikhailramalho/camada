@@ -711,21 +711,27 @@ SMTExprRef SMTLIBSolver::mkSymbolImpl(const std::string &Name,
 SMTExprRef SMTLIBSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                           const SMTExprRef &InitValue) {
   SMTSortRef Arr = mkArraySort(IndexSort, InitValue->Sort);
-  // Materialize through a fresh symbol rather than inlining. mathsat's
-  // SMT-LIB parser rejects `(as const ...)` inside `(get-value ...)`, and
-  // Camada's expression printer is inline-only — once the const-array is
-  // wrapped in any larger expression that we later try to query, we'd hit
-  // that parser bug. By binding the literal to a fresh symbol here, every
-  // downstream expression refers to the bare symbol name and the
-  // `((as const ...))` form only appears in the up-front (assert (= sym
-  // ...)).
-  const std::string Name = "__CAMADA_aconst" + std::to_string(NextIEEEBVId++);
+  // Materialize through a fresh `(define-fun)` rather than inlining. Two
+  // reasons:
+  //   1. mathsat's SMT-LIB parser rejects `(as const ...)` inside
+  //      `(get-value ...)`. Camada's expression printer is inline-only, so
+  //      any later expression that wraps the const-array and is queried via
+  //      `(get-value ...)` would hit that parser bug. Binding the literal
+  //      to a name once up front means every downstream expression
+  //      references the bare symbol.
+  //   2. (define-fun ...) is permanent under :global-declarations true and
+  //      survives push/pop unchanged. Earlier we used (declare-fun) +
+  //      (assert (= sym ...)), but the assertion is scoped — a const-array
+  //      created inside a push() and used after pop() would have its
+  //      defining equality dropped, leaving the symbol unconstrained
+  //      (Codex review #2024-04 [high]).
+  const std::string Name = "__CAMADA_aconst" + std::to_string(NextArrConstId++);
   std::string Quoted = quoteSymbol(Name);
-  std::string Decl = "(declare-fun " + Quoted + " () " + textOf(Arr) + ")";
-  emitLine(Decl);
   std::string LiteralText =
       "((as const " + textOf(Arr) + ") " + textOf(InitValue) + ")";
-  emitLine("(assert (= " + Quoted + " " + LiteralText + "))");
+  std::string Defn =
+      "(define-fun " + Quoted + " () " + textOf(Arr) + " " + LiteralText + ")";
+  emitLine(Defn);
   return makeSMTLIBExpr(SMTExprKind::ArrayConst, Arr, std::move(Quoted));
 }
 
