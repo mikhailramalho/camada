@@ -79,7 +79,12 @@ inline std::string cvc5Command() {
 #else
   std::string Bin = findExecutable("cvc5", nullptr);
 #endif
-  return Bin.empty() ? std::string{} : Bin + " --lang smt2 --incremental";
+  // --incremental is required for (push)/(pop). --arrays-exp enables cvc5's
+  // experimental array support, which covers `((as const ...))` const-array
+  // literals — without it cvc5 emits "Cannot handle assertion with term of
+  // kind STORE_ALL" and the formula returns unknown.
+  return Bin.empty() ? std::string{}
+                     : Bin + " --lang smt2 --incremental --arrays-exp";
 }
 
 inline std::string bitwuzlaCommand() {

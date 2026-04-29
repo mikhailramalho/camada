@@ -91,11 +91,14 @@ CAMADA_CVC5_SMTLIB_SHARED_TEST("incremental_push_pop",
                                incremental_push_pop(solver))
 CAMADA_CVC5_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
                                symbol_cache_survives_push_pop(solver))
-// Array fixtures and arith_model_queries are absent: cvc5 over the SMT-LIB
-// pipe with `(set-logic ALL)` returns `unknown` for these formulas (the array
-// + arith reasoning paths it picks under ALL differ from the native API
-// path). Those are real cvc5 quirks that the pipeline can't paper over.
+CAMADA_CVC5_SMTLIB_SHARED_TEST("array", array(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("array_const_store_semantics",
+                               array_const_store_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("bool_array_const_store_semantics",
+                               bool_array_const_store_semantics(solver))
 CAMADA_CVC5_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("arith_model_queries",
+                               arith_model_queries(solver))
 CAMADA_CVC5_SMTLIB_SHARED_TEST("quantifier_semantics",
                                quantifier_semantics(solver))
 CAMADA_CVC5_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
