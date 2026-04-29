@@ -45,10 +45,10 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 // SMT-LIB pipeline tests against the bitwuzla binary. bitwuzla supports BV,
 // Bool, arrays, FP-native, FP-BV, UF, and BV-quantifiers. It does NOT
 // support Int/Real arithmetic or `declare-datatypes` (tuples), so those
-// scenarios are intentionally absent.
+// fixtures are intentionally absent.
 // ---------------------------------------------------------------------------
 
-#define CAMADA_BITWUZLA_SMTLIB_TEST(NameStr, RunFn)                            \
+#define CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST(NameStr, RunFn)                   \
   TEST_CASE("SMTLIB pipeline: " NameStr " [bitwuzla]",                         \
             "[Bitwuzla][SMTLIB][pipeline]") {                                  \
     CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::bitwuzlaCommand(),    \
@@ -56,42 +56,53 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
     camada_smtlib_pipeline::RunFn(Cmd);                                        \
   }
 
-CAMADA_BITWUZLA_SMTLIB_TEST("public factory works", runSMTLIBPublicFactory)
-CAMADA_BITWUZLA_SMTLIB_TEST("dual emitter logs to file too",
-                            runSMTLIBDualEmitter)
-CAMADA_BITWUZLA_SMTLIB_TEST("SAT problem returns SAT from check()",
-                            runSMTLIBSatProblem)
-CAMADA_BITWUZLA_SMTLIB_TEST("UNSAT problem returns UNSAT from check()",
-                            runSMTLIBUnsatProblem)
-CAMADA_BITWUZLA_SMTLIB_TEST("getBV round-trips a concrete value",
-                            runSMTLIBGetBV)
-CAMADA_BITWUZLA_SMTLIB_TEST("getBV round-trips a 1-bit value",
-                            runSMTLIBGetBV1Bit)
-CAMADA_BITWUZLA_SMTLIB_TEST("push/pop returns sat/unsat/sat", runSMTLIBPushPop)
-CAMADA_BITWUZLA_SMTLIB_TEST("symbol declared in pushed scope survives pop",
-                            runSMTLIBSymbolSurvivesPop)
-CAMADA_BITWUZLA_SMTLIB_TEST("getBVInBin handles 128-bit decimal model value",
-                            runSMTLIBGetBVInBin128)
-CAMADA_BITWUZLA_SMTLIB_TEST("getFP32 round-trips (BV-encoded)",
-                            runSMTLIBGetFP32BVEncoded)
-CAMADA_BITWUZLA_SMTLIB_TEST("getFP64 round-trips (BV-encoded)",
-                            runSMTLIBGetFP64BVEncoded)
-CAMADA_BITWUZLA_SMTLIB_TEST("getFP32 round-trips (native FP)",
-                            runSMTLIBGetFP32Native)
-CAMADA_BITWUZLA_SMTLIB_TEST("getFP64 round-trips (native FP)",
-                            runSMTLIBGetFP64Native)
-CAMADA_BITWUZLA_SMTLIB_TEST("native FP arithmetic via fp.add",
-                            runSMTLIBNativeFPAdd)
-CAMADA_BITWUZLA_SMTLIB_TEST("native FP infinity model parses",
-                            runSMTLIBNativeFPInfinity)
-CAMADA_BITWUZLA_SMTLIB_TEST("native FP neg FlipSignBit toggles NaN sign",
-                            runSMTLIBNativeFPNegFlipNaN)
-CAMADA_BITWUZLA_SMTLIB_TEST("native FP NaN model parses",
-                            runSMTLIBNativeFPNaNModel)
-CAMADA_BITWUZLA_SMTLIB_TEST("getArrayElement returns the stored value",
-                            runSMTLIBGetArrayElement)
-CAMADA_BITWUZLA_SMTLIB_TEST("UF with BV domain/codomain", runSMTLIBUF)
-CAMADA_BITWUZLA_SMTLIB_TEST("forall quantifier over BV", runSMTLIBForall)
-CAMADA_BITWUZLA_SMTLIB_TEST("exists quantifier finds witness", runSMTLIBExists)
+CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST("public factory works",
+                                     runSMTLIBPublicFactory)
+CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
+                                     runSMTLIBDualEmitter)
+CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST(
+    "getBVInBin handles 128-bit decimal model value", runSMTLIBGetBVInBin128)
+CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST("native FP infinity model parses",
+                                     runSMTLIBNativeFPInfinity)
+CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST("native FP NaN model parses",
+                                     runSMTLIBNativeFPNaNModel)
+CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST(
+    "native FP neg FlipSignBit toggles NaN sign", runSMTLIBNativeFPNegFlipNaN)
 
-#undef CAMADA_BITWUZLA_SMTLIB_TEST
+#undef CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST
+
+#define CAMADA_BITWUZLA_SMTLIB_SHARED_TEST(NameStr, FixtureCall)               \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [bitwuzla]",                         \
+            "[Bitwuzla][SMTLIB][pipeline]") {                                  \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::bitwuzlaCommand(),    \
+                                 "bitwuzla");                                  \
+    camada::SMTSolverRef solver =                                              \
+        camada_smtlib_pipeline::makeSMTLIBSolver(Cmd);                         \
+    FixtureCall;                                                               \
+  }
+
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_semantics",
+                                   implies_semantics(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_true_implies_false",
+                                   implies_true_implies_false(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("bv_lshr_semantics",
+                                   bv_lshr_semantics(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("incremental_push_pop",
+                                   incremental_push_pop(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
+                                   symbol_cache_survives_push_pop(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array", array(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array_const_store_semantics",
+                                   array_const_store_semantics(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("bool_array_const_store_semantics",
+                                   bool_array_const_store_semantics(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("quantifier_semantics",
+                                   quantifier_semantics(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fp_equal NativeFP",
+                                   fp_equal(solver, camada::FPEncoding::Native))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fp_equal BVFP",
+                                   fp_equal(solver, camada::FPEncoding::BV))
+
+#undef CAMADA_BITWUZLA_SMTLIB_SHARED_TEST

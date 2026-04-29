@@ -120,6 +120,13 @@ public:
   ///   - error: `(error "...")`
   std::string readResponse() const;
 
+  /// Best-effort non-blocking drain: read responses until none are pending
+  /// within `TimeoutMs`. Used by resetImpl() to absorb solver-specific stray
+  /// `success` lines emitted alongside the standard reset/option acks (e.g.
+  /// mathsat acks `(echo)` itself, on top of the echoed content). Returns the
+  /// number of responses drained.
+  unsigned drainResponses(unsigned TimeoutMs) const;
+
   bool isOpen() const { return Out != nullptr; }
 
 private:

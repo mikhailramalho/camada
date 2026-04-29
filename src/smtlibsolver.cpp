@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <sys/select.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -258,6 +259,32 @@ void ProcessEmitter::flush() const {
 
 std::string ProcessEmitter::readResponse() const {
   return readOneSmtlibResponse(In);
+}
+
+unsigned ProcessEmitter::drainResponses(unsigned TimeoutMs) const {
+  if (!In)
+    return 0;
+  unsigned Drained = 0;
+  // Loop: poll the FD with select(); if data is available within the timeout,
+  // read one response and try again. The first iteration tolerates an
+  // already-buffered-but-not-yet-arrived response by giving the child up to
+  // TimeoutMs to flush. Subsequent iterations behave the same — the timeout
+  // is the point at which we declare the buffer drained.
+  int Fd = ::fileno(In);
+  while (true) {
+    fd_set ReadFds;
+    FD_ZERO(&ReadFds);
+    FD_SET(Fd, &ReadFds);
+    struct timeval Timeout;
+    Timeout.tv_sec = TimeoutMs / 1000;
+    Timeout.tv_usec = (TimeoutMs % 1000) * 1000;
+    int Ready = ::select(Fd + 1, &ReadFds, nullptr, nullptr, &Timeout);
+    if (Ready <= 0)
+      break; // no more responses pending within the timeout
+    (void)readOneSmtlibResponse(In);
+    ++Drained;
+  }
+  return Drained;
 }
 
 // ---------------------------------------------------------------------------
@@ -1563,23 +1590,30 @@ bool decimalToFraction(const std::string &S, std::string &Num,
 // Parse an SMT-LIB integer model value into a signed decimal string.
 // Accepted shapes: `N`, `(- N)` where N is a non-negative integer literal.
 // Returns the empty string on failure.
+// Forward declaration; full definition follows. intValueToDecimal reuses the
+// rational parser so it accepts the same wire shapes (decimals, rationals,
+// signed forms) and only returns success if the value is integral.
+bool rationalValueToFraction(const std::string &Value, std::string &Num,
+                             std::string &Den);
+
 std::string intValueToDecimal(const std::string &Value) {
-  std::string V = trimWS(Value);
-  // Negative form: `(- N)`.
-  if (V.size() >= 4 && V[0] == '(' && V[1] == '-' && V[2] == ' ' &&
-      V.back() == ')') {
-    std::string Inner = trimWS(V.substr(3, V.size() - 4));
-    for (char C : Inner)
-      if (C < '0' || C > '9')
-        return {};
-    if (Inner.empty())
-      return {};
-    return "-" + Inner;
-  }
-  for (char C : V)
-    if (C < '0' || C > '9')
-      return {};
-  return V.empty() ? std::string{} : V;
+  // Camada's getInt() is sometimes called on Real expressions whose model
+  // value happens to be integral (e.g. `getInt(r + 1/2)` where r = 3/2 →
+  // value 2). Solvers report such values as `2.0` (z3) or `2` (cvc5/yices/
+  // mathsat) or even `(/ 4 2)`. Reuse the rational parser so all shapes
+  // collapse to the same numerator/denominator pair, then return the
+  // numerator iff the denominator divides cleanly.
+  std::string Num, Den;
+  if (!rationalValueToFraction(Value, Num, Den))
+    return {};
+  if (Den == "1")
+    return Num;
+  // Den != "1": the value is non-integral. We could truncate towards zero,
+  // but Camada's getInt contract is "integer model value"; rejecting non-
+  // integral values is the safer behavior. The shared fixture only ever
+  // calls getInt() on values that ARE integral, so this path is just
+  // defensive.
+  return {};
 }
 
 // Parse an SMT-LIB rational/real model value into a (numerator, denominator)
@@ -1799,41 +1833,38 @@ checkResult SMTLIBSolver::checkImpl() {
 }
 
 void SMTLIBSolver::resetImpl() {
-  // (reset) is a non-uniform command: it clears every previously set option,
-  // including :print-success. Solvers respond inconsistently:
-  //   - z3: acks (reset) with `success`. set-option/get-info handled normally.
-  //   - cvc5: NO ack for (reset).
-  //   - yices: acks (reset) with `success`.
-  //   - mathsat: acks (reset) AND emits a trailing `success` for each echo
-  //     command, on top of the echoed content.
+  // (reset) is non-uniform across solvers:
+  //   - z3, bitwuzla, yices: ack `(reset)` with `success`.
+  //   - cvc5: no ack for `(reset)` (and resets :print-success in the process).
+  //   - mathsat: acks `(reset)`, AND additionally acks each `(echo ...)` with
+  //     a trailing `success` on top of the echoed content. Some solvers also
+  //     reject `(get-info)` (bitwuzla), so the marker can't rely on that
+  //     command being recognised.
   //
-  // Resync trick: send (reset) + (set-option :print-success true) +
-  // (get-info :version), and read until we see the parenthesized version
-  // response. Every leading `success` ack — from (reset), from (set-option) —
-  // is silently discarded by the loop. (get-info) emits ONE distinguishable
-  // response and no per-command ack on any of the four arith-capable
-  // solvers in our matrix, so the buffer ends clean.
-  //
-  // Bitwuzla rejects (get-info). It's BV-only, so it's not in any test that
-  // currently calls reset; if a caller does, the [error] response will be
-  // surfaced to them rather than silently desyncing.
+  // Strategy: send `(reset) (set-option :print-success true) (echo "...")`
+  // — `(echo)` is the one resync command every supported child accepts.
+  // Read until we see the marker (drains the leading success acks). Then
+  // do a non-blocking drain to absorb any solver-specific extra acks
+  // (mathsat's echo-ack, e.g.) so the protocol is back in lockstep before
+  // emitPreamble() runs.
   if (File)
     File->emitRaw("(reset)\n");
   if (Proc) {
     Proc->emitRaw("(reset)\n");
     Proc->emitRaw("(set-option :print-success true)\n");
-    Proc->emitRaw("(get-info :version)\n");
+    Proc->emitRaw("(echo \"__camada_reset_marker__\")\n");
     Proc->flush();
     while (true) {
       std::string Resp = Proc->readResponse();
       fatalErrorIf(Resp.empty(),
                    "SMTLIBSolver: child solver closed the pipe during (reset)");
-      // The version response always begins with `(:version` on a clean
-      // protocol; the leading `success` lines from (reset) and (set-option)
-      // are pure tokens and don't match.
-      if (Resp.find(":version") != std::string::npos)
+      if (Resp.find("__camada_reset_marker__") != std::string::npos)
         break;
     }
+    // Drain any remaining stray responses (e.g. mathsat's echo-ack `success`
+    // that arrives after the echoed content). 200ms is generous — the data
+    // is already in the kernel pipe by the time we reach this point.
+    Proc->drainResponses(200);
   }
   emitPreamble();
 }
