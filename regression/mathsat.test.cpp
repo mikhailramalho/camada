@@ -1,5 +1,6 @@
 
 
+#include "smtlib_pipeline.test.h"
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -120,3 +121,66 @@ TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
     REQUIRE_FALSE(x_bool_res.value());
   }
 }
+
+// ---------------------------------------------------------------------------
+// SMT-LIB pipeline tests against the mathsat binary. mathsat supports BV,
+// Bool, arrays, FP-native, FP-BV, Int, Real, and UF. It does NOT support
+// (forall ...)/(exists ...) under any logic, nor `declare-datatypes`.
+// ---------------------------------------------------------------------------
+
+#define CAMADA_MATHSAT_SMTLIB_TEST(NameStr, RunFn)                             \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [mathsat]",                          \
+            "[MathSAT][SMTLIB][pipeline]") {                                   \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::mathsatCommand(),     \
+                                 "mathsat");                                   \
+    camada_smtlib_pipeline::RunFn(Cmd);                                        \
+  }
+
+CAMADA_MATHSAT_SMTLIB_TEST("public factory works", runSMTLIBPublicFactory)
+CAMADA_MATHSAT_SMTLIB_TEST("dual emitter logs to file too",
+                           runSMTLIBDualEmitter)
+CAMADA_MATHSAT_SMTLIB_TEST("SAT problem returns SAT from check()",
+                           runSMTLIBSatProblem)
+CAMADA_MATHSAT_SMTLIB_TEST("UNSAT problem returns UNSAT from check()",
+                           runSMTLIBUnsatProblem)
+CAMADA_MATHSAT_SMTLIB_TEST("getBV round-trips a concrete value", runSMTLIBGetBV)
+CAMADA_MATHSAT_SMTLIB_TEST("getBV round-trips a 1-bit value",
+                           runSMTLIBGetBV1Bit)
+CAMADA_MATHSAT_SMTLIB_TEST("push/pop returns sat/unsat/sat", runSMTLIBPushPop)
+CAMADA_MATHSAT_SMTLIB_TEST("symbol declared in pushed scope survives pop",
+                           runSMTLIBSymbolSurvivesPop)
+CAMADA_MATHSAT_SMTLIB_TEST("getBVInBin handles 128-bit decimal model value",
+                           runSMTLIBGetBVInBin128)
+CAMADA_MATHSAT_SMTLIB_TEST("getFP32 round-trips (BV-encoded)",
+                           runSMTLIBGetFP32BVEncoded)
+CAMADA_MATHSAT_SMTLIB_TEST("getFP64 round-trips (BV-encoded)",
+                           runSMTLIBGetFP64BVEncoded)
+CAMADA_MATHSAT_SMTLIB_TEST("getFP32 round-trips (native FP)",
+                           runSMTLIBGetFP32Native)
+CAMADA_MATHSAT_SMTLIB_TEST("getFP64 round-trips (native FP)",
+                           runSMTLIBGetFP64Native)
+CAMADA_MATHSAT_SMTLIB_TEST("native FP arithmetic via fp.add",
+                           runSMTLIBNativeFPAdd)
+CAMADA_MATHSAT_SMTLIB_TEST("native FP infinity model parses",
+                           runSMTLIBNativeFPInfinity)
+CAMADA_MATHSAT_SMTLIB_TEST("native FP neg FlipSignBit toggles NaN sign",
+                           runSMTLIBNativeFPNegFlipNaN)
+CAMADA_MATHSAT_SMTLIB_TEST("native FP NaN model parses",
+                           runSMTLIBNativeFPNaNModel)
+CAMADA_MATHSAT_SMTLIB_TEST("getArrayElement returns the stored value",
+                           runSMTLIBGetArrayElement)
+CAMADA_MATHSAT_SMTLIB_TEST("getInt round-trips a positive integer",
+                           runSMTLIBGetIntPositive)
+CAMADA_MATHSAT_SMTLIB_TEST("getInt round-trips a negative integer",
+                           runSMTLIBGetIntNegative)
+CAMADA_MATHSAT_SMTLIB_TEST("integer arithmetic add and compare",
+                           runSMTLIBIntArithCompare)
+CAMADA_MATHSAT_SMTLIB_TEST("getRational returns fraction parts (positive)",
+                           runSMTLIBGetRationalPositive)
+CAMADA_MATHSAT_SMTLIB_TEST("getRational handles negative rational",
+                           runSMTLIBGetRationalNegative)
+CAMADA_MATHSAT_SMTLIB_TEST("int/real conversion and isInt",
+                           runSMTLIBIntRealConvIsInt)
+CAMADA_MATHSAT_SMTLIB_TEST("UF with BV domain/codomain", runSMTLIBUF)
+
+#undef CAMADA_MATHSAT_SMTLIB_TEST

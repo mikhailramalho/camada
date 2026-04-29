@@ -1,4 +1,5 @@
 
+#include "smtlib_pipeline.test.h"
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -124,3 +125,52 @@ TEST_CASE("Yices multi-instance lifecycle edge case", "[YICES]") {
   yices1->reset();
   REQUIRE(yices2->check() == camada::checkResult::SAT); // Still SAT
 }
+
+// ---------------------------------------------------------------------------
+// SMT-LIB pipeline tests against the yices-smt2 binary. yices-smt2 supports
+// BV, Bool, arrays, FP-BV (via bit-blast), Int, Real, and UF. It does NOT
+// support native FP, quantifiers under logic ALL, or `declare-datatypes`.
+// ---------------------------------------------------------------------------
+
+#define CAMADA_YICES_SMTLIB_TEST(NameStr, RunFn)                               \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [yices-smt2]",                       \
+            "[YICES][SMTLIB][pipeline]") {                                     \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::yicesSmt2Command(),   \
+                                 "yices-smt2");                                \
+    camada_smtlib_pipeline::RunFn(Cmd);                                        \
+  }
+
+CAMADA_YICES_SMTLIB_TEST("public factory works", runSMTLIBPublicFactory)
+CAMADA_YICES_SMTLIB_TEST("dual emitter logs to file too", runSMTLIBDualEmitter)
+CAMADA_YICES_SMTLIB_TEST("SAT problem returns SAT from check()",
+                         runSMTLIBSatProblem)
+CAMADA_YICES_SMTLIB_TEST("UNSAT problem returns UNSAT from check()",
+                         runSMTLIBUnsatProblem)
+CAMADA_YICES_SMTLIB_TEST("getBV round-trips a concrete value", runSMTLIBGetBV)
+CAMADA_YICES_SMTLIB_TEST("getBV round-trips a 1-bit value", runSMTLIBGetBV1Bit)
+CAMADA_YICES_SMTLIB_TEST("push/pop returns sat/unsat/sat", runSMTLIBPushPop)
+CAMADA_YICES_SMTLIB_TEST("symbol declared in pushed scope survives pop",
+                         runSMTLIBSymbolSurvivesPop)
+CAMADA_YICES_SMTLIB_TEST("getBVInBin handles 128-bit decimal model value",
+                         runSMTLIBGetBVInBin128)
+CAMADA_YICES_SMTLIB_TEST("getFP32 round-trips (BV-encoded)",
+                         runSMTLIBGetFP32BVEncoded)
+CAMADA_YICES_SMTLIB_TEST("getFP64 round-trips (BV-encoded)",
+                         runSMTLIBGetFP64BVEncoded)
+CAMADA_YICES_SMTLIB_TEST("getArrayElement returns the stored value",
+                         runSMTLIBGetArrayElement)
+CAMADA_YICES_SMTLIB_TEST("getInt round-trips a positive integer",
+                         runSMTLIBGetIntPositive)
+CAMADA_YICES_SMTLIB_TEST("getInt round-trips a negative integer",
+                         runSMTLIBGetIntNegative)
+CAMADA_YICES_SMTLIB_TEST("integer arithmetic add and compare",
+                         runSMTLIBIntArithCompare)
+CAMADA_YICES_SMTLIB_TEST("getRational returns fraction parts (positive)",
+                         runSMTLIBGetRationalPositive)
+CAMADA_YICES_SMTLIB_TEST("getRational handles negative rational",
+                         runSMTLIBGetRationalNegative)
+CAMADA_YICES_SMTLIB_TEST("int/real conversion and isInt",
+                         runSMTLIBIntRealConvIsInt)
+CAMADA_YICES_SMTLIB_TEST("UF with BV domain/codomain", runSMTLIBUF)
+
+#undef CAMADA_YICES_SMTLIB_TEST
