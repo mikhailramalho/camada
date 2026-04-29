@@ -619,7 +619,15 @@ public:
   virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
                                   const SMTSortRef &To) = 0;
 
-  /// Reinterpret a floating-point as a bitvector, using the IEEE format
+  /// Reinterpret a floating-point as a bitvector, using the IEEE format.
+  ///
+  /// Scope caveat: bitwuzla, cvc5, and the SMT-LIB pipeline backend implement
+  /// this by materializing a fresh BV symbol and binding it to the FP value
+  /// through an asserted equality. That equality is tied to the current
+  /// (push) level, so the returned bitvector is only meaningful at the
+  /// nesting level where this method was called — using it after a (pop)
+  /// that crosses the call site leaves the result effectively unconstrained.
+  /// Z3's native backend uses fp.to_ieee_bv directly and is not affected.
   virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) = 0;
 
   /// Check if the constraints are satisfiable

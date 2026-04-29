@@ -377,8 +377,11 @@ private:
   uint64_t NextLetId = 0;
 
   // Counter for fresh symbols introduced by mkIEEEFPToBVImpl. SMT-LIB has no
-  // direct fp→bv same-encoding op, so we materialize a fresh BV symbol and
-  // constrain it via the inverse fp.from-IEEE-bv direction.
+  // portable fp→bv same-encoding op, so we materialize a fresh BV symbol
+  // and constrain it via the inverse fp.from-IEEE-bv direction. The
+  // constraint is scoped to the current push level — same trade-off the
+  // bitwuzla and cvc5 native backends make. See the docstring on
+  // SMTSolver::mkIEEEFPToBV for the user-facing implication.
   uint64_t NextIEEEBVId = 0;
 
   // Counter for fresh tuple-sort names. mkTupleSortImpl declares a fresh
