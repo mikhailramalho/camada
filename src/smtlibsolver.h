@@ -137,7 +137,6 @@ private:
   std::FILE *In = nullptr;  // read side: child's stdout
   std::FILE *Out = nullptr; // write side: child's stdin
   long Pid = -1;            // typed as long to avoid leaking <sys/types.h>
-  void *OldSigpipeHandler = nullptr;
 };
 
 /// Tag type used to disambiguate the SMTLIBSolver constructor that spawns a

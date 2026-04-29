@@ -193,12 +193,22 @@ namespace {
 // return on success. Returns the child PID and populates In/Out with the
 // parent-side ends of the pipes. Aborts via fatalErrorIf on any setup
 // failure.
+//
+// FD hygiene: pipes are created with O_CLOEXEC so any other open
+// descriptors the host process may hold (sockets, files, other solver
+// pipes) don't leak into the spawned solver across execvp. dup2(src, dst)
+// in the child clears CLOEXEC on `dst`, so stdin/stdout/stderr survive
+// the exec; everything else is closed automatically by the kernel. As a
+// belt-and-suspenders defense for non-CLOEXEC FDs that predate this
+// change, the child also calls close_range past STDERR if available.
 template <typename ExecInChild>
 long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
   int InPipe[2];  // child stdout -> parent reads
   int OutPipe[2]; // parent writes -> child stdin
-  fatalErrorIf(::pipe(InPipe) != 0, "ProcessEmitter: failed to open pipe");
-  fatalErrorIf(::pipe(OutPipe) != 0, "ProcessEmitter: failed to open pipe");
+  fatalErrorIf(::pipe2(InPipe, O_CLOEXEC) != 0,
+               "ProcessEmitter: failed to open pipe");
+  fatalErrorIf(::pipe2(OutPipe, O_CLOEXEC) != 0,
+               "ProcessEmitter: failed to open pipe");
 
   pid_t Child = ::fork();
   fatalErrorIf(Child < 0, "ProcessEmitter: fork() failed");
@@ -207,19 +217,27 @@ long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
     // Child: rewire stdin/stdout/stderr to the pipes, then exec via the
     // caller's callback. The callback is expected to never return on a
     // successful exec; if it does, we treat that as exec failure.
-    ::close(OutPipe[1]);
-    ::close(InPipe[0]);
+    // dup2 atomically clears CLOEXEC on the destination, so the wired
+    // stdio ends will survive the exec while every other FD (including
+    // the original pipe FDs) is closed by the kernel via CLOEXEC.
     ::dup2(OutPipe[0], STDIN_FILENO);
     ::dup2(InPipe[1], STDOUT_FILENO);
     ::dup2(InPipe[1], STDERR_FILENO);
-    ::close(OutPipe[0]);
-    ::close(InPipe[1]);
+
+    // Belt-and-suspenders: close any other FDs the host may have opened
+    // without CLOEXEC. close_range was added in Linux 5.9 / glibc 2.34;
+    // fall back silently when unavailable.
+#ifdef SYS_close_range
+    ::syscall(SYS_close_range, STDERR_FILENO + 1, ~0U, 0);
+#endif
 
     ExecInChildFn();
     std::_Exit(127);
   }
 
-  // Parent.
+  // Parent: close the ends we don't own. Their CLOEXEC bit was set by
+  // pipe2, so even if we somehow leaked them they'd be cleaned up across
+  // any subsequent exec on this side.
   ::close(OutPipe[0]);
   ::close(InPipe[1]);
   Out = ::fdopen(OutPipe[1], "w");
@@ -1669,24 +1687,142 @@ bool decimalToFraction(const std::string &S, std::string &Num,
 bool rationalValueToFraction(const std::string &Value, std::string &Num,
                              std::string &Den);
 
+// Decimal long division: divide non-negative decimal string Num by
+// non-negative decimal string Den. If the division is exact, set Quotient
+// to the result and return true; otherwise return false. Both inputs must
+// be non-empty and contain only digits, with no leading sign.
+bool decimalDivideExact(const std::string &Num, const std::string &Den,
+                        std::string &Quotient) {
+  if (Den.empty() || (Den.size() == 1 && Den[0] == '0'))
+    return false;
+  if (Num.empty())
+    return false;
+
+  // Standard schoolbook long division: walk Num left-to-right, build a
+  // running remainder, and compute one quotient digit per Num digit.
+  // Compare-and-subtract on decimal strings is enough; we don't need
+  // arbitrary-precision arithmetic for typical SMT-LIB rational values.
+  auto cmpDecimal = [](const std::string &A, const std::string &B) -> int {
+    // Strip leading zeros for the comparison.
+    std::size_t Ai = 0;
+    while (Ai + 1 < A.size() && A[Ai] == '0')
+      ++Ai;
+    std::size_t Bi = 0;
+    while (Bi + 1 < B.size() && B[Bi] == '0')
+      ++Bi;
+    std::size_t ALen = A.size() - Ai;
+    std::size_t BLen = B.size() - Bi;
+    if (ALen != BLen)
+      return ALen < BLen ? -1 : 1;
+    return A.compare(Ai, ALen, B, Bi, BLen) < 0   ? -1
+           : A.compare(Ai, ALen, B, Bi, BLen) > 0 ? 1
+                                                  : 0;
+  };
+  auto subDecimal = [](const std::string &A,
+                       const std::string &B) -> std::string {
+    // Compute A - B assuming A >= B and both are non-negative decimals.
+    std::string Out(A.size(), '0');
+    int Borrow = 0;
+    std::size_t Ai = A.size();
+    std::size_t Bi = B.size();
+    while (Ai > 0) {
+      --Ai;
+      int Digit = (A[Ai] - '0') - Borrow;
+      if (Bi > 0) {
+        --Bi;
+        Digit -= (B[Bi] - '0');
+      }
+      if (Digit < 0) {
+        Digit += 10;
+        Borrow = 1;
+      } else {
+        Borrow = 0;
+      }
+      Out[Ai] = static_cast<char>('0' + Digit);
+    }
+    // Strip leading zeros.
+    std::size_t Start = Out.find_first_not_of('0');
+    if (Start == std::string::npos)
+      return "0";
+    return Out.substr(Start);
+  };
+
+  std::string Q;
+  std::string R = "0";
+  for (char C : Num) {
+    if (C < '0' || C > '9')
+      return false;
+    // R = R * 10 + digit
+    if (R == "0")
+      R = std::string(1, C);
+    else
+      R.push_back(C);
+    // Strip a leading zero introduced by appending to "0".
+    if (R.size() > 1 && R[0] == '0')
+      R.erase(0, 1);
+    // Find largest digit d (0-9) such that d*Den <= R.
+    int D = 0;
+    std::string Multiple = "0";
+    for (int Try = 1; Try <= 9; ++Try) {
+      // Compute Try * Den incrementally.
+      std::string Next;
+      int Carry = 0;
+      for (std::size_t I = Den.size(); I-- > 0;) {
+        int Digit = (Den[I] - '0') * Try + Carry;
+        Next.insert(Next.begin(), static_cast<char>('0' + Digit % 10));
+        Carry = Digit / 10;
+      }
+      while (Carry > 0) {
+        Next.insert(Next.begin(), static_cast<char>('0' + Carry % 10));
+        Carry /= 10;
+      }
+      if (cmpDecimal(Next, R) > 0)
+        break;
+      D = Try;
+      Multiple = Next;
+    }
+    Q.push_back(static_cast<char>('0' + D));
+    R = subDecimal(R, Multiple);
+  }
+  if (R != "0")
+    return false;
+  // Strip leading zeros from quotient, leaving at least one digit.
+  std::size_t Start = Q.find_first_not_of('0');
+  if (Start == std::string::npos)
+    Quotient = "0";
+  else
+    Quotient = Q.substr(Start);
+  return true;
+}
+
 std::string intValueToDecimal(const std::string &Value) {
   // Camada's getInt() is sometimes called on Real expressions whose model
   // value happens to be integral (e.g. `getInt(r + 1/2)` where r = 3/2 →
-  // value 2). Solvers report such values as `2.0` (z3) or `2` (cvc5/yices/
-  // mathsat) or even `(/ 4 2)`. Reuse the rational parser so all shapes
-  // collapse to the same numerator/denominator pair, then return the
-  // numerator iff the denominator divides cleanly.
+  // value 2). Solvers report such values in several shapes:
+  //   - "2"            (cvc5, yices, mathsat for integer-typed)
+  //   - "2.0"          (z3 for Real-typed)
+  //   - "(/ 4 2)"      (any solver that emits unreduced rationals — e.g.
+  //                     mathsat's Real model values aren't always reduced)
+  //   - "(- 5)"        (negative integer)
+  //   - "(- (/ 4 2))"  (negative integer via unreduced rational)
+  // Reuse the rational parser so every shape collapses to a (Num, Den)
+  // pair, then succeed if the division is exact.
   std::string Num, Den;
   if (!rationalValueToFraction(Value, Num, Den))
     return {};
   if (Den == "1")
     return Num;
-  // Den != "1": the value is non-integral. We could truncate towards zero,
-  // but Camada's getInt contract is "integer model value"; rejecting non-
-  // integral values is the safer behavior. The shared fixture only ever
-  // calls getInt() on values that ARE integral, so this path is just
-  // defensive.
-  return {};
+
+  // Den != "1": exact-divide Num by Den. Strip the sign first so the
+  // divider only sees non-negative magnitudes.
+  bool Negative = !Num.empty() && Num[0] == '-';
+  std::string NumMag = Negative ? Num.substr(1) : Num;
+  std::string Quotient;
+  if (!decimalDivideExact(NumMag, Den, Quotient))
+    return {};
+  if (Negative && Quotient != "0")
+    return "-" + Quotient;
+  return Quotient;
 }
 
 // Parse an SMT-LIB rational/real model value into a (numerator, denominator)
@@ -1769,6 +1905,11 @@ bool rationalValueToFraction(const std::string &Value, std::string &Num,
 }
 
 } // namespace
+
+std::string
+SMTLIBSolver::parseIntModelValueForTest(const std::string &Value) {
+  return intValueToDecimal(Value);
+}
 
 SMTResult<bool> SMTLIBSolver::getBoolImpl(const SMTExprRef &Exp) {
   if (!Proc)
