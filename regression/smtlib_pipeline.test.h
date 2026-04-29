@@ -62,66 +62,78 @@ inline std::string findExecutable(const std::string &Name,
   return {};
 }
 
-// Per-solver command lookup.
-inline std::string z3Command() {
+// Per-solver argv lookup. Each returns the full argv vector ready to pass
+// to camada::createSMTLIBSolver(); empty vector means the binary isn't
+// reachable and the test should SKIP.
+inline std::vector<std::string> z3Command() {
 #ifdef CAMADA_TEST_Z3_BIN
   std::string Bin = findExecutable("z3", CAMADA_TEST_Z3_BIN);
 #else
   std::string Bin = findExecutable("z3", nullptr);
 #endif
-  return Bin.empty() ? std::string{} : Bin + " -in";
+  if (Bin.empty())
+    return {};
+  return {Bin, "-in"};
 }
 
-inline std::string cvc5Command() {
+inline std::vector<std::string> cvc5Command() {
 #ifdef CAMADA_TEST_CVC5_BIN
   std::string Bin = findExecutable("cvc5", CAMADA_TEST_CVC5_BIN);
 #else
   std::string Bin = findExecutable("cvc5", nullptr);
 #endif
+  if (Bin.empty())
+    return {};
   // --incremental is required for (push)/(pop). --arrays-exp enables cvc5's
   // experimental array support, which covers `((as const ...))` const-array
   // literals — without it cvc5 emits "Cannot handle assertion with term of
   // kind STORE_ALL" and the formula returns unknown.
-  return Bin.empty() ? std::string{}
-                     : Bin + " --lang smt2 --incremental --arrays-exp";
+  return {Bin, "--lang", "smt2", "--incremental", "--arrays-exp"};
 }
 
-inline std::string bitwuzlaCommand() {
+inline std::vector<std::string> bitwuzlaCommand() {
 #ifdef CAMADA_TEST_BITWUZLA_BIN
   std::string Bin = findExecutable("bitwuzla", CAMADA_TEST_BITWUZLA_BIN);
 #else
   std::string Bin = findExecutable("bitwuzla", nullptr);
 #endif
-  return Bin;
+  if (Bin.empty())
+    return {};
+  return {Bin};
 }
 
-inline std::string yicesSmt2Command() {
+inline std::vector<std::string> yicesSmt2Command() {
 #ifdef CAMADA_TEST_YICES_SMT2_BIN
   std::string Bin = findExecutable("yices-smt2", CAMADA_TEST_YICES_SMT2_BIN);
 #else
   std::string Bin = findExecutable("yices-smt2", nullptr);
 #endif
-  return Bin.empty() ? std::string{} : Bin + " --incremental";
+  if (Bin.empty())
+    return {};
+  return {Bin, "--incremental"};
 }
 
-inline std::string mathsatCommand() {
+inline std::vector<std::string> mathsatCommand() {
 #ifdef CAMADA_TEST_MATHSAT_BIN
   std::string Bin = findExecutable("mathsat", CAMADA_TEST_MATHSAT_BIN);
 #else
   std::string Bin = findExecutable("mathsat", nullptr);
 #endif
-  return Bin;
+  if (Bin.empty())
+    return {};
+  return {Bin};
 }
 
-// Build an SMTSolverRef driving the given child command. The returned ref
+// Build an SMTSolverRef driving the given child argv. The returned ref
 // works with any fixture helper that takes `const camada::SMTSolverRef &`.
-inline camada::SMTSolverRef makeSMTLIBSolver(const std::string &Cmd) {
-  return camada::createSMTLIBSolver(Cmd);
+inline camada::SMTSolverRef
+makeSMTLIBSolver(const std::vector<std::string> &Argv) {
+  return camada::createSMTLIBSolver(Argv);
 }
 
 // Skip the test if the binary isn't reachable.
 #define CAMADA_SMTLIB_REQUIRE_BINARY(CmdExpr, Name)                            \
-  std::string Cmd = (CmdExpr);                                                 \
+  std::vector<std::string> Cmd = (CmdExpr);                                    \
   if (Cmd.empty())                                                             \
     SKIP(std::string(Name) + " binary not found on PATH or in deps install");
 
@@ -149,22 +161,22 @@ inline std::string readFile(const std::string &Path) {
   return Ss.str();
 }
 
-// The createSMTLIBSolver(Cmd) public factory must produce a solver that can
+// The createSMTLIBSolver(Argv) public factory must produce a solver that can
 // drive a trivial round-trip through the child.
-inline void runSMTLIBPublicFactory(const std::string &Cmd) {
-  auto Solver = camada::createSMTLIBSolver(Cmd);
+inline void runSMTLIBPublicFactory(const std::vector<std::string> &Argv) {
+  auto Solver = camada::createSMTLIBSolver(Argv);
   auto BV8 = Solver->mkBVSort(8);
   auto X = Solver->mkSymbol("x", BV8);
   Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(1, BV8)));
   REQUIRE(Solver->check() == camada::checkResult::SAT);
 }
 
-// The dual-emitter form (Cmd + path) must drive the child AND tee the script
+// The dual-emitter form (Argv + path) must drive the child AND tee the script
 // to disk simultaneously.
-inline void runSMTLIBDualEmitter(const std::string &Cmd) {
+inline void runSMTLIBDualEmitter(const std::vector<std::string> &Argv) {
   std::string Path = makeTempPath();
   {
-    auto Solver = camada::createSMTLIBSolver(Cmd, Path);
+    auto Solver = camada::createSMTLIBSolver(Argv, Path);
     auto BV8 = Solver->mkBVSort(8);
     auto X = Solver->mkSymbol("x", BV8);
     Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(3, BV8)));

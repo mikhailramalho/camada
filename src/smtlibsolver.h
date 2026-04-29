@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "camadaexpr.h"
 #include "camadaimpl.h"
@@ -94,14 +95,17 @@ private:
 
 /// Drives an external SMT-LIB-speaking solver via stdin/stdout pipes.
 ///
-/// Spawns the child via `sh -c <cmd>`, so callers can pass shell-friendly
-/// commands like `z3 -in` or `cvc5 --lang smt2`. The constructor sends
-/// `(set-option :print-success true)` at startup so every non-query command
-/// produces a `success`/`error` response, which gives a deterministic way to
-/// resynchronize with the child after each emitted line.
+/// The child is spawned with `execvp(Argv[0], Argv)` — no shell involved, so
+/// argv entries are passed verbatim and shell metacharacters (quotes, `;`,
+/// `|`, `$()`, …) carry no special meaning. Argv[0] is resolved against
+/// `$PATH` if it has no `/`, otherwise treated as a literal path.
+///
+/// The constructor sends `(set-option :print-success true)` at startup so
+/// every non-query command produces a `success`/`error` response, giving a
+/// deterministic resync point after each emitted line.
 class ProcessEmitter {
 public:
-  explicit ProcessEmitter(const std::string &Cmd);
+  explicit ProcessEmitter(const std::vector<std::string> &Argv);
   ProcessEmitter(const ProcessEmitter &) = delete;
   ProcessEmitter &operator=(const ProcessEmitter &) = delete;
   ~ProcessEmitter() noexcept;
@@ -158,15 +162,18 @@ public:
   /// Pass "-" for stdout. check() returns UNKNOWN; get* queries error.
   explicit SMTLIBSolver(const std::string &OutputPath);
 
-  /// Interactive constructor: spawn a child solver via `sh -c <Cmd>`. The
-  /// solver must speak standard SMT-LIB on stdin/stdout (z3, cvc5, etc.).
-  /// check() and get* queries round-trip through the child.
-  SMTLIBSolver(SMTLIBProcessTag, const std::string &Cmd);
+  /// Interactive constructor: spawn a child solver via
+  /// `execvp(Argv[0], Argv)`. The solver must speak standard SMT-LIB on
+  /// stdin/stdout (z3, cvc5, etc.). check() and get* queries round-trip
+  /// through the child. No shell is involved — argv entries are passed
+  /// verbatim, so spaces, quotes, and other metacharacters in any entry
+  /// carry no special meaning.
+  SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv);
 
-  /// Combined constructor: spawn a child solver *and* log the script to a
-  /// file. Useful when you want both an interactive answer and a reproducer
-  /// to hand to another tool.
-  SMTLIBSolver(SMTLIBProcessTag, const std::string &Cmd,
+  /// Combined constructor: spawn a child solver via execvp *and* log the
+  /// script to a file. Useful when you want both an interactive answer
+  /// and a reproducer to hand to another tool.
+  SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
                const std::string &OutputPath);
 
   ~SMTLIBSolver() override;

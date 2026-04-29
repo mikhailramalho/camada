@@ -677,19 +677,27 @@ SMTSolverRef createSTPSolver();
 
 /// Create an SMT-LIB-backed solver that drives an external solver process.
 ///
-/// Cmd is passed to `sh -c`, so any shell-friendly invocation works:
-///   - "z3 -in"
-///   - "cvc5 --lang smt2"
-///   - "/path/to/solver --some-flags"
+/// The child is spawned with `execvp(Argv[0], Argv)`. Argv[0] is the solver
+/// binary (path or PATH-resolvable name); subsequent entries are passed
+/// verbatim as separate argv entries. No shell is involved, so spaces,
+/// quotes, and other shell metacharacters in any entry carry no special
+/// meaning — safe to use with paths/arguments coming from configuration,
+/// environment, or other untrusted sources.
 ///
-/// The child must speak standard SMT-LIB on stdin/stdout. Camada speaks
+/// Examples:
+///   createSMTLIBSolver({"z3", "-in"})
+///   createSMTLIBSolver({"cvc5", "--lang", "smt2", "--incremental"})
+///   createSMTLIBSolver({"/path/to/solver", "--some-flag"})
+///
+/// The child must speak standard SMT-LIB on stdin/stdout. Camada sends
 /// `(set-option :print-success true)` to it at startup, so any solver that
 /// honors that contract works.
-SMTSolverRef createSMTLIBSolver(const std::string &Cmd);
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv);
 
-/// Same as `createSMTLIBSolver(Cmd)` but also tees the emitted SMT-LIB script
-/// to OutputPath (or stdout if OutputPath is "-") for offline reproduction.
-SMTSolverRef createSMTLIBSolver(const std::string &Cmd,
+/// Same as `createSMTLIBSolver(Argv)` but also tees the emitted SMT-LIB
+/// script to OutputPath (or stdout if OutputPath is "-") for offline
+/// reproduction.
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
                                 const std::string &OutputPath);
 
 } // namespace camada

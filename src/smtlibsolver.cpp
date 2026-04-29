@@ -182,10 +182,16 @@ std::string readOneSmtlibResponse(std::FILE *In) {
 
 } // namespace
 
-ProcessEmitter::ProcessEmitter(const std::string &Cmd) {
-  fatalErrorIf(Cmd.empty(),
-               "SMTLIBSolver: ProcessEmitter requires a non-empty command");
+namespace {
 
+// Shared fork + pipe + wire-stdio scaffolding. The caller provides an
+// `ExecInChild` callback that runs in the forked child after stdin/stdout/
+// stderr have been wired to the pipes; it must call exec*() and never
+// return on success. Returns the child PID and populates In/Out with the
+// parent-side ends of the pipes. Aborts via fatalErrorIf on any setup
+// failure.
+template <typename ExecInChild>
+long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
   int InPipe[2];  // child stdout -> parent reads
   int OutPipe[2]; // parent writes -> child stdin
   fatalErrorIf(::pipe(InPipe) != 0, "ProcessEmitter: failed to open pipe");
@@ -195,7 +201,9 @@ ProcessEmitter::ProcessEmitter(const std::string &Cmd) {
   fatalErrorIf(Child < 0, "ProcessEmitter: fork() failed");
 
   if (Child == 0) {
-    // Child: rewire stdin/stdout/stderr to the pipes and exec sh -c <Cmd>.
+    // Child: rewire stdin/stdout/stderr to the pipes, then exec via the
+    // caller's callback. The callback is expected to never return on a
+    // successful exec; if it does, we treat that as exec failure.
     ::close(OutPipe[1]);
     ::close(InPipe[0]);
     ::dup2(OutPipe[0], STDIN_FILENO);
@@ -204,11 +212,7 @@ ProcessEmitter::ProcessEmitter(const std::string &Cmd) {
     ::close(OutPipe[0]);
     ::close(InPipe[1]);
 
-    const char *Shell = std::getenv("SHELL");
-    if (!Shell || !*Shell)
-      Shell = "/bin/sh";
-    ::execlp(Shell, Shell, "-c", Cmd.c_str(), static_cast<char *>(nullptr));
-    // Reaching here means execlp failed.
+    ExecInChildFn();
     std::_Exit(127);
   }
 
@@ -226,15 +230,39 @@ ProcessEmitter::ProcessEmitter(const std::string &Cmd) {
   // bytes into libc, leaving select() unable to see them. Unbuffered
   // reads keep stdio and the kernel pipe in sync.
   ::setvbuf(In, nullptr, _IONBF, 0);
-  Pid = static_cast<long>(Child);
+  return static_cast<long>(Child);
+}
 
+void *installSigpipeIgn() {
   // If the child dies, writes to its closed stdin would otherwise raise
   // SIGPIPE and kill us. Ignore the signal; we'll detect EOF on read.
   using Handler = void (*)(int);
   Handler Prev = std::signal(SIGPIPE, SIG_IGN);
   fatalErrorIf(Prev == SIG_ERR,
                "ProcessEmitter: failed to install SIGPIPE handler");
-  OldSigpipeHandler = reinterpret_cast<void *>(Prev);
+  return reinterpret_cast<void *>(Prev);
+}
+
+} // namespace
+
+ProcessEmitter::ProcessEmitter(const std::vector<std::string> &Argv) {
+  fatalErrorIf(Argv.empty(),
+               "SMTLIBSolver: ProcessEmitter requires a non-empty argv");
+  fatalErrorIf(Argv[0].empty(),
+               "SMTLIBSolver: ProcessEmitter argv[0] must be non-empty");
+
+  // Build a NULL-terminated argv suitable for execvp. We materialize the
+  // pointer array in the parent; it's safe to pass through fork/exec
+  // because fork preserves the address space until the child execs.
+  std::vector<char *> ArgvPtrs;
+  ArgvPtrs.reserve(Argv.size() + 1);
+  for (const auto &A : Argv)
+    ArgvPtrs.push_back(const_cast<char *>(A.c_str()));
+  ArgvPtrs.push_back(nullptr);
+
+  Pid = forkAndWire(In, Out,
+                    [&ArgvPtrs]() { ::execvp(ArgvPtrs[0], ArgvPtrs.data()); });
+  OldSigpipeHandler = installSigpipeIgn();
 }
 
 ProcessEmitter::~ProcessEmitter() noexcept {
@@ -359,16 +387,18 @@ SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath)
   initializeCommonSingletons();
 }
 
-SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag, const std::string &Cmd)
-    : Proc(std::make_unique<ProcessEmitter>(Cmd)) {
+SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
+                           const std::vector<std::string> &Argv)
+    : Proc(std::make_unique<ProcessEmitter>(Argv)) {
   emitPreamble();
   initializeCommonSingletons();
 }
 
-SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag, const std::string &Cmd,
+SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
+                           const std::vector<std::string> &Argv,
                            const std::string &OutputPath)
     : File(std::make_unique<FileEmitter>(OutputPath)),
-      Proc(std::make_unique<ProcessEmitter>(Cmd)) {
+      Proc(std::make_unique<ProcessEmitter>(Argv)) {
   emitPreamble();
   initializeCommonSingletons();
 }

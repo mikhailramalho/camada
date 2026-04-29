@@ -108,13 +108,13 @@ SMTSolverRef createSTPSolver() {
 #endif
 }
 
-SMTSolverRef createSMTLIBSolver(const std::string &Cmd) {
-  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Cmd);
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv) {
+  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv);
 }
 
-SMTSolverRef createSMTLIBSolver(const std::string &Cmd,
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
                                 const std::string &OutputPath) {
-  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Cmd, OutputPath);
+  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, OutputPath);
 }
 
 } // namespace camada

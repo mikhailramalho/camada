@@ -131,12 +131,14 @@ requested.
 In addition to the six native bindings above, Camada also ships an SMT-LIB
 backend that drives any external solver speaking standard SMT-LIB on
 stdin/stdout — z3, cvc5, or anything else that honors the
-`(set-option :print-success true)` contract. Use it via:
+`(set-option :print-success true)` contract. The child is spawned with
+`execvp(argv[0], argv)` — no shell is involved, so individual argv entries
+can contain spaces or other characters without escaping concerns. Use it via:
 
 ```cpp
-auto solver = camada::createSMTLIBSolver("z3 -in");
+auto solver = camada::createSMTLIBSolver({"z3", "-in"});
 // ... build a problem with the usual mk*/addConstraint API ...
-auto result = solver->check();           // sat / unsat / unknown
+auto result = solver->check();          // sat / unsat / unknown
 auto value = solver->getBV(symbol);     // round-trips through (get-value ...)
 ```
 
@@ -144,25 +146,26 @@ A two-argument form also tees the emitted SMT-LIB script to a file, useful
 when you want both an interactive answer and a reproducer to share:
 
 ```cpp
-auto solver = camada::createSMTLIBSolver("cvc5 --lang smt2", "session.smt2");
+auto solver = camada::createSMTLIBSolver(
+    {"cvc5", "--lang", "smt2", "--incremental"}, "session.smt2");
 ```
 
-Verified child solvers (the regression suite parameterizes every interactive
-test over each binary it can find on disk):
+Verified child solvers (the regression suite drives each one through the
+shared fixtures from `tests.h`):
 
-| Solver       | Invocation                       | Notes |
-| ------------ | -------------------------------- | ----- |
-| z3           | `z3 -in`                         | default |
-| cvc5         | `cvc5 --lang smt2 --incremental` | `--incremental` is required for `(push)` / `(pop)`. |
-| bitwuzla     | `bitwuzla`                       | speaks SMT-LIB on stdin without extra flags |
-| yices-smt2   | `yices-smt2 --incremental`       | `--incremental` is required for `(push)` / `(pop)`. No floating-point support — callers using native FP get an `unsupported` from the child. Use `FPEncoding::BV` to route every FP op through the common-layer bit-blast path, which works against yices. |
-| mathsat      | `mathsat`                        | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
+| Solver       | Argv                                                            | Notes |
+| ------------ | --------------------------------------------------------------- | ----- |
+| z3           | `{"z3", "-in"}`                                                 | default |
+| cvc5         | `{"cvc5", "--lang", "smt2", "--incremental", "--arrays-exp"}`   | `--incremental` is required for `(push)` / `(pop)`. `--arrays-exp` enables `((as const ...))` const-array literals. |
+| bitwuzla     | `{"bitwuzla"}`                                                  | speaks SMT-LIB on stdin without extra flags |
+| yices-smt2   | `{"yices-smt2", "--incremental"}`                               | `--incremental` is required for `(push)` / `(pop)`. No floating-point support — callers using native FP get an `unsupported` from the child. Use `FPEncoding::BV` to route every FP op through the common-layer bit-blast path, which works against yices. |
+| mathsat      | `{"mathsat"}`                                                   | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
 
 The Camada preamble unconditionally sends `(set-option :print-success true)`,
 `(set-option :produce-models true)`, `(set-option :global-declarations true)`,
 `(set-info :status unknown)`, and `(set-logic ALL)` at startup, so any solver
 that honors the SMT-LIB option contract should work. Other solvers should be
-straightforward to plug in via the `createSMTLIBSolver(cmd)` factory.
+straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
 
 The backend covers BV/Bool/arrays and native floating-point (FP arithmetic,
 predicates, conversions, and `(_ +oo …)` / `(_ NaN …)` / `(fp …)` model
