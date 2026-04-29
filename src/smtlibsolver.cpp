@@ -283,11 +283,19 @@ inline int computeFdLimitForChild() {
 // uses close_range and close(); no malloc/dirent/sysconf/stdio. The
 // `MaxFd` upper bound must be computed in the parent before fork.
 //
-// Tries close_range first (Linux 5.9+); on hosts where it isn't compiled
-// in, isn't supported by the runtime kernel, or fails for any reason,
-// falls back to a bounded close() loop. Belt-and-suspenders for host-
-// process FDs that weren't opened with CLOEXEC.
-inline void closeFdsAboveStderr(int MaxFd) {
+// LINUX ONLY. macOS depends on inherited fds for launchd/bootstrap-port
+// IPC inside libSystem; closing them blocks dyld from loading any
+// dynamically-linked binary in the child. Our pipes are already created
+// with FD_CLOEXEC, which is the only descriptor hygiene Camada itself
+// owns. Host-process fd hygiene (the trust-boundary concern Codex raised)
+// is Linux-only here; macOS users that need it should use posix_spawn
+// with POSIX_SPAWN_CLOEXEC_DEFAULT in their integration layer.
+//
+// On Linux, tries close_range first (5.9+); falls back to a bounded
+// close() loop for older kernels. Belt-and-suspenders for host-process
+// FDs that weren't opened with CLOEXEC.
+inline void closeFdsAboveStderr([[maybe_unused]] int MaxFd) {
+#if defined(__linux__)
 #ifdef SYS_close_range
   long Rc = ::syscall(SYS_close_range, STDERR_FILENO + 1, ~0U, 0);
   if (Rc == 0)
@@ -295,6 +303,7 @@ inline void closeFdsAboveStderr(int MaxFd) {
 #endif
   for (int Fd = STDERR_FILENO + 1; Fd < MaxFd; ++Fd)
     ::close(Fd);
+#endif
 }
 
 // Shared fork + pipe + wire-stdio scaffolding. The caller provides an
