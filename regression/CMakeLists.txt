@@ -71,15 +71,25 @@ if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/yices-smt2")
   )
 endif()
 
-# MathSAT ships a binary inside its vendor archive but does not stage it into
-# ${CAMADA_DEPS_INSTALL_DIR}/bin. Search the unpacked source tree for any
-# mathsat-*/bin/mathsat. CONFIGURE_DEPENDS makes CMake re-evaluate the glob on
-# every build so a dep version bump (e.g. 5.6.15 -> 5.6.16) is picked up without
-# needing to manually re-run `cmake -S . -B build`.
-file(GLOB CAMADA_MATHSAT_BIN_CANDIDATES CONFIGURE_DEPENDS
-     "${CAMADA_DEPS_SRC_DIR}/mathsat-*/bin/mathsat")
-if(CAMADA_MATHSAT_BIN_CANDIDATES)
-  list(GET CAMADA_MATHSAT_BIN_CANDIDATES 0 CAMADA_MATHSAT_BIN_PATH)
+# MathSAT ships a binary inside its vendor archive. On macOS the vendor binary
+# hard-codes /opt/local/lib/libgmp.10.dylib; CamadaDependencies.cmake copies it
+# into ${CAMADA_DEPS_INSTALL_DIR}/bin and rewrites the load path so it can run
+# without MacPorts, so prefer that staged copy. Fall back to globbing the
+# unpacked source tree (Linux, or macOS hosts where staging was skipped).
+# CONFIGURE_DEPENDS makes CMake re-evaluate the glob on every build so a dep
+# version bump (e.g. 5.6.15 -> 5.6.16) is picked up without manually re-running
+# `cmake -S . -B build`.
+set(CAMADA_MATHSAT_BIN_PATH "")
+if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/mathsat")
+  set(CAMADA_MATHSAT_BIN_PATH "${CAMADA_DEPS_INSTALL_DIR}/bin/mathsat")
+else()
+  file(GLOB CAMADA_MATHSAT_BIN_CANDIDATES CONFIGURE_DEPENDS
+       "${CAMADA_DEPS_SRC_DIR}/mathsat-*/bin/mathsat")
+  if(CAMADA_MATHSAT_BIN_CANDIDATES)
+    list(GET CAMADA_MATHSAT_BIN_CANDIDATES 0 CAMADA_MATHSAT_BIN_PATH)
+  endif()
+endif()
+if(CAMADA_MATHSAT_BIN_PATH)
   target_compile_definitions(
     ${REGRESSION_TARGET_NAME}
     PRIVATE "CAMADA_TEST_MATHSAT_BIN=\"${CAMADA_MATHSAT_BIN_PATH}\"")

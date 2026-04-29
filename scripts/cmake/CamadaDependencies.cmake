@@ -1021,9 +1021,92 @@ function(camada_setup_z3)
   endif()
 endfunction()
 
+# Stage the macOS MathSAT binary into ${CAMADA_DEPS_INSTALL_DIR}/bin and rewrite
+# its hard-coded /opt/local/lib/libgmp.10.dylib LC_LOAD_DYLIB so the binary can
+# launch on machines that don't ship MacPorts. The vendor archive's prebuilt
+# binary always points at the MacPorts GMP path; on Homebrew hosts dyld aborts
+# the process before it reads any input, which breaks every SMTLIB pipeline test
+# for MathSAT. We rewrite the path to whichever libgmp.10.dylib we can locate
+# (Homebrew first, then a few well-known prefixes) and ad-hoc resign because
+# arm64 rejects a modified binary that still carries its old signature. If no
+# usable dylib is found we leave the binary alone — a MacPorts host already
+# satisfies the original load path, and any other host will have its pipeline
+# tests SKIP because the binary will fail to launch.
+function(camada_stage_macos_mathsat_binary mathsat_source_dir)
+  set(src_binary "${mathsat_source_dir}/bin/mathsat")
+  if(NOT EXISTS "${src_binary}")
+    return()
+  endif()
+
+  set(dst_binary "${CAMADA_DEPS_INSTALL_DIR}/bin/mathsat")
+  file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/bin")
+  file(COPY "${src_binary}" DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/bin")
+
+  set(_gmp_candidates "")
+  find_program(_camada_brew brew)
+  if(_camada_brew)
+    execute_process(
+      COMMAND "${_camada_brew}" --prefix gmp
+      OUTPUT_VARIABLE _brew_gmp_prefix
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE _brew_gmp_rc
+      ERROR_QUIET)
+    if(_brew_gmp_rc EQUAL 0 AND _brew_gmp_prefix)
+      list(APPEND _gmp_candidates "${_brew_gmp_prefix}/lib/libgmp.10.dylib")
+    endif()
+  endif()
+  list(
+    APPEND
+    _gmp_candidates
+    "/opt/homebrew/opt/gmp/lib/libgmp.10.dylib"
+    "/opt/homebrew/lib/libgmp.10.dylib"
+    "/usr/local/opt/gmp/lib/libgmp.10.dylib"
+    "/usr/local/lib/libgmp.10.dylib"
+    "/opt/local/lib/libgmp.10.dylib")
+
+  set(_gmp_dylib "")
+  foreach(candidate IN LISTS _gmp_candidates)
+    if(EXISTS "${candidate}")
+      set(_gmp_dylib "${candidate}")
+      break()
+    endif()
+  endforeach()
+
+  if(NOT _gmp_dylib)
+    message(
+      STATUS
+        "MathSAT: no libgmp.10.dylib found on host; SMTLIB pipeline tests will SKIP."
+    )
+    return()
+  endif()
+
+  if(_gmp_dylib STREQUAL "/opt/local/lib/libgmp.10.dylib")
+    return()
+  endif()
+
+  execute_process(
+    COMMAND install_name_tool -change /opt/local/lib/libgmp.10.dylib
+            "${_gmp_dylib}" "${dst_binary}"
+    RESULT_VARIABLE _rc)
+  if(NOT _rc EQUAL 0)
+    message(WARNING "MathSAT: install_name_tool failed (${_rc}) on ${dst_binary}")
+    return()
+  endif()
+  execute_process(COMMAND codesign --force --sign - "${dst_binary}"
+                  RESULT_VARIABLE _rc)
+  if(NOT _rc EQUAL 0)
+    message(WARNING "MathSAT: codesign failed (${_rc}) on ${dst_binary}")
+  endif()
+endfunction()
+
 function(camada_setup_mathsat)
   set(mathsat_header "${CAMADA_DEPS_INSTALL_DIR}/include/mathsat.h")
   if(EXISTS "${mathsat_header}")
+    if(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin")
+      camada_select_mathsat_prebuilt_info(_unused_url _unused_archive
+                                          _cached_source_dir)
+      camada_stage_macos_mathsat_binary("${_cached_source_dir}")
+    endif()
     return()
   endif()
 
@@ -1067,6 +1150,7 @@ function(camada_setup_mathsat)
         COMMAND ${CMAKE_COMMAND} -E create_symlink /usr/local/include/gmp.h
                 "${CAMADA_DEPS_INSTALL_DIR}/include/gmp.h")
     endif()
+    camada_stage_macos_mathsat_binary("${mathsat_source_dir}")
   else()
     file(COPY "${mathsat_source_dir}/lib/"
          DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/lib")
