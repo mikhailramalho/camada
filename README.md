@@ -321,6 +321,7 @@ Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbm
 - `mkFPNeg` now accepts `FPNegBehavior`.
 - The default, `FPNegBehavior::FlipSignBit`, preserves the full IEEE payload and only toggles the sign bit, including on `NaN`s.
 - `FPNegBehavior::PreserveNaNPayload` follows the SMT floating-point standard and leaves `NaN`s unchanged.
+- `FlipSignBit` is fully honored under BV encoding and via the SMTLIB pipeline. On native FP backends (Bitwuzla, CVC5, Z3) it is best-effort: these solvers treat all `NaN`s as a single equivalence class, so when the operand is a `NaN` the resulting `NaN`'s bit pattern is not guaranteed to match a literal sign-bit flip of the input bits.
 
 ## Usage Example
 
