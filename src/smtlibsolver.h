@@ -178,6 +178,8 @@ protected:
   SMTSortRef mkBVRMSortImpl() override;
   SMTSortRef mkFPSortImpl(unsigned ExpWidth, unsigned SigWidth) override;
   SMTSortRef mkRMSortImpl() override;
+  SMTSortRef mkIntSortImpl() override;
+  SMTSortRef mkRealSortImpl() override;
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;
 
@@ -280,10 +282,42 @@ protected:
                               const SMTSortRef &To) override;
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
+  // --- Int / Real literals + arithmetic ---
+  SMTExprRef mkIntImpl(int64_t v) override;
+  SMTExprRef mkIntImpl(const std::string &v) override;
+  SMTExprRef mkRealImpl(const std::string &v) override;
+  SMTExprRef mkRealImpl(int64_t v) override;
+  SMTExprRef mkRealImpl(int64_t num, int64_t den) override;
+  SMTExprRef mkArithNegImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkArithAddImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithSubImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithMulImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithDivImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithModImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithLtImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithGtImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithLeImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithGeImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
+
   // --- model queries: write-only mode aborts on these ---
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
   SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
   SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::string> getIntImpl(const SMTExprRef &Exp) override;
+  SMTResult<std::pair<std::string, std::string>>
+  getRationalImpl(const SMTExprRef &Exp) override;
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 

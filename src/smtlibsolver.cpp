@@ -452,6 +452,14 @@ SMTSortRef SMTLIBSolver::mkRMSortImpl() {
       SMTSortKind::RM, this, "RoundingMode", SMTSort::ScalarSortData{3}));
 }
 
+SMTSortRef SMTLIBSolver::mkIntSortImpl() {
+  return makeSortRef<SMTLIBSort>(SMTLIBSort(SMTSortKind::Int, this, "Int"));
+}
+
+SMTSortRef SMTLIBSolver::mkRealSortImpl() {
+  return makeSortRef<SMTLIBSort>(SMTLIBSort(SMTSortKind::Real, this, "Real"));
+}
+
 SMTSortRef SMTLIBSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                          const SMTSortRef &ElemSort) {
   std::string Text =
@@ -881,6 +889,160 @@ SMTExprRef SMTLIBSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   return NewSymbol;
 }
 
+// --- Int / Real literals + arithmetic ---
+
+// Integer literals in SMT-LIB are written as bare numerals, with `(- N)` for
+// negatives — there is no signed numeric token.
+SMTExprRef SMTLIBSolver::mkIntImpl(int64_t v) {
+  std::string Text;
+  if (v < 0) {
+    // Avoid overflow when negating INT64_MIN. Build the magnitude as an
+    // unsigned and stringify, then wrap in (- ...).
+    uint64_t Mag = static_cast<uint64_t>(-(v + 1)) + 1;
+    Text = "(- " + std::to_string(Mag) + ")";
+  } else {
+    Text = std::to_string(v);
+  }
+  return makeSMTLIBExpr(SMTExprKind::IntConst, mkIntSort(), std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkIntImpl(const std::string &v) {
+  // Caller passes a decimal string, possibly leading '-'. Wrap with (- ...)
+  // for the negative case so the wire form is canonical SMT-LIB.
+  if (!v.empty() && v[0] == '-')
+    return makeSMTLIBExpr(SMTExprKind::IntConst, mkIntSort(),
+                          "(- " + v.substr(1) + ")");
+  return makeSMTLIBExpr(SMTExprKind::IntConst, mkIntSort(), v);
+}
+
+SMTExprRef SMTLIBSolver::mkRealImpl(const std::string &v) {
+  // Real literals: the input may be a decimal ("3.14"), an integer ("7"), a
+  // signed integer ("-7"), or a rational like "3/4". Normalize to the form
+  // SMT-LIB accepts in expression position: bare decimals/integers, with
+  // (- ...) for negatives and (/ p q) for rationals.
+  if (v.empty())
+    return makeSMTLIBExpr(SMTExprKind::RealConst, mkRealSort(), "0.0");
+  std::string Body = v;
+  bool Negative = false;
+  if (Body[0] == '-') {
+    Negative = true;
+    Body = Body.substr(1);
+  }
+  std::string Text;
+  std::size_t Slash = Body.find('/');
+  if (Slash != std::string::npos)
+    Text = "(/ " + Body.substr(0, Slash) + " " + Body.substr(Slash + 1) + ")";
+  else
+    Text = Body;
+  if (Negative)
+    Text = "(- " + Text + ")";
+  return makeSMTLIBExpr(SMTExprKind::RealConst, mkRealSort(), std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkRealImpl(int64_t v) {
+  // Reuse the int64-stringify path, but mark the result Real-sorted.
+  std::string Text;
+  if (v < 0) {
+    uint64_t Mag = static_cast<uint64_t>(-(v + 1)) + 1;
+    Text = "(- " + std::to_string(Mag) + ")";
+  } else {
+    Text = std::to_string(v);
+  }
+  return makeSMTLIBExpr(SMTExprKind::RealConst, mkRealSort(), std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkRealImpl(int64_t num, int64_t den) {
+  std::string NumText;
+  std::string DenText = std::to_string(den < 0 ? -den : den);
+  bool Negative = (num < 0) ^ (den < 0);
+  uint64_t NumMag = num < 0 ? static_cast<uint64_t>(-(num + 1)) + 1
+                            : static_cast<uint64_t>(num);
+  NumText = std::to_string(NumMag);
+  std::string Text = "(/ " + NumText + " " + DenText + ")";
+  if (Negative)
+    Text = "(- " + Text + ")";
+  return makeSMTLIBExpr(SMTExprKind::RealConst, mkRealSort(), std::move(Text));
+}
+
+SMTExprRef SMTLIBSolver::mkArithNegImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::ArithNeg, Exp->Sort,
+                        "(- " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithAddImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithAdd, LHS->Sort,
+                        "(+ " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithSubImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithSub, LHS->Sort,
+                        "(- " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithMulImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithMul, LHS->Sort,
+                        "(* " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithDivImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  // SMT-LIB uses `div` for integer arithmetic and `/` for real arithmetic.
+  // Camada dispatches on operand sort, so this method receives both kinds —
+  // pick the right token based on the LHS sort.
+  const char *Op = LHS->Sort->isIntSort() ? "div" : "/";
+  return makeSMTLIBExpr(SMTExprKind::ArithDiv, LHS->Sort,
+                        std::string("(") + Op + " " + textOf(LHS) + " " +
+                            textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithModImpl(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithMod, mkIntSort(),
+                        "(mod " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithLtImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithLt, mkBoolSort(),
+                        "(< " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithGtImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithGt, mkBoolSort(),
+                        "(> " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithLeImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithLe, mkBoolSort(),
+                        "(<= " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkArithGeImpl(const SMTExprRef &LHS,
+                                       const SMTExprRef &RHS) {
+  return makeSMTLIBExpr(SMTExprKind::ArithGe, mkBoolSort(),
+                        "(>= " + textOf(LHS) + " " + textOf(RHS) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkInt2RealImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::Int2Real, mkRealSort(),
+                        "(to_real " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkReal2IntImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::Real2Int, mkIntSort(),
+                        "(to_int " + textOf(Exp) + ")");
+}
+
+SMTExprRef SMTLIBSolver::mkIsIntImpl(const SMTExprRef &Exp) {
+  return makeSMTLIBExpr(SMTExprKind::IsInt, mkBoolSort(),
+                        "(is_int " + textOf(Exp) + ")");
+}
+
 // --- write-only model queries / check ---
 
 namespace {
@@ -1182,6 +1344,167 @@ std::string fpValueToBinary(const std::string &Value, unsigned ExpWidth,
   return {};
 }
 
+// Trim ASCII whitespace from both ends of S.
+std::string trimWS(const std::string &S) {
+  std::size_t I = 0;
+  std::size_t J = S.size();
+  while (I < J && (S[I] == ' ' || S[I] == '\t' || S[I] == '\n' || S[I] == '\r'))
+    ++I;
+  while (J > I && (S[J - 1] == ' ' || S[J - 1] == '\t' || S[J - 1] == '\n' ||
+                   S[J - 1] == '\r'))
+    --J;
+  return S.substr(I, J - I);
+}
+
+// Strip a `<number>.0...` decimal tail if the fractional part is all zeros,
+// otherwise leave the string alone. This lets us treat z3's (/ 3.0 4.0) and
+// cvc5's (/ 3 4) uniformly.
+std::string normalizeNumeric(const std::string &S) {
+  std::size_t Dot = S.find('.');
+  if (Dot == std::string::npos)
+    return S;
+  for (std::size_t I = Dot + 1; I < S.size(); ++I)
+    if (S[I] != '0')
+      return S; // non-zero fractional digit; keep the original
+  return S.substr(0, Dot);
+}
+
+// Convert a possibly-decimal numeric string into an integer / fraction pair.
+// "3" → ("3", "1"), "3.0" → ("3", "1"), "0.5" → ("5", "10"),
+// "1.25" → ("125", "100"). Returns false on any character outside [0-9.].
+bool decimalToFraction(const std::string &S, std::string &Num,
+                       std::string &Den) {
+  if (S.empty())
+    return false;
+  std::size_t Dot = S.find('.');
+  if (Dot == std::string::npos) {
+    for (char C : S)
+      if (C < '0' || C > '9')
+        return false;
+    Num = S;
+    Den = "1";
+    return true;
+  }
+  std::string Whole = S.substr(0, Dot);
+  std::string Frac = S.substr(Dot + 1);
+  for (char C : Whole)
+    if (C < '0' || C > '9')
+      return false;
+  for (char C : Frac)
+    if (C < '0' || C > '9')
+      return false;
+  Num = Whole + Frac;
+  // Strip leading zeros from numerator (but keep "0").
+  std::size_t Start = Num.find_first_not_of('0');
+  if (Start == std::string::npos)
+    Num = "0";
+  else
+    Num = Num.substr(Start);
+  Den = "1" + std::string(Frac.size(), '0');
+  return true;
+}
+
+// Parse an SMT-LIB integer model value into a signed decimal string.
+// Accepted shapes: `N`, `(- N)` where N is a non-negative integer literal.
+// Returns the empty string on failure.
+std::string intValueToDecimal(const std::string &Value) {
+  std::string V = trimWS(Value);
+  // Negative form: `(- N)`.
+  if (V.size() >= 4 && V[0] == '(' && V[1] == '-' && V[2] == ' ' &&
+      V.back() == ')') {
+    std::string Inner = trimWS(V.substr(3, V.size() - 4));
+    for (char C : Inner)
+      if (C < '0' || C > '9')
+        return {};
+    if (Inner.empty())
+      return {};
+    return "-" + Inner;
+  }
+  for (char C : V)
+    if (C < '0' || C > '9')
+      return {};
+  return V.empty() ? std::string{} : V;
+}
+
+// Parse an SMT-LIB rational/real model value into a (numerator, denominator)
+// pair of decimal strings. Both can be negative; the convention is that the
+// numerator carries the sign and the denominator is non-negative.
+//
+// Accepted shapes:
+//   N                       (integer)
+//   (- N)                   (negative integer)
+//   D                       (decimal: "3.14")
+//   (- D)                   (negative decimal)
+//   (/ p q)                 (rational; p and q are integer or decimal)
+//   (- (/ p q))             (negative rational)
+//   (/ (- p) q), (/ p (- q))  (rare but valid)
+bool rationalValueToFraction(const std::string &Value, std::string &Num,
+                             std::string &Den) {
+  std::string V = trimWS(Value);
+  // Strip a leading (- ...) negation, recurse, and flip the numerator sign.
+  if (V.size() >= 4 && V[0] == '(' && V[1] == '-' && V[2] == ' ' &&
+      V.back() == ')') {
+    std::string Inner = trimWS(V.substr(3, V.size() - 4));
+    if (!rationalValueToFraction(Inner, Num, Den))
+      return false;
+    if (!Num.empty() && Num[0] == '-')
+      Num = Num.substr(1);
+    else
+      Num = "-" + Num;
+    return true;
+  }
+  // (/ p q): parse p and q recursively as numerics.
+  if (V.size() >= 4 && V.substr(0, 3) == "(/ " && V.back() == ')') {
+    // Walk the body to split p and q at top-level whitespace.
+    std::string Body = V.substr(3, V.size() - 4);
+    int Depth = 0;
+    std::size_t Split = std::string::npos;
+    for (std::size_t I = 0; I < Body.size(); ++I) {
+      if (Body[I] == '(')
+        ++Depth;
+      else if (Body[I] == ')')
+        --Depth;
+      else if (Depth == 0 &&
+               (Body[I] == ' ' || Body[I] == '\t' || Body[I] == '\n')) {
+        Split = I;
+        break;
+      }
+    }
+    if (Split == std::string::npos)
+      return false;
+    std::string P = trimWS(Body.substr(0, Split));
+    std::string Q = trimWS(Body.substr(Split + 1));
+    std::string PNum, PDen, QNum, QDen;
+    if (!rationalValueToFraction(P, PNum, PDen))
+      return false;
+    if (!rationalValueToFraction(Q, QNum, QDen))
+      return false;
+    // (PNum/PDen) / (QNum/QDen) = (PNum*QDen) / (PDen*QNum). For the common
+    // case where PDen and QDen are both "1" this collapses to PNum/QNum.
+    if (PDen == "1" && QDen == "1") {
+      Num = PNum;
+      Den = QNum;
+    } else {
+      // Cross-multiplication on decimal strings would need a multi-precision
+      // helper; we don't expect solvers to nest decimals inside (/ ...) in
+      // practice, so flag the unhandled shape rather than approximating.
+      return false;
+    }
+    // Move sign to numerator if it ended up on Den.
+    if (!Den.empty() && Den[0] == '-') {
+      Den = Den.substr(1);
+      if (!Num.empty() && Num[0] == '-')
+        Num = Num.substr(1);
+      else
+        Num = "-" + Num;
+    }
+    return true;
+  }
+  // Bare numeric (possibly decimal).
+  std::string Norm = normalizeNumeric(V);
+  return decimalToFraction(Norm, Num, Den);
+}
+
 } // namespace
 
 SMTResult<bool> SMTLIBSolver::getBoolImpl(const SMTExprRef &Exp) {
@@ -1247,6 +1570,45 @@ SMTResult<std::string> SMTLIBSolver::getFPInBinImpl(const SMTExprRef &Exp) {
   return Bits;
 }
 
+SMTResult<std::string> SMTLIBSolver::getIntImpl(const SMTExprRef &Exp) {
+  if (!Proc)
+    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver write-only mode does not support get*"};
+
+  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
+  if (File)
+    File->emitRaw(Cmd);
+  Proc->emitRaw(Cmd);
+  Proc->flush();
+  std::string Resp = Proc->readResponse();
+  std::string Value = extractValueFromGetValue(Resp);
+  std::string Decimal = intValueToDecimal(Value);
+  if (Decimal.empty())
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver: could not parse Int value: " + Resp};
+  return Decimal;
+}
+
+SMTResult<std::pair<std::string, std::string>>
+SMTLIBSolver::getRationalImpl(const SMTExprRef &Exp) {
+  if (!Proc)
+    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver write-only mode does not support get*"};
+
+  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
+  if (File)
+    File->emitRaw(Cmd);
+  Proc->emitRaw(Cmd);
+  Proc->flush();
+  std::string Resp = Proc->readResponse();
+  std::string Value = extractValueFromGetValue(Resp);
+  std::string Num, Den;
+  if (!rationalValueToFraction(Value, Num, Den))
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver: could not parse Real value: " + Resp};
+  return std::make_pair(Num, Den);
+}
+
 SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
                                              const SMTExprRef &Index) {
   // The native backends evaluate (select Array Index) against their cached
@@ -1281,7 +1643,42 @@ checkResult SMTLIBSolver::checkImpl() {
 }
 
 void SMTLIBSolver::resetImpl() {
-  emitLine("(reset)");
+  // (reset) is a non-uniform command: it clears every previously set option,
+  // including :print-success. Solvers respond inconsistently:
+  //   - z3: acks (reset) with `success`. set-option/get-info handled normally.
+  //   - cvc5: NO ack for (reset).
+  //   - yices: acks (reset) with `success`.
+  //   - mathsat: acks (reset) AND emits a trailing `success` for each echo
+  //     command, on top of the echoed content.
+  //
+  // Resync trick: send (reset) + (set-option :print-success true) +
+  // (get-info :version), and read until we see the parenthesized version
+  // response. Every leading `success` ack — from (reset), from (set-option) —
+  // is silently discarded by the loop. (get-info) emits ONE distinguishable
+  // response and no per-command ack on any of the four arith-capable
+  // solvers in our matrix, so the buffer ends clean.
+  //
+  // Bitwuzla rejects (get-info). It's BV-only, so it's not in any test that
+  // currently calls reset; if a caller does, the [error] response will be
+  // surfaced to them rather than silently desyncing.
+  if (File)
+    File->emitRaw("(reset)\n");
+  if (Proc) {
+    Proc->emitRaw("(reset)\n");
+    Proc->emitRaw("(set-option :print-success true)\n");
+    Proc->emitRaw("(get-info :version)\n");
+    Proc->flush();
+    while (true) {
+      std::string Resp = Proc->readResponse();
+      fatalErrorIf(Resp.empty(),
+                   "SMTLIBSolver: child solver closed the pipe during (reset)");
+      // The version response always begins with `(:version` on a clean
+      // protocol; the leading `success` lines from (reset) and (set-option)
+      // are pure tokens and don't match.
+      if (Resp.find(":version") != std::string::npos)
+        break;
+    }
+  }
   emitPreamble();
 }
 

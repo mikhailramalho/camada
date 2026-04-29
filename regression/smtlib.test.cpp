@@ -344,6 +344,13 @@ const std::vector<SolverDescriptor> &availableSolvers() {
       SKIP("yices-smt2 does not support floating-point");                      \
   } while (0)
 
+// bitwuzla is BV/arrays/FP only; it rejects Int/Real sorts at declaration.
+#define CAMADA_SMTLIB_SKIP_NON_ARITH(S)                                        \
+  do {                                                                         \
+    if ((S).Name == "bitwuzla")                                                \
+      SKIP("bitwuzla does not support Int/Real arithmetic");                   \
+  } while (0)
+
 TEST_CASE("SMTLIB interactive: public factory works against every solver",
           "[SMTLIB][pipeline]") {
   CAMADA_SMTLIB_FOREACH_SOLVER(S);
@@ -713,4 +720,125 @@ TEST_CASE("SMTLIB interactive: getArrayElement returns the stored value",
   auto Bin = Solver->getBVInBin(Selected);
   REQUIRE(Bin);
   REQUIRE(Bin.value() == "01100011"); // 99 in 8-bit binary
+}
+
+TEST_CASE("SMTLIB interactive: getInt round-trips a positive integer",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_ARITH(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto X = Solver->mkSymbol("x", Solver->mkIntSort());
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkInt(int64_t{42})));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getInt(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == "42");
+}
+
+TEST_CASE("SMTLIB interactive: getInt round-trips a negative integer",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_ARITH(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto X = Solver->mkSymbol("x", Solver->mkIntSort());
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkInt(int64_t{-7})));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Result = Solver->getInt(X);
+  REQUIRE(Result);
+  REQUIRE(Result.value() == "-7");
+}
+
+TEST_CASE("SMTLIB interactive: integer arithmetic add and compare",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_ARITH(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto Int = Solver->mkIntSort();
+  auto X = Solver->mkSymbol("x", Int);
+  auto Y = Solver->mkSymbol("y", Int);
+  // x + y = 10  AND  x > y  AND  x = 7  →  y = 3
+  Solver->addConstraint(
+      Solver->mkEqual(Solver->mkArithAdd(X, Y), Solver->mkInt(int64_t{10})));
+  Solver->addConstraint(Solver->mkArithGt(X, Y));
+  Solver->addConstraint(Solver->mkEqual(X, Solver->mkInt(int64_t{7})));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Yval = Solver->getInt(Y);
+  REQUIRE(Yval);
+  REQUIRE(Yval.value() == "3");
+}
+
+TEST_CASE("SMTLIB interactive: getRational returns fraction parts",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_ARITH(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto Y = Solver->mkSymbol("y", Solver->mkRealSort());
+  Solver->addConstraint(
+      Solver->mkEqual(Y, Solver->mkReal(int64_t{3}, int64_t{4})));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Num = Solver->getRealNumerator(Y);
+  auto Den = Solver->getRealDenominator(Y);
+  REQUIRE(Num);
+  REQUIRE(Den);
+  REQUIRE(Num.value() == "3");
+  REQUIRE(Den.value() == "4");
+}
+
+TEST_CASE("SMTLIB interactive: getRational handles negative rational",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_ARITH(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto Y = Solver->mkSymbol("y", Solver->mkRealSort());
+  Solver->addConstraint(
+      Solver->mkEqual(Y, Solver->mkReal(int64_t{-7}, int64_t{8})));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  auto Num = Solver->getRealNumerator(Y);
+  auto Den = Solver->getRealDenominator(Y);
+  REQUIRE(Num);
+  REQUIRE(Den);
+  REQUIRE(Num.value() == "-7");
+  REQUIRE(Den.value() == "8");
+}
+
+TEST_CASE("SMTLIB interactive: int/real conversion and isInt",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_ARITH(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  // (to_real 5) = 5.0  →  is_int(5.0) = true
+  auto Five = Solver->mkInt(int64_t{5});
+  auto FiveReal = Solver->mkInt2Real(Five);
+  Solver->addConstraint(Solver->mkIsInt(FiveReal));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  Solver->reset();
+  // (to_int 7.5) = 7
+  auto SevenHalf = Solver->mkReal(int64_t{15}, int64_t{2}); // 15/2 = 7.5
+  auto Seven = Solver->mkReal2Int(SevenHalf);
+  Solver->addConstraint(Solver->mkEqual(Seven, Solver->mkInt(int64_t{7})));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
 }
