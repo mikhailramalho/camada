@@ -19,14 +19,14 @@
  *
  **************************************************************************/
 
-// Write-only golden-string tests for the SMT-LIB backend (issue #57 Phase 1).
+// Write-only golden-string tests for the SMT-LIB backend.
 //
 // Build a tiny formula, emit the SMT-LIB script to a temp file, and assert
 // the file content matches a string literal. No external solver required.
 //
-// The interactive child-process pipeline tests (Phase 2/3) live alongside
-// each native backend's regression file (z3.test.cpp etc.). They share the
-// scenario helpers in smtlib_pipeline.test.h, which lets one CTest entry per
+// The interactive child-process pipeline tests live alongside each native
+// backend's regression file (z3.test.cpp etc.). They share the scenario
+// helpers in smtlib_pipeline.test.h, which lets one CTest entry per
 // (test × solver) report pass/fail without per-test SKIP noise.
 
 #include <catch2/catch_test_macros.hpp>

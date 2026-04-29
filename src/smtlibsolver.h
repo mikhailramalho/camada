@@ -73,9 +73,10 @@ public:
 
 /// Emits SMT-LIB output to a file (or stdout if path is "-").
 ///
-/// Phase 1: this is the only emitter used; SMTLIBSolver constructed with a
-/// FileEmitter is purely write-only. Phase 2 will add ProcessEmitter and
-/// allow both to be active simultaneously (script + interactive solving).
+/// SMTLIBSolver constructed with only a FileEmitter is purely write-only:
+/// check() emits `(check-sat)` and returns UNKNOWN, get* queries error.
+/// When paired with a ProcessEmitter, the same script is teed to disk
+/// alongside the interactive solving session.
 class FileEmitter {
 public:
   explicit FileEmitter(const std::string &Path);
@@ -147,14 +148,15 @@ struct SMTLIBProcessTag {};
 ///
 /// Two construction modes:
 ///
-///   - Write-only (Phase 1): the script is appended to a file (or stdout if
-///     the path is "-"). check() emits `(check-sat)` and returns UNKNOWN;
+///   - Write-only: the script is appended to a file (or stdout if the
+///     path is "-"). check() emits `(check-sat)` and returns UNKNOWN;
 ///     get* queries return UnsupportedOperation errors.
 ///
-///   - Interactive (Phase 2): a child solver process is spawned via
-///     `sh -c <cmd>`. check() sends `(check-sat)` and reads sat/unsat/unknown
-///     back. The interactive mode also supports an optional output path to
-///     log the same script to disk for offline reproduction.
+///   - Interactive: a child solver process is spawned via
+///     `execvp(argv[0], argv)`. check() sends `(check-sat)` and reads
+///     sat/unsat/unknown back. The interactive mode also accepts an
+///     optional output path to log the same script to disk for offline
+///     reproduction.
 class SMTLIBSolver : public SMTSolverImpl {
 public:
   /// Write-only constructor: write the emitted SMT-LIB script to OutputPath.
@@ -200,7 +202,7 @@ protected:
   SMTSortRef
   mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
 
-  // --- expressions: bare minimum for the Phase 1 smoke test ---
+  // --- expressions ---
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkBVNotImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkNotImpl(const SMTExprRef &Exp) override;

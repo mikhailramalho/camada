@@ -595,8 +595,8 @@ void SMTLIBSolver::emitPreamble() {
   // matrix accept this option.
   emitLine("(set-option :global-declarations true)");
   emitLine("(set-info :status unknown)");
-  // ALL covers BV/Bool/arrays/FP/Int/Real, which is everything Phase 3
-  // exercises. Children that don't support a particular sort will reject the
+  // ALL covers BV/Bool/arrays/FP/Int/Real, which is the full Camada
+  // surface. Children that don't support a particular sort will reject the
   // first command that uses it (yices-smt2 has no FP, for example). Callers
   // who want a portable script across heterogeneous solvers should pick
   // FPEncoding::BV at sort-construction time — that already routes every FP
@@ -2231,7 +2231,7 @@ void SMTLIBSolver::dumpImpl(std::string &Out) {
 }
 
 void SMTLIBSolver::dumpModelImpl(std::string &Out) {
-  Out = "SMTLIBSolver Phase 1 is write-only; dumpModel unavailable.\n";
+  Out = "SMTLIBSolver write-only mode does not produce a model.\n";
 }
 
 std::string SMTLIBSolver::getSolverNameAndVersion() const {
