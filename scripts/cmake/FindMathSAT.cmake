@@ -112,6 +112,21 @@ if(_camada_download_mathsat
   endif()
 endif()
 
+# On macOS the vendor MathSAT binary hard-codes a MacPorts libgmp.10.dylib load
+# path, so SMTLIB pipeline tests (which spawn the binary) need it rewritten to a
+# libgmp dylib that exists on this host. Re-run the staging helper
+# unconditionally — it's idempotent and works whether or not
+# camada_setup_mathsat ran in this configure.
+if(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin"
+   AND CAMADA_MATHSAT_INCLUDE_DIR
+   AND CAMADA_MATHSAT_LIB)
+  camada_select_mathsat_prebuilt_info(_unused_url _unused_archive
+                                      _camada_mathsat_source_dir)
+  if(EXISTS "${_camada_mathsat_source_dir}/bin/mathsat")
+    camada_stage_macos_mathsat_binary("${_camada_mathsat_source_dir}")
+  endif()
+endif()
+
 # Alright, now create a list with MathSAT and it's dependencies
 list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
 

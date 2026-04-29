@@ -1062,7 +1062,12 @@ SMTExprRef CVC5Solver::mkRMImpl(const RM &R) {
 
 SMTExprRef CVC5Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth, FPEncoding::Native);
+  // Camada's API passes SigWidth INCLUDING the hidden bit (FP32 → 24).
+  // Camada's mkFPSort takes the trailing significand width (without the
+  // hidden bit), so subtract 1 here. cvc5's own mkFloatingPointSort /
+  // mkFloatingPointNaN take the hidden-bit-inclusive form, so they get the
+  // raw SigWidth.
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   const SMTExprRef &theNaN =
       makeExprRef<CVC5Expr>(SMTExprKind::FPConst, &Context, sort,
                             Terms.mkFloatingPointNaN(ExpWidth, SigWidth));
@@ -1071,7 +1076,8 @@ SMTExprRef CVC5Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
 
 SMTExprRef CVC5Solver::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                  const unsigned SigWidth) {
-  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth, FPEncoding::Native);
+  // See mkNaNImpl above for the SigWidth - 1 rationale.
+  const SMTSortRef &sort = mkFPSort(ExpWidth, SigWidth - 1, FPEncoding::Native);
   return makeExprRef<CVC5Expr>(
       SMTExprKind::FPConst, &Context, sort,
       Sgn ? Terms.mkFloatingPointNegInf(ExpWidth, SigWidth)

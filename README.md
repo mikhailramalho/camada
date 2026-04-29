@@ -12,6 +12,7 @@ multiple SMT solvers. It exposes a unified API across:
 - STP
 - Yices
 - Z3
+- SMT-LIB (any external solver speaking SMT-LIB v2 on stdin/stdout)
 
 The library is designed to make solver switching cheap while still filling
 feature gaps in backends that are missing parts of the SMT-LIB surface.
@@ -119,11 +120,76 @@ location during the build.
 | [STP](https://stp.github.io/)              |  2.3.4          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
 | [Z3](https://github.com/Z3Prover/z3)       |  4.16.0         | ✔️ |
+| SMT-LIB (any external solver) | n/a | depends on child |
 
 <sup>1</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
 it does not support these operations natively. `ROUND_TO_AWAY` is also not
 supported by the native MathSAT floating-point API and aborts with an error if
 requested.
+
+### SMT-LIB backend
+
+In addition to the six native bindings above, Camada also ships an SMT-LIB
+backend that drives any external solver speaking standard SMT-LIB on
+stdin/stdout — z3, cvc5, or anything else that honors the
+`(set-option :print-success true)` contract. The child is spawned with
+`execvp(argv[0], argv)` — no shell is involved, so individual argv entries
+can contain spaces or other characters without escaping concerns. Use it via:
+
+```cpp
+auto solver = camada::createSMTLIBSolver({"z3", "-in"});
+// ... build a problem with the usual mk*/addConstraint API ...
+auto result = solver->check();          // sat / unsat / unknown
+auto value = solver->getBV(symbol);     // round-trips through (get-value ...)
+```
+
+A two-argument form also tees the emitted SMT-LIB script to a file, useful
+when you want both an interactive answer and a reproducer to share:
+
+```cpp
+auto solver = camada::createSMTLIBSolver(
+    {"cvc5", "--lang", "smt2", "--incremental"}, "session.smt2");
+```
+
+Verified child solvers (the regression suite drives each one through the
+shared fixtures from `tests.h`):
+
+| Solver       | Argv                                                            | Notes |
+| ------------ | --------------------------------------------------------------- | ----- |
+| z3           | `{"z3", "-in"}`                                                 | default |
+| cvc5         | `{"cvc5", "--lang", "smt2", "--incremental", "--arrays-exp"}`   | `--incremental` is required for `(push)` / `(pop)`. `--arrays-exp` enables `((as const ...))` const-array literals. |
+| bitwuzla     | `{"bitwuzla"}`                                                  | speaks SMT-LIB on stdin without extra flags |
+| yices-smt2   | `{"yices-smt2", "--incremental"}`                               | `--incremental` is required for `(push)` / `(pop)`. No floating-point support — callers using native FP get an `unsupported` from the child. Use `FPEncoding::BV` to route every FP op through the common-layer bit-blast path, which works against yices. |
+| mathsat      | `{"mathsat"}`                                                   | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
+
+The Camada preamble unconditionally sends `(set-option :print-success true)`,
+`(set-option :produce-models true)`, `(set-option :global-declarations true)`,
+`(set-info :status unknown)`, and `(set-logic ALL)` at startup, so any solver
+that honors the SMT-LIB option contract should work. Other solvers should be
+straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
+
+Caveats:
+
+- `mkIEEEFPToBV` is scoped to the current `(push)`/`(pop)` level. SMT-LIB
+  has no portable same-encoding `fp→bv` op, so the backend materializes a
+  fresh BV symbol and constrains it via the inverse direction — the
+  constraint is unwound by `(pop)`, same as the cvc5 and bitwuzla native
+  backends.
+- The child is spawned with `execvp`, so argv strings are interpreted
+  verbatim by the kernel — not by a shell. Spaces, quotes, and `$` in
+  individual argv entries are safe, but you cannot rely on shell
+  redirection or environment expansion.
+
+The backend covers the full Camada surface: BV/Bool, arrays, native
+floating-point (FP arithmetic, predicates, conversions, and `(_ +oo …)` /
+`(_ NaN …)` / `(fp …)` model parsing), Int/Real, uninterpreted functions,
+quantifiers, and tuples (via `(declare-datatypes ...)`). Capability subsetting
+is per-solver — for example yices-smt2 doesn't speak native FP and bitwuzla
+doesn't speak Int/Real or tuples — and the regression matrix exercises only
+the operations each child supports. Callers that need FP against a child
+solver that doesn't speak it should ask Camada for `FPEncoding::BV` at
+sort-construction time — that routes every FP op through the common-layer
+bit-blast path and emits BV-only SMT-LIB.
 
 ## API Overview
 

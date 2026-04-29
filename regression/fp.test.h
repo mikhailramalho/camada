@@ -105,6 +105,75 @@ inline void fp_neg_nan_native_bv_parity(const camada::SMTSolverRef &solver) {
   check_neg("fp_neg_standard", camada::FPNegBehavior::PreserveNaNPayload);
 }
 
+// Pin the IEEE-754 binary representation Camada returns for the FP infinity
+// constant. Native FP backends emit `(_ +oo eb sb)` model values; BV-encoded
+// FP returns the bitstring directly. Either way the result must be the
+// canonical sign + all-ones-exponent + zero-significand pattern.
+inline void fp_infinity_model_value(const camada::SMTSolverRef &solver,
+                                    camada::FPEncoding Encoding) {
+  auto fp32 = solver->mkFP32Sort(Encoding);
+  auto x = solver->mkSymbol("x", fp32);
+  // SigWidth here counts the hidden bit (FP32 = 8 + 24).
+  solver->addConstraint(
+      solver->mkEqual(x, solver->mkInf(false, 8, 24, Encoding)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto bin = solver->getFPInBin(x);
+  REQUIRE(bin);
+  // +inf in IEEE-754 single precision: 0 11111111 00000000000000000000000.
+  REQUIRE(bin.value() == "01111111100000000000000000000000");
+}
+
+// Pin model parsing for NaN. Native FP backends emit `(_ NaN eb sb)`; the
+// returned bitstring must be a structurally-valid NaN (sign 0, exp all
+// ones, significand non-zero).
+inline void fp_nan_model_value(const camada::SMTSolverRef &solver,
+                               camada::FPEncoding Encoding) {
+  auto fp32 = solver->mkFP32Sort(Encoding);
+  auto x = solver->mkSymbol("x", fp32);
+  solver->addConstraint(solver->mkFPIsNaN(x));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto bin = solver->getFPInBin(x);
+  REQUIRE(bin);
+  // IEEE-754 NaN: exponent all-ones (bits [1..8] for FP32), significand
+  // non-zero. The sign bit is unspecified — solvers may return either
+  // "quiet NaN" pattern with sign 0 or 1.
+  REQUIRE(bin.value().substr(1, 8) == "11111111");
+  REQUIRE(bin.value().substr(9).find('1') != std::string::npos);
+}
+
+// `mkFPNeg` with `FPNegBehavior::FlipSignBit` must toggle the sign bit
+// unconditionally — even on NaN, where SMT-LIB's standard `(fp.neg x)`
+// (PreserveNaNPayload) would be allowed to leave NaNs unchanged. The
+// implementation must therefore round-trip through `mkIEEEFPToBV` /
+// `mkBVToIEEEFP`. This fixture pins that path: take an arbitrary NaN, neg
+// it with FlipSignBit, and assert the IEEE bit pattern matches the input
+// with bit [N-1] xored.
+inline void
+fp_neg_flip_nan_via_bv_round_trip(const camada::SMTSolverRef &solver,
+                                  camada::FPEncoding Encoding) {
+  auto fp32 = solver->mkFP32Sort(Encoding);
+  auto x = solver->mkSymbol("x", fp32);
+  solver->addConstraint(solver->mkFPIsNaN(x));
+
+  auto negged = solver->mkFPNeg(x, camada::FPNegBehavior::FlipSignBit);
+  auto x_bits = solver->mkIEEEFPToBV(x);
+  auto negged_bits = solver->mkIEEEFPToBV(negged);
+
+  // bit [31] of negged_bits must be the complement of bit [31] of x_bits.
+  auto x_sign = solver->mkBVExtract(31, 31, x_bits);
+  auto n_sign = solver->mkBVExtract(31, 31, negged_bits);
+  solver->addConstraint(solver->mkEqual(n_sign, solver->mkBVNot(x_sign)));
+
+  // bits [30:0] must match.
+  auto x_rest = solver->mkBVExtract(30, 0, x_bits);
+  auto n_rest = solver->mkBVExtract(30, 0, negged_bits);
+  solver->addConstraint(solver->mkEqual(n_rest, x_rest));
+
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
 inline void fp_arithmetics(const camada::SMTSolverRef &solver,
                            camada::FPEncoding Encoding) {
   auto x = solver->mkFP32(0.750000059604644775390625f, Encoding);

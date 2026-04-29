@@ -93,6 +93,25 @@ inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Pin model parsing for bit-vector widths above 64. Solvers that emit BV
+// model values in the `(_ bv<n> <w>)` decimal form (mathsat is the canonical
+// example over the SMT-LIB pipe) need an arbitrary-precision decimal-to-
+// binary conversion; the previous 64-bit-cap implementation silently
+// returned an empty result on widths >= 65.
+inline void wide_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
+  auto bv128 = solver->mkBVSort(128);
+  auto x = solver->mkSymbol("x", bv128);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(42, bv128)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto bin = solver->getBVInBin(x);
+  REQUIRE(bin);
+  // 42 = 0b101010, zero-extended to 128 bits.
+  std::string expected(128, '0');
+  expected.replace(expected.size() - 6, 6, "101010");
+  REQUIRE(bin.value() == expected);
+}
+
 inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   auto x = solver->mkSymbol("x", solver->mkBVSort(8));
   auto one = solver->mkBVFromDec(1, 8);

@@ -1,4 +1,5 @@
 
+#include "smtlib_pipeline.test.h"
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -42,3 +43,68 @@ TEST_CASE("Empty tuple CVC5 test", "[CVC5]") {
   auto cvc5 = camada::createCVC5Solver();
   empty_tuple_semantics(cvc5);
 }
+
+// ---------------------------------------------------------------------------
+// SMT-LIB pipeline tests against the cvc5 binary. cvc5 supports the full
+// Camada surface (BV, Bool, arrays, FP-native, FP-BV, Int, Real, UF,
+// quantifiers, tuples). Same coverage as the z3 pipeline tests.
+// ---------------------------------------------------------------------------
+
+#define CAMADA_CVC5_SMTLIB_PIPELINE_TEST(NameStr, RunFn)                       \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [cvc5]",                             \
+            "[CVC5][SMTLIB][pipeline]") {                                      \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::cvc5Command(),        \
+                                 "cvc5");                                      \
+    camada_smtlib_pipeline::RunFn(Cmd);                                        \
+  }
+
+CAMADA_CVC5_SMTLIB_PIPELINE_TEST("public factory works", runSMTLIBPublicFactory)
+CAMADA_CVC5_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
+                                 runSMTLIBDualEmitter)
+
+#undef CAMADA_CVC5_SMTLIB_PIPELINE_TEST
+
+#define CAMADA_CVC5_SMTLIB_SHARED_TEST(NameStr, FixtureCall)                   \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [cvc5]",                             \
+            "[CVC5][SMTLIB][pipeline]") {                                      \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::cvc5Command(),        \
+                                 "cvc5");                                      \
+    camada::SMTSolverRef solver =                                              \
+        camada_smtlib_pipeline::makeSMTLIBSolver(Cmd);                         \
+    FixtureCall;                                                               \
+  }
+
+CAMADA_CVC5_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("implies_semantics", implies_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("implies_true_implies_false",
+                               implies_true_implies_false(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("bv_lshr_semantics", bv_lshr_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("incremental_push_pop",
+                               incremental_push_pop(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
+                               symbol_cache_survives_push_pop(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("array", array(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("array_const_store_semantics",
+                               array_const_store_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("bool_array_const_store_semantics",
+                               bool_array_const_store_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("arith_model_queries",
+                               arith_model_queries(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("quantifier_semantics",
+                               quantifier_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
+                               int_arithmetic_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
+                               real_arithmetic_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("arith_conversion_semantics",
+                               arith_conversion_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("tuple_semantics", tuple_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("empty_tuple_semantics",
+                               empty_tuple_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("fp_equal NativeFP",
+                               fp_equal(solver, camada::FPEncoding::Native))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("fp_equal BVFP",
+                               fp_equal(solver, camada::FPEncoding::BV))
+
+#undef CAMADA_CVC5_SMTLIB_SHARED_TEST

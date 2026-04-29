@@ -46,6 +46,10 @@
 #include "stpsolver.h"
 #endif
 
+// SMT-LIB backend is unconditional — it has no native solver dep, just
+// drives an external SMT-LIB-speaking process.
+#include "smtlibsolver.h"
+
 namespace camada {
 
 std::string getCamadaVersion() { return CAMADA_VERSION; }
@@ -102,6 +106,15 @@ SMTSolverRef createSTPSolver() {
   fatalError("Camada was not compiled with STP support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_STP=ON");
 #endif
+}
+
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv) {
+  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv);
+}
+
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
+                                const std::string &OutputPath) {
+  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, OutputPath);
 }
 
 } // namespace camada

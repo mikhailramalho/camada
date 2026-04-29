@@ -105,3 +105,50 @@ bool_array_const_store_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(read_written_res.value());
   REQUIRE(!read_other_res.value());
 }
+
+// Pin that a const-array constructed inside a (push) scope still satisfies
+// its defining equality after a matching (pop). The SMT-LIB backend used to
+// lower mkArrayConst through (declare-fun) + (assert (= sym ...)), and the
+// asserted equality was scoped — the symbol survived the pop with no
+// constraint, leaving the array silently unconstrained. The current
+// encoding uses (define-fun), which is permanent under
+// :global-declarations true.
+inline void array_const_survives_push_pop(const camada::SMTSolverRef &solver) {
+  {
+    auto idx = solver->mkBVSort(3);
+    auto elem = solver->mkBVSort(8);
+    auto fill = solver->mkBVFromDec(170, elem); // 0b10101010
+
+    solver->push();
+    auto a = solver->mkArrayConst(idx, fill);
+    solver->pop();
+
+    // After the pop, the const-array reference is still in effect: every
+    // index reads back the fill value.
+    auto sample_idx = solver->mkBVFromDec(3, idx);
+    solver->addConstraint(
+        solver->mkEqual(solver->mkArraySelect(a, sample_idx), fill));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Reset and re-establish every handle from scratch — handles created
+  // before reset() are stale.
+  solver->reset();
+
+  {
+    auto idx = solver->mkBVSort(3);
+    auto elem = solver->mkBVSort(8);
+    auto fill = solver->mkBVFromDec(170, elem);
+
+    solver->push();
+    auto a = solver->mkArrayConst(idx, fill);
+    solver->pop();
+
+    auto sample_idx = solver->mkBVFromDec(3, idx);
+    // Constraining a different value at the same index must be unsat —
+    // confirms the const-array binding is still in force after the pop.
+    solver->addConstraint(solver->mkNot(
+        solver->mkEqual(solver->mkArraySelect(a, sample_idx), fill)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}

@@ -182,11 +182,13 @@ static inline bool checkExprError(msat_env Context, const T &Value) {
   return false;
 }
 
+#ifndef NDEBUG
 static inline bool checkExprError(const SMTExpr &Exp) {
   auto const &exp = toSolverExpr<MathSATExpr>(Exp);
   return exp.isDecl() ? checkExprError(*exp.Context, exp.getDecl())
                       : checkExprError(*exp.Context, exp.getTerm());
 }
+#endif
 
 SMTExprRef MathSATSolver::newExprRefImpl(const SMTExpr &Exp) {
   assert(!checkExprError(Exp) && "Error when creating MathSAT expr.");
