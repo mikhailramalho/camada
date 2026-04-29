@@ -23,11 +23,14 @@
 #include "camadacommon.h"
 
 #include <algorithm>
+#include <atomic>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <fcntl.h>
 #include <string>
 #include <sys/select.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -233,14 +236,28 @@ long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
   return static_cast<long>(Child);
 }
 
-void *installSigpipeIgn() {
-  // If the child dies, writes to its closed stdin would otherwise raise
-  // SIGPIPE and kill us. Ignore the signal; we'll detect EOF on read.
-  using Handler = void (*)(int);
-  Handler Prev = std::signal(SIGPIPE, SIG_IGN);
-  fatalErrorIf(Prev == SIG_ERR,
-               "ProcessEmitter: failed to install SIGPIPE handler");
-  return reinterpret_cast<void *>(Prev);
+// Install SIGPIPE=SIG_IGN exactly once for the lifetime of the host process,
+// the first time any ProcessEmitter is constructed. Per-instance restore
+// would race destructively when multiple SMTLIBSolver instances coexist:
+// destroying one would reinstate the previous handler while the other is
+// still writing to its child, and a later EPIPE would kill the host. The
+// "install once, never restore" idiom is what mainstream libraries that
+// drive subprocesses already do (curl, ssh, etc.); host applications that
+// require a different policy will reinstall their own handler regardless,
+// and this code only ever clobbers SIGPIPE the first time.
+//
+// std::call_once + a mutex would be cleaner, but Camada otherwise stays
+// out of <thread>, so use the equivalent atomic flag.
+void ensureSigpipeIgnored() {
+  static std::atomic<bool> Installed{false};
+  bool Expected = false;
+  if (Installed.compare_exchange_strong(Expected, true)) {
+    using Handler = void (*)(int);
+    Handler Prev = std::signal(SIGPIPE, SIG_IGN);
+    fatalErrorIf(Prev == SIG_ERR,
+                 "ProcessEmitter: failed to install SIGPIPE handler");
+    (void)Prev; // intentionally not stored — see comment above.
+  }
 }
 
 } // namespace
@@ -260,9 +277,9 @@ ProcessEmitter::ProcessEmitter(const std::vector<std::string> &Argv) {
     ArgvPtrs.push_back(const_cast<char *>(A.c_str()));
   ArgvPtrs.push_back(nullptr);
 
+  ensureSigpipeIgnored();
   Pid = forkAndWire(In, Out,
                     [&ArgvPtrs]() { ::execvp(ArgvPtrs[0], ArgvPtrs.data()); });
-  OldSigpipeHandler = installSigpipeIgn();
 }
 
 ProcessEmitter::~ProcessEmitter() noexcept {
@@ -274,10 +291,6 @@ ProcessEmitter::~ProcessEmitter() noexcept {
     ::kill(static_cast<pid_t>(Pid), SIGTERM);
     int Status = 0;
     ::waitpid(static_cast<pid_t>(Pid), &Status, 0);
-  }
-  if (OldSigpipeHandler) {
-    using Handler = void (*)(int);
-    std::signal(SIGPIPE, reinterpret_cast<Handler>(OldSigpipeHandler));
   }
 }
 
