@@ -365,6 +365,12 @@ public:
   /// `FlipSignBit` preserves the full IEEE encoding and only toggles the sign
   /// bit. `PreserveNaNPayload` follows the SMT floating-point standard and
   /// leaves NaNs unchanged.
+  ///
+  /// `FlipSignBit` is fully honored under BV encoding and via the SMTLIB
+  /// pipeline. On native FP backends (Bitwuzla, CVC5, Z3) it is best-effort:
+  /// these solvers treat all NaNs as a single equivalence class, so when the
+  /// operand is a NaN the resulting NaN's bit pattern is not guaranteed to
+  /// match a literal sign-bit flip of the input bits.
   virtual SMTExprRef
   mkFPNeg(const SMTExprRef &Exp,
           FPNegBehavior Behavior = FPNegBehavior::FlipSignBit) = 0;
