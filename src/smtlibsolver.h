@@ -385,12 +385,6 @@ private:
   std::unique_ptr<FileEmitter> File;
   std::unique_ptr<ProcessEmitter> Proc;
 
-  // Counter for fresh let-bound names (?x0, ?x1, ...). Phase 1 does not
-  // currently emit lets — the printer is straight-line — but the counter
-  // is wired in so the let-binding visitor can be added without churning
-  // the rest of the class.
-  uint64_t NextLetId = 0;
-
   // Counter for fresh symbols introduced by mkIEEEFPToBVImpl. SMT-LIB has no
   // portable fp→bv same-encoding op, so we materialize a fresh BV symbol
   // and constrain it via the inverse fp.from-IEEE-bv direction. The

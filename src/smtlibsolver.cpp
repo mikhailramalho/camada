@@ -189,6 +189,34 @@ std::string readOneSmtlibResponse(std::FILE *In) {
 
 namespace {
 
+// Open a pipe with both ends marked CLOEXEC. Uses pipe2(O_CLOEXEC) on
+// Linux; on platforms without pipe2 (notably macOS), falls back to pipe()
+// + fcntl(F_SETFD, FD_CLOEXEC). Returns 0 on success, -1 on failure.
+//
+// The pipe()/fcntl() fallback has a small race window where another
+// thread could fork+exec and inherit the FDs. SMTLIBSolver constructs
+// happen on the calling thread before any solver fork, so the window is
+// closed in practice; documenting the trade-off rather than working
+// around it (the alternative is platform-specific posix_spawn plumbing).
+inline int openPipeCloexec(int Fds[2]) {
+#ifdef O_CLOEXEC
+#if defined(__linux__) || defined(__GLIBC__)
+  return ::pipe2(Fds, O_CLOEXEC);
+#endif
+#endif
+  if (::pipe(Fds) != 0)
+    return -1;
+  for (int I = 0; I < 2; ++I) {
+    int Flags = ::fcntl(Fds[I], F_GETFD);
+    if (Flags < 0 || ::fcntl(Fds[I], F_SETFD, Flags | FD_CLOEXEC) < 0) {
+      ::close(Fds[0]);
+      ::close(Fds[1]);
+      return -1;
+    }
+  }
+  return 0;
+}
+
 // Async-signal-safe child-side abort: write a fixed message to
 // STDERR_FILENO (best-effort; we're about to exit anyway), then _Exit.
 // Must be used in the post-fork pre-exec window instead of fatalErrorIf,
@@ -296,9 +324,9 @@ template <typename ExecInChild>
 long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
   int InPipe[2];  // child stdout -> parent reads
   int OutPipe[2]; // parent writes -> child stdin
-  fatalErrorIf(::pipe2(InPipe, O_CLOEXEC) != 0,
+  fatalErrorIf(openPipeCloexec(InPipe) != 0,
                "ProcessEmitter: failed to open pipe");
-  fatalErrorIf(::pipe2(OutPipe, O_CLOEXEC) != 0,
+  fatalErrorIf(openPipeCloexec(OutPipe) != 0,
                "ProcessEmitter: failed to open pipe");
 
   // Compute the fd-table limit BEFORE fork; the child must not call
