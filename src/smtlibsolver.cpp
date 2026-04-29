@@ -24,11 +24,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <climits>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <fcntl.h>
 #include <string>
+#include <sys/resource.h>
 #include <sys/select.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -187,6 +189,86 @@ std::string readOneSmtlibResponse(std::FILE *In) {
 
 namespace {
 
+// Async-signal-safe child-side abort: write a fixed message to
+// STDERR_FILENO (best-effort; we're about to exit anyway), then _Exit.
+// Must be used in the post-fork pre-exec window instead of fatalErrorIf,
+// which uses fprintf and is not async-signal-safe.
+[[noreturn]] inline void childAbort(const char *Msg, size_t Len) {
+  ssize_t Ignored = ::write(STDERR_FILENO, Msg, Len);
+  (void)Ignored;
+  std::_Exit(127);
+}
+
+#define CAMADA_CHILD_ABORT(msg) childAbort((msg), sizeof(msg) - 1)
+
+// Move `Fd` to a fresh fd >= 3 with CLOEXEC set, so the subsequent dup2
+// onto stdin/stdout/stderr is guaranteed to be a real copy (which clears
+// CLOEXEC on the destination). If the host has closed standard descriptors
+// before constructing SMTLIBSolver, pipe2 can hand back FDs at 0/1/2; a
+// dup2(0, 0) is a no-op that leaves CLOEXEC set, so the kernel would close
+// the wired stdio on exec.
+//
+// Closes the original FD on success; the caller continues with `Fd`
+// updated. On F_DUPFD_CLOEXEC failure (e.g. an extremely tight RLIMIT
+// where pipe2 already exhausted the table), uses the async-signal-safe
+// child-abort path — fatalErrorIf would deadlock under fork.
+inline void renumberAboveStdio(int &Fd) {
+  if (Fd >= 3)
+    return;
+  int New = ::fcntl(Fd, F_DUPFD_CLOEXEC, 3);
+  if (New < 0)
+    CAMADA_CHILD_ABORT("ProcessEmitter: F_DUPFD_CLOEXEC failed\n");
+  ::close(Fd);
+  Fd = New;
+}
+
+// Compute a safe upper bound for the fd table in the *parent*, before
+// fork. Used by the post-fork close-loop fallback so the child never has
+// to call sysconf()/getrlimit() (neither is guaranteed async-signal-safe
+// in a multithreaded host: the child inherits only the calling thread,
+// so any libc lock held by another thread at fork would deadlock).
+//
+// Honors the actual RLIMIT_NOFILE — silently capping to 1024 when sysconf
+// reports a higher limit would leak high-numbered non-CLOEXEC FDs into
+// the solver. We only fall back to 1024 if both getrlimit and sysconf
+// fail to report a usable value.
+inline int computeFdLimitForChild() {
+  struct rlimit Rl;
+  if (::getrlimit(RLIMIT_NOFILE, &Rl) == 0 && Rl.rlim_cur != RLIM_INFINITY &&
+      Rl.rlim_cur > 0) {
+    rlim_t V = Rl.rlim_cur;
+    if (V > static_cast<rlim_t>(INT_MAX))
+      V = static_cast<rlim_t>(INT_MAX);
+    return static_cast<int>(V);
+  }
+  long Max = ::sysconf(_SC_OPEN_MAX);
+  if (Max > 0) {
+    if (Max > INT_MAX)
+      Max = INT_MAX;
+    return static_cast<int>(Max);
+  }
+  return 1024;
+}
+
+// Close every fd above STDERR_FILENO in the calling process. ASYNC-SIGNAL-
+// SAFE: callable in the post-fork pre-exec window of a forked child. Only
+// uses close_range and close(); no malloc/dirent/sysconf/stdio. The
+// `MaxFd` upper bound must be computed in the parent before fork.
+//
+// Tries close_range first (Linux 5.9+); on hosts where it isn't compiled
+// in, isn't supported by the runtime kernel, or fails for any reason,
+// falls back to a bounded close() loop. Belt-and-suspenders for host-
+// process FDs that weren't opened with CLOEXEC.
+inline void closeFdsAboveStderr(int MaxFd) {
+#ifdef SYS_close_range
+  long Rc = ::syscall(SYS_close_range, STDERR_FILENO + 1, ~0U, 0);
+  if (Rc == 0)
+    return;
+#endif
+  for (int Fd = STDERR_FILENO + 1; Fd < MaxFd; ++Fd)
+    ::close(Fd);
+}
+
 // Shared fork + pipe + wire-stdio scaffolding. The caller provides an
 // `ExecInChild` callback that runs in the forked child after stdin/stdout/
 // stderr have been wired to the pipes; it must call exec*() and never
@@ -194,13 +276,22 @@ namespace {
 // parent-side ends of the pipes. Aborts via fatalErrorIf on any setup
 // failure.
 //
-// FD hygiene: pipes are created with O_CLOEXEC so any other open
-// descriptors the host process may hold (sockets, files, other solver
-// pipes) don't leak into the spawned solver across execvp. dup2(src, dst)
-// in the child clears CLOEXEC on `dst`, so stdin/stdout/stderr survive
-// the exec; everything else is closed automatically by the kernel. As a
-// belt-and-suspenders defense for non-CLOEXEC FDs that predate this
-// change, the child also calls close_range past STDERR if available.
+// FD hygiene:
+//   - Pipes are opened with pipe2(O_CLOEXEC). For host-process FDs that
+//     are NOT CLOEXEC, the child also closes everything above STDERR via
+//     close_range (or a bounded close() loop) just before exec.
+//   - In the child, pipe endpoints are renumbered above STDERR before
+//     being dup2'd onto stdin/stdout/stderr. This guarantees dup2's
+//     `src != dst` invariant and therefore the CLOEXEC-clearing semantics
+//     it provides on the destination FD. Without that step, a host that
+//     closed stdin/stdout could see pipe2 reuse fd 0/1, and dup2(0, 0)
+//     would be a no-op leaving CLOEXEC set — execvp would then close the
+//     solver's own stdio.
+//   - Everything between fork() and exec*() is async-signal-safe: only
+//     close_range/close/dup2/fcntl. No malloc, dirent walking, stdio, or
+//     sysconf. In a multithreaded host the child inherits only the forking
+//     thread; any libc lock held by another thread at fork would deadlock
+//     the child if we touched the corresponding subsystem.
 template <typename ExecInChild>
 long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
   int InPipe[2];  // child stdout -> parent reads
@@ -210,26 +301,34 @@ long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
   fatalErrorIf(::pipe2(OutPipe, O_CLOEXEC) != 0,
                "ProcessEmitter: failed to open pipe");
 
+  // Compute the fd-table limit BEFORE fork; the child must not call
+  // sysconf() in its post-fork pre-exec window.
+  const int MaxFd = computeFdLimitForChild();
+
   pid_t Child = ::fork();
   fatalErrorIf(Child < 0, "ProcessEmitter: fork() failed");
 
   if (Child == 0) {
-    // Child: rewire stdin/stdout/stderr to the pipes, then exec via the
-    // caller's callback. The callback is expected to never return on a
-    // successful exec; if it does, we treat that as exec failure.
-    // dup2 atomically clears CLOEXEC on the destination, so the wired
-    // stdio ends will survive the exec while every other FD (including
-    // the original pipe FDs) is closed by the kernel via CLOEXEC.
-    ::dup2(OutPipe[0], STDIN_FILENO);
-    ::dup2(InPipe[1], STDOUT_FILENO);
-    ::dup2(InPipe[1], STDERR_FILENO);
+    // Child: move every pipe endpoint we'll use to fd >= 3 first, so the
+    // subsequent dup2 calls are real copies (which clear CLOEXEC on the
+    // destination). dup2(N, N) is a no-op and would leave CLOEXEC set,
+    // closing the wired stdio across exec.
+    int ChildIn = OutPipe[0];
+    int ChildOut = InPipe[1];
+    renumberAboveStdio(ChildIn);
+    renumberAboveStdio(ChildOut);
 
-    // Belt-and-suspenders: close any other FDs the host may have opened
-    // without CLOEXEC. close_range was added in Linux 5.9 / glibc 2.34;
-    // fall back silently when unavailable.
-#ifdef SYS_close_range
-    ::syscall(SYS_close_range, STDERR_FILENO + 1, ~0U, 0);
-#endif
+    if (::dup2(ChildIn, STDIN_FILENO) < 0)
+      CAMADA_CHILD_ABORT("ProcessEmitter: dup2(stdin) failed\n");
+    if (::dup2(ChildOut, STDOUT_FILENO) < 0)
+      CAMADA_CHILD_ABORT("ProcessEmitter: dup2(stdout) failed\n");
+    if (::dup2(ChildOut, STDERR_FILENO) < 0)
+      CAMADA_CHILD_ABORT("ProcessEmitter: dup2(stderr) failed\n");
+
+    // Close every other fd before exec. Pipes opened with CLOEXEC are
+    // already covered, but host-process FDs without CLOEXEC would
+    // otherwise be inherited by the solver process.
+    closeFdsAboveStderr(MaxFd);
 
     ExecInChildFn();
     std::_Exit(127);
