@@ -1086,10 +1086,10 @@ function(camada_stage_macos_mathsat_binary mathsat_source_dir)
 
   execute_process(
     COMMAND install_name_tool -change /opt/local/lib/libgmp.10.dylib
-            "${_gmp_dylib}" "${dst_binary}"
-    RESULT_VARIABLE _rc)
+            "${_gmp_dylib}" "${dst_binary}" RESULT_VARIABLE _rc)
   if(NOT _rc EQUAL 0)
-    message(WARNING "MathSAT: install_name_tool failed (${_rc}) on ${dst_binary}")
+    message(
+      WARNING "MathSAT: install_name_tool failed (${_rc}) on ${dst_binary}")
     return()
   endif()
   execute_process(COMMAND codesign --force --sign - "${dst_binary}"
