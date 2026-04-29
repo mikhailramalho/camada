@@ -481,6 +481,37 @@ SMTLIBSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
                  SMTSort::FunctionSortData{DomainSorts, CodomainSort}));
 }
 
+// Tuple sort via SMT-LIB declare-datatypes. Eagerly emit a fresh datatype
+// declaration whose constructor and projector names are derived from the
+// fresh sort name: `__camada_tup<N>` for the sort, `__camada_tup<N>_mk` for
+// the constructor, `__camada_tup<N>_p<i>` for projector i. Camada caches
+// tuple sorts by element identity, so this runs at most once per distinct
+// shape — no risk of redefining a datatype.
+//
+// Only z3 and cvc5 in the verified matrix support `declare-datatypes`;
+// bitwuzla, mathsat, and yices-smt2 reject the command. Callers using those
+// children with tuples will get the child's `error`/`unsupported` reply,
+// which surfaces through emitLine's standard error path.
+SMTSortRef
+SMTLIBSolver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
+  std::string Name = "__camada_tup" + utoa(NextTupleId++);
+  std::string Decl = "(declare-datatypes ((" + Name + " 0)) (((" + Name + "_mk";
+  for (std::size_t I = 0; I < ElementSorts.size(); ++I) {
+    Decl += " (";
+    Decl += Name;
+    Decl += "_p";
+    Decl += utoa(I);
+    Decl += " ";
+    Decl += textOf(ElementSorts[I]);
+    Decl += ")";
+  }
+  Decl += "))))";
+  emitLine(Decl);
+  return makeSortRef<SMTLIBSort>(
+      SMTLIBSort(SMTSortKind::Tuple, this, std::move(Name),
+                 SMTSort::TupleSortData{ElementSorts}));
+}
+
 SMTSortRef SMTLIBSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                          const SMTSortRef &ElemSort) {
   std::string Text =
@@ -1130,6 +1161,42 @@ SMTExprRef SMTLIBSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
   std::string Text =
       "(exists (" + renderBinders(Vars) + ") " + textOf(Body) + ")";
   return makeSMTLIBExpr(SMTExprKind::Exists, mkBoolSort(), std::move(Text));
+}
+
+// --- tuples ---
+
+// Construct a tuple value: invoke the datatype constructor `<sortname>_mk`.
+// SMT-LIB requires the bare constructor name (no parens) for 0-ary
+// constructors and `(<ctor> e0 e1 ...)` otherwise.
+SMTExprRef SMTLIBSolver::mkTupleImpl(const std::vector<SMTExprRef> &Elements) {
+  std::vector<SMTSortRef> ElementSorts;
+  ElementSorts.reserve(Elements.size());
+  for (const auto &E : Elements)
+    ElementSorts.push_back(E->Sort);
+  SMTSortRef TupleSort = mkTupleSort(ElementSorts);
+  const std::string &Name = static_cast<const SMTLIBSort &>(*TupleSort).Sort;
+  std::string Text;
+  if (Elements.empty()) {
+    Text = Name + "_mk";
+  } else {
+    Text = "(" + Name + "_mk";
+    for (const auto &E : Elements) {
+      Text += " ";
+      Text += textOf(E);
+    }
+    Text += ")";
+  }
+  return makeSMTLIBExpr(SMTExprKind::TupleConst, TupleSort, std::move(Text));
+}
+
+// Project tuple field i: (<sortname>_p<i> t).
+SMTExprRef SMTLIBSolver::mkTupleSelectImpl(const SMTExprRef &Tuple,
+                                           unsigned Index) {
+  const std::string &Name = static_cast<const SMTLIBSort &>(*Tuple->Sort).Sort;
+  std::string Text =
+      "(" + Name + "_p" + utoa(Index) + " " + textOf(Tuple) + ")";
+  SMTSortRef ElementSort = Tuple->Sort->getTupleElementSorts()[Index];
+  return makeSMTLIBExpr(SMTExprKind::TupleSelect, ElementSort, std::move(Text));
 }
 
 // --- write-only model queries / check ---

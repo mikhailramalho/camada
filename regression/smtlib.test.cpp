@@ -360,6 +360,14 @@ const std::vector<SolverDescriptor> &availableSolvers() {
       SKIP((S).Name + " does not support quantifiers in logic ALL");           \
   } while (0)
 
+// Only z3 and cvc5 in the matrix support `declare-datatypes`, which Camada
+// uses to encode tuples. The other three reject the command.
+#define CAMADA_SMTLIB_SKIP_NON_DATATYPE(S)                                     \
+  do {                                                                         \
+    if ((S).Name != "z3" && (S).Name != "cvc5")                                \
+      SKIP((S).Name + " does not support declare-datatypes (tuples)");         \
+  } while (0)
+
 TEST_CASE("SMTLIB interactive: public factory works against every solver",
           "[SMTLIB][pipeline]") {
   CAMADA_SMTLIB_FOREACH_SOLVER(S);
@@ -905,5 +913,48 @@ TEST_CASE("SMTLIB interactive: exists quantifier finds witness",
   auto X = Solver->mkSymbol("x", BV8);
   auto Body = Solver->mkEqual(X, Solver->mkBVFromDec(5, BV8));
   Solver->addConstraint(Solver->mkExists({X}, Body));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+}
+
+TEST_CASE("SMTLIB interactive: tuple round-trips through projections",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_DATATYPE(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto BoolS = Solver->mkBoolSort();
+  auto BV8 = Solver->mkBVSort(8);
+  auto TupSort = Solver->mkTupleSort({BoolS, BV8});
+
+  auto T = Solver->mkSymbol("t", TupSort);
+  auto Tup =
+      Solver->mkTuple({Solver->mkBool(true), Solver->mkBVFromDec(42, BV8)});
+  Solver->addConstraint(Solver->mkEqual(T, Tup));
+  REQUIRE(Solver->check() == camada::checkResult::SAT);
+
+  // Project field 0 (Bool) and field 1 (BV8) and verify their values.
+  auto B = Solver->mkTupleSelect(T, 0);
+  auto V = Solver->mkTupleSelect(T, 1);
+  auto BVal = Solver->getBool(B);
+  auto VBin = Solver->getBVInBin(V);
+  REQUIRE(BVal);
+  REQUIRE(VBin);
+  REQUIRE(BVal.value() == true);
+  REQUIRE(VBin.value() == "00101010"); // 42
+}
+
+TEST_CASE("SMTLIB interactive: empty tuple is constructible",
+          "[SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_FOREACH_SOLVER(S);
+  CAPTURE(S.Name);
+  CAMADA_SMTLIB_SKIP_NON_DATATYPE(S);
+
+  auto Solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBProcessTag{}, S.Command);
+  auto TupSort = Solver->mkTupleSort({});
+  auto T = Solver->mkSymbol("e", TupSort);
+  Solver->addConstraint(Solver->mkEqual(T, Solver->mkTuple({})));
   REQUIRE(Solver->check() == camada::checkResult::SAT);
 }

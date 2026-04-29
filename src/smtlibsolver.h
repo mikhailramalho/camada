@@ -184,6 +184,8 @@ protected:
                              const SMTSortRef &ElemSort) override;
   SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
                                 const SMTSortRef &CodomainSort) override;
+  SMTSortRef
+  mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
 
   // --- expressions: bare minimum for the Phase 1 smoke test ---
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
@@ -321,6 +323,11 @@ protected:
   SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                           const SMTExprRef &Body) override;
 
+  // --- tuples (z3/cvc5 only via SMT-LIB declare-datatypes) ---
+  SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &Elements) override;
+  SMTExprRef mkTupleSelectImpl(const SMTExprRef &Tuple,
+                               unsigned Index) override;
+
   // --- model queries: write-only mode aborts on these ---
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
   SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
@@ -366,6 +373,11 @@ private:
   // direct fp→bv same-encoding op, so we materialize a fresh BV symbol and
   // constrain it via the inverse fp.from-IEEE-bv direction.
   uint64_t NextIEEEBVId = 0;
+
+  // Counter for fresh tuple-sort names. mkTupleSortImpl declares a fresh
+  // datatype per distinct tuple shape (Camada caches sort identity, so the
+  // declaration runs at most once per shape).
+  uint64_t NextTupleId = 0;
 };
 
 } // namespace camada
