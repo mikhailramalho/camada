@@ -362,6 +362,15 @@ protected:
 
   std::string getSolverNameAndVersion() const override;
 
+public:
+  /// Test-only: parse a `(get-value ...)` Int-typed model value into a
+  /// signed decimal string. Exposed so unit tests can drive the parser
+  /// against wire shapes (unreduced rationals, decimal-typed integers,
+  /// etc.) without needing a child solver that emits exactly that
+  /// shape. Returns the empty string on parse failure. Not part of the
+  /// public Camada API.
+  static std::string parseIntModelValueForTest(const std::string &Value);
+
 private:
   // Build a bare expression carrying the given SMT-LIB text.
   SMTExprRef makeSMTLIBExpr(SMTExprKind Kind, const SMTSortRef &Sort,

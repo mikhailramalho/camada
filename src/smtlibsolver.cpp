@@ -1906,8 +1906,7 @@ bool rationalValueToFraction(const std::string &Value, std::string &Num,
 
 } // namespace
 
-std::string
-SMTLIBSolver::parseIntModelValueForTest(const std::string &Value) {
+std::string SMTLIBSolver::parseIntModelValueForTest(const std::string &Value) {
   return intValueToDecimal(Value);
 }
 

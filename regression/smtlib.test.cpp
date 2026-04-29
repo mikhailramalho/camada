@@ -217,3 +217,42 @@ TEST_CASE("SMTLIB write-only emits 32-bit -1 literal as 32 ones", "[SMTLIB]") {
   REQUIRE(Got.find("(assert (= |x| #b" + std::string(32, '1') + "))\n") !=
           std::string::npos);
 }
+
+// Regression for a Codex-flagged parser weakness: getInt() must accept an
+// integral rational model value even when the rational is unreduced
+// (Num != Den, but Den evenly divides Num). Solver versions vary in
+// whether they reduce rational fractions before reporting them, so the
+// parser should not depend on them all reducing. We exercise the parser
+// directly via the test-only entry point so the test isn't gated on which
+// solvers happen to be reachable on the host.
+TEST_CASE("SMTLIB getInt accepts integral unreduced rationals", "[SMTLIB]") {
+  using camada::SMTLIBSolver;
+
+  // Plain integer: bare numeral and parenthesized negative.
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("7") == "7");
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("(- 5)") == "-5");
+
+  // Decimal-typed integer (z3's Real-typed get-value shape).
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("2.0") == "2");
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("(- 3.0)") == "-3");
+
+  // Reduced rational: trivially handled.
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("(/ 6 1)") == "6");
+
+  // Unreduced rationals where the division is exact.
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("(/ 4 2)") == "2");
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("(/ 100 25)") == "4");
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("(- (/ 10 5))") == "-2");
+
+  // Non-integral rationals must remain rejected (getInt's contract is
+  // "integer model value"; truncation would be silently lossy).
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("(/ 7 2)").empty());
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest("3.14").empty());
+
+  // Wide values: ensures the decimal-string long-division helper isn't
+  // capped at 64 bits.
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest(
+              "(/ 100000000000000000000 100000000000000000000)") == "1");
+  REQUIRE(SMTLIBSolver::parseIntModelValueForTest(
+              "(/ 100000000000000000000 50000000000000000000)") == "2");
+}
