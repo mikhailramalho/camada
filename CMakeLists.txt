@@ -199,6 +199,25 @@ set(RELEASE_MODE
     OFF
     CACHE INTERNAL "Force release mode")
 
+# MathSAT's public header pulls in <gmp.h> and Camada calls mpq_*/mpz_* APIs
+# directly, so a full GMP development install (header + import library + DLL) is
+# required at build time. The MathSAT win64 vendor archive ships only the
+# runtime gmp.dll, no gmp.h, and Windows has no system GMP, so MathSAT is not
+# supported on Windows. Force it off before config_solver runs to avoid the
+# "cannot be enabled when MathSAT is not available" error path.
+if(WIN32)
+  if(DEFINED CAMADA_SOLVER_MATHSAT_ENABLE AND CAMADA_SOLVER_MATHSAT_ENABLE
+                                              STREQUAL "ON")
+    message(
+      FATAL_ERROR
+        "CAMADA_SOLVER_MATHSAT_ENABLE=ON is not supported on Windows (no GMP development files available)"
+    )
+  endif()
+  set(CAMADA_SOLVER_MATHSAT_ENABLE
+      OFF
+      CACHE STRING "Build Camada with MathSAT" FORCE)
+endif()
+
 # Find solvers
 config_solver(Bitwuzla 0.9.0)
 config_solver(CVC5 1.0.8)
