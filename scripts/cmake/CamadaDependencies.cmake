@@ -826,10 +826,22 @@ function(camada_setup_bitwuzla)
                            DIRECTORY)
     get_filename_component(bitwuzla_libdir "${bitwuzla_pkgconfig_dir}"
                            DIRECTORY)
-    file(
-      WRITE "${bitwuzla_pc_file}"
-      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
-    )
+    if(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
+      # Windows: no gmp.pc/mpfr.pc on the runner, so drop the Requires line —
+      # pkg-config would otherwise fail to resolve them and silently report
+      # Bitwuzla as not found. The Bitwuzla static libs statically embed
+      # GMP/MPFR. -lpsapi is the only system import the Windows build needs (the
+      # vendor archive's pkg-config file listed it before our rewrite).
+      file(
+        WRITE "${bitwuzla_pc_file}"
+        "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nLibs: -L\${libdir} -lbitwuzla -lpsapi -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
+      )
+    else()
+      file(
+        WRITE "${bitwuzla_pc_file}"
+        "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
+      )
+    endif()
   endforeach()
 endfunction()
 
