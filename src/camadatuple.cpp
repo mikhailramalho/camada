@@ -125,10 +125,37 @@ public:
   SMTExprRef FalseTuple;
 
 protected:
-  // Camada-managed tuple expressions have no shared backend identity; two
-  // freshly built nodes are equal iff they are the same object. Semantic
-  // equality must go through mkCamadaTupleEqual.
-  bool equal_to(SMTExpr const &Other) const override { return this == &Other; }
+  // Structural host-side equality. Two freshly built nodes compare equal
+  // when they describe the same tuple shape with components that
+  // themselves compare equal via SMTExpr::operator== — symbol vs symbol
+  // matches on name; value vs value recursively compares the field
+  // vector; ite vs ite recursively compares cond + branches. This is
+  // host-side AST equality only; SMT-level satisfaction equality goes
+  // through mkCamadaTupleEqual, which decomposes into per-field
+  // mkEqual + mkAnd.
+  bool equal_to(SMTExpr const &Other) const override {
+    if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind() ||
+        getKind() != Other.getKind())
+      return false;
+    auto const &Rhs = static_cast<const CamadaTupleExpr &>(Other);
+    switch (getKind()) {
+    case SMTExprKind::Symbol:
+      return SymbolName == Rhs.SymbolName;
+    case SMTExprKind::TupleConst: {
+      if (Elements.size() != Rhs.Elements.size())
+        return false;
+      for (std::size_t I = 0; I < Elements.size(); ++I)
+        if (!(*Elements[I] == *Rhs.Elements[I]))
+          return false;
+      return true;
+    }
+    case SMTExprKind::Ite:
+      return *Cond == *Rhs.Cond && *TrueTuple == *Rhs.TrueTuple &&
+             *FalseTuple == *Rhs.FalseTuple;
+    default:
+      return false;
+    }
+  }
 
 private:
   SMTBackendKind BackendKind;

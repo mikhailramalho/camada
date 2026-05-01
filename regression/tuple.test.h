@@ -98,6 +98,38 @@ inline void tuple_with_array_field(const camada::SMTSolverRef &solver) {
   REQUIRE(sel_res.value() == 42);
 }
 
+// Pin host-side AST equality for tuple expressions: two freshly built
+// CamadaTupleExpr nodes that describe the same shape with structurally
+// equal components compare equal via SMTExpr::operator==. Distinct
+// components (different bool, different bv, different symbol name)
+// compare unequal. Native-tuple backends already get this for free via
+// their backend term; the encoded path needs to implement it on
+// CamadaTupleExpr explicitly.
+inline void tuple_structural_equality(const camada::SMTSolverRef &solver) {
+  auto boolSort = solver->mkBoolSort();
+  auto bv8Sort = solver->mkBVSort(8);
+  auto tupleSort = solver->mkTupleSort({boolSort, bv8Sort});
+
+  auto t1 = solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(42, 8)});
+  auto t1_alias =
+      solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(42, 8)});
+  auto t2 =
+      solver->mkTuple({solver->mkBool(false), solver->mkBVFromDec(42, 8)});
+
+  REQUIRE(*t1 == *t1);
+  REQUIRE(*t1 == *t1_alias);
+  REQUIRE_FALSE(*t1 == *t2);
+
+  // Symbols: same (name, sort) → equal; different name → not.
+  auto sym_a = solver->mkSymbol("tup_a", tupleSort);
+  auto sym_b = solver->mkSymbol("tup_b", tupleSort);
+  // mkSymbol caches by (name, sort), so the same name returns the same
+  // handle. Use the underlying expr equality to verify the path works
+  // even when handle identity coincides with structural identity.
+  REQUIRE(*sym_a == *sym_a);
+  REQUIRE_FALSE(*sym_a == *sym_b);
+}
+
 inline void empty_tuple_semantics(const camada::SMTSolverRef &solver) {
   auto tupleSort = solver->mkTupleSort({});
   auto tupleValue = solver->mkTuple({});
