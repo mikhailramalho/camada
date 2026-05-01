@@ -100,6 +100,10 @@ endif()
 
 add_executable(${BENCH_TARGET_NAME} bench/main.cpp)
 target_link_libraries(${BENCH_TARGET_NAME} PRIVATE ${PROJECT_NAME})
+if(WIN32)
+  # GetProcessMemoryInfo lives in psapi on Windows.
+  target_link_libraries(${BENCH_TARGET_NAME} PRIVATE psapi)
+endif()
 
 # Solvers
 if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
