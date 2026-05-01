@@ -43,6 +43,36 @@ jobs:
     - name: Run consumer
       run: ctest --test-dir scripts/release-consumer/build --output-on-failure
 
+  windows:
+    name: Windows release consumer
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Cache release deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          .build-release/deps
+          .build-release/_deps
+        key: ${{ runner.os }}-release-deps-v1
+
+    - name: Generate release
+      shell: pwsh
+      run: python ./scripts/release.py
+
+    - name: Configure consumer
+      shell: pwsh
+      run: cmake -S scripts/release-consumer -B scripts/release-consumer/build "-DCMAKE_PREFIX_PATH=$env:GITHUB_WORKSPACE/release"
+
+    - name: Build consumer
+      shell: pwsh
+      run: cmake --build scripts/release-consumer/build --config Release
+
+    - name: Run consumer
+      shell: pwsh
+      run: ctest --test-dir scripts/release-consumer/build -C Release --output-on-failure
+
   macos:
     name: macOS release consumer
     runs-on: macos-15

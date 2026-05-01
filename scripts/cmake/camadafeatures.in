@@ -6,3 +6,4 @@
 #cmakedefine01 CAMADA_HAVE_STP
 #cmakedefine01 CAMADA_HAVE_YICES
 #cmakedefine01 CAMADA_HAVE_Z3
+#cmakedefine01 CAMADA_HAVE_SMTLIB

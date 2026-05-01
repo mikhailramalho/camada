@@ -40,6 +40,10 @@ set(CAMADA_Z3_MACOS_X86_64_URL
 set(CAMADA_Z3_MACOS_ARM64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-osx-15.7.3.zip"
     CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
+set(CAMADA_Z3_WINDOWS_X86_64_URL
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-win.zip"
+    CACHE STRING
+          "URL used to download the prebuilt Z3 archive for Windows x86_64")
 set(CAMADA_CVC5_LINUX_X86_64_URL
     "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-Linux-x86_64-static.zip"
     CACHE STRING
@@ -56,6 +60,10 @@ set(CAMADA_CVC5_MACOS_ARM64_URL
     "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-macOS-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt cvc5 archive for macOS arm64")
+# No Windows prebuilt for CVC5: cvc5Targets.cmake lists cadical, picpoly,
+# picpolyxx, and gmp as bare-name INTERFACE_LINK_LIBRARIES, but the static
+# Windows release zip merges them into cvc5.lib without shipping standalone .lib
+# files, so MSVC fails with LNK1104 trying to find cadical.lib.
 set(CAMADA_BITWUZLA_LINUX_X86_64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Linux-x86_64-static.zip"
     CACHE STRING
@@ -69,6 +77,9 @@ set(CAMADA_BITWUZLA_MACOS_ARM64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-macOS-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt Bitwuzla archive for macOS arm64")
+# No Windows prebuilt for Bitwuzla: the upstream Win64 archive is MinGW-built
+# and its libbitwuzla.a is not link-compatible with MSVC. ESBMC does not enable
+# Bitwuzla on Windows for the same reason.
 set(CAMADA_MATHSAT_VERSION
     "5.6.16"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
@@ -84,6 +95,9 @@ set(CAMADA_MATHSAT_MACOS_X86_64_URL
 set(CAMADA_MATHSAT_MACOS_ARM64_URL
     "https://mathsat.fbk.eu/release/mathsat-5.6.16-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS arm64")
+# No Windows prebuilt for MathSAT: mathsat.h pulls in <gmp.h> and Camada calls
+# mpq_*/mpz_* APIs directly, but Windows has no system GMP and the win64 vendor
+# archive ships only the runtime gmp.dll, no headers.
 
 function(camada_ensure_deps_dirs)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_DIR}")
@@ -415,6 +429,16 @@ function(camada_select_prebuilt_url output_var package_name)
          AND NOT CAMADA_${package_name}_MACOS_ARM64_URL STREQUAL "")
         set(${output_var}
             "${CAMADA_${package_name}_MACOS_ARM64_URL}"
+            PARENT_SCOPE)
+        return()
+      endif()
+    endif()
+  elseif(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64|amd64)$")
+      if(DEFINED CAMADA_${package_name}_WINDOWS_X86_64_URL
+         AND NOT CAMADA_${package_name}_WINDOWS_X86_64_URL STREQUAL "")
+        set(${output_var}
+            "${CAMADA_${package_name}_WINDOWS_X86_64_URL}"
             PARENT_SCOPE)
         return()
       endif()

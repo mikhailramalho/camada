@@ -1,5 +1,7 @@
 
+#if SOLVER_SMTLIB_ENABLED
 #include "smtlib_pipeline.test.h"
+#endif
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -61,6 +63,7 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
   tests(z3);
 }
 
+#if SOLVER_SMTLIB_ENABLED
 // ---------------------------------------------------------------------------
 // SMT-LIB pipeline tests against the z3 binary.
 //
@@ -163,3 +166,4 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                              makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_Z3_SMTLIB_SHARED_TEST
+#endif // SOLVER_SMTLIB_ENABLED

@@ -1,5 +1,7 @@
 
+#if SOLVER_SMTLIB_ENABLED
 #include "smtlib_pipeline.test.h"
+#endif
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -126,6 +128,7 @@ TEST_CASE("Yices multi-instance lifecycle edge case", "[YICES]") {
   REQUIRE(yices2->check() == camada::checkResult::SAT); // Still SAT
 }
 
+#if SOLVER_SMTLIB_ENABLED
 // ---------------------------------------------------------------------------
 // SMT-LIB pipeline tests against the yices-smt2 binary. yices-smt2 supports
 // BV, Bool, arrays, FP-BV (via bit-blast), Int, Real, and UF. It does NOT
@@ -206,3 +209,4 @@ CAMADA_YICES_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                 makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_YICES_SMTLIB_SHARED_TEST
+#endif // SOLVER_SMTLIB_ENABLED

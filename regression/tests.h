@@ -7,8 +7,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <csignal>
 #include <cstdlib>
+#if !defined(_WIN32)
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 #define RESETANDTEST(testname)                                                 \
   solver->reset();                                                             \

@@ -942,15 +942,20 @@ std::string BitwuzlaSolver::getSolverNameAndVersion() const {
 }
 
 void BitwuzlaSolver::dumpImpl(std::string &Out) {
-  char *Buffer = nullptr;
-  size_t Size = 0;
-  FILE *Stream = open_memstream(&Buffer, &Size);
+  // Portable: use tmpfile() (C standard) as the FILE* sink for the C API,
+  // then read it back. Avoids POSIX-only open_memstream, which MSVC lacks.
+  FILE *Stream = std::tmpfile();
   bitwuzlaCheck(Stream != nullptr,
-                "Failed to open memory stream for Bitwuzla dump");
+                "Failed to open temp file for Bitwuzla dump");
   bitwuzla_print_formula(Context, "smt2", Stream, 2);
-  fclose(Stream);
-  Out.assign(Buffer, Size);
-  free(Buffer);
+  std::fflush(Stream);
+  std::rewind(Stream);
+  Out.clear();
+  char Buf[4096];
+  size_t N;
+  while ((N = std::fread(Buf, 1, sizeof(Buf), Stream)) > 0)
+    Out.append(Buf, N);
+  std::fclose(Stream);
 }
 
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {

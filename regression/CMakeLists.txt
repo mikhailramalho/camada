@@ -37,8 +37,11 @@ endif()
 # add each solver specific implementation, if it is enabled
 compile_test("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
-add_executable(${REGRESSION_TARGET_NAME} main.cpp smtlib.test.cpp
-                                         "${solver_test_files}")
+set(REGRESSION_SOURCES main.cpp "${solver_test_files}")
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  list(APPEND REGRESSION_SOURCES smtlib.test.cpp)
+endif()
+add_executable(${REGRESSION_TARGET_NAME} ${REGRESSION_SOURCES})
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME}
                                                         Catch2::Catch2)
 
@@ -95,50 +98,73 @@ if(CAMADA_MATHSAT_BIN_PATH)
     PRIVATE "CAMADA_TEST_MATHSAT_BIN=\"${CAMADA_MATHSAT_BIN_PATH}\"")
 endif()
 
-add_executable(${BENCH_TARGET_NAME} bench/main.cpp)
-target_link_libraries(${BENCH_TARGET_NAME} PRIVATE ${PROJECT_NAME})
+# The bench driver reads /proc/self/statm and is Linux-shaped; we only measure
+# performance on Linux. Skip the target on Windows entirely.
+if(NOT WIN32)
+  add_executable(${BENCH_TARGET_NAME} bench/main.cpp)
+  target_link_libraries(${BENCH_TARGET_NAME} PRIVATE ${PROJECT_NAME})
+endif()
 
 # Solvers
 if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE PkgConfig::Bitwuzla)
-  target_compile_definitions(${BENCH_TARGET_NAME}
-                             PRIVATE SOLVER_BITWUZLA_ENABLED)
+  if(TARGET ${BENCH_TARGET_NAME})
+    target_compile_definitions(${BENCH_TARGET_NAME}
+                               PRIVATE SOLVER_BITWUZLA_ENABLED)
+  endif()
 endif()
 
 if(${CAMADA_SOLVER_CVC5_ENABLE})
   target_link_directories(
     ${REGRESSION_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
     ${CAMADA_DEPS_INSTALL_DIR}/lib64)
-  target_link_directories(
-    ${BENCH_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
-    ${CAMADA_DEPS_INSTALL_DIR}/lib64)
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC cvc5::cvc5)
   if(CAMADA_CVC5_EXTRA_LIBS)
     target_link_libraries(${REGRESSION_TARGET_NAME}
                           PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
-    target_link_libraries(${BENCH_TARGET_NAME} PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
   endif()
-  target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_CVC5_ENABLED)
+  if(TARGET ${BENCH_TARGET_NAME})
+    target_link_directories(
+      ${BENCH_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
+      ${CAMADA_DEPS_INSTALL_DIR}/lib64)
+    if(CAMADA_CVC5_EXTRA_LIBS)
+      target_link_libraries(${BENCH_TARGET_NAME}
+                            PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
+    endif()
+    target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_CVC5_ENABLED)
+  endif()
 endif()
 
 if(${CAMADA_SOLVER_MATHSAT_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
-  target_compile_definitions(${BENCH_TARGET_NAME}
-                             PRIVATE SOLVER_MATHSAT_ENABLED)
+  if(TARGET ${BENCH_TARGET_NAME})
+    target_compile_definitions(${BENCH_TARGET_NAME}
+                               PRIVATE SOLVER_MATHSAT_ENABLED)
+  endif()
 endif()
 
 if(${CAMADA_SOLVER_STP_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC stp)
-  target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
+  if(TARGET ${BENCH_TARGET_NAME})
+    target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
+  endif()
 endif()
 
 if(${CAMADA_SOLVER_YICES_ENABLE})
   target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
-  target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_YICES_ENABLED)
+  if(TARGET ${BENCH_TARGET_NAME})
+    target_compile_definitions(${BENCH_TARGET_NAME}
+                               PRIVATE SOLVER_YICES_ENABLED)
+  endif()
+endif()
+
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  target_compile_definitions(${REGRESSION_TARGET_NAME}
+                             PRIVATE SOLVER_SMTLIB_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_Z3_ENABLE})
@@ -151,22 +177,39 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
   # (smtlib.test.cpp) do.
   target_compile_definitions(${REGRESSION_TARGET_NAME}
                              PRIVATE SOLVER_Z3_ENABLED)
-  target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
+  if(TARGET ${BENCH_TARGET_NAME})
+    target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
+  endif()
   get_filename_component(CAMADA_Z3_LIB_DIR "${CAMADA_Z3_LIB}" DIRECTORY)
   if(EXISTS "${CAMADA_Z3_LIB_DIR}")
     target_link_directories(${REGRESSION_TARGET_NAME} PRIVATE
                             ${CAMADA_Z3_LIB_DIR})
-    target_link_directories(${BENCH_TARGET_NAME} PRIVATE ${CAMADA_Z3_LIB_DIR})
     set_property(
       TARGET ${REGRESSION_TARGET_NAME}
       APPEND
       PROPERTY BUILD_RPATH "${CAMADA_Z3_LIB_DIR}")
-    set_property(
-      TARGET ${BENCH_TARGET_NAME}
-      APPEND
-      PROPERTY BUILD_RPATH "${CAMADA_Z3_LIB_DIR}")
+    if(TARGET ${BENCH_TARGET_NAME})
+      target_link_directories(${BENCH_TARGET_NAME} PRIVATE ${CAMADA_Z3_LIB_DIR})
+      set_property(
+        TARGET ${BENCH_TARGET_NAME}
+        APPEND
+        PROPERTY BUILD_RPATH "${CAMADA_Z3_LIB_DIR}")
+    endif()
   endif()
 endif()
 
 include(Catch)
-catch_discover_tests(${REGRESSION_TARGET_NAME})
+# On Windows, libz3.dll is staged in ${CAMADA_DEPS_INSTALL_DIR}/bin (separately
+# from the import lib in lib/) and must be on PATH for both Catch2's test
+# discovery probe (which runs the .exe at build time) and ctest. DL_PATHS was
+# added to catch_discover_tests in Catch2 3.4 and prepends to PATH on Windows.
+set(_camada_regression_dl_paths "")
+if(WIN32 AND IS_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/bin")
+  set(_camada_regression_dl_paths "${CAMADA_DEPS_INSTALL_DIR}/bin")
+endif()
+if(_camada_regression_dl_paths)
+  catch_discover_tests(${REGRESSION_TARGET_NAME} DL_PATHS
+                       "${_camada_regression_dl_paths}")
+else()
+  catch_discover_tests(${REGRESSION_TARGET_NAME})
+endif()

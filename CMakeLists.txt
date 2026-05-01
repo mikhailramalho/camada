@@ -117,13 +117,23 @@ option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 option(ENABLE_WARNINGS
        "Enable -Wall, -Wextra, and -pedantic when compiling (default: ON)" ON)
 if(ENABLE_WARNINGS)
-  add_definitions(-Wall -Wextra -pedantic)
+  if(MSVC)
+    # MSVC equivalents: /W4 covers most -Wall+-Wextra cases; /permissive-
+    # tightens conformance similar to -pedantic.
+    add_compile_options(/W4 /permissive-)
+  else()
+    add_compile_options(-Wall -Wextra -pedantic)
+  endif()
 endif()
 
 option(ENABLE_WERROR
        "All warnings are treated as errors when compiling (default: OFF)" OFF)
 if(ENABLE_WERROR)
-  add_definitions(-Werror)
+  if(MSVC)
+    add_compile_options(/WX)
+  else()
+    add_compile_options(-Werror)
+  endif()
 endif()
 
 # Demand C++17
@@ -197,6 +207,24 @@ config_solver(STP 2.3.4)
 config_solver(Yices 2.6.1)
 config_solver(Z3 4.16.0)
 
+# The SMT-LIB pipeline backend drives an external SMT-LIB-speaking process via
+# fork/exec/setrlimit/select, so it is POSIX-only. Default ON elsewhere; force
+# OFF on Windows.
+if(WIN32)
+  set(CAMADA_SOLVER_SMTLIB_ENABLE_DEFAULT OFF)
+else()
+  set(CAMADA_SOLVER_SMTLIB_ENABLE_DEFAULT ON)
+endif()
+option(CAMADA_SOLVER_SMTLIB_ENABLE
+       "Build Camada with the SMT-LIB pipeline backend"
+       ${CAMADA_SOLVER_SMTLIB_ENABLE_DEFAULT})
+if(WIN32 AND CAMADA_SOLVER_SMTLIB_ENABLE)
+  message(
+    FATAL_ERROR
+      "CAMADA_SOLVER_SMTLIB_ENABLE is not supported on Windows (the backend uses POSIX fork/exec)"
+  )
+endif()
+
 # Generate ac_config.h
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/cmake_config.in"
                "${CMAKE_CURRENT_BINARY_DIR}/src/ac_config.h")
@@ -231,6 +259,11 @@ if(CAMADA_SOLVER_Z3_ENABLE STREQUAL "ON")
   set(CAMADA_HAVE_Z3 1)
 endif()
 
+set(CAMADA_HAVE_SMTLIB 0)
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  set(CAMADA_HAVE_SMTLIB 1)
+endif()
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/camadafeatures.in"
                "${CMAKE_CURRENT_BINARY_DIR}/src/camadafeatures.h")
 
@@ -250,7 +283,7 @@ install_basic_package_files(
   ${PROJECT_NAME}
   NO_CHECK_REQUIRED_COMPONENTS_MACRO
   INCLUDE_CONTENT
-  "set(CAMADA_HAVE_BITWUZLA @CAMADA_HAVE_BITWUZLA@)\nset(CAMADA_HAVE_CVC5 @CAMADA_HAVE_CVC5@)\nset(CAMADA_HAVE_MATHSAT @CAMADA_HAVE_MATHSAT@)\nset(CAMADA_HAVE_STP @CAMADA_HAVE_STP@)\nset(CAMADA_HAVE_YICES @CAMADA_HAVE_YICES@)\nset(CAMADA_HAVE_Z3 @CAMADA_HAVE_Z3@)"
+  "set(CAMADA_HAVE_BITWUZLA @CAMADA_HAVE_BITWUZLA@)\nset(CAMADA_HAVE_CVC5 @CAMADA_HAVE_CVC5@)\nset(CAMADA_HAVE_MATHSAT @CAMADA_HAVE_MATHSAT@)\nset(CAMADA_HAVE_STP @CAMADA_HAVE_STP@)\nset(CAMADA_HAVE_YICES @CAMADA_HAVE_YICES@)\nset(CAMADA_HAVE_Z3 @CAMADA_HAVE_Z3@)\nset(CAMADA_HAVE_SMTLIB @CAMADA_HAVE_SMTLIB@)"
 )
 
 # Add the uninstall target
@@ -295,3 +328,4 @@ config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_MATHSAT_ENABLE}")
 config_info_bool("Solver STP" "${CAMADA_SOLVER_STP_ENABLE}")
 config_info_bool("Solver Yices" "${CAMADA_SOLVER_YICES_ENABLE}")
 config_info_bool("Solver Z3" "${CAMADA_SOLVER_Z3_ENABLE}")
+config_info_bool("SMT-LIB pipeline" "${CAMADA_SOLVER_SMTLIB_ENABLE}")

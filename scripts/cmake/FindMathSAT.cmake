@@ -127,7 +127,7 @@ if(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin"
   endif()
 endif()
 
-# Alright, now create a list with MathSAT and it's dependencies
+# Alright, now create a list with MathSAT and it's dependencies.
 list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
 
 # handle the QUIETLY and REQUIRED arguments and set MATHSAT_FOUND to TRUE if all

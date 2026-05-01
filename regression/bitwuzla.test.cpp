@@ -1,5 +1,7 @@
 
+#if SOLVER_SMTLIB_ENABLED
 #include "smtlib_pipeline.test.h"
+#endif
 #include "tests.h"
 
 #include <bitwuzlasolver.h>
@@ -41,6 +43,7 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
   tests(bitwuzla);
 }
 
+#if SOLVER_SMTLIB_ENABLED
 // ---------------------------------------------------------------------------
 // SMT-LIB pipeline tests against the bitwuzla binary. bitwuzla supports BV,
 // Bool, arrays, FP-native, FP-BV, UF, and BV-quantifiers. It does NOT
@@ -123,3 +126,4 @@ CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                    makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_BITWUZLA_SMTLIB_SHARED_TEST
+#endif // SOLVER_SMTLIB_ENABLED
