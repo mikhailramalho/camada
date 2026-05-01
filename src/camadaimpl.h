@@ -58,7 +58,12 @@ public:
     HandleState->bumpGeneration();
   }
 
-protected:
+public:
+  /// Allocates an SMTExpr-derived object in the per-solver arena. Used by
+  /// every backend's *Impl methods and by camadatuple.cpp to construct
+  /// CamadaTupleExpr nodes. The first ctor argument of `SolverExpr` (and
+  /// of CamadaTupleExpr) is `SMTExprKind` so it is forwarded explicitly
+  /// rather than tucked inside ArgsV.
   template <typename SolverExpr, typename... Args>
   SMTExprRef makeExprRef(SMTExprKind Kind, Args &&...ArgsV) {
     auto *Exp =
@@ -67,36 +72,12 @@ protected:
     return SMTExprRef(Exp, HandleState, HandleState->Generation);
   }
 
+  /// Allocates an SMTSort-derived object in the per-solver arena. Same
+  /// shape as makeExprRef but takes the sort by value (each backend's
+  /// SolverSort is cheap to construct in place at the call site).
   template <typename SolverSort> SMTSortRef makeSortRef(SolverSort Sort) {
     auto *OwnedSort = SortArena.create<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
-#ifndef NDEBUG
-    OwnedSort->markWidthValidated();
-#endif
-    return SMTSortRef(OwnedSort, HandleState, HandleState->Generation);
-  }
-
-public:
-  /// Allocates a Camada-managed (non-SolverExpr) expression in the arena.
-  /// Used by camadatuple.cpp to construct CamadaTupleExpr nodes that have
-  /// no backend term. Public so the free functions in camadatuple.cpp can
-  /// reach it; not part of the SMTSolver public surface.
-  template <typename ExprT, typename... Args>
-  SMTExprRef makeCamadaExprRef(Args &&...ArgsV) {
-    auto *Exp = ExprArena.create<ExprT>(std::forward<Args>(ArgsV)...);
-#ifndef NDEBUG
-    // Camada-managed exprs (currently only CamadaTupleExpr) live above
-    // the backend's width contract — width validation does not apply.
-    if (!Exp->Sort->isTupleSort())
-      assert(Exp->Sort->isWidthValidated());
-#endif
-    return SMTExprRef(Exp, HandleState, HandleState->Generation);
-  }
-
-  /// Counterpart to makeCamadaExprRef for sorts.
-  template <typename SortT, typename... Args>
-  SMTSortRef makeCamadaSortRef(Args &&...ArgsV) {
-    auto *OwnedSort = SortArena.create<SortT>(std::forward<Args>(ArgsV)...);
 #ifndef NDEBUG
     OwnedSort->markWidthValidated();
 #endif

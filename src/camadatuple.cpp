@@ -62,41 +62,42 @@ private:
   SMTBackendKind BackendKind;
 };
 
-/// Tuple expression owned by the Camada layer. One of three node kinds:
-///   - Symbol: lazy — per-field symbols are minted on demand by mkTupleSelect
-///   - Value: eager — components are stored verbatim
-///   - Ite: lazy — distributes over fields when selected
+/// Tuple expression owned by the Camada layer. The SMTExpr::Kind
+/// discriminates between three shapes (Symbol / TupleConst / Ite) — no
+/// separate NodeKind is needed:
+///   - SMTExprKind::Symbol: lazy — per-field symbols minted on demand by
+///     mkTupleSelect
+///   - SMTExprKind::TupleConst: eager — components stored verbatim
+///   - SMTExprKind::Ite: lazy — distributes over fields when selected
 class CamadaTupleExpr : public SMTExpr {
 public:
-  enum class NodeKind { Symbol, Value, Ite };
+  // Symbol form (SMTExprKind::Symbol)
+  CamadaTupleExpr(SMTExprKind ExprKind, SMTBackendKind BackendKind,
+                  const SMTSortRef &Sort, std::string SymbolName)
+      : SMTExpr(ExprKind, Sort), SymbolName(std::move(SymbolName)),
+        BackendKind(BackendKind) {}
 
-  // Symbol form
-  CamadaTupleExpr(SMTBackendKind BackendKind, const SMTSortRef &Sort,
-                  std::string SymbolName)
-      : SMTExpr(SMTExprKind::Symbol, Sort), Kind(NodeKind::Symbol),
-        SymbolName(std::move(SymbolName)), BackendKind(BackendKind) {}
+  // Value form (SMTExprKind::TupleConst)
+  CamadaTupleExpr(SMTExprKind ExprKind, SMTBackendKind BackendKind,
+                  const SMTSortRef &Sort, std::vector<SMTExprRef> Elements)
+      : SMTExpr(ExprKind, Sort), Elements(std::move(Elements)),
+        BackendKind(BackendKind) {}
 
-  // Value form
-  CamadaTupleExpr(SMTBackendKind BackendKind, const SMTSortRef &Sort,
-                  std::vector<SMTExprRef> Elements)
-      : SMTExpr(SMTExprKind::TupleConst, Sort), Kind(NodeKind::Value),
-        Elements(std::move(Elements)), BackendKind(BackendKind) {}
-
-  // Ite form
-  CamadaTupleExpr(SMTBackendKind BackendKind, const SMTSortRef &Sort,
-                  SMTExprRef Cond, SMTExprRef T, SMTExprRef F)
-      : SMTExpr(SMTExprKind::Ite, Sort), Kind(NodeKind::Ite),
-        Cond(std::move(Cond)), TrueTuple(std::move(T)),
+  // Ite form (SMTExprKind::Ite)
+  CamadaTupleExpr(SMTExprKind ExprKind, SMTBackendKind BackendKind,
+                  const SMTSortRef &Sort, SMTExprRef Cond, SMTExprRef T,
+                  SMTExprRef F)
+      : SMTExpr(ExprKind, Sort), Cond(std::move(Cond)), TrueTuple(std::move(T)),
         FalseTuple(std::move(F)), BackendKind(BackendKind) {}
 
   SMTBackendKind getBackendKind() const override { return BackendKind; }
 
   void dump(std::string &Out) const override {
-    switch (Kind) {
-    case NodeKind::Symbol:
+    switch (getKind()) {
+    case SMTExprKind::Symbol:
       Out = "(CamadaTupleSymbol " + SymbolName + ")\n";
       return;
-    case NodeKind::Value: {
+    case SMTExprKind::TupleConst: {
       Out = "(CamadaTupleValue";
       for (const auto &E : Elements) {
         Out += " ";
@@ -109,14 +110,14 @@ public:
       Out += ")\n";
       return;
     }
-    case NodeKind::Ite:
+    case SMTExprKind::Ite:
       Out = "(CamadaTupleIte ...)\n";
       return;
+    default:
+      fatalError("Invalid CamadaTupleExpr SMTExprKind");
     }
-    fatalError("Invalid CamadaTupleExpr NodeKind");
   }
 
-  NodeKind Kind;
   std::string SymbolName;
   std::vector<SMTExprRef> Elements;
   SMTExprRef Cond;
@@ -149,15 +150,15 @@ SMTSortRef mkCamadaTupleSort(SMTSolverImpl &Solver,
   SMTBackendKind BackendKind = ElementSorts.empty()
                                    ? Solver.mkBoolSort()->getBackendKind()
                                    : ElementSorts.front()->getBackendKind();
-  return Solver.makeCamadaSortRef<CamadaTupleSort>(BackendKind, ElementSorts);
+  return Solver.makeSortRef(CamadaTupleSort(BackendKind, ElementSorts));
 }
 
 SMTExprRef mkCamadaTupleSymbol(SMTSolverImpl &Solver, const std::string &Name,
                                const SMTSortRef &Sort) {
   fatalErrorIf(!Sort->isTupleSort(),
                "mkCamadaTupleSymbol called on non-tuple sort");
-  return Solver.makeCamadaExprRef<CamadaTupleExpr>(Sort->getBackendKind(), Sort,
-                                                   Name);
+  return Solver.makeExprRef<CamadaTupleExpr>(
+      SMTExprKind::Symbol, Sort->getBackendKind(), Sort, Name);
 }
 
 SMTExprRef mkCamadaTuple(SMTSolverImpl &Solver,
@@ -167,8 +168,8 @@ SMTExprRef mkCamadaTuple(SMTSolverImpl &Solver,
   for (const auto &E : Elements)
     ElementSorts.push_back(E->Sort);
   SMTSortRef Sort = Solver.mkTupleSort(ElementSorts);
-  return Solver.makeCamadaExprRef<CamadaTupleExpr>(Sort->getBackendKind(), Sort,
-                                                   Elements);
+  return Solver.makeExprRef<CamadaTupleExpr>(
+      SMTExprKind::TupleConst, Sort->getBackendKind(), Sort, Elements);
 }
 
 SMTExprRef mkCamadaTupleSelect(SMTSolverImpl &Solver, const SMTExprRef &Tuple,
@@ -180,22 +181,23 @@ SMTExprRef mkCamadaTupleSelect(SMTSolverImpl &Solver, const SMTExprRef &Tuple,
                "Tuple field index out of bounds");
 
   const SMTSortRef &FieldSort = Tuple->Sort->getTupleElementSorts()[Index];
-  switch (TE->Kind) {
-  case CamadaTupleExpr::NodeKind::Symbol: {
+  switch (TE->getKind()) {
+  case SMTExprKind::Symbol: {
     // Synthesize a per-field symbol on demand. The reserved __CAMADA_tup_
     // name space prevents collisions with user-supplied symbol names.
     std::string FieldName =
         "__CAMADA_tup_" + TE->SymbolName + "_" + std::to_string(Index);
     return Solver.mkSymbolUnchecked(FieldName, FieldSort);
   }
-  case CamadaTupleExpr::NodeKind::Value:
+  case SMTExprKind::TupleConst:
     return TE->Elements[Index];
-  case CamadaTupleExpr::NodeKind::Ite:
+  case SMTExprKind::Ite:
     return Solver.mkIte(TE->Cond,
                         mkCamadaTupleSelect(Solver, TE->TrueTuple, Index),
                         mkCamadaTupleSelect(Solver, TE->FalseTuple, Index));
+  default:
+    fatalError("Invalid CamadaTupleExpr SMTExprKind");
   }
-  fatalError("Invalid CamadaTupleExpr NodeKind");
 }
 
 SMTExprRef mkCamadaTupleEqual(SMTSolverImpl &Solver, const SMTExprRef &LHS,
@@ -220,8 +222,8 @@ SMTExprRef mkCamadaTupleIte(SMTSolverImpl &Solver, const SMTExprRef &Cond,
                             const SMTExprRef &T, const SMTExprRef &F) {
   fatalErrorIf(!T->Sort->isTupleSort() || !F->Sort->isTupleSort(),
                "mkCamadaTupleIte on non-tuple branches");
-  return Solver.makeCamadaExprRef<CamadaTupleExpr>(T->getBackendKind(), T->Sort,
-                                                   Cond, T, F);
+  return Solver.makeExprRef<CamadaTupleExpr>(
+      SMTExprKind::Ite, T->getBackendKind(), T->Sort, Cond, T, F);
 }
 
 } // namespace camada
