@@ -199,4 +199,17 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
 endif()
 
 include(Catch)
-catch_discover_tests(${REGRESSION_TARGET_NAME})
+# On Windows, libz3.dll is staged in ${CAMADA_DEPS_INSTALL_DIR}/bin (separately
+# from the import lib in lib/) and must be on PATH for both Catch2's test
+# discovery probe (which runs the .exe at build time) and ctest. DL_PATHS was
+# added to catch_discover_tests in Catch2 3.4 and prepends to PATH on Windows.
+set(_camada_regression_dl_paths "")
+if(WIN32 AND IS_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/bin")
+  set(_camada_regression_dl_paths "${CAMADA_DEPS_INSTALL_DIR}/bin")
+endif()
+if(_camada_regression_dl_paths)
+  catch_discover_tests(${REGRESSION_TARGET_NAME} DL_PATHS
+                       "${_camada_regression_dl_paths}")
+else()
+  catch_discover_tests(${REGRESSION_TARGET_NAME})
+endif()
