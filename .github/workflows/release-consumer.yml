@@ -76,7 +76,21 @@ jobs:
 
     - name: Configure consumer
       shell: pwsh
-      run: cmake -S scripts/release-consumer -B scripts/release-consumer/build -DCMAKE_PREFIX_PATH=$env:GITHUB_WORKSPACE/release
+      # Resolve the prefix path through PowerShell first, with backslashes
+      # normalized to forward slashes so CMake's path parsing is unambiguous,
+      # then pass it as a single quoted -D argument. Verify the package
+      # config file is actually present so failures point at the install
+      # step rather than CMake's search.
+      run: |
+        $prefix = (Resolve-Path "$env:GITHUB_WORKSPACE/release").Path -replace '\\', '/'
+        Write-Host "Resolved CMAKE_PREFIX_PATH=$prefix"
+        $configFile = Join-Path $prefix "lib/cmake/camada/camadaConfig.cmake"
+        if (-not (Test-Path $configFile)) {
+          Write-Error "camadaConfig.cmake not found at $configFile"
+          Get-ChildItem -Recurse -Path $prefix | Select-Object -First 50 | Format-Table FullName
+          exit 1
+        }
+        cmake -S scripts/release-consumer -B scripts/release-consumer/build "-DCMAKE_PREFIX_PATH=$prefix"
 
     - name: Build consumer
       shell: pwsh
