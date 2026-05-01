@@ -60,10 +60,10 @@ set(CAMADA_CVC5_MACOS_ARM64_URL
     "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-macOS-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt cvc5 archive for macOS arm64")
-set(CAMADA_CVC5_WINDOWS_X86_64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-Win64-x86_64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for Windows x86_64")
+# No Windows prebuilt for CVC5: cvc5Targets.cmake lists cadical, picpoly,
+# picpolyxx, and gmp as bare-name INTERFACE_LINK_LIBRARIES, but the static
+# Windows release zip merges them into cvc5.lib without shipping standalone .lib
+# files, so MSVC fails with LNK1104 trying to find cadical.lib.
 set(CAMADA_BITWUZLA_LINUX_X86_64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Linux-x86_64-static.zip"
     CACHE STRING

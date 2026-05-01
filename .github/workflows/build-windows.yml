@@ -34,12 +34,13 @@ jobs:
 
     - name: Configure Camada
       shell: pwsh
-      # Windows is Z3 + CVC5 only. Bitwuzla's upstream Windows release is
-      # MinGW-built and its static archives are not link-compatible with MSVC;
-      # MathSAT's public header pulls in <gmp.h> but Windows has no system GMP
-      # and its win64 archive ships only gmp.dll. ESBMC's own Windows CI is
-      # Z3-only for the same reasons.
-      run: cmake -S . -B build -DCAMADA_ENABLE_REGRESSION=ON -DBUILD_SHARED_LIBS=OFF -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL -DCAMADA_SOLVER_BITWUZLA_ENABLE=OFF -DCAMADA_SOLVER_CVC5_ENABLE=ON -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF -DCAMADA_SOLVER_STP_ENABLE=OFF -DCAMADA_SOLVER_YICES_ENABLE=OFF -DCAMADA_SOLVER_Z3_ENABLE=ON -DENABLE_WARNINGS=ON -DCMAKE_INSTALL_PREFIX:PATH=$env:GITHUB_WORKSPACE/release -DCMAKE_BUILD_TYPE=Debug
+      # Windows is Z3-only, matching ESBMC's Windows CI. Bitwuzla's Windows
+      # release is MinGW-built and its archives are not link-compatible with
+      # MSVC; MathSAT's public header pulls in <gmp.h> but Windows has no
+      # system GMP; CVC5's static Windows prebuilt declares bare-name
+      # transitive deps (cadical, picpoly, picpolyxx, gmp) in its
+      # cvc5Targets.cmake that don't ship as separate .lib files there.
+      run: cmake -S . -B build -DCAMADA_ENABLE_REGRESSION=ON -DBUILD_SHARED_LIBS=OFF -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL -DCAMADA_SOLVER_BITWUZLA_ENABLE=OFF -DCAMADA_SOLVER_CVC5_ENABLE=OFF -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF -DCAMADA_SOLVER_STP_ENABLE=OFF -DCAMADA_SOLVER_YICES_ENABLE=OFF -DCAMADA_SOLVER_Z3_ENABLE=ON -DENABLE_WARNINGS=ON -DCMAKE_INSTALL_PREFIX:PATH=$env:GITHUB_WORKSPACE/release -DCMAKE_BUILD_TYPE=Debug
 
     - name: Build Camada
       shell: pwsh
