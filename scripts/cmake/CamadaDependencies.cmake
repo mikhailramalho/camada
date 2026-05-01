@@ -97,6 +97,9 @@ set(CAMADA_MATHSAT_MACOS_X86_64_URL
 set(CAMADA_MATHSAT_MACOS_ARM64_URL
     "https://mathsat.fbk.eu/release/mathsat-5.6.16-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS arm64")
+set(CAMADA_MATHSAT_WINDOWS_X86_64_URL
+    "https://mathsat.fbk.eu/release/mathsat-5.6.16-win64.zip"
+    CACHE STRING "URL used to download MathSAT for Windows x86_64")
 
 function(camada_ensure_deps_dirs)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_DIR}")
@@ -507,6 +510,20 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
         PARENT_SCOPE)
     set(${output_source_dir_var}
         "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-linux-aarch64"
+        PARENT_SCOPE)
+    return()
+  endif()
+
+  if(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows"
+     AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64|amd64)$")
+    set(${output_url_var}
+        "${CAMADA_MATHSAT_WINDOWS_X86_64_URL}"
+        PARENT_SCOPE)
+    set(${output_archive_var}
+        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-win64.zip"
+        PARENT_SCOPE)
+    set(${output_source_dir_var}
+        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-win64"
         PARENT_SCOPE)
     return()
   endif()
@@ -1179,5 +1196,14 @@ function(camada_setup_mathsat)
          DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/lib")
     file(COPY "${mathsat_source_dir}/include/"
          DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/include")
+    # Windows ships mathsat as `lib/mathsat.lib` (import library) plus
+    # `bin/mathsat.dll` and `bin/gmp.dll` (runtime). The import lib was picked
+    # up above; co-locate the runtime DLLs so dependents can find them next to
+    # the .lib at link time and at run time.
+    if(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows" AND IS_DIRECTORY
+                                                    "${mathsat_source_dir}/bin")
+      file(COPY "${mathsat_source_dir}/bin/"
+           DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/bin")
+    endif()
   endif()
 endfunction()
