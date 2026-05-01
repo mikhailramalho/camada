@@ -91,16 +91,16 @@ TEST_CASE("Override Yices Solver", "[YICES]") {
     }
 
   private:
-    static void configureQfBv(ctx_config_t *config) {
+    static void configureQfAbv(ctx_config_t *config) {
       yices_set_config(config, "mode", "push-pop");
       yices_set_config(config, "solver-type", "dpllt");
       yices_set_config(config, "uf-solver", "none");
       yices_set_config(config, "bv-solver", "default");
-      yices_set_config(config, "array-solver", "none");
+      yices_set_config(config, "array-solver", "default");
       yices_set_config(config, "arith-solver", "none");
     }
 
-    void create() { recreateContextWithConfig("QF_BV", configureQfBv); }
+    void create() { recreateContextWithConfig("QF_ABV", configureQfAbv); }
   };
 
   // Create Yices Solver

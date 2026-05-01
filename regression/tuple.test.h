@@ -58,6 +58,46 @@ inline void tuple_semantics_with_int(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Tuple whose second field is an array. Exercises the encoded path's
+// per-field decomposition for non-scalar field sorts: on backends
+// without native datatype support, the array field becomes a regular
+// array-typed symbol named __CAMADA_tup_<base>_1 minted on demand.
+//
+// Skipped on yices-smt2 SMT-LIB pipeline (which rejects mkArrayConst —
+// this fixture intentionally avoids it). Works on every native backend
+// and on the SMT-LIB pipeline against z3/cvc5/bitwuzla/mathsat.
+inline void tuple_with_array_field(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idxSort = solver->mkBVSort(3);
+  auto arrSort = solver->mkArraySort(idxSort, bv8);
+  auto tupleSort = solver->mkTupleSort({bv8, arrSort});
+
+  REQUIRE(tupleSort->isTupleSort());
+  REQUIRE(tupleSort->getTupleElementSorts().size() == 2);
+  REQUIRE(tupleSort->getTupleElementSorts()[1] == arrSort);
+
+  auto t = solver->mkSymbol("t_arr", tupleSort);
+  auto bvField = solver->mkTupleSelect(t, 0);
+  auto arrField = solver->mkTupleSelect(t, 1);
+  REQUIRE(bvField->Sort == bv8);
+  REQUIRE(arrField->Sort == arrSort);
+
+  // Constrain the BV field to 7 and require arrField[3] == 42.
+  solver->addConstraint(solver->mkEqual(bvField, solver->mkBVFromDec(7, 8)));
+  auto idx = solver->mkBVFromDec(3, idxSort);
+  auto fortyTwo = solver->mkBVFromDec(42, 8);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(arrField, idx), fortyTwo));
+
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto bv_res = solver->getBV(bvField);
+  REQUIRE(bv_res);
+  REQUIRE(bv_res.value() == 7);
+  auto sel_res = solver->getBV(solver->mkArraySelect(arrField, idx));
+  REQUIRE(sel_res);
+  REQUIRE(sel_res.value() == 42);
+}
+
 inline void empty_tuple_semantics(const camada::SMTSolverRef &solver) {
   auto tupleSort = solver->mkTupleSort({});
   auto tupleValue = solver->mkTuple({});

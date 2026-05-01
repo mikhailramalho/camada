@@ -202,6 +202,9 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fp_equal BVFP",
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
                                   tuple_semantics(solver),
                                   makeSMTLIBSolverCamadaTuples)
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("tuple_with_array_field [Camada]",
+                                  tuple_with_array_field(solver),
+                                  makeSMTLIBSolverCamadaTuples)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                   empty_tuple_semantics(solver),
                                   makeSMTLIBSolverCamadaTuples)
