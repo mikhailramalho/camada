@@ -22,31 +22,28 @@ jobs:
         echo "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
         echo "VCPKG_TARGET_TRIPLET=x64-windows" >> $env:GITHUB_ENV
 
-    - name: Install pkg-config
-      # FindBitwuzla.cmake reads bitwuzla.pc through pkg-config; without
-      # it, Bitwuzla_LINK_LIBRARIES / Bitwuzla_INCLUDE_DIRS stay unset
-      # and the Bitwuzla find fails. The chocolatey pkgconfiglite drop
-      # puts pkg-config.exe on PATH where find_package(PkgConfig) sees
-      # it. The community.chocolatey.org feed occasionally returns 504,
-      # so retry a few times before giving up — and verify pkg-config
-      # is actually installed afterwards (choco install can exit 0 with
-      # "Chocolatey installed 0/0 packages" on a transient feed error).
+    - name: Install pkgconf via vcpkg
+      # FindBitwuzla.cmake reads bitwuzla.pc through pkg-config. The
+      # `pkgconf` port from vcpkg ships pkgconf.exe (a drop-in
+      # replacement that find_package(PkgConfig) accepts via its
+      # `pkg-config pkgconf` name list). vcpkg is Microsoft-hosted and
+      # locally cached on the windows-latest image, so it's far more
+      # reliable than the community.chocolatey.org feed (which 503s
+      # intermittently). The Strawberry Perl shim already on PATH
+      # (`C:\Strawberry\perl\bin\pkg-config.bat`) cannot read our
+      # bundled .pc files, so prepend the vcpkg tools dir so its
+      # pkgconf.exe wins.
       shell: pwsh
       run: |
-        $attempt = 0
-        $maxAttempts = 3
-        while ($attempt -lt $maxAttempts) {
-          $attempt++
-          choco install pkgconfiglite --no-progress -y
-          if ($LASTEXITCODE -eq 0 -and (Get-Command pkg-config -ErrorAction SilentlyContinue)) {
-            Write-Host "pkg-config installed at: $((Get-Command pkg-config).Source)"
-            exit 0
-          }
-          Write-Host "choco install attempt $attempt failed (exit $LASTEXITCODE); retrying..."
-          Start-Sleep -Seconds 15
+        vcpkg install pkgconf:x64-windows
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $pkgconfDir = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\tools\pkgconf"
+        if (-not (Test-Path "$pkgconfDir\pkgconf.exe")) {
+          Write-Error "vcpkg installed pkgconf but pkgconf.exe is missing at $pkgconfDir"
+          exit 1
         }
-        Write-Error "Failed to install pkgconfiglite after $maxAttempts attempts"
-        exit 1
+        echo "$pkgconfDir" >> $env:GITHUB_PATH
+        Write-Host "pkgconf installed at: $pkgconfDir\pkgconf.exe"
 
       # Setup/cache dependencies
     - name: Cache deps

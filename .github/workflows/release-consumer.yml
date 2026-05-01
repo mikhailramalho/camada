@@ -49,23 +49,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install pkg-config
+    - name: Install pkgconf via vcpkg
       shell: pwsh
       run: |
-        $attempt = 0
-        $maxAttempts = 3
-        while ($attempt -lt $maxAttempts) {
-          $attempt++
-          choco install pkgconfiglite --no-progress -y
-          if ($LASTEXITCODE -eq 0 -and (Get-Command pkg-config -ErrorAction SilentlyContinue)) {
-            Write-Host "pkg-config installed at: $((Get-Command pkg-config).Source)"
-            exit 0
-          }
-          Write-Host "choco install attempt $attempt failed (exit $LASTEXITCODE); retrying..."
-          Start-Sleep -Seconds 15
+        vcpkg install pkgconf:x64-windows
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $pkgconfDir = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\tools\pkgconf"
+        if (-not (Test-Path "$pkgconfDir\pkgconf.exe")) {
+          Write-Error "vcpkg installed pkgconf but pkgconf.exe is missing at $pkgconfDir"
+          exit 1
         }
-        Write-Error "Failed to install pkgconfiglite after $maxAttempts attempts"
-        exit 1
+        echo "$pkgconfDir" >> $env:GITHUB_PATH
+        Write-Host "pkgconf installed at: $pkgconfDir\pkgconf.exe"
 
     - name: Cache release deps
       uses: actions/cache@v4
