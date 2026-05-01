@@ -1,0 +1,82 @@
+name: Release Consumer
+
+# Drive scripts/release.py and build a tiny downstream consumer
+# (scripts/release-consumer) against the staged `./release` directory.
+# Exercises the install path the official release tarballs use, so changes
+# to install rules, exported include paths, or camadaTargets.cmake stop
+# breaking downstream builds silently.
+on:
+  push:
+    branches:
+    - master
+    - release/*
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  linux:
+    name: Linux release consumer
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Dependencies
+      run: sudo apt-get update && sudo apt-get install -y cmake linux-libc-dev ninja-build gperf doxygen pkg-config libgmp-dev libmpfr-dev python3
+
+    - name: Cache release deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          .build-release/deps
+          .build-release/_deps
+        key: ${{ runner.os }}-release-deps-v1
+
+    - name: Generate release
+      run: python3 ./scripts/release.py
+
+    - name: Configure consumer
+      run: cmake -S scripts/release-consumer -B scripts/release-consumer/build -GNinja -DCMAKE_PREFIX_PATH=$PWD/release
+
+    - name: Build consumer
+      run: cmake --build scripts/release-consumer/build
+
+    - name: Run consumer
+      run: ctest --test-dir scripts/release-consumer/build --output-on-failure
+
+  macos:
+    name: macOS release consumer
+    runs-on: macos-15
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Dependencies
+      # mpfr is needed because Bitwuzla's FP backend calls mpfr_* directly
+      # and scripts/release.py adds -lmpfr to the install's link interface.
+      run: brew install gmp mpfr cmake ninja automake boost zlib bison flex doxygen libtool pkg-config gettext texinfo python3
+
+    - name: Configure Homebrew Environment
+      run: |
+        echo "CPPFLAGS=-I$(brew --prefix gmp)/include" >> $GITHUB_ENV
+        echo "LDFLAGS=-L$(brew --prefix gmp)/lib" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=$(brew --prefix gmp)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig" >> $GITHUB_ENV
+
+    - name: Cache release deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          .build-release/deps
+          .build-release/_deps
+        key: ${{ runner.os }}-release-deps-v1
+
+    - name: Generate release
+      run: python3 ./scripts/release.py
+
+    - name: Configure consumer
+      # `-L$(brew --prefix)/lib` makes -lgmp / -lmpfr resolvable: Homebrew
+      # libs are not on the linker's default search path on macOS.
+      run: cmake -S scripts/release-consumer -B scripts/release-consumer/build -GNinja -DCMAKE_PREFIX_PATH=$PWD/release -DCMAKE_EXE_LINKER_FLAGS="-L$(brew --prefix)/lib"
+
+    - name: Build consumer
+      run: cmake --build scripts/release-consumer/build
+
+    - name: Run consumer
+      run: ctest --test-dir scripts/release-consumer/build --output-on-failure
