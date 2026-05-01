@@ -1,9 +1,9 @@
-# Smoke test for a Camada release tarball: configure with
-# CMAKE_PREFIX_PATH pointing at the staged ./release directory and build a
-# tiny program that links against camada::camada and exercises one or more
-# enabled backends. CI uses this to catch packaging regressions in
-# scripts/release.py and the install rules — the regular regression suite
-# only validates the in-tree library, not the installed package config.
+# Smoke test for a Camada release tarball: configure with CMAKE_PREFIX_PATH
+# pointing at the staged ./release directory and build a tiny program that links
+# against camada::camada and exercises one or more enabled backends. CI uses
+# this to catch packaging regressions in scripts/release.py and the install
+# rules — the regular regression suite only validates the in-tree library, not
+# the installed package config.
 
 cmake_minimum_required(VERSION 3.15)
 project(camada-release-consumer LANGUAGES CXX)
