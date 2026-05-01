@@ -49,6 +49,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install pkg-config
+      shell: pwsh
+      run: choco install pkgconfiglite --no-progress -y
+
     - name: Cache release deps
       uses: actions/cache@v4
       with:

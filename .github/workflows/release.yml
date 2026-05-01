@@ -59,6 +59,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install pkg-config
+      shell: pwsh
+      run: choco install pkgconfiglite --no-progress -y
+
     - name: Generate release
       shell: pwsh
       run: python ./scripts/release.py

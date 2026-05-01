@@ -22,6 +22,15 @@ jobs:
         echo "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
         echo "VCPKG_TARGET_TRIPLET=x64-windows" >> $env:GITHUB_ENV
 
+    - name: Install pkg-config
+      # FindBitwuzla.cmake reads bitwuzla.pc through pkg-config; without
+      # it, Bitwuzla_LINK_LIBRARIES / Bitwuzla_INCLUDE_DIRS stay unset
+      # and the Bitwuzla find fails. The chocolatey pkgconfiglite drop
+      # puts pkg-config.exe on PATH where find_package(PkgConfig) sees
+      # it.
+      shell: pwsh
+      run: choco install pkgconfiglite --no-progress -y
+
       # Setup/cache dependencies
     - name: Cache deps
       id: cache-deps-v8
