@@ -49,19 +49,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install pkgconf via vcpkg
-      shell: pwsh
-      run: |
-        vcpkg install pkgconf:x64-windows
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        $pkgconfDir = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\tools\pkgconf"
-        if (-not (Test-Path "$pkgconfDir\pkgconf.exe")) {
-          Write-Error "vcpkg installed pkgconf but pkgconf.exe is missing at $pkgconfDir"
-          exit 1
-        }
-        echo "$pkgconfDir" >> $env:GITHUB_PATH
-        Write-Host "pkgconf installed at: $pkgconfDir\pkgconf.exe"
-
     - name: Cache release deps
       uses: actions/cache@v4
       with:

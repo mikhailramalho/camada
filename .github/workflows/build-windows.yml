@@ -22,29 +22,6 @@ jobs:
         echo "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
         echo "VCPKG_TARGET_TRIPLET=x64-windows" >> $env:GITHUB_ENV
 
-    - name: Install pkgconf via vcpkg
-      # FindBitwuzla.cmake reads bitwuzla.pc through pkg-config. The
-      # `pkgconf` port from vcpkg ships pkgconf.exe (a drop-in
-      # replacement that find_package(PkgConfig) accepts via its
-      # `pkg-config pkgconf` name list). vcpkg is Microsoft-hosted and
-      # locally cached on the windows-latest image, so it's far more
-      # reliable than the community.chocolatey.org feed (which 503s
-      # intermittently). The Strawberry Perl shim already on PATH
-      # (`C:\Strawberry\perl\bin\pkg-config.bat`) cannot read our
-      # bundled .pc files, so prepend the vcpkg tools dir so its
-      # pkgconf.exe wins.
-      shell: pwsh
-      run: |
-        vcpkg install pkgconf:x64-windows
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        $pkgconfDir = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\tools\pkgconf"
-        if (-not (Test-Path "$pkgconfDir\pkgconf.exe")) {
-          Write-Error "vcpkg installed pkgconf but pkgconf.exe is missing at $pkgconfDir"
-          exit 1
-        }
-        echo "$pkgconfDir" >> $env:GITHUB_PATH
-        Write-Host "pkgconf installed at: $pkgconfDir\pkgconf.exe"
-
       # Setup/cache dependencies
     - name: Cache deps
       id: cache-deps-v8
@@ -57,12 +34,11 @@ jobs:
 
     - name: Configure Camada
       shell: pwsh
-      # MathSAT and Bitwuzla are OFF on Windows. MathSAT's public header
-      # pulls in <gmp.h> and Camada calls mpq_*/mpz_* APIs directly, but
-      # Windows has no system GMP and the win64 vendor archive ships only
-      # gmp.dll. Bitwuzla's upstream Windows release is MinGW-built and its
-      # static archives are not link-compatible with MSVC. ESBMC's own
-      # Windows CI is Z3-only for the same reasons.
+      # Windows is Z3 + CVC5 only. Bitwuzla's upstream Windows release is
+      # MinGW-built and its static archives are not link-compatible with MSVC;
+      # MathSAT's public header pulls in <gmp.h> but Windows has no system GMP
+      # and its win64 archive ships only gmp.dll. ESBMC's own Windows CI is
+      # Z3-only for the same reasons.
       run: cmake -S . -B build -DCAMADA_ENABLE_REGRESSION=ON -DBUILD_SHARED_LIBS=OFF -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL -DCAMADA_SOLVER_BITWUZLA_ENABLE=OFF -DCAMADA_SOLVER_CVC5_ENABLE=ON -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF -DCAMADA_SOLVER_STP_ENABLE=OFF -DCAMADA_SOLVER_YICES_ENABLE=OFF -DCAMADA_SOLVER_Z3_ENABLE=ON -DENABLE_WARNINGS=ON -DCMAKE_INSTALL_PREFIX:PATH=$env:GITHUB_WORKSPACE/release -DCMAKE_BUILD_TYPE=Debug
 
     - name: Build Camada
