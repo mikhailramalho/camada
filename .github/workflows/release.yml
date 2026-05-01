@@ -53,10 +53,30 @@ jobs:
         name: release-macos
         path: camada-macos-arm64.tar.gz
 
+  build-windows:
+    name: Build Windows Release
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Generate release
+      shell: pwsh
+      run: python ./scripts/release.py
+
+    - name: Create zip
+      shell: pwsh
+      run: Compress-Archive -Path release/* -DestinationPath camada-windows-x64.zip
+
+      # Upload asset
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-windows
+        path: camada-windows-x64.zip
+
   create-release:
     name: Upload Release Asset
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos]
+    needs: [build-linux, build-macos, build-windows]
     steps:
     - name: Download Linux Build
       uses: actions/download-artifact@v4
@@ -68,6 +88,12 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: release-macos
+        path: ./
+
+    - name: Download Windows Build
+      uses: actions/download-artifact@v4
+      with:
+        name: release-windows
         path: ./
 
     - name: Create Release
@@ -102,3 +128,14 @@ jobs:
         asset_path: ./camada-macos-arm64.tar.gz
         asset_name: camada-macos-arm64.tar.gz
         asset_content_type: application/gzip
+
+    - name: Upload Release Asset (Windows)
+      id: upload-release-asset-windows
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./camada-windows-x64.zip
+        asset_name: camada-windows-x64.zip
+        asset_content_type: application/zip
