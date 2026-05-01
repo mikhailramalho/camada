@@ -117,13 +117,23 @@ option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 option(ENABLE_WARNINGS
        "Enable -Wall, -Wextra, and -pedantic when compiling (default: ON)" ON)
 if(ENABLE_WARNINGS)
-  add_definitions(-Wall -Wextra -pedantic)
+  if(MSVC)
+    # MSVC equivalents: /W4 covers most -Wall+-Wextra cases; /permissive-
+    # tightens conformance similar to -pedantic.
+    add_compile_options(/W4 /permissive-)
+  else()
+    add_compile_options(-Wall -Wextra -pedantic)
+  endif()
 endif()
 
 option(ENABLE_WERROR
        "All warnings are treated as errors when compiling (default: OFF)" OFF)
 if(ENABLE_WERROR)
-  add_definitions(-Werror)
+  if(MSVC)
+    add_compile_options(/WX)
+  else()
+    add_compile_options(-Werror)
+  endif()
 endif()
 
 # Demand C++17
