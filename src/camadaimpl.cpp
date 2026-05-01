@@ -345,6 +345,18 @@ SMTSortRef SMTSolverImpl::mkFP64Sort(FPEncoding Encoding) {
 
 SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
+  // Tuple-typed array components on backends without native datatype
+  // support would route the encoded tuple's CamadaTupleSort (which has
+  // no backend sort handle) through mkArraySortImpl, where the backend
+  // would static_cast it as one of its own sorts. Reject up front. The
+  // per-field array decomposition is tracked in issue #17.
+  fatalErrorIf(IndexSort->isTupleSort() && !nativeTupleSupport(),
+               "Arrays whose index sort is a tuple are not yet supported "
+               "on this backend; see issue #17");
+  fatalErrorIf(ElemSort->isTupleSort() && !nativeTupleSupport(),
+               "Arrays whose element sort is a tuple are not yet supported "
+               "on this backend; see issue #17");
+
   ArraySortCacheKey Key{IndexSort.get(), ElemSort.get()};
   auto It = ArraySortCache.find(Key);
   if (It != ArraySortCache.end())
@@ -363,6 +375,18 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
                               const SMTSortRef &CodomainSort) {
   fatalErrorIf(DomainSorts.empty(),
                "Function sort must have at least one domain sort");
+  // Tuple-typed function components on backends without native datatype
+  // support would static_cast a CamadaTupleSort as a backend sort.
+  // Reject up front; structural lowering is part of the issue #17 work.
+  if (!nativeTupleSupport()) {
+    fatalErrorIf(CodomainSort->isTupleSort(),
+                 "Functions returning tuples are not yet supported on this "
+                 "backend; see issue #17");
+    for (const auto &D : DomainSorts)
+      fatalErrorIf(D->isTupleSort(),
+                   "Functions taking tuple arguments are not yet supported "
+                   "on this backend; see issue #17");
+  }
   if (DomainSorts.size() <= 4) {
     SmallFunctionSortCacheKey SmallKey{};
     SmallKey.CodomainSort = CodomainSort.get();
@@ -1091,6 +1115,14 @@ SMTExprRef SMTSolverImpl::mkApplyImpl(const SMTExprRef &,
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireBoolSort(Body, "Expected boolean quantifier body");
+  // Encoded tuple variables would reach the backend's mkForallImpl as a
+  // CamadaTupleExpr without a backend term, which the backend would
+  // then static_cast as one of its own expressions. Reject up front.
+  if (!nativeTupleSupport())
+    for (const auto &V : Vars)
+      fatalErrorIf(V->Sort->isTupleSort(),
+                   "Quantifiers over tuple-typed variables are not yet "
+                   "supported on this backend; see issue #17");
   SMTExprRef theExp = mkForallImpl(Vars, Body);
   assert(theExp->isBoolSort());
   return theExp;
@@ -1104,6 +1136,11 @@ SMTExprRef SMTSolverImpl::mkForallImpl(const std::vector<SMTExprRef> &,
 SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireBoolSort(Body, "Expected boolean quantifier body");
+  if (!nativeTupleSupport())
+    for (const auto &V : Vars)
+      fatalErrorIf(V->Sort->isTupleSort(),
+                   "Quantifiers over tuple-typed variables are not yet "
+                   "supported on this backend; see issue #17");
   SMTExprRef theExp = mkExistsImpl(Vars, Body);
   assert(theExp->isBoolSort());
   return theExp;
