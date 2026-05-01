@@ -106,6 +106,8 @@ protected:
   SMTSortRef
   mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
 
+  bool nativeTupleSupport() const override { return true; }
+
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkBVNotImpl(const SMTExprRef &Exp) override;

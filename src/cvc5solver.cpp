@@ -1102,7 +1102,7 @@ SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   const SMTSortRef &to =
       mkFPSort(Exp->Sort->getFPExponentWidth(),
                Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
-  const SMTExprRef &newSymbol = mkSymbol(name, to);
+  const SMTExprRef &newSymbol = mkSymbolUnchecked(name, to);
 
   // and constraint it to be the conversion of the fp, since
   // (fp_matches_bv f bv) <-> (= f ((_ to_fp E S) bv))

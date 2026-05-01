@@ -910,7 +910,7 @@ SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   const SMTSortRef &to =
       mkFPSort(Exp->Sort->getFPExponentWidth(),
                Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
-  const SMTExprRef &newSymbol = mkSymbol(name, to);
+  const SMTExprRef &newSymbol = mkSymbolUnchecked(name, to);
   addConstraint(mkEqual(Exp, mkBVToIEEEFP(newSymbol, Exp->Sort)));
   return newSymbol;
 }

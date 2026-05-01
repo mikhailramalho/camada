@@ -58,7 +58,12 @@ public:
     HandleState->bumpGeneration();
   }
 
-protected:
+public:
+  /// Allocates an SMTExpr-derived object in the per-solver arena. Used by
+  /// every backend's *Impl methods and by camadatuple.cpp to construct
+  /// CamadaTupleExpr nodes. The first ctor argument of `SolverExpr` (and
+  /// of CamadaTupleExpr) is `SMTExprKind` so it is forwarded explicitly
+  /// rather than tucked inside ArgsV.
   template <typename SolverExpr, typename... Args>
   SMTExprRef makeExprRef(SMTExprKind Kind, Args &&...ArgsV) {
     auto *Exp =
@@ -67,6 +72,9 @@ protected:
     return SMTExprRef(Exp, HandleState, HandleState->Generation);
   }
 
+  /// Allocates an SMTSort-derived object in the per-solver arena. Same
+  /// shape as makeExprRef but takes the sort by value (each backend's
+  /// SolverSort is cheap to construct in place at the call site).
   template <typename SolverSort> SMTSortRef makeSortRef(SolverSort Sort) {
     auto *OwnedSort = SortArena.create<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
@@ -76,6 +84,13 @@ protected:
     return SMTSortRef(OwnedSort, HandleState, HandleState->Generation);
   }
 
+  /// mkSymbol variant that bypasses the user-name validation. Used by
+  /// internal lowerings (Camada tuple field decomposition, STP array
+  /// extensionality, FP-to-BV shadowing) that mint symbols with the
+  /// reserved __CAMADA_ prefix.
+  SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
+
+protected:
   void invalidateGeneratedObjects();
   void clearSortCaches();
   void clearExprCaches();
@@ -383,6 +398,12 @@ protected:
                                         const SMTSortRef &);
 
   virtual SMTSortRef mkTupleSortImpl(const std::vector<SMTSortRef> &);
+
+  /// Backends that natively support SMT-LIB datatypes (z3, cvc5, smtlib)
+  /// override this to true. Other backends (bitwuzla, mathsat, stp,
+  /// yices) inherit the default false and route tuple operations through
+  /// the Camada-managed lowering in camadatuple.cpp.
+  virtual bool nativeTupleSupport() const { return false; }
 
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 

@@ -548,24 +548,27 @@ const std::string &textOf(const SMTSortRef &S) {
 
 } // namespace
 
-SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath)
-    : File(std::make_unique<FileEmitter>(OutputPath)) {
-  emitPreamble();
-  initializeCommonSingletons();
-}
-
-SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
-                           const std::vector<std::string> &Argv)
-    : Proc(std::make_unique<ProcessEmitter>(Argv)) {
+SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
+                           TupleEncoding TupleMode)
+    : File(std::make_unique<FileEmitter>(OutputPath)), TupleMode(TupleMode) {
   emitPreamble();
   initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
-                           const std::string &OutputPath)
+                           TupleEncoding TupleMode)
+    : Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode) {
+  emitPreamble();
+  initializeCommonSingletons();
+}
+
+SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
+                           const std::vector<std::string> &Argv,
+                           const std::string &OutputPath,
+                           TupleEncoding TupleMode)
     : File(std::make_unique<FileEmitter>(OutputPath)),
-      Proc(std::make_unique<ProcessEmitter>(Argv)) {
+      Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode) {
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -1205,7 +1208,7 @@ SMTExprRef SMTLIBSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   const std::string Name = "__CAMADA_ieeebv" + std::to_string(NextIEEEBVId++);
   SMTSortRef BVSort = mkBVSort(Exp->Sort->getFPExponentWidth() +
                                Exp->Sort->getFPSignificandWidth() + 1);
-  SMTExprRef NewSymbol = mkSymbol(Name, BVSort);
+  SMTExprRef NewSymbol = mkSymbolUnchecked(Name, BVSort);
   addConstraint(mkEqual(Exp, mkBVToIEEEFP(NewSymbol, Exp->Sort)));
   return NewSymbol;
 }
