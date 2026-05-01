@@ -8,7 +8,14 @@ function(check_z3_version z3_include z3_lib)
   if(NOT BUILD_SHARED_LIBS)
     find_package(Threads REQUIRED)
     if(Threads_FOUND)
-      list(APPEND z3_lib "${CMAKE_THREAD_LIBS_INIT} -ldl")
+      # Z3's static link interface needs -ldl on Unix-style platforms; MSVC has
+      # no `dl` library and `cl` parses `-ldl` as `/dl` (LNK4044), so skip it on
+      # Windows. Threads on Windows is satisfied implicitly.
+      if(MSVC)
+        list(APPEND z3_lib "${CMAKE_THREAD_LIBS_INIT}")
+      else()
+        list(APPEND z3_lib "${CMAKE_THREAD_LIBS_INIT} -ldl")
+      endif()
     endif()
   endif()
 
@@ -94,12 +101,16 @@ if(_camada_download_z3
   endif()
 endif()
 
-# Alright, now create a list with z3 and it's dependencies
+# Alright, now create a list with z3 and it's dependencies. -ldl is Unix-only;
+# MSVC has no `dl` library and would emit LNK4044 silently swallowing the flag.
+# Threads on Windows is satisfied implicitly.
 if(NOT BUILD_SHARED_LIBS)
   find_package(Threads REQUIRED)
   if(Threads_FOUND)
     list(APPEND CAMADA_Z3_LIB "${CMAKE_THREAD_LIBS_INIT}")
-    list(APPEND CAMADA_Z3_LIB "-ldl")
+    if(NOT MSVC)
+      list(APPEND CAMADA_Z3_LIB "-ldl")
+    endif()
   endif()
 endif()
 
