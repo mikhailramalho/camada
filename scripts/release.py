@@ -38,10 +38,9 @@ def rewrite_release_link_interface(targets_file, solver_archives):
                             for name in solver_archives]
 
     if sys.platform == "win32":
-        # MSVC auto-links the C runtime; the bundled Bitwuzla import lib
-        # (libbitwuzla.a in the vendor archive) and the Z3 import lib are
-        # the only externals camada needs at link time. mathsat.lib (if
-        # enabled) statically embeds GMP, so we don't add it here either.
+        # MSVC auto-links the C runtime; the Z3 import lib is the only
+        # external camada needs at link time on Windows. Bitwuzla and
+        # MathSAT are not available on Windows.
         system_libs = []
     else:
         system_libs = ["-lmpfr", "-lgmp"]
@@ -78,12 +77,16 @@ if __name__ == '__main__':
     release_build_dir.mkdir()
     os.chdir(release_build_dir)
 
+    # Bitwuzla is unsupported on Windows: its upstream prebuilt is MinGW-built
+    # and the static archive is not link-compatible with MSVC. ESBMC's Windows
+    # CI is Z3-only for the same reason.
+    bitwuzla_flag = "OFF" if is_windows else "ON"
     cmake_args = [
         "cmake", "..",
         "-DBUILD_SHARED_LIBS=OFF",
         "-DCAMADA_ENABLE_REGRESSION=OFF",
         "-DCAMADA_DOWNLOAD_DEPENDENCIES=PERMISSIVE",
-        "-DCAMADA_SOLVER_BITWUZLA_ENABLE=ON",
+        f"-DCAMADA_SOLVER_BITWUZLA_ENABLE={bitwuzla_flag}",
         "-DCAMADA_SOLVER_CVC5_ENABLE=OFF",
         "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",
         "-DCAMADA_SOLVER_STP_ENABLE=OFF",
@@ -126,11 +129,10 @@ if __name__ == '__main__':
     deps_install_dir = str(release_build_dir / "deps" / "install")
 
     solver_archives = []
-    # Bitwuzla's Windows prebuilt also ships `lib/libbitwuzla*.a`, so the
-    # same glob works on every platform.
-    solver_archives.extend(
-        copy_release_dependency("**/libbitwuzla*.a", deps_install_dir,
-                                release_lib_dir))
+    if not is_windows:
+        solver_archives.extend(
+            copy_release_dependency("**/libbitwuzla*.a", deps_install_dir,
+                                    release_lib_dir))
     if is_windows:
         # Z3 on Windows ships `bin/libz3.lib` (import lib) and
         # `bin/libz3.dll` (runtime). Pull the import lib into release/lib
@@ -170,8 +172,10 @@ if __name__ == '__main__':
     license_dir = Path("./release/license")
     license_dir.mkdir()
     shutil.copy2("LICENSE", license_dir / "LICENSE")
-    bitwuzla_copying = release_build_dir / "deps" / "install" / "COPYING"
-    if bitwuzla_copying.exists():
-        shutil.copy2(bitwuzla_copying, license_dir / "BITWUZLA_LICENSE.txt")
+    if not is_windows:
+        bitwuzla_copying = release_build_dir / "deps" / "install" / "COPYING"
+        if bitwuzla_copying.exists():
+            shutil.copy2(bitwuzla_copying,
+                         license_dir / "BITWUZLA_LICENSE.txt")
     shutil.copy2("./scripts/licenses/Z3_LICENSE.txt",
                  license_dir / "Z3_LICENSE.txt")

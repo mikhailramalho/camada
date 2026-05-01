@@ -10,27 +10,15 @@
 #include <iomanip>
 #include <stdexcept>
 #include <string>
+#include <unistd.h>
 #include <utility>
 #include <vector>
-
-#if defined(_WIN32)
-#include <psapi.h>
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
 
 std::size_t readCurrentRSSKiB() {
-#if defined(_WIN32)
-  PROCESS_MEMORY_COUNTERS pmc{};
-  if (!GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
-    throw std::runtime_error("GetProcessMemoryInfo failed");
-  return static_cast<std::size_t>(pmc.WorkingSetSize) / 1024;
-#else
   std::ifstream Statm("/proc/self/statm");
   std::size_t total_pages = 0;
   std::size_t resident_pages = 0;
@@ -42,7 +30,6 @@ std::size_t readCurrentRSSKiB() {
     throw std::runtime_error("Failed to read page size");
 
   return (resident_pages * static_cast<std::size_t>(page_size)) / 1024;
-#endif
 }
 
 camada::SMTSolverRef createSolver(const std::string &backend) {

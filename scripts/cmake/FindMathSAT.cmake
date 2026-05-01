@@ -58,16 +58,11 @@ find_library(
   HINTS ${_camada_mathsat_hints}
   PATH_SUFFIXES lib bin)
 
-# The MathSAT Windows prebuilt is shipped as `mathsat.lib` (import lib) plus
-# `bin/mathsat.dll`. The DLL statically embeds GMP, and the archive does not
-# ship a separate gmp.lib or gmp.h. Skip the gmp lookup there.
-if(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
-  find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
-  find_path(
-    CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
-    HINTS ${_camada_mathsat_gmp_hints}
-    PATH_SUFFIXES include)
-endif()
+find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+find_path(
+  CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
+  HINTS ${_camada_mathsat_gmp_hints}
+  PATH_SUFFIXES include)
 
 if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
    AND _camada_download_mathsat)
@@ -80,13 +75,11 @@ if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
     CAMADA_MATHSAT_LIB mathsat
     HINTS ${_camada_mathsat_hints}
     PATH_SUFFIXES lib bin)
-  if(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
-    find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
-    find_path(
-      CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
-      HINTS ${_camada_mathsat_gmp_hints}
-      PATH_SUFFIXES include)
-  endif()
+  find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+  find_path(
+    CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
+    HINTS ${_camada_mathsat_gmp_hints}
+    PATH_SUFFIXES include)
 endif()
 
 # Try to check it dynamically, by compiling a small program that prints
@@ -134,12 +127,8 @@ if(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin"
   endif()
 endif()
 
-# Alright, now create a list with MathSAT and it's dependencies. The Windows
-# prebuilt embeds GMP in mathsat.dll, so there is no separate gmp library to
-# link against on that platform.
-if(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
-  list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
-endif()
+# Alright, now create a list with MathSAT and it's dependencies.
+list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
 
 # handle the QUIETLY and REQUIRED arguments and set MATHSAT_FOUND to TRUE if all
 # listed variables are TRUE

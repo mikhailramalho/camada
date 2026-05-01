@@ -77,11 +77,9 @@ set(CAMADA_BITWUZLA_MACOS_ARM64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-macOS-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt Bitwuzla archive for macOS arm64")
-set(CAMADA_BITWUZLA_WINDOWS_X86_64_URL
-    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Win64-x86_64-static.zip"
-    CACHE
-      STRING
-      "URL used to download the prebuilt Bitwuzla archive for Windows x86_64")
+# No Windows prebuilt for Bitwuzla: the upstream Win64 archive is MinGW-built
+# and its libbitwuzla.a is not link-compatible with MSVC. ESBMC does not enable
+# Bitwuzla on Windows for the same reason.
 set(CAMADA_MATHSAT_VERSION
     "5.6.16"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
@@ -97,9 +95,9 @@ set(CAMADA_MATHSAT_MACOS_X86_64_URL
 set(CAMADA_MATHSAT_MACOS_ARM64_URL
     "https://mathsat.fbk.eu/release/mathsat-5.6.16-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS arm64")
-set(CAMADA_MATHSAT_WINDOWS_X86_64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.16-win64.zip"
-    CACHE STRING "URL used to download MathSAT for Windows x86_64")
+# No Windows prebuilt for MathSAT: mathsat.h pulls in <gmp.h> and Camada calls
+# mpq_*/mpz_* APIs directly, but Windows has no system GMP and the win64 vendor
+# archive ships only the runtime gmp.dll, no headers.
 
 function(camada_ensure_deps_dirs)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_DIR}")
@@ -514,20 +512,6 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
     return()
   endif()
 
-  if(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows"
-     AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64|amd64)$")
-    set(${output_url_var}
-        "${CAMADA_MATHSAT_WINDOWS_X86_64_URL}"
-        PARENT_SCOPE)
-    set(${output_archive_var}
-        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-win64.zip"
-        PARENT_SCOPE)
-    set(${output_source_dir_var}
-        "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-win64"
-        PARENT_SCOPE)
-    return()
-  endif()
-
   message(
     FATAL_ERROR
       "No prebuilt MathSAT archive configured for host system '${CMAKE_HOST_SYSTEM_NAME}' and processor '${CMAKE_HOST_SYSTEM_PROCESSOR}'"
@@ -826,22 +810,10 @@ function(camada_setup_bitwuzla)
                            DIRECTORY)
     get_filename_component(bitwuzla_libdir "${bitwuzla_pkgconfig_dir}"
                            DIRECTORY)
-    if(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
-      # Windows: no gmp.pc/mpfr.pc on the runner, so drop the Requires line —
-      # pkg-config would otherwise fail to resolve them and silently report
-      # Bitwuzla as not found. The Bitwuzla static libs statically embed
-      # GMP/MPFR. -lpsapi is the only system import the Windows build needs (the
-      # vendor archive's pkg-config file listed it before our rewrite).
-      file(
-        WRITE "${bitwuzla_pc_file}"
-        "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nLibs: -L\${libdir} -lbitwuzla -lpsapi -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
-      )
-    else()
-      file(
-        WRITE "${bitwuzla_pc_file}"
-        "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
-      )
-    endif()
+    file(
+      WRITE "${bitwuzla_pc_file}"
+      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
+    )
   endforeach()
 endfunction()
 
@@ -1162,12 +1134,7 @@ function(camada_setup_mathsat)
     return()
   endif()
 
-  # MathSAT's Windows prebuilt statically embeds GMP and ships gmp.dll next to
-  # mathsat.dll, so the source-build path (which requires autotools) is not
-  # needed there.
-  if(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
-    camada_setup_gmp()
-  endif()
+  camada_setup_gmp()
   camada_ensure_deps_dirs()
   camada_select_mathsat_prebuilt_info(mathsat_url mathsat_archive
                                       mathsat_source_dir)
@@ -1213,14 +1180,5 @@ function(camada_setup_mathsat)
          DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/lib")
     file(COPY "${mathsat_source_dir}/include/"
          DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/include")
-    # Windows ships mathsat as `lib/mathsat.lib` (import library) plus
-    # `bin/mathsat.dll` and `bin/gmp.dll` (runtime). The import lib was picked
-    # up above; co-locate the runtime DLLs so dependents can find them next to
-    # the .lib at link time and at run time.
-    if(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows" AND IS_DIRECTORY
-                                                    "${mathsat_source_dir}/bin")
-      file(COPY "${mathsat_source_dir}/bin/"
-           DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/bin")
-    endif()
   endif()
 endfunction()
