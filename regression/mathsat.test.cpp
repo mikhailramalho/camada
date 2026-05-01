@@ -1,6 +1,8 @@
 
 
+#if SOLVER_SMTLIB_ENABLED
 #include "smtlib_pipeline.test.h"
+#endif
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -122,6 +124,7 @@ TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
   }
 }
 
+#if SOLVER_SMTLIB_ENABLED
 // ---------------------------------------------------------------------------
 // SMT-LIB pipeline tests against the mathsat binary. mathsat supports BV,
 // Bool, arrays, FP-native, FP-BV, Int, Real, and UF. It does NOT support
@@ -210,3 +213,4 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                   makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_MATHSAT_SMTLIB_SHARED_TEST
+#endif // SOLVER_SMTLIB_ENABLED

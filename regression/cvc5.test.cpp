@@ -1,5 +1,7 @@
 
+#if SOLVER_SMTLIB_ENABLED
 #include "smtlib_pipeline.test.h"
+#endif
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -39,6 +41,7 @@ TEST_CASE("Tuple-with-Int CVC5 test", "[CVC5]") {
   tuple_semantics_with_int(cvc5);
 }
 
+#if SOLVER_SMTLIB_ENABLED
 // ---------------------------------------------------------------------------
 // SMT-LIB pipeline tests against the cvc5 binary. cvc5 supports the full
 // Camada surface (BV, Bool, arrays, FP-native, FP-BV, Int, Real, UF,
@@ -132,3 +135,4 @@ CAMADA_CVC5_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_CVC5_SMTLIB_SHARED_TEST
+#endif // SOLVER_SMTLIB_ENABLED

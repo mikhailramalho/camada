@@ -46,9 +46,12 @@
 #include "stpsolver.h"
 #endif
 
-// SMT-LIB backend is unconditional — it has no native solver dep, just
-// drives an external SMT-LIB-speaking process.
+// The SMT-LIB pipeline backend has no native solver dep — it drives an
+// external SMT-LIB-speaking process via fork/exec/setrlimit/select, so it
+// is POSIX-only and gated behind SOLVER_SMTLIB_ENABLED.
+#if SOLVER_SMTLIB_ENABLED
 #include "smtlibsolver.h"
+#endif
 
 namespace camada {
 
@@ -110,14 +113,29 @@ SMTSolverRef createSTPSolver() {
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
                                 TupleEncoding TupleMode) {
+#if SOLVER_SMTLIB_ENABLED
   return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, TupleMode);
+#else
+  (void)Argv;
+  (void)TupleMode;
+  fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
+             "(unsupported on this platform)");
+#endif
 }
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
                                 const std::string &OutputPath,
                                 TupleEncoding TupleMode) {
+#if SOLVER_SMTLIB_ENABLED
   return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, OutputPath,
                                         TupleMode);
+#else
+  (void)Argv;
+  (void)OutputPath;
+  (void)TupleMode;
+  fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
+             "(unsupported on this platform)");
+#endif
 }
 
 } // namespace camada

@@ -33,10 +33,13 @@ set(${LIBRARY_TARGET_NAME}_SRC
     bitwuzlasolver.cpp
     cvc5solver.cpp
     mathsatsolver.cpp
-    smtlibsolver.cpp
     stpsolver.cpp
     yicessolver.cpp
     z3solver.cpp)
+
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  list(APPEND ${LIBRARY_TARGET_NAME}_SRC smtlibsolver.cpp)
+endif()
 
 # List of HPP (header) library files, the public ones will be installed on the
 # system
@@ -48,8 +51,11 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camadaexpr.h
     camadahandle.h
     camadaimpl.h
-    camadasort.h
-    smtlibsolver.h)
+    camadasort.h)
+
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  list(APPEND ${LIBRARY_TARGET_NAME}_PUB_HDR smtlibsolver.h)
+endif()
 
 # add each solver specific header, if it is enabled
 add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
@@ -143,6 +149,11 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
       PROPERTY BUILD_RPATH "${CAMADA_Z3_LIB_DIR}")
   endif()
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
+endif()
+
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  target_compile_definitions(${LIBRARY_TARGET_NAME}
+                             PRIVATE SOLVER_SMTLIB_ENABLED)
 endif()
 
 # Set two minimum target properties for the library. See

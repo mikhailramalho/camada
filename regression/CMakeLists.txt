@@ -37,8 +37,11 @@ endif()
 # add each solver specific implementation, if it is enabled
 compile_test("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
-add_executable(${REGRESSION_TARGET_NAME} main.cpp smtlib.test.cpp
-                                         "${solver_test_files}")
+set(REGRESSION_SOURCES main.cpp "${solver_test_files}")
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  list(APPEND REGRESSION_SOURCES smtlib.test.cpp)
+endif()
+add_executable(${REGRESSION_TARGET_NAME} ${REGRESSION_SOURCES})
 target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME}
                                                         Catch2::Catch2)
 
@@ -139,6 +142,11 @@ if(${CAMADA_SOLVER_YICES_ENABLE})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
   target_compile_definitions(${BENCH_TARGET_NAME} PRIVATE SOLVER_YICES_ENABLED)
+endif()
+
+if(CAMADA_SOLVER_SMTLIB_ENABLE)
+  target_compile_definitions(${REGRESSION_TARGET_NAME}
+                             PRIVATE SOLVER_SMTLIB_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_Z3_ENABLE})
