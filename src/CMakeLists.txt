@@ -73,11 +73,21 @@ add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS
             ${LIBRARY_TARGET_NAME})
 
 # Solvers
+#
+# The installed <backend>solver.h headers `#include` the backend's own headers
+# (z3++.h, bitwuzla/c/bitwuzla.h, etc.), so consumers compiling against Camada
+# must see the same headers Camada itself was built with. Propagate the
+# bundled-backend include path PUBLIC and wrap it in BUILD_INTERFACE because the
+# bundled solvers are not staged into Camada's install prefix — installed
+# consumers must supply their own backend headers. If a consumer also has a
+# system copy of the same backend (/opt/homebrew/include, /usr/local/include) on
+# its own -I list, they must arrange for Camada's propagated -I to come first;
+# this CMake side only ensures the path reaches the consumer at all.
 if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME}
                         PUBLIC ${Bitwuzla_LINK_LIBRARIES})
-  target_include_directories(${LIBRARY_TARGET_NAME}
-                             PRIVATE ${Bitwuzla_INCLUDE_DIRS})
+  target_include_directories(
+    ${LIBRARY_TARGET_NAME} PUBLIC "$<BUILD_INTERFACE:${Bitwuzla_INCLUDE_DIRS}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME}
                              PRIVATE SOLVER_BITWUZLA_ENABLED)
 endif()
@@ -96,30 +106,33 @@ endif()
 
 if(${CAMADA_SOLVER_MATHSAT_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
-  target_include_directories(${LIBRARY_TARGET_NAME}
-                             PRIVATE ${CAMADA_MATHSAT_INCLUDE_DIR})
+  target_include_directories(
+    ${LIBRARY_TARGET_NAME}
+    PUBLIC "$<BUILD_INTERFACE:${CAMADA_MATHSAT_INCLUDE_DIR}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME}
                              PRIVATE SOLVER_MATHSAT_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_STP_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC stp)
-  target_include_directories(${LIBRARY_TARGET_NAME} PRIVATE ${STP_INCLUDE_DIRS})
+  target_include_directories(${LIBRARY_TARGET_NAME}
+                             PUBLIC "$<BUILD_INTERFACE:${STP_INCLUDE_DIRS}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_YICES_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
-  target_include_directories(${LIBRARY_TARGET_NAME}
-                             PRIVATE ${CAMADA_YICES_INCLUDE_DIR})
+  target_include_directories(
+    ${LIBRARY_TARGET_NAME}
+    PUBLIC "$<BUILD_INTERFACE:${CAMADA_YICES_INCLUDE_DIR}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME}
                              PRIVATE SOLVER_YICES_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_Z3_ENABLE})
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
-  target_include_directories(${LIBRARY_TARGET_NAME}
-                             PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
+  target_include_directories(
+    ${LIBRARY_TARGET_NAME} PUBLIC "$<BUILD_INTERFACE:${CAMADA_Z3_INCLUDE_DIR}>")
   get_filename_component(CAMADA_Z3_LIB_DIR "${CAMADA_Z3_LIB}" DIRECTORY)
   if(BUILD_SHARED_LIBS AND EXISTS "${CAMADA_Z3_LIB_DIR}")
     target_link_directories(${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_Z3_LIB_DIR})
