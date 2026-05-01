@@ -34,11 +34,43 @@
 
 namespace camada {
 
+/// Selects how Camada represents floating-point values when constructing
+/// FP/RM sorts and FP constants. The encoding is per-sort, not solver-
+/// wide — a single solver instance can hold both Native and BV-encoded
+/// FP values at the same time, and they interoperate through the
+/// common-layer encoders.
+///
+/// - Native: use the backend's native floating-point sort (`Float32Sort`
+///   in z3, `mkFloatingPoint` in cvc5, etc.). Requires native FP
+///   support in the backend; fastest path on solvers that have it.
+/// - BV: bit-blast every FP value into a fixed-width bit-vector and
+///   emulate the IEEE-754 operations through Camada's common-layer
+///   encoder. The only path available on backends without native FP
+///   (STP, Yices-SMT2) and on SMT-LIB scripts intended for solvers that
+///   reject native FP. Substantially slower than Native on backends
+///   that have both.
+///
+/// The two encodings round-trip cleanly across all five FP arithmetic
+/// ops, predicates, and conversions (the `fp_native_bv_predicate_parity`
+/// regression pins this), but model values are reported in the encoded
+/// representation — `getFP32` decodes BV back to `float`, `getBV`
+/// returns the raw bits when the sort was Native.
 enum class FPEncoding { Native, BV };
 
+/// Selects how Camada lowers `mkFPNeg` for backends whose native FP
+/// implementation diverges from the IEEE-754 sign-bit-flip semantics
+/// some users expect.
+///
+/// - FlipSignBit: always flip the IEEE-754 sign bit, including on NaN
+///   inputs. Matches the behavior of CPU FP units and most language
+///   runtimes. Backed by an explicit bit-blast on solvers whose native
+///   `fp.neg` preserves the NaN payload — see PR #59 for the per-
+///   backend status.
+/// - PreserveNaNPayload: follow the SMT-LIB `fp.neg` definition, which
+///   leaves NaN payloads (including the sign bit) unchanged. Cheaper to
+///   emit on backends that natively implement this semantics.
 enum class FPNegBehavior {
   FlipSignBit,
-  // Follows SMT-LIB FP semantics: fp.neg leaves NaNs unchanged.
   PreserveNaNPayload,
 };
 
