@@ -1162,7 +1162,12 @@ function(camada_setup_mathsat)
     return()
   endif()
 
-  camada_setup_gmp()
+  # MathSAT's Windows prebuilt statically embeds GMP and ships gmp.dll next to
+  # mathsat.dll, so the source-build path (which requires autotools) is not
+  # needed there.
+  if(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
+    camada_setup_gmp()
+  endif()
   camada_ensure_deps_dirs()
   camada_select_mathsat_prebuilt_info(mathsat_url mathsat_archive
                                       mathsat_source_dir)
