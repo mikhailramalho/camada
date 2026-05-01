@@ -61,7 +61,21 @@ jobs:
 
     - name: Install pkg-config
       shell: pwsh
-      run: choco install pkgconfiglite --no-progress -y
+      run: |
+        $attempt = 0
+        $maxAttempts = 3
+        while ($attempt -lt $maxAttempts) {
+          $attempt++
+          choco install pkgconfiglite --no-progress -y
+          if ($LASTEXITCODE -eq 0 -and (Get-Command pkg-config -ErrorAction SilentlyContinue)) {
+            Write-Host "pkg-config installed at: $((Get-Command pkg-config).Source)"
+            exit 0
+          }
+          Write-Host "choco install attempt $attempt failed (exit $LASTEXITCODE); retrying..."
+          Start-Sleep -Seconds 15
+        }
+        Write-Error "Failed to install pkgconfiglite after $maxAttempts attempts"
+        exit 1
 
     - name: Generate release
       shell: pwsh

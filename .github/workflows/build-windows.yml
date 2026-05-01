@@ -27,9 +27,26 @@ jobs:
       # it, Bitwuzla_LINK_LIBRARIES / Bitwuzla_INCLUDE_DIRS stay unset
       # and the Bitwuzla find fails. The chocolatey pkgconfiglite drop
       # puts pkg-config.exe on PATH where find_package(PkgConfig) sees
-      # it.
+      # it. The community.chocolatey.org feed occasionally returns 504,
+      # so retry a few times before giving up — and verify pkg-config
+      # is actually installed afterwards (choco install can exit 0 with
+      # "Chocolatey installed 0/0 packages" on a transient feed error).
       shell: pwsh
-      run: choco install pkgconfiglite --no-progress -y
+      run: |
+        $attempt = 0
+        $maxAttempts = 3
+        while ($attempt -lt $maxAttempts) {
+          $attempt++
+          choco install pkgconfiglite --no-progress -y
+          if ($LASTEXITCODE -eq 0 -and (Get-Command pkg-config -ErrorAction SilentlyContinue)) {
+            Write-Host "pkg-config installed at: $((Get-Command pkg-config).Source)"
+            exit 0
+          }
+          Write-Host "choco install attempt $attempt failed (exit $LASTEXITCODE); retrying..."
+          Start-Sleep -Seconds 15
+        }
+        Write-Error "Failed to install pkgconfiglite after $maxAttempts attempts"
+        exit 1
 
       # Setup/cache dependencies
     - name: Cache deps
