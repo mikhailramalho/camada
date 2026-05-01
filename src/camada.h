@@ -42,6 +42,18 @@ enum class FPNegBehavior {
   PreserveNaNPayload,
 };
 
+/// Selects how the SMT-LIB backend lowers tuples on the wire.
+///
+/// - Native: emit `(declare-datatypes ...)` and rely on the downstream
+///   solver to support SMT-LIB datatypes. Works against z3 and cvc5; not
+///   accepted by bitwuzla, mathsat, yices-smt2.
+/// - Camada: lower tuples in Camada to per-field BV/Bool symbols before
+///   anything reaches the wire. The emitted script contains no
+///   datatype declarations, so any standard SMT-LIB v2 solver can parse
+///   it. Same encoding the non-native backends (bitwuzla/mathsat/stp/
+///   yices) already use.
+enum class TupleEncoding { Native, Camada };
+
 enum class RM {
   ROUND_TO_EVEN = 0,
   ROUND_TO_AWAY = 1,
@@ -698,13 +710,17 @@ SMTSolverRef createSTPSolver();
 /// The child must speak standard SMT-LIB on stdin/stdout. Camada sends
 /// `(set-option :print-success true)` to it at startup, so any solver that
 /// honors that contract works.
-SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv);
+SMTSolverRef
+createSMTLIBSolver(const std::vector<std::string> &Argv,
+                   TupleEncoding TupleMode = TupleEncoding::Native);
 
 /// Same as `createSMTLIBSolver(Argv)` but also tees the emitted SMT-LIB
 /// script to OutputPath (or stdout if OutputPath is "-") for offline
 /// reproduction.
-SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                const std::string &OutputPath);
+SMTSolverRef
+createSMTLIBSolver(const std::vector<std::string> &Argv,
+                   const std::string &OutputPath,
+                   TupleEncoding TupleMode = TupleEncoding::Native);
 
 } // namespace camada
 

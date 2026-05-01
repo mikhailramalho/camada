@@ -184,3 +184,23 @@ CAMADA_YICES_SMTLIB_SHARED_TEST("fp_equal BVFP",
                                 fp_equal(solver, camada::FPEncoding::BV))
 
 #undef CAMADA_YICES_SMTLIB_SHARED_TEST
+
+// Tuples against the yices-smt2 binary use TupleEncoding::Camada — yices
+// rejects (declare-datatypes ...), but the Camada lowering produces a
+// pure BV/Bool script which yices solves natively.
+#define CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST(NameStr, FixtureCall)            \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [yices]",                            \
+            "[Yices][SMTLIB][pipeline]") {                                     \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::yicesSmt2Command(),   \
+                                 "yices-smt2");                                \
+    camada::SMTSolverRef solver =                                              \
+        camada_smtlib_pipeline::makeSMTLIBSolverCamadaTuples(Cmd);             \
+    FixtureCall;                                                               \
+  }
+
+CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST("tuple_semantics [Camada]",
+                                      tuple_semantics(solver))
+CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST("empty_tuple_semantics [Camada]",
+                                      empty_tuple_semantics(solver))
+
+#undef CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST

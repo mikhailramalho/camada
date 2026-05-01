@@ -131,6 +131,15 @@ makeSMTLIBSolver(const std::vector<std::string> &Argv) {
   return camada::createSMTLIBSolver(Argv);
 }
 
+// Same, but the SMTLIBSolver lowers tuples in Camada (per-field BV/Bool
+// symbols) instead of emitting `(declare-datatypes ...)`. Use this for
+// tuple fixtures against child solvers that don't accept SMT-LIB
+// datatypes (bitwuzla, mathsat, yices-smt2).
+inline camada::SMTSolverRef
+makeSMTLIBSolverCamadaTuples(const std::vector<std::string> &Argv) {
+  return camada::createSMTLIBSolver(Argv, camada::TupleEncoding::Camada);
+}
+
 // Skip the test if the binary isn't reachable.
 #define CAMADA_SMTLIB_REQUIRE_BINARY(CmdExpr, Name)                            \
   std::vector<std::string> Cmd = (CmdExpr);                                    \

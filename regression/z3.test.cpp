@@ -34,14 +34,9 @@ TEST_CASE("Arith Z3 test", "[Z3]") {
   arith_symbolic_shift_semantics(z3);
 }
 
-TEST_CASE("Tuple Z3 test", "[Z3]") {
+TEST_CASE("Tuple-with-Int Z3 test", "[Z3]") {
   auto z3 = camada::createZ3Solver();
-  tuple_semantics(z3);
-}
-
-TEST_CASE("Empty tuple Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver();
-  empty_tuple_semantics(z3);
+  tuple_semantics_with_int(z3);
 }
 
 TEST_CASE("Override Z3 Solver", "[Z3]") {
@@ -130,8 +125,9 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
 CAMADA_Z3_SMTLIB_SHARED_TEST("arith_model_queries", arith_model_queries(solver))
 CAMADA_Z3_SMTLIB_SHARED_TEST("arith_conversion_semantics",
                              arith_conversion_semantics(solver))
-CAMADA_Z3_SMTLIB_SHARED_TEST("tuple_semantics", tuple_semantics(solver))
-CAMADA_Z3_SMTLIB_SHARED_TEST("empty_tuple_semantics",
+CAMADA_Z3_SMTLIB_SHARED_TEST("tuple_semantics [native]",
+                             tuple_semantics(solver))
+CAMADA_Z3_SMTLIB_SHARED_TEST("empty_tuple_semantics [native]",
                              empty_tuple_semantics(solver))
 CAMADA_Z3_SMTLIB_SHARED_TEST("fp_equal NativeFP",
                              fp_equal(solver, camada::FPEncoding::Native))
@@ -139,3 +135,21 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("fp_equal BVFP",
                              fp_equal(solver, camada::FPEncoding::BV))
 
 #undef CAMADA_Z3_SMTLIB_SHARED_TEST
+
+// Camada tuple lowering (per-field BV/Bool symbols). Works against any
+// SMT-LIB v2 solver — verified here against z3 too so we know the
+// emitted script is actually solvable, not just well-formed.
+#define CAMADA_Z3_SMTLIB_CAMADA_TUPLE_TEST(NameStr, FixtureCall)               \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [z3]", "[Z3][SMTLIB][pipeline]") {   \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::z3Command(), "z3");   \
+    camada::SMTSolverRef solver =                                              \
+        camada_smtlib_pipeline::makeSMTLIBSolverCamadaTuples(Cmd);             \
+    FixtureCall;                                                               \
+  }
+
+CAMADA_Z3_SMTLIB_CAMADA_TUPLE_TEST("tuple_semantics [Camada]",
+                                   tuple_semantics(solver))
+CAMADA_Z3_SMTLIB_CAMADA_TUPLE_TEST("empty_tuple_semantics [Camada]",
+                                   empty_tuple_semantics(solver))
+
+#undef CAMADA_Z3_SMTLIB_CAMADA_TUPLE_TEST

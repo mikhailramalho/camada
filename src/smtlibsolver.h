@@ -161,7 +161,10 @@ class SMTLIBSolver : public SMTSolverImpl {
 public:
   /// Write-only constructor: write the emitted SMT-LIB script to OutputPath.
   /// Pass "-" for stdout. check() returns UNKNOWN; get* queries error.
-  explicit SMTLIBSolver(const std::string &OutputPath);
+  /// `TupleMode` selects how tuples are lowered on the wire — see the
+  /// docstring on TupleEncoding.
+  explicit SMTLIBSolver(const std::string &OutputPath,
+                        TupleEncoding TupleMode = TupleEncoding::Native);
 
   /// Interactive constructor: spawn a child solver via
   /// `execvp(Argv[0], Argv)`. The solver must speak standard SMT-LIB on
@@ -169,13 +172,15 @@ public:
   /// through the child. No shell is involved — argv entries are passed
   /// verbatim, so spaces, quotes, and other metacharacters in any entry
   /// carry no special meaning.
-  SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv);
+  SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
+               TupleEncoding TupleMode = TupleEncoding::Native);
 
   /// Combined constructor: spawn a child solver via execvp *and* log the
   /// script to a file. Useful when you want both an interactive answer
   /// and a reproducer to hand to another tool.
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
-               const std::string &OutputPath);
+               const std::string &OutputPath,
+               TupleEncoding TupleMode = TupleEncoding::Native);
 
   ~SMTLIBSolver() override;
 
@@ -201,6 +206,10 @@ protected:
                                 const SMTSortRef &CodomainSort) override;
   SMTSortRef
   mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
+
+  bool nativeTupleSupport() const override {
+    return TupleMode == TupleEncoding::Native;
+  }
 
   // --- expressions ---
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
@@ -386,6 +395,11 @@ private:
 
   std::unique_ptr<FileEmitter> File;
   std::unique_ptr<ProcessEmitter> Proc;
+
+  // Tuple lowering mode: Native emits (declare-datatypes ...) on the
+  // wire; Camada decomposes tuples into per-field BV/Bool symbols before
+  // anything reaches the wire. Default is Native.
+  TupleEncoding TupleMode = TupleEncoding::Native;
 
   // Counter for fresh symbols introduced by mkIEEEFPToBVImpl. SMT-LIB has no
   // portable fp→bv same-encoding op, so we materialize a fresh BV symbol

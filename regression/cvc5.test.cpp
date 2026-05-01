@@ -34,14 +34,9 @@ TEST_CASE("Arith CVC5 test", "[CVC5]") {
   arith_symbolic_shift_semantics(cvc5);
 }
 
-TEST_CASE("Tuple CVC5 test", "[CVC5]") {
+TEST_CASE("Tuple-with-Int CVC5 test", "[CVC5]") {
   auto cvc5 = camada::createCVC5Solver();
-  tuple_semantics(cvc5);
-}
-
-TEST_CASE("Empty tuple CVC5 test", "[CVC5]") {
-  auto cvc5 = camada::createCVC5Solver();
-  empty_tuple_semantics(cvc5);
+  tuple_semantics_with_int(cvc5);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,8 +94,9 @@ CAMADA_CVC5_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
                                real_arithmetic_semantics(solver))
 CAMADA_CVC5_SMTLIB_SHARED_TEST("arith_conversion_semantics",
                                arith_conversion_semantics(solver))
-CAMADA_CVC5_SMTLIB_SHARED_TEST("tuple_semantics", tuple_semantics(solver))
-CAMADA_CVC5_SMTLIB_SHARED_TEST("empty_tuple_semantics",
+CAMADA_CVC5_SMTLIB_SHARED_TEST("tuple_semantics [native]",
+                               tuple_semantics(solver))
+CAMADA_CVC5_SMTLIB_SHARED_TEST("empty_tuple_semantics [native]",
                                empty_tuple_semantics(solver))
 CAMADA_CVC5_SMTLIB_SHARED_TEST("fp_equal NativeFP",
                                fp_equal(solver, camada::FPEncoding::Native))
@@ -108,3 +104,20 @@ CAMADA_CVC5_SMTLIB_SHARED_TEST("fp_equal BVFP",
                                fp_equal(solver, camada::FPEncoding::BV))
 
 #undef CAMADA_CVC5_SMTLIB_SHARED_TEST
+
+#define CAMADA_CVC5_SMTLIB_CAMADA_TUPLE_TEST(NameStr, FixtureCall)             \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [cvc5]",                             \
+            "[CVC5][SMTLIB][pipeline]") {                                      \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::cvc5Command(),        \
+                                 "cvc5");                                      \
+    camada::SMTSolverRef solver =                                              \
+        camada_smtlib_pipeline::makeSMTLIBSolverCamadaTuples(Cmd);             \
+    FixtureCall;                                                               \
+  }
+
+CAMADA_CVC5_SMTLIB_CAMADA_TUPLE_TEST("tuple_semantics [Camada]",
+                                     tuple_semantics(solver))
+CAMADA_CVC5_SMTLIB_CAMADA_TUPLE_TEST("empty_tuple_semantics [Camada]",
+                                     empty_tuple_semantics(solver))
+
+#undef CAMADA_CVC5_SMTLIB_CAMADA_TUPLE_TEST

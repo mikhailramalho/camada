@@ -386,7 +386,8 @@ SMTExprRef STPSolver::mkEqualImpl(const SMTExprRef &LHS,
     // variable
     const std::string name =
         "__CAMADA_index" + std::to_string(ConstArrayCounter++);
-    const SMTExprRef &index = mkSymbol(name, LHS->Sort->getIndexSort());
+    const SMTExprRef &index =
+        mkSymbolUnchecked(name, LHS->Sort->getIndexSort());
 
     // and do select(A,i) == select(B,i)
     return mkEqual(mkArraySelect(LHS, index), mkArraySelect(RHS, index));
@@ -569,7 +570,8 @@ SMTExprRef STPSolver::mkSymbolImpl(const std::string &Name,
 SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                        const SMTExprRef &InitValue) {
   const std::string name = "__CAMADA_arr" + std::to_string(ConstArrayCounter++);
-  SMTExprRef arr = mkSymbol(name, mkArraySort(IndexSort, InitValue->Sort));
+  SMTExprRef arr =
+      mkSymbolUnchecked(name, mkArraySort(IndexSort, InitValue->Sort));
 
   const unsigned width = IndexSort->getWidth();
   if (width >= 64)

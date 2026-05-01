@@ -29,6 +29,7 @@ set(${LIBRARY_TARGET_NAME}_SRC
     camadafp.cpp
     camadaimpl.cpp
     camadasort.cpp
+    camadatuple.cpp
     bitwuzlasolver.cpp
     cvc5solver.cpp
     mathsatsolver.cpp

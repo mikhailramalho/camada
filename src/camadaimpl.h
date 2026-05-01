@@ -76,6 +76,40 @@ protected:
     return SMTSortRef(OwnedSort, HandleState, HandleState->Generation);
   }
 
+public:
+  /// Allocates a Camada-managed (non-SolverExpr) expression in the arena.
+  /// Used by camadatuple.cpp to construct CamadaTupleExpr nodes that have
+  /// no backend term. Public so the free functions in camadatuple.cpp can
+  /// reach it; not part of the SMTSolver public surface.
+  template <typename ExprT, typename... Args>
+  SMTExprRef makeCamadaExprRef(Args &&...ArgsV) {
+    auto *Exp = ExprArena.create<ExprT>(std::forward<Args>(ArgsV)...);
+#ifndef NDEBUG
+    // Camada-managed exprs (currently only CamadaTupleExpr) live above
+    // the backend's width contract — width validation does not apply.
+    if (!Exp->Sort->isTupleSort())
+      assert(Exp->Sort->isWidthValidated());
+#endif
+    return SMTExprRef(Exp, HandleState, HandleState->Generation);
+  }
+
+  /// Counterpart to makeCamadaExprRef for sorts.
+  template <typename SortT, typename... Args>
+  SMTSortRef makeCamadaSortRef(Args &&...ArgsV) {
+    auto *OwnedSort = SortArena.create<SortT>(std::forward<Args>(ArgsV)...);
+#ifndef NDEBUG
+    OwnedSort->markWidthValidated();
+#endif
+    return SMTSortRef(OwnedSort, HandleState, HandleState->Generation);
+  }
+
+  /// mkSymbol variant that bypasses the user-name validation. Used by
+  /// internal lowerings (Camada tuple field decomposition, STP array
+  /// extensionality, FP-to-BV shadowing) that mint symbols with the
+  /// reserved __CAMADA_ prefix.
+  SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
+
+protected:
   void invalidateGeneratedObjects();
   void clearSortCaches();
   void clearExprCaches();
@@ -383,6 +417,12 @@ protected:
                                         const SMTSortRef &);
 
   virtual SMTSortRef mkTupleSortImpl(const std::vector<SMTSortRef> &);
+
+  /// Backends that natively support SMT-LIB datatypes (z3, cvc5, smtlib)
+  /// override this to true. Other backends (bitwuzla, mathsat, stp,
+  /// yices) inherit the default false and route tuple operations through
+  /// the Camada-managed lowering in camadatuple.cpp.
+  virtual bool nativeTupleSupport() const { return false; }
 
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 

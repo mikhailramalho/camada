@@ -21,6 +21,7 @@
 
 #include "camadaimpl.h"
 #include "camadacommon.h"
+#include "camadatuple.h"
 
 #include <cstdio>
 #include <limits>
@@ -400,6 +401,14 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
 
 SMTSortRef
 SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
+  // Route to the Camada-managed lowering for backends without native
+  // datatype support; the caches still serve identity for these (the
+  // CamadaTupleSort sits in the same SortArena as backend sorts).
+  auto Construct = [this, &ElementSorts]() {
+    return nativeTupleSupport() ? mkTupleSortImpl(ElementSorts)
+                                : mkCamadaTupleSort(*this, ElementSorts);
+  };
+
   if (ElementSorts.size() <= 4) {
     SmallTupleSortCacheKey SmallKey{};
     SmallKey.Size = static_cast<uint8_t>(ElementSorts.size());
@@ -410,7 +419,7 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
     if (It != SmallTupleSortCache.end())
       return It->second;
 
-    SMTSortRef theSort = mkTupleSortImpl(ElementSorts);
+    SMTSortRef theSort = Construct();
     assert(theSort->isTupleSort());
     assert(theSort->getTupleElementSorts() == ElementSorts);
     SmallTupleSortCache.emplace(SmallKey, theSort);
@@ -425,7 +434,7 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
   if (It != TupleSortCache.end())
     return It->second;
 
-  SMTSortRef theSort = mkTupleSortImpl(ElementSorts);
+  SMTSortRef theSort = Construct();
   assert(theSort->isTupleSort());
   assert(theSort->getTupleElementSorts() == ElementSorts);
   TupleSortCache.emplace(std::move(Key), theSort);
@@ -548,10 +557,18 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSge,
                                     requireBVSameSort(LHS, RHS),
                                     mkBVSgeImpl(LHS, RHS),
                                     assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(
-    SMTExprRef, mkEqual,
-    requireSameSort(LHS, RHS, "Expected expressions with same sort"),
-    mkEqualImpl(LHS, RHS), assert(theExp->isBoolSort()))
+SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) {
+  requireSameSort(LHS, RHS, "Expected expressions with same sort");
+  // Tuple-sorted operands on backends without native datatype support
+  // route through the Camada lowering, which fans out to per-field
+  // equalities.
+  if (LHS->Sort->isTupleSort() && !nativeTupleSupport())
+    return mkCamadaTupleEqual(*this, LHS, RHS);
+  SMTExprRef theExp = mkEqualImpl(LHS, RHS);
+  assert(theExp->isBoolSort());
+  return theExp;
+}
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkImplies,
                                     requireBoolSameSort(LHS, RHS),
                                     mkImpliesImpl(LHS, RHS),
@@ -726,6 +743,11 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                                 const SMTExprRef &F) {
   requireBoolSort(Cond, "Expected boolean condition");
   requireSameSort(T, F, "Expected ITE branches with same sort");
+  // Tuple-sorted branches on backends without native datatype support
+  // route through the Camada lowering, which builds an Ite-kind tuple
+  // node that distributes selection over its fields lazily.
+  if (T->Sort->isTupleSort() && !nativeTupleSupport())
+    return mkCamadaTupleIte(*this, Cond, T, F);
   SMTExprRef theExp = mkIteImpl(Cond, T, F);
   assert(theExp->Sort == F->Sort);
   return theExp;
@@ -1023,6 +1045,9 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
+  if (!nativeTupleSupport())
+    return mkCamadaTuple(*this, Elements);
+
   std::vector<SMTSortRef> ElementSorts;
   ElementSorts.reserve(Elements.size());
   for (const auto &Element : Elements)
@@ -1038,6 +1063,8 @@ SMTExprRef SMTSolverImpl::mkTupleSelect(const SMTExprRef &Tuple,
   fatalErrorIf(!Tuple->Sort->isTupleSort(), "Expected tuple expression");
   fatalErrorIf(Index >= Tuple->Sort->getTupleElementSorts().size(),
                "Tuple element index is out of bounds");
+  if (!nativeTupleSupport())
+    return mkCamadaTupleSelect(*this, Tuple, Index);
   SMTExprRef theExp = mkTupleSelectImpl(Tuple, Index);
   assert(theExp->Sort == Tuple->Sort->getTupleElementSorts()[Index]);
   return theExp;
@@ -1279,10 +1306,30 @@ SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int) {
 
 SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
                                    const SMTSortRef &Sort) {
+  // The `__CAMADA_` prefix is reserved for Camada-internal symbol names
+  // (currently tuple field decompositions and FP-to-BV shadowing). User
+  // names with that prefix would alias internal symbols and silently
+  // corrupt encoded-tuple semantics; reject up front.
+  fatalErrorIf(Name.compare(0, 9, "__CAMADA_") == 0,
+               "Symbol names with the reserved __CAMADA_ prefix are not "
+               "permitted; rename the symbol");
+  return mkSymbolUnchecked(Name, Sort);
+}
+
+SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
+                                            const SMTSortRef &Sort) {
   SymbolExprCacheKey Key{Sort.get(), Name};
   auto Cached = SymbolExprCache.find(Key);
   if (Cached != SymbolExprCache.end())
     return Cached->second;
+
+  // Route tuple-typed symbols to the Camada-managed lowering on backends
+  // without native datatype support.
+  if (Sort->isTupleSort() && !nativeTupleSupport()) {
+    SMTExprRef theExp = mkCamadaTupleSymbol(*this, Name, Sort);
+    SymbolExprCache.emplace(Key, theExp);
+    return theExp;
+  }
 
   SMTExprRef theExp = mkSymbolImpl(Name, Sort);
   assert(theExp->Sort == Sort);
