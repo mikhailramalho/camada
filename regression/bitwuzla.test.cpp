@@ -63,78 +63,60 @@ CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
 
 #undef CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST
 
-#define CAMADA_BITWUZLA_SMTLIB_SHARED_TEST(NameStr, FixtureCall)               \
+// `MakeFn` is the camada_smtlib_pipeline factory used to construct the
+// SMTLIBSolver — pass `makeSMTLIBSolver` for the default native-tuple
+// configuration, or `makeSMTLIBSolverCamadaTuples` to lower tuples into
+// per-field BV/Bool symbols on the wire (required against children that
+// reject `(declare-datatypes ...)`).
+#define CAMADA_BITWUZLA_SMTLIB_SHARED_TEST(NameStr, FixtureCall, MakeFn)       \
   TEST_CASE("SMTLIB pipeline: " NameStr " [bitwuzla]",                         \
             "[Bitwuzla][SMTLIB][pipeline]") {                                  \
     CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::bitwuzlaCommand(),    \
                                  "bitwuzla");                                  \
-    camada::SMTSolverRef solver =                                              \
-        camada_smtlib_pipeline::makeSMTLIBSolver(Cmd);                         \
+    camada::SMTSolverRef solver = camada_smtlib_pipeline::MakeFn(Cmd);         \
     FixtureCall;                                                               \
   }
 
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver))
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_semantics",
-                                   implies_semantics(solver))
+                                   implies_semantics(solver), makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_true_implies_false",
-                                   implies_true_implies_false(solver))
+                                   implies_true_implies_false(solver),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("bv_lshr_semantics",
-                                   bv_lshr_semantics(solver))
+                                   bv_lshr_semantics(solver), makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("incremental_push_pop",
-                                   incremental_push_pop(solver))
+                                   incremental_push_pop(solver),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
-                                   symbol_cache_survives_push_pop(solver))
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array", array(solver))
+                                   symbol_cache_survives_push_pop(solver),
+                                   makeSMTLIBSolver)
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array", array(solver), makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array_const_store_semantics",
-                                   array_const_store_semantics(solver))
+                                   array_const_store_semantics(solver),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("bool_array_const_store_semantics",
-                                   bool_array_const_store_semantics(solver))
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
+                                   bool_array_const_store_semantics(solver),
+                                   makeSMTLIBSolver)
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("quantifier_semantics",
-                                   quantifier_semantics(solver))
+                                   quantifier_semantics(solver),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fp_equal NativeFP",
-                                   fp_equal(solver, camada::FPEncoding::Native))
+                                   fp_equal(solver, camada::FPEncoding::Native),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fp_equal BVFP",
-                                   fp_equal(solver, camada::FPEncoding::BV))
+                                   fp_equal(solver, camada::FPEncoding::BV),
+                                   makeSMTLIBSolver)
+// bitwuzla rejects (declare-datatypes ...), so tuples here must use the
+// Camada lowering (per-field BV/Bool symbols).
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
+                                   tuple_semantics(solver),
+                                   makeSMTLIBSolverCamadaTuples)
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
+                                   empty_tuple_semantics(solver),
+                                   makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_BITWUZLA_SMTLIB_SHARED_TEST
-
-// Tuples against the bitwuzla binary use TupleEncoding::Camada — bitwuzla
-// rejects (declare-datatypes ...), but it parses BV/Bool fine, so the
-// Camada lowering produces a script bitwuzla can solve.
-#define CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST(NameStr, FixtureCall)         \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [bitwuzla]",                         \
-            "[Bitwuzla][SMTLIB][pipeline]") {                                  \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::bitwuzlaCommand(),    \
-                                 "bitwuzla");                                  \
-    camada::SMTSolverRef solver =                                              \
-        camada_smtlib_pipeline::makeSMTLIBSolverCamadaTuples(Cmd);             \
-    FixtureCall;                                                               \
-  }
-
-CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST("tuple_semantics [Camada]",
-                                         tuple_semantics(solver))
-CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST("empty_tuple_semantics [Camada]",
-                                         empty_tuple_semantics(solver))
-
-#undef CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST
-
-// Tuples against the bitwuzla binary use TupleEncoding::Camada — bitwuzla
-// rejects (declare-datatypes ...), but it parses BV/Bool fine, so the
-// Camada lowering produces a script bitwuzla can solve.
-#define CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST(NameStr, FixtureCall)         \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [bitwuzla][Camada tuples]",          \
-            "[Bitwuzla][SMTLIB][pipeline]") {                                  \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::bitwuzlaCommand(),    \
-                                 "bitwuzla");                                  \
-    camada::SMTSolverRef solver =                                              \
-        camada_smtlib_pipeline::makeSMTLIBSolverCamadaTuples(Cmd);             \
-    FixtureCall;                                                               \
-  }
-
-CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST("tuple_semantics",
-                                         tuple_semantics(solver))
-CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST("empty_tuple_semantics",
-                                         empty_tuple_semantics(solver))
-
-#undef CAMADA_BITWUZLA_SMTLIB_CAMADA_TUPLE_TEST

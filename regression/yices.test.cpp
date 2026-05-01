@@ -148,59 +148,61 @@ CAMADA_YICES_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
 
 #undef CAMADA_YICES_SMTLIB_PIPELINE_TEST
 
-#define CAMADA_YICES_SMTLIB_SHARED_TEST(NameStr, FixtureCall)                  \
+// `MakeFn` is the camada_smtlib_pipeline factory used to construct the
+// SMTLIBSolver — pass `makeSMTLIBSolver` for the default native-tuple
+// configuration, or `makeSMTLIBSolverCamadaTuples` to lower tuples into
+// per-field BV/Bool symbols on the wire (required against children that
+// reject `(declare-datatypes ...)`).
+#define CAMADA_YICES_SMTLIB_SHARED_TEST(NameStr, FixtureCall, MakeFn)          \
   TEST_CASE("SMTLIB pipeline: " NameStr " [yices-smt2]",                       \
             "[YICES][SMTLIB][pipeline]") {                                     \
     CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::yicesSmt2Command(),   \
                                  "yices-smt2");                                \
-    camada::SMTSolverRef solver =                                              \
-        camada_smtlib_pipeline::makeSMTLIBSolver(Cmd);                         \
+    camada::SMTSolverRef solver = camada_smtlib_pipeline::MakeFn(Cmd);         \
     FixtureCall;                                                               \
   }
 
-CAMADA_YICES_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver))
-CAMADA_YICES_SMTLIB_SHARED_TEST("implies_semantics", implies_semantics(solver))
+CAMADA_YICES_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver),
+                                makeSMTLIBSolver)
+CAMADA_YICES_SMTLIB_SHARED_TEST("implies_semantics", implies_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("implies_true_implies_false",
-                                implies_true_implies_false(solver))
-CAMADA_YICES_SMTLIB_SHARED_TEST("bv_lshr_semantics", bv_lshr_semantics(solver))
+                                implies_true_implies_false(solver),
+                                makeSMTLIBSolver)
+CAMADA_YICES_SMTLIB_SHARED_TEST("bv_lshr_semantics", bv_lshr_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("incremental_push_pop",
-                                incremental_push_pop(solver))
+                                incremental_push_pop(solver), makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
-                                symbol_cache_survives_push_pop(solver))
+                                symbol_cache_survives_push_pop(solver),
+                                makeSMTLIBSolver)
 // Array fixtures absent for yices: they all use `mkArrayConst`, which Camada
 // emits as `((as const ...) ...)`. yices-smt2 rejects this syntax outright
 // ("undefined term: const"); native yices supports const-arrays via a
 // different C-API path, but there's no SMT-LIB-wire equivalent.
-CAMADA_YICES_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
+CAMADA_YICES_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
-                                int_arithmetic_semantics(solver))
+                                int_arithmetic_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
-                                real_arithmetic_semantics(solver))
+                                real_arithmetic_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("arith_model_queries",
-                                arith_model_queries(solver))
+                                arith_model_queries(solver), makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("arith_conversion_semantics",
-                                arith_conversion_semantics(solver))
+                                arith_conversion_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("fp_equal BVFP",
-                                fp_equal(solver, camada::FPEncoding::BV))
+                                fp_equal(solver, camada::FPEncoding::BV),
+                                makeSMTLIBSolver)
+// yices rejects (declare-datatypes ...), so tuples here must use the
+// Camada lowering (per-field BV/Bool symbols).
+CAMADA_YICES_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
+                                tuple_semantics(solver),
+                                makeSMTLIBSolverCamadaTuples)
+CAMADA_YICES_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
+                                empty_tuple_semantics(solver),
+                                makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_YICES_SMTLIB_SHARED_TEST
-
-// Tuples against the yices-smt2 binary use TupleEncoding::Camada — yices
-// rejects (declare-datatypes ...), but the Camada lowering produces a
-// pure BV/Bool script which yices solves natively.
-#define CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST(NameStr, FixtureCall)            \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [yices]",                            \
-            "[Yices][SMTLIB][pipeline]") {                                     \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::yicesSmt2Command(),   \
-                                 "yices-smt2");                                \
-    camada::SMTSolverRef solver =                                              \
-        camada_smtlib_pipeline::makeSMTLIBSolverCamadaTuples(Cmd);             \
-    FixtureCall;                                                               \
-  }
-
-CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST("tuple_semantics [Camada]",
-                                      tuple_semantics(solver))
-CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST("empty_tuple_semantics [Camada]",
-                                      empty_tuple_semantics(solver))
-
-#undef CAMADA_YICES_SMTLIB_CAMADA_TUPLE_TEST

@@ -143,64 +143,67 @@ CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
 
 #undef CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST
 
-#define CAMADA_MATHSAT_SMTLIB_SHARED_TEST(NameStr, FixtureCall)                \
+// `MakeFn` is the camada_smtlib_pipeline factory used to construct the
+// SMTLIBSolver — pass `makeSMTLIBSolver` for the default native-tuple
+// configuration, or `makeSMTLIBSolverCamadaTuples` to lower tuples into
+// per-field BV/Bool symbols on the wire (required against children that
+// reject `(declare-datatypes ...)`).
+#define CAMADA_MATHSAT_SMTLIB_SHARED_TEST(NameStr, FixtureCall, MakeFn)        \
   TEST_CASE("SMTLIB pipeline: " NameStr " [mathsat]",                          \
             "[MathSAT][SMTLIB][pipeline]") {                                   \
     CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::mathsatCommand(),     \
                                  "mathsat");                                   \
-    camada::SMTSolverRef solver =                                              \
-        camada_smtlib_pipeline::makeSMTLIBSolver(Cmd);                         \
+    camada::SMTSolverRef solver = camada_smtlib_pipeline::MakeFn(Cmd);         \
     FixtureCall;                                                               \
   }
 
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver))
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("implies_semantics",
-                                  implies_semantics(solver))
+                                  implies_semantics(solver), makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("implies_true_implies_false",
-                                  implies_true_implies_false(solver))
+                                  implies_true_implies_false(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("bv_lshr_semantics",
-                                  bv_lshr_semantics(solver))
+                                  bv_lshr_semantics(solver), makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("incremental_push_pop",
-                                  incremental_push_pop(solver))
+                                  incremental_push_pop(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
-                                  symbol_cache_survives_push_pop(solver))
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array", array(solver))
+                                  symbol_cache_survives_push_pop(solver),
+                                  makeSMTLIBSolver)
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array", array(solver), makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array_const_store_semantics",
-                                  array_const_store_semantics(solver))
+                                  array_const_store_semantics(solver),
+                                  makeSMTLIBSolver)
 // bool_array_const_store_semantics is absent: mathsat rejects arrays whose
 // element sort is Bool ("Arrays with Bool as argument are not supported").
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver))
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
-                                  int_arithmetic_semantics(solver))
+                                  int_arithmetic_semantics(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
-                                  real_arithmetic_semantics(solver))
+                                  real_arithmetic_semantics(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_model_queries",
-                                  arith_model_queries(solver))
+                                  arith_model_queries(solver), makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_conversion_semantics",
-                                  arith_conversion_semantics(solver))
+                                  arith_conversion_semantics(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fp_equal NativeFP",
-                                  fp_equal(solver, camada::FPEncoding::Native))
+                                  fp_equal(solver, camada::FPEncoding::Native),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fp_equal BVFP",
-                                  fp_equal(solver, camada::FPEncoding::BV))
+                                  fp_equal(solver, camada::FPEncoding::BV),
+                                  makeSMTLIBSolver)
+// mathsat's SMT-LIB parser rejects (declare-datatypes ...), so tuples here
+// must use the Camada lowering (per-field BV/Bool symbols).
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
+                                  tuple_semantics(solver),
+                                  makeSMTLIBSolverCamadaTuples)
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
+                                  empty_tuple_semantics(solver),
+                                  makeSMTLIBSolverCamadaTuples)
 
 #undef CAMADA_MATHSAT_SMTLIB_SHARED_TEST
-
-// Tuples against the mathsat binary use TupleEncoding::Camada — mathsat's
-// SMT-LIB parser rejects (declare-datatypes ...), but the Camada lowering
-// emits only BV/Bool which mathsat solves natively.
-#define CAMADA_MATHSAT_SMTLIB_CAMADA_TUPLE_TEST(NameStr, FixtureCall)          \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [mathsat]",                          \
-            "[MathSAT][SMTLIB][pipeline]") {                                   \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::mathsatCommand(),     \
-                                 "mathsat");                                   \
-    camada::SMTSolverRef solver =                                              \
-        camada_smtlib_pipeline::makeSMTLIBSolverCamadaTuples(Cmd);             \
-    FixtureCall;                                                               \
-  }
-
-CAMADA_MATHSAT_SMTLIB_CAMADA_TUPLE_TEST("tuple_semantics [Camada]",
-                                        tuple_semantics(solver))
-CAMADA_MATHSAT_SMTLIB_CAMADA_TUPLE_TEST("empty_tuple_semantics [Camada]",
-                                        empty_tuple_semantics(solver))
-
-#undef CAMADA_MATHSAT_SMTLIB_CAMADA_TUPLE_TEST
