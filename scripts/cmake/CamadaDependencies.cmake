@@ -40,6 +40,10 @@ set(CAMADA_Z3_MACOS_X86_64_URL
 set(CAMADA_Z3_MACOS_ARM64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-osx-15.7.3.zip"
     CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
+set(CAMADA_Z3_WINDOWS_X86_64_URL
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-win.zip"
+    CACHE STRING
+          "URL used to download the prebuilt Z3 archive for Windows x86_64")
 set(CAMADA_CVC5_LINUX_X86_64_URL
     "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-Linux-x86_64-static.zip"
     CACHE STRING
@@ -69,6 +73,11 @@ set(CAMADA_BITWUZLA_MACOS_ARM64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-macOS-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt Bitwuzla archive for macOS arm64")
+set(CAMADA_BITWUZLA_WINDOWS_X86_64_URL
+    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Win64-x86_64-static.zip"
+    CACHE
+      STRING
+      "URL used to download the prebuilt Bitwuzla archive for Windows x86_64")
 set(CAMADA_MATHSAT_VERSION
     "5.6.16"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
@@ -415,6 +424,16 @@ function(camada_select_prebuilt_url output_var package_name)
          AND NOT CAMADA_${package_name}_MACOS_ARM64_URL STREQUAL "")
         set(${output_var}
             "${CAMADA_${package_name}_MACOS_ARM64_URL}"
+            PARENT_SCOPE)
+        return()
+      endif()
+    endif()
+  elseif(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64|amd64)$")
+      if(DEFINED CAMADA_${package_name}_WINDOWS_X86_64_URL
+         AND NOT CAMADA_${package_name}_WINDOWS_X86_64_URL STREQUAL "")
+        set(${output_var}
+            "${CAMADA_${package_name}_WINDOWS_X86_64_URL}"
             PARENT_SCOPE)
         return()
       endif()
