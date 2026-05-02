@@ -90,9 +90,21 @@ add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS
 # system copy of the same backend (/opt/homebrew/include, /usr/local/include) on
 # its own -I list, they must arrange for Camada's propagated -I to come first;
 # this CMake side only ensures the path reaches the consumer at all.
+#
+# Collect the per-backend PUBLIC link libraries into a single list so we can
+# wrap them in LINK_GROUP RESCAN for static builds on linkers that need it. With
+# BUILD_SHARED_LIBS=OFF, the GNU linker resolves symbols left-to-right in a
+# single pass; backend archives reference each other (e.g. libyices.a →
+# libgmp.a, libcvc5.a → libcadical.a) and produce undefined references when one
+# comes before the archive that defines its symbols. RESCAN tells the linker to
+# iterate over the listed archives until the symbol set converges (--start-group
+# / --end-group on GNU ld / lld / mold). LINK_GROUP requires the backend libs to
+# be passed as a single generator-expression argument, hence the up-front
+# collection.
+set(_camada_backend_link_libs "")
+
 if(${CAMADA_SOLVER_BITWUZLA_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME}
-                        PUBLIC ${Bitwuzla_LINK_LIBRARIES})
+  list(APPEND _camada_backend_link_libs ${Bitwuzla_LINK_LIBRARIES})
   target_include_directories(
     ${LIBRARY_TARGET_NAME} PUBLIC "$<BUILD_INTERFACE:${Bitwuzla_INCLUDE_DIRS}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME}
@@ -103,16 +115,15 @@ if(${CAMADA_SOLVER_CVC5_ENABLE})
   target_link_directories(
     ${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
     ${CAMADA_DEPS_INSTALL_DIR}/lib64)
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC cvc5::cvc5)
+  list(APPEND _camada_backend_link_libs cvc5::cvc5)
   if(CAMADA_CVC5_EXTRA_LIBS)
-    target_link_libraries(${LIBRARY_TARGET_NAME}
-                          PUBLIC ${CAMADA_CVC5_EXTRA_LIBS})
+    list(APPEND _camada_backend_link_libs ${CAMADA_CVC5_EXTRA_LIBS})
   endif()
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_CVC5_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_MATHSAT_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_MATHSAT_LIB})
+  list(APPEND _camada_backend_link_libs ${CAMADA_MATHSAT_LIB})
   target_include_directories(
     ${LIBRARY_TARGET_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CAMADA_MATHSAT_INCLUDE_DIR}>")
@@ -121,14 +132,14 @@ if(${CAMADA_SOLVER_MATHSAT_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_STP_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC stp)
+  list(APPEND _camada_backend_link_libs stp)
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PUBLIC "$<BUILD_INTERFACE:${STP_INCLUDE_DIRS}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
 endif()
 
 if(${CAMADA_SOLVER_YICES_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_YICES_LIB})
+  list(APPEND _camada_backend_link_libs ${CAMADA_YICES_LIB})
   target_include_directories(
     ${LIBRARY_TARGET_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CAMADA_YICES_INCLUDE_DIR}>")
@@ -137,7 +148,7 @@ if(${CAMADA_SOLVER_YICES_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_Z3_ENABLE})
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
+  list(APPEND _camada_backend_link_libs ${CAMADA_Z3_LIB})
   target_include_directories(
     ${LIBRARY_TARGET_NAME} PUBLIC "$<BUILD_INTERFACE:${CAMADA_Z3_INCLUDE_DIR}>")
   get_filename_component(CAMADA_Z3_LIB_DIR "${CAMADA_Z3_LIB}" DIRECTORY)
@@ -149,6 +160,25 @@ if(${CAMADA_SOLVER_Z3_ENABLE})
       PROPERTY BUILD_RPATH "${CAMADA_Z3_LIB_DIR}")
   endif()
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_Z3_ENABLED)
+endif()
+
+if(_camada_backend_link_libs)
+  # LINK_GROUP RESCAN only applies under linkers that advertise support for it
+  # (GNU ld / lld / mold via --start-group/--end-group). Apple ld and MSVC's
+  # link.exe iterate by default and don't expose RESCAN at all — passing the
+  # generator expression there causes "Feature 'RESCAN' is not supported for the
+  # 'CXX' link language" at generate time. Restrict the wrap to the static
+  # Linux/BSD path; on every other configuration use a plain link list.
+  if(NOT BUILD_SHARED_LIBS
+     AND NOT MSVC
+     AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(
+      ${LIBRARY_TARGET_NAME}
+      PUBLIC "$<LINK_GROUP:RESCAN,${_camada_backend_link_libs}>")
+  else()
+    target_link_libraries(${LIBRARY_TARGET_NAME}
+                          PUBLIC ${_camada_backend_link_libs})
+  endif()
 endif()
 
 if(CAMADA_SOLVER_SMTLIB_ENABLE)

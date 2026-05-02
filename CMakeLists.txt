@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.24)
 
 set(CAMADA_VER_MAJOR 0)
-set(CAMADA_VER_MINOR 8)
+set(CAMADA_VER_MINOR 9)
 
 project(
   camada
@@ -113,6 +113,21 @@ include(OptimizationCCache)
 
 # Shared/Dynamic or Static library?
 option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
+
+# When building static, prefer static archives in find_library lookups so the
+# exported camada::camada link interface captures absolute paths to .a files
+# instead of .so files. CMake's install(EXPORT) snapshots whatever each
+# find_library() resolved to during configure; without this, find_library
+# defaults pick .so over .a even when both are staged in our deps tree (Z3's
+# Linux prebuilt ships both `bin/libz3.so` and `bin/libz3.a`), and the exported
+# link interface ends up pointing at the shared object. Consumers that want a
+# fully-static link then have to override the interface themselves. Putting .a
+# first in CMAKE_FIND_LIBRARY_SUFFIXES makes every downstream find_library() in
+# our find modules pick the static archive, which is what BUILD_SHARED_LIBS=OFF
+# callers actually expect.
+if(NOT BUILD_SHARED_LIBS AND NOT WIN32)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a" ${CMAKE_FIND_LIBRARY_SUFFIXES})
+endif()
 
 option(ENABLE_WARNINGS
        "Enable -Wall, -Wextra, and -pedantic when compiling (default: ON)" ON)
