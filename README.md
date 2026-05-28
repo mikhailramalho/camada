@@ -93,9 +93,9 @@ Downloaded sources and locally installed solver artifacts are stored under
 `<build-dir>/deps/src` and `<build-dir>/deps/install`.
 
 When CMake downloads dependencies itself:
-- `Bitwuzla` uses the prebuilt static release archive from `0.9.0`.
-- `Z3` uses the prebuilt release archive from `z3-4.16.0`.
-- `CVC5` uses the prebuilt static release archive from `cvc5-1.3.3`.
+- `Bitwuzla` uses the prebuilt static release archive from `0.9.1`.
+- `Z3` uses the prebuilt release archive from `z3-4.15.4`.
+- `CVC5` uses the prebuilt static release archive from `cvc5-1.3.4`.
 - `Yices` uses a source build.
 - `GMP` uses a source build when it is needed by downloaded dependencies and no
   suitable staged copy is already available.
@@ -114,12 +114,12 @@ location during the build.
 
 | Backend    | Minimum version | Native floating-point support |
 | ---------- | :-------------: | :-------------: |
-| [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.0          | ✔️ |
+| [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.1          | ✔️ |
 | [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️ |
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
 | [STP](https://stp.github.io/)              |  2.3.4          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
-| [Z3](https://github.com/Z3Prover/z3)       |  4.16.0         | ✔️ |
+| [Z3](https://github.com/Z3Prover/z3)       |  4.15.4         | ✔️ |
 | SMT-LIB (any external solver) | n/a | depends on child |
 
 <sup>1</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
