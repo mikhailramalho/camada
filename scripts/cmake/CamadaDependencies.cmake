@@ -26,38 +26,38 @@ set(CAMADA_DEPS_INSTALL_DIR
     CACHE PATH "Directory used to install downloaded solver dependencies")
 
 set(CAMADA_Z3_LINUX_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-glibc-2.39.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-x64-glibc-2.39.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux x86_64")
 set(CAMADA_Z3_LINUX_AARCH64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-glibc-2.38.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-arm64-glibc-2.34.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux aarch64")
 set(CAMADA_Z3_MACOS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-osx-15.7.3.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-x64-osx-13.7.6.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for macOS x86_64")
 set(CAMADA_Z3_MACOS_ARM64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-osx-15.7.3.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-arm64-osx-13.7.6.zip"
     CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-win.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-x64-win.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Windows x86_64")
 set(CAMADA_CVC5_LINUX_X86_64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-Linux-x86_64-static.zip"
+    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-Linux-x86_64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt cvc5 archive for Linux x86_64")
 set(CAMADA_CVC5_LINUX_AARCH64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-Linux-arm64-static.zip"
+    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-Linux-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt cvc5 archive for Linux aarch64")
 set(CAMADA_CVC5_MACOS_X86_64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-macOS-x86_64-static.zip"
+    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-macOS-x86_64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt cvc5 archive for macOS x86_64")
 set(CAMADA_CVC5_MACOS_ARM64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-macOS-arm64-static.zip"
+    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-macOS-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt cvc5 archive for macOS arm64")
 # No Windows prebuilt for CVC5: cvc5Targets.cmake lists cadical, picpoly,
@@ -65,16 +65,16 @@ set(CAMADA_CVC5_MACOS_ARM64_URL
 # Windows release zip merges them into cvc5.lib without shipping standalone .lib
 # files, so MSVC fails with LNK1104 trying to find cadical.lib.
 set(CAMADA_BITWUZLA_LINUX_X86_64_URL
-    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Linux-x86_64-static.zip"
+    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.1/Bitwuzla-Linux-x86_64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt Bitwuzla archive for Linux x86_64")
 set(CAMADA_BITWUZLA_LINUX_AARCH64_URL
-    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-Linux-arm64-static.zip"
+    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.1/Bitwuzla-Linux-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt Bitwuzla archive for Linux aarch64"
 )
 set(CAMADA_BITWUZLA_MACOS_ARM64_URL
-    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.0/Bitwuzla-macOS-arm64-static.zip"
+    "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.1/Bitwuzla-macOS-arm64-static.zip"
     CACHE STRING
           "URL used to download the prebuilt Bitwuzla archive for macOS arm64")
 # No Windows prebuilt for Bitwuzla: the upstream Win64 archive is MinGW-built
@@ -812,7 +812,7 @@ function(camada_setup_bitwuzla)
                            DIRECTORY)
     file(
       WRITE "${bitwuzla_pc_file}"
-      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.0\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
+      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
     )
   endforeach()
 endfunction()
