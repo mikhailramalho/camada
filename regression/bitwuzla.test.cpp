@@ -157,3 +157,17 @@ CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
 
 #undef CAMADA_BITWUZLA_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED
+
+TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
+  auto solver = camada::createBitwuzlaSolver();
+  using camada::SolverFeature;
+  REQUIRE_FALSE(solver->supports(SolverFeature::IntRealArithmetic));
+  REQUIRE(solver->supports(SolverFeature::Quantifiers));
+  REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
+  REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
+  REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
+  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  REQUIRE(solver->supports(SolverFeature::Timeouts));
+  REQUIRE(solver->supports(SolverFeature::ArrayModels));
+}

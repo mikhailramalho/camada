@@ -431,6 +431,7 @@ public:
                           const SMTSortRef &To) override final;
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final;
   checkResult check() override final;
+  bool supports(SolverFeature Feature) const override final;
   void reset() override final;
   void push(unsigned nscopes = 1) override final;
   void pop(unsigned nscopes = 1) override final;
@@ -776,6 +777,12 @@ protected:
                            unsigned SWidth);
 
   virtual checkResult checkImpl() = 0;
+
+  /// Backend feature bits for everything supports() cannot answer from
+  /// the existing capability hooks (nativeTupleSupport,
+  /// nativeConstArraySupport). The default claims nothing; backends
+  /// override with a switch over the features they implement.
+  virtual bool supportsImpl(SolverFeature Feature) const;
 
   virtual void resetImpl() = 0;
 

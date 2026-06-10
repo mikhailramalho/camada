@@ -121,6 +121,43 @@ std::string getCamadaVersion();
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 
+/// Capabilities a backend may or may not implement, queryable through
+/// SMTSolver::supports() instead of discovering them through aborts or
+/// UnsupportedOperation errors.
+///
+/// A true bit means the corresponding API surface is implemented for the
+/// backend; individual calls can still fail for input-specific reasons
+/// through their SMTResult. On the SMT-LIB pipeline backend the bits
+/// describe what Camada emits — a particular child solver may still
+/// reject a construct at runtime.
+enum class SolverFeature {
+  /// Int/Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
+  IntRealArithmetic,
+  /// Quantified formulas (mkForall, mkExists).
+  Quantifiers,
+  /// Uninterpreted functions (mkFunctionSort, mkApply).
+  UninterpretedFunctions,
+  /// FPEncoding::Native sorts and operations; FPEncoding::BV works on
+  /// every backend regardless.
+  NativeFloatingPoint,
+  /// Backend-native tuple/datatype sorts; other backends route tuples
+  /// through the Camada per-field lowering.
+  NativeTuples,
+  /// Backend-native `((as const ...) v)` constant arrays; other backends
+  /// lower them lazily (see ConstArrayLowering).
+  NativeConstantArrays,
+  /// Unsat-assumption extraction after an UNSAT checkSatAssuming()
+  /// (see issue #76). checkSatAssuming itself works on every backend
+  /// through a push/assert/check/pop fallback.
+  UnsatAssumptions,
+  /// Per-check wall-clock limits via setTimeout() (see issue #77).
+  Timeouts,
+  /// Sparse array model extraction via getArrayValues() for arbitrary
+  /// arrays (see issue #79). Lazily lowered constant arrays are answered
+  /// by the common layer on every backend regardless.
+  ArrayModels,
+};
+
 /// Coarse-grained error categories for operations that return `SMTResult<T>`.
 ///
 /// These are intended for user-triggerable failures such as unsupported
@@ -752,6 +789,10 @@ public:
 
   /// Pop one or more assertion scopes.
   virtual void pop(unsigned nscopes = 1) = 0;
+
+  /// Returns whether this backend implements the given feature. See the
+  /// SolverFeature enumerators for what each bit covers.
+  virtual bool supports(SolverFeature Feature) const = 0;
 
   /// Returns the solver name and version
   virtual std::string getSolverNameAndVersion() const = 0;

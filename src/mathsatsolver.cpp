@@ -1090,6 +1090,24 @@ SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                             backend_init));
 }
 
+bool MathSATSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::Quantifiers:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult MathSATSolver::checkImpl() {
   msat_result res = msat_solve(Context);
   if (res == MSAT_SAT)

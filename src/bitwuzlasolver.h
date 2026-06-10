@@ -233,6 +233,8 @@ protected:
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
   checkResult checkImpl() override;
+
+  bool supportsImpl(SolverFeature Feature) const override;
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;

@@ -349,3 +349,27 @@ TEST_CASE("SMTLIB write-only emits deep expression chains", "[SMTLIB]") {
 
   REQUIRE(Got.find("(check-sat)") != std::string::npos);
 }
+
+TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
+  std::string Path = makeTempPath();
+  auto solver = std::make_unique<camada::SMTLIBSolver>(Path);
+  using camada::SolverFeature;
+  REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
+  REQUIRE(solver->supports(SolverFeature::Quantifiers));
+  REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
+  REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE(solver->supports(SolverFeature::NativeTuples));
+  REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
+  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
+  REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
+
+  // Camada tuple lowering flips the native-tuples bit.
+  auto camadaTuples = std::make_unique<camada::SMTLIBSolver>(
+      Path, camada::TupleEncoding::Camada);
+  REQUIRE_FALSE(camadaTuples->supports(SolverFeature::NativeTuples));
+
+  solver.reset();
+  camadaTuples.reset();
+  std::remove(Path.c_str());
+}

@@ -1204,6 +1204,23 @@ SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
       Terms.mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body}));
 }
 
+bool CVC5Solver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult CVC5Solver::checkImpl() {
   cvc5::Result res = Context.checkSat();
   if (res.isSat())
