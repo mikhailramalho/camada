@@ -368,8 +368,6 @@ public:
   void dumpModel(std::string &Out) override final;
 
 protected:
-  virtual SMTExprRef newExprRefImpl(const SMTExpr &Exp) = 0;
-
   // Rewrap an existing backend payload with a different Camada-facing
   // sort/kind. This is still needed for lowered/common-layer operations where
   // the semantic API node differs from the literal backend term shape, even

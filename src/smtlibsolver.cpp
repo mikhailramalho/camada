@@ -632,11 +632,6 @@ SMTExprRef SMTLIBSolver::makeSMTLIBExpr(SMTExprKind Kind,
 
 // --- core dispatch helpers ---
 
-SMTExprRef SMTLIBSolver::newExprRefImpl(const SMTExpr &Exp) {
-  const auto &E = toSolverExpr<SMTLIBExpr>(Exp);
-  return makeExprRef<SMTLIBExpr>(Exp.getKind(), E.Context, Exp.Sort, E.Expr);
-}
-
 SMTExprRef SMTLIBSolver::rewrapExprImpl(const SMTExpr &Exp,
                                         const SMTSortRef &Sort,
                                         SMTExprKind Kind) {
