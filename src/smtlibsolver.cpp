@@ -82,31 +82,71 @@ private:
     }
   }
 
-  std::string emit(const SMTExpr &E) {
-    const SMTLIBTerm &T = termOf(E);
-    if (T.Args.empty())
-      return T.Head; // terminals are cheap: always inline
-    if (auto It = Memo.find(&E); It != Memo.end())
-      return It->second;
-    std::string Text = "(";
-    Text += T.Head;
-    for (const SMTExprRef &Arg : T.Args) {
-      Text += " ";
-      // Binder arguments must not share subterms with the outside of the
-      // binder, so they render in a fresh scope. Inner let temporaries may
-      // shadow outer ones; that is harmless because a fresh scope never
-      // references outer temporaries.
-      Text += T.OwnScope ? SMTLIBRenderer().render(*Arg) : emit(*Arg);
+  // Iterative post-order emission: recursion would overflow the stack on
+  // deep, lightly shared chains (SSA-style formulas reach hundreds of
+  // thousands of nodes).
+  std::string emit(const SMTExpr &Root) {
+    struct Frame {
+      const SMTExpr *E;
+      const SMTLIBTerm *T;
+      std::size_t NextArg;
+      std::string Text;
+    };
+    std::string Leaf;
+    std::vector<Frame> Stack;
+    // Returns true when the expression's text is available immediately in
+    // Leaf (terminal or memoized); otherwise opens a frame for it.
+    const auto enter = [&](const SMTExpr &E) {
+      const SMTLIBTerm &T = termOf(E);
+      if (T.Args.empty()) {
+        Leaf = T.Head; // terminals are cheap: always inline
+        return true;
+      }
+      if (auto It = Memo.find(&E); It != Memo.end()) {
+        Leaf = It->second;
+        return true;
+      }
+      Stack.push_back(Frame{&E, &T, 0, "(" + T.Head});
+      return false;
+    };
+    if (enter(Root))
+      return Leaf;
+    while (true) {
+      Frame &F = Stack.back();
+      if (F.NextArg < F.T->Args.size()) {
+        const SMTExprRef &Arg = F.T->Args[F.NextArg];
+        F.Text += " ";
+        ++F.NextArg;
+        // Binder arguments must not share subterms with the outside of the
+        // binder, so they render in a fresh scope. Inner let temporaries
+        // may shadow outer ones; that is harmless because a fresh scope
+        // never references outer temporaries.
+        if (F.T->OwnScope) {
+          F.Text += SMTLIBRenderer().render(*Arg);
+          continue;
+        }
+        if (enter(*Arg))
+          Stack.back().Text += Leaf; // enter() may have re-seated back()
+        continue;
+      }
+      F.Text += ")";
+      std::string Done = std::move(F.Text);
+      const SMTExpr *E = F.E;
+      Stack.pop_back();
+      if (RefCount[E] > 1) {
+        // Temp names contain a bare '%', which quoteSymbol output can never
+        // produce (every literal '%' in a user name is encoded as "%25"),
+        // so a temporary can never capture a user symbol.
+        std::string Temp = "%t" + std::to_string(NextTemp++);
+        Prefix += "(let ((" + Temp + " " + Done + ")) ";
+        ++OpenLets;
+        Memo.emplace(E, Temp);
+        Done = std::move(Temp);
+      }
+      if (Stack.empty())
+        return Done;
+      Stack.back().Text += Done;
     }
-    Text += ")";
-    if (RefCount[&E] > 1) {
-      std::string Temp = "?x" + std::to_string(NextTemp++);
-      Prefix += "(let ((" + Temp + " " + Text + ")) ";
-      ++OpenLets;
-      Memo.emplace(&E, Temp);
-      return Temp;
-    }
-    return Text;
   }
 
   std::unordered_map<const SMTExpr *, unsigned> RefCount;
@@ -160,7 +200,8 @@ bool SMTLIBExpr::equal_to(SMTExpr const &Other) const {
       Expr.Args.size() != O.Expr.Args.size())
     return false;
   for (std::size_t I = 0; I < Expr.Args.size(); ++I)
-    if (!(*Expr.Args[I] == *O.Expr.Args[I]))
+    if (&*Expr.Args[I] != &*O.Expr.Args[I] &&
+        !(*Expr.Args[I] == *O.Expr.Args[I]))
       return false;
   return true;
 }
@@ -994,9 +1035,9 @@ SMTExprRef SMTLIBSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   // Materialize through a fresh `(define-fun)` rather than inlining. Two
   // reasons:
   //   1. mathsat's SMT-LIB parser rejects `(as const ...)` inside
-  //      `(get-value ...)`. Camada's expression printer is inline-only, so
-  //      any later expression that wraps the const-array and is queried via
-  //      `(get-value ...)` would hit that parser bug. Binding the literal
+  //      `(get-value ...)`, so any later expression that inlines the
+  //      const-array literal and is queried via `(get-value ...)` would
+  //      hit that parser bug. Binding the literal
   //      to a name once up front means every downstream expression
   //      references the bare symbol.
   //   2. (define-fun ...) is permanent under :global-declarations true and
@@ -1357,6 +1398,8 @@ SMTExprRef SMTLIBSolver::mkApplyImpl(const SMTExprRef &Function,
                                      const std::vector<SMTExprRef> &Args) {
   // Function is always a declared symbol, so its Head is the (quoted)
   // function name; the application node carries the operands.
+  assert(toSolverExpr<SMTLIBExpr>(*Function).Expr.Args.empty() &&
+         "Function expressions must be plain symbols");
   return makeSMTLIBExpr(SMTExprKind::Apply, Function->Sort->getCodomainSort(),
                         toSolverExpr<SMTLIBExpr>(*Function).Expr.Head, Args);
 }

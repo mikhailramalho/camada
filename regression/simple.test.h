@@ -432,3 +432,19 @@ inline void arena_stress_test(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(expr, expr));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
+
+// Model query over a term with a shared subterm. On the SMT-LIB backend the
+// (get-value ...) argument contains a let binding; child solvers must
+// accept it and return the right value.
+inline void shared_subterm_model_value(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto x = solver->mkSymbol("sst_x", bv8);
+  auto sum = solver->mkBVAdd(x, x);
+  auto prod = solver->mkBVMul(sum, sum);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(3, bv8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto val = solver->getBV(prod);
+  REQUIRE(val);
+  REQUIRE(val.value() == 36);
+}
