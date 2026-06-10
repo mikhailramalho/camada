@@ -316,43 +316,22 @@ static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
   }
 }
 
+static inline SMTExprRef
+mkRoundingDecision(SMTSolver &S, const SMTExprRef &R, const SMTExprRef &RMNeg,
+                   const SMTExprRef &RMPos, const SMTExprRef &RMAway,
+                   const SMTExprRef &RMEven, const SMTExprRef &Sgn,
+                   const SMTExprRef &Last, const SMTExprRef &Round,
+                   const SMTExprRef &Sticky);
+
 static inline SMTExprRef mkRoundingDecision(SMTSolver &S, const SMTExprRef &R,
                                             const SMTExprRef &Sgn,
                                             const SMTExprRef &Last,
                                             const SMTExprRef &Round,
                                             const SMTExprRef &Sticky) {
-  assert(Sgn->getWidth() == 1 && "mkRoundingDecision: Sgn must be 1-bit");
-  assert(Last->getWidth() == 1 && "mkRoundingDecision: Last must be 1-bit");
-  assert(Round->getWidth() == 1 && "mkRoundingDecision: Round must be 1-bit");
-  assert(Sticky->getWidth() == 1 && "mkRoundingDecision: Sticky must be 1-bit");
-  SMTExprRef last_or_sticky = S.mkBVOr(Last, Sticky);
-  SMTExprRef round_or_sticky = S.mkBVOr(Round, Sticky);
-
-  SMTExprRef not_round = S.mkBVNot(Round);
-  SMTExprRef not_lors = S.mkBVNot(last_or_sticky);
-  SMTExprRef not_rors = S.mkBVNot(round_or_sticky);
-  SMTExprRef not_sgn = S.mkBVNot(Sgn);
-
-  SMTExprRef inc_teven = S.mkBVNot(S.mkBVOr(not_round, not_lors));
-  const SMTExprRef &inc_taway = Round;
-  SMTExprRef inc_pos = S.mkBVNot(S.mkBVOr(Sgn, not_rors));
-  SMTExprRef inc_neg = S.mkBVNot(S.mkBVOr(not_sgn, not_rors));
-
-  SMTExprRef nil_1 = mkBVZero1(S);
-  SMTExprRef rm_neg = mkRMLit(S, RM::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_pos = mkRMLit(S, RM::ROUND_TO_PLUS_INF);
-  SMTExprRef rm_away = mkRMLit(S, RM::ROUND_TO_AWAY);
-  SMTExprRef rm_even = mkRMLit(S, RM::ROUND_TO_EVEN);
-
-  SMTExprRef rm_is_to_neg = S.mkEqual(R, rm_neg);
-  SMTExprRef rm_is_to_pos = S.mkEqual(R, rm_pos);
-  SMTExprRef rm_is_away = S.mkEqual(R, rm_away);
-  SMTExprRef rm_is_even = S.mkEqual(R, rm_even);
-
-  SMTExprRef inc_c4 = S.mkIte(rm_is_to_neg, inc_neg, nil_1);
-  SMTExprRef inc_c3 = S.mkIte(rm_is_to_pos, inc_pos, inc_c4);
-  SMTExprRef inc_c2 = S.mkIte(rm_is_away, inc_taway, inc_c3);
-  return S.mkIte(rm_is_even, inc_teven, inc_c2);
+  return mkRoundingDecision(
+      S, R, mkRMLit(S, RM::ROUND_TO_MINUS_INF),
+      mkRMLit(S, RM::ROUND_TO_PLUS_INF), mkRMLit(S, RM::ROUND_TO_AWAY),
+      mkRMLit(S, RM::ROUND_TO_EVEN), Sgn, Last, Round, Sticky);
 }
 
 static inline SMTExprRef
