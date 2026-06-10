@@ -757,11 +757,28 @@ SMTResult<bool> Z3Solver::getBoolImpl(const SMTExprRef &Exp) {
                   "Bool model value is neither true nor false"};
 }
 
+// Extract the binary form of a bit-vector numeral. Z3's model evaluator can
+// return a numeral it stores with a negative internal value (printed as
+// e.g. "(bvneg #x...)"); expr::as_binary relies on
+// Z3_get_numeral_binary_string, which rejects those with Z3_INVALID_ARG and
+// kills the process through the error handler. Read the sign-aware decimal
+// representation first and, when negative, let Z3 renormalize it modulo
+// 2^Width before extracting the binary form. See the equivalent fix in
+// ESBMC's z3_convt::get_bv (esbmc/esbmc#5208).
+static bool bvNumeralToBinary(z3::context &Ctx, const z3::expr &Value,
+                              unsigned Width, std::string &Out) {
+  if (!Value.is_numeral())
+    return false;
+  std::string Dec = Z3_get_numeral_string(Ctx, Value);
+  if (!Dec.empty() && Dec[0] == '-')
+    return Ctx.bv_val(Dec.c_str(), Width).as_binary(Out);
+  return Value.as_binary(Out);
+}
+
 SMTResult<std::string> Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
   z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   std::string bv;
-  bool is_num = Value.as_binary(bv);
-  if (!is_num)
+  if (!bvNumeralToBinary(*Context, Value, Exp->getWidth(), bv))
     return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
                     "Failed to get bit-vector model value from Z3"};
   return bv;
@@ -810,8 +827,7 @@ SMTResult<std::string> Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   z3::expr Value = Solver.get_model().eval(toZ3Expr(Exp), true);
   z3::expr fp_value = Solver.get_model().eval(Value.mk_to_ieee_bv(), true);
   std::string bv;
-  bool is_num = fp_value.as_binary(bv);
-  if (!is_num)
+  if (!bvNumeralToBinary(*Context, fp_value, Exp->getWidth(), bv))
     return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
                     "Failed to convert FP model value to BV in Z3"};
   return bv;
