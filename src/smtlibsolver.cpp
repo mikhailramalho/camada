@@ -2049,7 +2049,8 @@ std::string SMTLIBSolver::parseIntModelValueForTest(const std::string &Value) {
   return intValueToDecimal(Value);
 }
 
-SMTResult<bool> SMTLIBSolver::getBoolImpl(const SMTExprRef &Exp) {
+SMTResult<std::string> SMTLIBSolver::sendGetValue(const SMTExprRef &Exp,
+                                                  std::string &Resp) {
   if (!Proc)
     return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
                     "SMTLIBSolver write-only mode does not support get*"};
@@ -2059,29 +2060,29 @@ SMTResult<bool> SMTLIBSolver::getBoolImpl(const SMTExprRef &Exp) {
     File->emitRaw(Cmd);
   Proc->emitRaw(Cmd);
   Proc->flush();
-  std::string Resp = Proc->readResponse();
-  std::string Value = extractValueFromGetValue(Resp);
-  if (Value == "true")
+  Resp = Proc->readResponse();
+  return extractValueFromGetValue(Resp);
+}
+
+SMTResult<bool> SMTLIBSolver::getBoolImpl(const SMTExprRef &Exp) {
+  std::string Resp;
+  SMTResult<std::string> Value = sendGetValue(Exp, Resp);
+  if (!Value)
+    return Value.error();
+  if (Value.value() == "true")
     return true;
-  if (Value == "false")
+  if (Value.value() == "false")
     return false;
   return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
                   "SMTLIBSolver: unexpected get-value response: " + Resp};
 }
 
 SMTResult<std::string> SMTLIBSolver::getBVInBinImpl(const SMTExprRef &Exp) {
-  if (!Proc)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "SMTLIBSolver write-only mode does not support get*"};
-
-  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
-  if (File)
-    File->emitRaw(Cmd);
-  Proc->emitRaw(Cmd);
-  Proc->flush();
-  std::string Resp = Proc->readResponse();
-  std::string Value = extractValueFromGetValue(Resp);
-  std::string Bits = bvValueToBinary(Value, Exp->getWidth());
+  std::string Resp;
+  SMTResult<std::string> Value = sendGetValue(Exp, Resp);
+  if (!Value)
+    return Value.error();
+  std::string Bits = bvValueToBinary(Value.value(), Exp->getWidth());
   if (Bits.empty())
     return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
                     "SMTLIBSolver: could not parse BV value: " + Resp};
@@ -2091,21 +2092,14 @@ SMTResult<std::string> SMTLIBSolver::getBVInBinImpl(const SMTExprRef &Exp) {
 SMTResult<std::string> SMTLIBSolver::getFPInBinImpl(const SMTExprRef &Exp) {
   // For BV-encoded FP, the base-class default routes through getBVInBin and
   // works fine. This override is only reached for native FP sorts.
-  if (!Proc)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "SMTLIBSolver write-only mode does not support get*"};
-
-  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
-  if (File)
-    File->emitRaw(Cmd);
-  Proc->emitRaw(Cmd);
-  Proc->flush();
-  std::string Resp = Proc->readResponse();
-  std::string Value = extractValueFromGetValue(Resp);
+  std::string Resp;
+  SMTResult<std::string> Value = sendGetValue(Exp, Resp);
+  if (!Value)
+    return Value.error();
 
   unsigned ExpWidth = Exp->Sort->getFPExponentWidth();
   unsigned SigWidth = Exp->Sort->getFPSignificandWidth(); // excludes hidden bit
-  std::string Bits = fpValueToBinary(Value, ExpWidth, SigWidth);
+  std::string Bits = fpValueToBinary(Value.value(), ExpWidth, SigWidth);
   if (Bits.empty())
     return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
                     "SMTLIBSolver: could not parse FP value: " + Resp};
@@ -2113,18 +2107,11 @@ SMTResult<std::string> SMTLIBSolver::getFPInBinImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTLIBSolver::getIntImpl(const SMTExprRef &Exp) {
-  if (!Proc)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "SMTLIBSolver write-only mode does not support get*"};
-
-  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
-  if (File)
-    File->emitRaw(Cmd);
-  Proc->emitRaw(Cmd);
-  Proc->flush();
-  std::string Resp = Proc->readResponse();
-  std::string Value = extractValueFromGetValue(Resp);
-  std::string Decimal = intValueToDecimal(Value);
+  std::string Resp;
+  SMTResult<std::string> Value = sendGetValue(Exp, Resp);
+  if (!Value)
+    return Value.error();
+  std::string Decimal = intValueToDecimal(Value.value());
   if (Decimal.empty())
     return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
                     "SMTLIBSolver: could not parse Int value: " + Resp};
@@ -2133,19 +2120,12 @@ SMTResult<std::string> SMTLIBSolver::getIntImpl(const SMTExprRef &Exp) {
 
 SMTResult<std::pair<std::string, std::string>>
 SMTLIBSolver::getRationalImpl(const SMTExprRef &Exp) {
-  if (!Proc)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "SMTLIBSolver write-only mode does not support get*"};
-
-  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
-  if (File)
-    File->emitRaw(Cmd);
-  Proc->emitRaw(Cmd);
-  Proc->flush();
-  std::string Resp = Proc->readResponse();
-  std::string Value = extractValueFromGetValue(Resp);
+  std::string Resp;
+  SMTResult<std::string> Value = sendGetValue(Exp, Resp);
+  if (!Value)
+    return Value.error();
   std::string Num, Den;
-  if (!rationalValueToFraction(Value, Num, Den))
+  if (!rationalValueToFraction(Value.value(), Num, Den))
     return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
                     "SMTLIBSolver: could not parse Real value: " + Resp};
   return std::make_pair(Num, Den);
