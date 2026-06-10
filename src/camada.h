@@ -326,6 +326,38 @@ public:
   /// Creates a bitvector signed greater-equal-than operation
   virtual SMTExprRef mkBVSge(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
+  /// Creates a boolean predicate that is true iff the infinitely-precise
+  /// sum of LHS and RHS (interpreted as signed or unsigned per IsSigned) is
+  /// not representable at the operands' bit-width. Equivalent to SMT-LIB's
+  /// bvsaddo/bvuaddo.
+  virtual SMTExprRef mkBVAddOverflow(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS, bool IsSigned) = 0;
+
+  /// Creates a boolean predicate that is true iff the infinitely-precise
+  /// difference LHS - RHS (signed or unsigned per IsSigned) is not
+  /// representable at the operands' bit-width. Equivalent to SMT-LIB's
+  /// bvssubo/bvusubo.
+  virtual SMTExprRef mkBVSubOverflow(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS, bool IsSigned) = 0;
+
+  /// Creates a boolean predicate that is true iff the infinitely-precise
+  /// product of LHS and RHS (signed or unsigned per IsSigned) is not
+  /// representable at the operands' bit-width. Equivalent to SMT-LIB's
+  /// bvsmulo/bvumulo.
+  virtual SMTExprRef mkBVMulOverflow(const SMTExprRef &LHS,
+                                     const SMTExprRef &RHS, bool IsSigned) = 0;
+
+  /// Creates a boolean predicate that is true iff signed division LHS / RHS
+  /// overflows, i.e. LHS is the minimal signed value and RHS is -1.
+  /// Equivalent to SMT-LIB's bvsdivo. Division by zero is not an overflow.
+  virtual SMTExprRef mkBVSDivOverflow(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) = 0;
+
+  /// Creates a boolean predicate that is true iff signed negation of Exp
+  /// overflows, i.e. Exp is the minimal signed value. Equivalent to
+  /// SMT-LIB's bvnego.
+  virtual SMTExprRef mkBVNegOverflow(const SMTExprRef &Exp) = 0;
+
   /// Creates a boolean not operation
   virtual SMTExprRef mkNot(const SMTExprRef &Exp) = 0;
 

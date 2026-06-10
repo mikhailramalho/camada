@@ -93,6 +93,110 @@ inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Prove each overflow predicate equivalent to an independent reference
+// encoding for symbolic operands. Every reference computes the exact result
+// at a wider width and range-checks it — deliberately a different
+// formulation from both the native solver predicates and the common-layer
+// fallback, so a bug on either side makes the equivalence SAT. Width 1 is
+// included because it is where sign-bit extracts and extensions are most
+// fragile.
+inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
+  for (const unsigned W : {1u, 8u}) {
+    const int64_t SMax = (int64_t{1} << (W - 1)) - 1;
+    const int64_t SMin = -(int64_t{1} << (W - 1));
+    const int64_t UMax = (int64_t{1} << W) - 1;
+
+    const auto requireEquiv = [&](const char *Name, const camada::SMTExprRef &P,
+                                  const camada::SMTExprRef &Ref) {
+      INFO("width " << W << " " << Name);
+      solver->addConstraint(solver->mkNot(solver->mkEqual(P, Ref)));
+      REQUIRE(solver->check() == camada::checkResult::UNSAT);
+      solver->reset();
+    };
+    const auto symbols = [&]() {
+      return std::make_pair(solver->mkSymbol("ovf_x", solver->mkBVSort(W)),
+                            solver->mkSymbol("ovf_y", solver->mkBVSort(W)));
+    };
+    // Exact signed result at width W+n is out of [SMin, SMax].
+    const auto signedOutOfRange = [&](const camada::SMTExprRef &Exact,
+                                      unsigned Width) {
+      return solver->mkOr(
+          solver->mkBVSlt(Exact, solver->mkBVFromDec(SMin, Width)),
+          solver->mkBVSgt(Exact, solver->mkBVFromDec(SMax, Width)));
+    };
+    // Exact unsigned result at width W+n exceeds UMax.
+    const auto unsignedOutOfRange = [&](const camada::SMTExprRef &Exact,
+                                        unsigned Width) {
+      return solver->mkBVUgt(Exact, solver->mkBVFromDec(UMax, Width));
+    };
+
+    {
+      auto [x, y] = symbols();
+      auto Exact =
+          solver->mkBVAdd(solver->mkBVSignExt(1, x), solver->mkBVSignExt(1, y));
+      requireEquiv("saddo", solver->mkBVAddOverflow(x, y, true),
+                   signedOutOfRange(Exact, W + 1));
+    }
+    {
+      auto [x, y] = symbols();
+      auto Exact =
+          solver->mkBVAdd(solver->mkBVZeroExt(1, x), solver->mkBVZeroExt(1, y));
+      requireEquiv("uaddo", solver->mkBVAddOverflow(x, y, false),
+                   unsignedOutOfRange(Exact, W + 1));
+    }
+    {
+      auto [x, y] = symbols();
+      auto Exact =
+          solver->mkBVSub(solver->mkBVSignExt(1, x), solver->mkBVSignExt(1, y));
+      requireEquiv("ssubo", solver->mkBVSubOverflow(x, y, true),
+                   signedOutOfRange(Exact, W + 1));
+    }
+    {
+      // The exact unsigned difference at W+1 bits is negative (top bit set)
+      // iff the subtraction borrows.
+      auto [x, y] = symbols();
+      auto Exact =
+          solver->mkBVSub(solver->mkBVZeroExt(1, x), solver->mkBVZeroExt(1, y));
+      requireEquiv("usubo", solver->mkBVSubOverflow(x, y, false),
+                   solver->mkEqual(solver->mkBVExtract(W, W, Exact),
+                                   solver->mkBVFromDec(1, 1)));
+    }
+    {
+      auto [x, y] = symbols();
+      auto Exact =
+          solver->mkBVMul(solver->mkBVSignExt(W, x), solver->mkBVSignExt(W, y));
+      requireEquiv("smulo", solver->mkBVMulOverflow(x, y, true),
+                   signedOutOfRange(Exact, 2 * W));
+    }
+    {
+      auto [x, y] = symbols();
+      auto Exact =
+          solver->mkBVMul(solver->mkBVZeroExt(W, x), solver->mkBVZeroExt(W, y));
+      requireEquiv("umulo", solver->mkBVMulOverflow(x, y, false),
+                   unsignedOutOfRange(Exact, 2 * W));
+    }
+    {
+      // For a non-zero divisor the exact quotient at W+1 bits is out of
+      // range only for MIN / -1. Division by zero is excluded explicitly:
+      // it is never an overflow, but SMT-LIB defines bvsdiv(x<0, 0) = +1,
+      // which falls outside [SMin, SMax] when W == 1.
+      auto [x, y] = symbols();
+      auto Exact = solver->mkBVSDiv(solver->mkBVSignExt(1, x),
+                                    solver->mkBVSignExt(1, y));
+      auto NonZeroY =
+          solver->mkNot(solver->mkEqual(y, solver->mkBVFromDec(0, W)));
+      requireEquiv("sdivo", solver->mkBVSDivOverflow(x, y),
+                   solver->mkAnd(NonZeroY, signedOutOfRange(Exact, W + 1)));
+    }
+    {
+      auto x = solver->mkSymbol("ovf_x", solver->mkBVSort(W));
+      auto Exact = solver->mkBVNeg(solver->mkBVSignExt(1, x));
+      requireEquiv("nego", solver->mkBVNegOverflow(x),
+                   signedOutOfRange(Exact, W + 1));
+    }
+  }
+}
+
 // Pins the narrow (width <= 64) decimal-constant path, which backends may
 // serve through native integer APIs: negative values must produce the
 // two's-complement pattern and values must be masked to the sort width.

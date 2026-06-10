@@ -473,6 +473,55 @@ SMTExprRef CVC5Solver::mkBVSgeImpl(const SMTExprRef &LHS,
                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
+SMTExprRef CVC5Solver::mkBVAddOverflowImpl(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS,
+                                           bool IsSigned) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVAddOverflow, &Context, mkBoolSort(),
+      Terms.mkTerm(IsSigned ? cvc5::Kind::BITVECTOR_SADDO
+                            : cvc5::Kind::BITVECTOR_UADDO,
+                   {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                    toSolverExpr<CVC5Expr>(*RHS).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkBVSubOverflowImpl(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS,
+                                           bool IsSigned) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSubOverflow, &Context, mkBoolSort(),
+      Terms.mkTerm(IsSigned ? cvc5::Kind::BITVECTOR_SSUBO
+                            : cvc5::Kind::BITVECTOR_USUBO,
+                   {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                    toSolverExpr<CVC5Expr>(*RHS).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkBVMulOverflowImpl(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS,
+                                           bool IsSigned) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVMulOverflow, &Context, mkBoolSort(),
+      Terms.mkTerm(IsSigned ? cvc5::Kind::BITVECTOR_SMULO
+                            : cvc5::Kind::BITVECTOR_UMULO,
+                   {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                    toSolverExpr<CVC5Expr>(*RHS).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                            const SMTExprRef &RHS) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVSDivOverflow, &Context, mkBoolSort(),
+      Terms.mkTerm(cvc5::Kind::BITVECTOR_SDIVO,
+                   {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                    toSolverExpr<CVC5Expr>(*RHS).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVNegOverflow, &Context, mkBoolSort(),
+      Terms.mkTerm(cvc5::Kind::BITVECTOR_NEGO,
+                   {toSolverExpr<CVC5Expr>(*Exp).Expr}));
+}
+
 SMTExprRef CVC5Solver::mkImpliesImpl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   return makeExprRef<CVC5Expr>(

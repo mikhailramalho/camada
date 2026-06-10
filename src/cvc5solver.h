@@ -169,6 +169,20 @@ protected:
 
   SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVAddOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVSubOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVMulOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNegOverflowImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
 

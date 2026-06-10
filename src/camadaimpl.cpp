@@ -588,6 +588,49 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSge,
                                     requireBVSameSort(LHS, RHS),
                                     mkBVSgeImpl(LHS, RHS),
                                     assert(theExp->Sort->isBoolSort()))
+
+SMTExprRef SMTSolverImpl::mkBVAddOverflow(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  requireBVSameSort(LHS, RHS);
+  SMTExprRef theExp = mkBVAddOverflowImpl(LHS, RHS, IsSigned);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBVSubOverflow(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  requireBVSameSort(LHS, RHS);
+  SMTExprRef theExp = mkBVSubOverflowImpl(LHS, RHS, IsSigned);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBVMulOverflow(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  requireBVSameSort(LHS, RHS);
+  SMTExprRef theExp = mkBVMulOverflowImpl(LHS, RHS, IsSigned);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBVSDivOverflow(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS) {
+  requireBVSameSort(LHS, RHS);
+  SMTExprRef theExp = mkBVSDivOverflowImpl(LHS, RHS);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBVNegOverflow(const SMTExprRef &Exp) {
+  requireBVSort(Exp, "Expected bit-vector expression");
+  SMTExprRef theExp = mkBVNegOverflowImpl(Exp);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
 SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   requireSameSort(LHS, RHS, "Expected expressions with same sort");
@@ -1752,6 +1795,88 @@ SMTExprRef SMTSolverImpl::mkBVSgeImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   SMTExprRef theExp = mkNotImpl(mkBVSltImpl(LHS, RHS));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSge);
+}
+
+SMTExprRef SMTSolverImpl::mkBVAddOverflowImpl(const SMTExprRef &LHS,
+                                              const SMTExprRef &RHS,
+                                              bool IsSigned) {
+  const unsigned Width = LHS->getWidth();
+  SMTExprRef theExp;
+  if (IsSigned) {
+    // Signed addition overflows iff the operands have the same sign and the
+    // sum's sign differs from it.
+    SMTExprRef Sum = mkBVAdd(LHS, RHS);
+    SMTExprRef LSign = mkBVExtract(Width - 1, Width - 1, LHS);
+    SMTExprRef RSign = mkBVExtract(Width - 1, Width - 1, RHS);
+    SMTExprRef SumSign = mkBVExtract(Width - 1, Width - 1, Sum);
+    theExp = mkAnd(mkEqual(LSign, RSign), mkNot(mkEqual(LSign, SumSign)));
+  } else {
+    // Unsigned addition overflows iff the (Width+1)-bit sum carries out.
+    SMTExprRef Sum = mkBVAdd(mkBVZeroExt(1, LHS), mkBVZeroExt(1, RHS));
+    theExp = mkEqual(mkBVExtract(Width, Width, Sum), getBVOne1Expr());
+  }
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVAddOverflow);
+}
+
+SMTExprRef SMTSolverImpl::mkBVSubOverflowImpl(const SMTExprRef &LHS,
+                                              const SMTExprRef &RHS,
+                                              bool IsSigned) {
+  const unsigned Width = LHS->getWidth();
+  SMTExprRef theExp;
+  if (IsSigned) {
+    // Signed subtraction overflows iff the operands have different signs and
+    // the difference's sign differs from the minuend's.
+    SMTExprRef Diff = mkBVSub(LHS, RHS);
+    SMTExprRef LSign = mkBVExtract(Width - 1, Width - 1, LHS);
+    SMTExprRef RSign = mkBVExtract(Width - 1, Width - 1, RHS);
+    SMTExprRef DiffSign = mkBVExtract(Width - 1, Width - 1, Diff);
+    theExp =
+        mkAnd(mkNot(mkEqual(LSign, RSign)), mkNot(mkEqual(LSign, DiffSign)));
+  } else {
+    // Unsigned subtraction overflows (borrows) iff LHS < RHS.
+    theExp = mkBVUlt(LHS, RHS);
+  }
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSubOverflow);
+}
+
+SMTExprRef SMTSolverImpl::mkBVMulOverflowImpl(const SMTExprRef &LHS,
+                                              const SMTExprRef &RHS,
+                                              bool IsSigned) {
+  const unsigned Width = LHS->getWidth();
+  SMTExprRef theExp;
+  if (IsSigned) {
+    // Multiply at double width; the product is representable iff its top
+    // Width+1 bits all equal the result's sign bit.
+    SMTExprRef Prod = mkBVMul(mkBVSignExt(Width, LHS), mkBVSignExt(Width, RHS));
+    SMTExprRef Top = mkBVExtract(2 * Width - 1, Width - 1, Prod);
+    SMTExprRef Zeros = mkBVFromDec(0, Width + 1);
+    SMTExprRef Ones = mkBVNot(Zeros);
+    theExp = mkNot(mkOr(mkEqual(Top, Zeros), mkEqual(Top, Ones)));
+  } else {
+    // Unsigned: any set bit in the product's top half is an overflow.
+    SMTExprRef Prod = mkBVMul(mkBVZeroExt(Width, LHS), mkBVZeroExt(Width, RHS));
+    SMTExprRef Top = mkBVExtract(2 * Width - 1, Width, Prod);
+    theExp = mkNot(mkEqual(Top, mkBVFromDec(0, Width)));
+  }
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVMulOverflow);
+}
+
+SMTExprRef SMTSolverImpl::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                               const SMTExprRef &RHS) {
+  // The only signed-division overflow is MIN_INT / -1.
+  const unsigned Width = LHS->getWidth();
+  SMTExprRef Min = mkBVFromBin("1" + std::string(Width - 1, '0'), Width);
+  SMTExprRef NegOne = mkBVFromDec(-1, Width);
+  SMTExprRef theExp = mkAnd(mkEqual(LHS, Min), mkEqual(RHS, NegOne));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSDivOverflow);
+}
+
+SMTExprRef SMTSolverImpl::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
+  // Signed negation overflows only for MIN_INT.
+  const unsigned Width = Exp->getWidth();
+  SMTExprRef Min = mkBVFromBin("1" + std::string(Width - 1, '0'), Width);
+  SMTExprRef theExp = mkEqual(Exp, Min);
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNegOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,
