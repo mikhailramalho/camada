@@ -830,6 +830,44 @@ checkResult YicesSolver::checkImpl() {
   return checkResult::UNKNOWN;
 }
 
+checkResult
+YicesSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  std::vector<term_t> assumptions;
+  assumptions.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toSolverExpr<YicesExpr>(*Assumption).Expr);
+
+  smt_status_t res = yices_check_context_with_assumptions(
+      Context, nullptr, static_cast<uint32_t>(assumptions.size()),
+      assumptions.data());
+  if (res == YICES_STATUS_SAT)
+    return checkResult::SAT;
+
+  if (res == YICES_STATUS_UNSAT)
+    return checkResult::UNSAT;
+
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> YicesSolver::getUnsatAssumptionsImpl() {
+  term_vector_t core;
+  yices_init_term_vector(&core);
+  if (yices_get_unsat_core(Context, &core) != 0) {
+    yices_delete_term_vector(&core);
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices could not retrieve the unsat core"};
+  }
+  std::vector<SMTExprRef> Result;
+  for (uint32_t i = 0; i < core.size; ++i)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (core.data[i] == toSolverExpr<YicesExpr>(*Assumption).Expr) {
+        Result.push_back(Assumption);
+        break;
+      }
+  yices_delete_term_vector(&core);
+  return Result;
+}
+
 void YicesSolver::resetImpl() {
   Assertions.clear();
   AssertionScopeSizes.clear();

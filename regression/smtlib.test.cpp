@@ -74,6 +74,7 @@ TEST_CASE("SMTLIB write-only emits a minimal script", "[SMTLIB]") {
 
   const std::string Expected = "(set-option :print-success false)\n"
                                "(set-option :produce-models true)\n"
+                               "(set-option :produce-unsat-assumptions true)\n"
                                "(set-option :global-declarations true)\n"
                                "(set-info :status unknown)\n"
                                "(set-logic ALL)\n"
@@ -277,6 +278,7 @@ TEST_CASE("SMTLIB write-only let-binds shared subterms", "[SMTLIB]") {
   const std::string Expected =
       "(set-option :print-success false)\n"
       "(set-option :produce-models true)\n"
+      "(set-option :produce-unsat-assumptions true)\n"
       "(set-option :global-declarations true)\n"
       "(set-info :status unknown)\n"
       "(set-logic ALL)\n"
@@ -311,6 +313,7 @@ TEST_CASE("SMTLIB write-only let temporaries cannot capture user symbols",
 
   const std::string Expected = "(set-option :print-success false)\n"
                                "(set-option :produce-models true)\n"
+                               "(set-option :produce-unsat-assumptions true)\n"
                                "(set-option :global-declarations true)\n"
                                "(set-info :status unknown)\n"
                                "(set-logic ALL)\n"

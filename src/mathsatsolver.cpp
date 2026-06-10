@@ -1101,7 +1101,56 @@ checkResult MathSATSolver::checkImpl() {
   return checkResult::UNKNOWN;
 }
 
+checkResult MathSATSolver::checkSatAssumingImpl(
+    const std::vector<SMTExprRef> &Assumptions) {
+  // msat_solve_with_assumptions rejects anything but (negated) Boolean
+  // constants, so activate each assumption through a fresh literal:
+  // assert (=> lit assumption), then assume the literal. Equisatisfiable
+  // with assuming the term directly, and the core maps back through the
+  // literals. The implications stay asserted at the current backtrack
+  // level after the call; with the literals otherwise unconstrained they
+  // are vacuously satisfiable, so later checks are unaffected.
+  LastAssumptionLits.clear();
+  std::vector<msat_term> lits;
+  lits.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions) {
+    const SMTExprRef Lit = mkSymbolUnchecked(
+        "__CAMADA_assume_" + std::to_string(NextAssumeId++), mkBoolSort());
+    addConstraint(mkImplies(Lit, Assumption));
+    lits.push_back(toMathSATTerm(Lit));
+    LastAssumptionLits.emplace_back(msat_term_id(lits.back()), Assumption);
+  }
+
+  msat_result res =
+      msat_solve_with_assumptions(Context, lits.data(), lits.size());
+  if (res == MSAT_SAT)
+    return checkResult::SAT;
+
+  if (res == MSAT_UNSAT)
+    return checkResult::UNSAT;
+
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> MathSATSolver::getUnsatAssumptionsImpl() {
+  size_t size = 0;
+  msat_term *core = msat_get_unsat_assumptions(Context, &size);
+  if (!core)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::MathSAT,
+                    "MathSAT could not retrieve the unsat assumptions"};
+  std::vector<SMTExprRef> Result;
+  for (size_t i = 0; i < size; ++i)
+    for (const auto &[LitId, Assumption] : LastAssumptionLits)
+      if (msat_term_id(core[i]) == LitId) {
+        Result.push_back(Assumption);
+        break;
+      }
+  msat_free(core);
+  return Result;
+}
+
 void MathSATSolver::resetImpl() {
+  LastAssumptionLits.clear();
   destroyContext();
   initializeContext();
 }

@@ -108,6 +108,7 @@ CVC5Solver::CVC5Solver() : Context(Terms) {
   Context.setOption("arrays-exp", "true");
   Context.setOption("produce-models", "true");
   Context.setOption("produce-assertions", "true");
+  Context.setOption("produce-unsat-assumptions", "true");
   initializeCommonSingletons();
 }
 
@@ -1213,6 +1214,35 @@ checkResult CVC5Solver::checkImpl() {
     return checkResult::UNKNOWN;
 
   return checkResult::UNSAT;
+}
+
+checkResult
+CVC5Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  std::vector<cvc5::Term> assumptions;
+  assumptions.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toSolverExpr<CVC5Expr>(*Assumption).Expr);
+
+  cvc5::Result res = Context.checkSatAssuming(assumptions);
+  if (res.isSat())
+    return checkResult::SAT;
+
+  if (res.isUnknown())
+    return checkResult::UNKNOWN;
+
+  return checkResult::UNSAT;
+}
+
+SMTResult<std::vector<SMTExprRef>> CVC5Solver::getUnsatAssumptionsImpl() {
+  std::vector<cvc5::Term> core = Context.getUnsatAssumptions();
+  std::vector<SMTExprRef> Result;
+  for (const cvc5::Term &Term : core)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (Term == toSolverExpr<CVC5Expr>(*Assumption).Expr) {
+        Result.push_back(Assumption);
+        break;
+      }
+  return Result;
 }
 
 void CVC5Solver::resetImpl() { Context.resetAssertions(); }

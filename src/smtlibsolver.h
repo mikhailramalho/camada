@@ -376,6 +376,9 @@ protected:
 
   // --- check / push / pop / reset ---
   checkResult checkImpl() override;
+  checkResult
+  checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
+  SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
@@ -441,6 +444,23 @@ private:
   // we bind every const-array literal to a fresh symbol up front and
   // reference the symbol from then on.
   uint64_t NextArrConstId = 0;
+
+  // Whether the child solver acknowledged
+  // `(set-option :produce-unsat-assumptions true)` with `success`.
+  // Children that answer `unsupported` (the standard reply for an
+  // unimplemented option) still solve normally; only
+  // getUnsatAssumptions() degrades to an error.
+  bool UnsatAssumptionsSupported = false;
+
+  // checkSatAssumingImpl assumes fresh activation literals
+  // (`__CAMADA_assume_N`) instead of the caller's terms: the standard
+  // restricts (check-sat-assuming ...) to property literals, and
+  // (get-unsat-assumptions) echoes whatever was assumed, so minted
+  // symbols make the response trivially and unambiguously decodable.
+  // This maps each literal of the most recent call back to the
+  // assumption it activates.
+  uint64_t NextAssumeId = 0;
+  std::vector<std::pair<std::string, SMTExprRef>> LastAssumptionLits;
 };
 
 } // namespace camada

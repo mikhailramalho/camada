@@ -117,6 +117,9 @@ CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_semantics",
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_true_implies_false",
                                    implies_true_implies_false(solver),
                                    makeSMTLIBSolver)
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("check_sat_assuming_semantics",
+                                   check_sat_assuming_semantics(solver),
+                                   makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("bv_lshr_semantics",
                                    bv_lshr_semantics(solver), makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("incremental_push_pop",

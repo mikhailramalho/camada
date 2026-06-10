@@ -190,6 +190,17 @@ protected:
   SMTExprRef resolveLazyArrayElement(const SMTExprRef &Array,
                                      const SMTExprRef &Index);
 
+  // --- Assumption-based solving ---
+  // The assumptions of the most recent checkSatAssuming() call, kept so
+  // backends can map the solver's native unsat core back to the caller's
+  // SMTExprRefs. UnsatAssumptionsValid gates getUnsatAssumptions(): it is
+  // set only when that call returned UNSAT and cleared by anything that
+  // invalidates the solver's core — a plain check(), addConstraint(),
+  // push(), pop(), or reset().
+  std::vector<SMTExprRef> LastAssumptions;
+  bool UnsatAssumptionsValid = false;
+  void invalidateUnsatAssumptions();
+
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 
@@ -431,6 +442,9 @@ public:
                           const SMTSortRef &To) override final;
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final;
   checkResult check() override final;
+  checkResult
+  checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) override final;
+  SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() override final;
   void reset() override final;
   void push(unsigned nscopes = 1) override final;
   void pop(unsigned nscopes = 1) override final;
@@ -776,6 +790,19 @@ protected:
                            unsigned SWidth);
 
   virtual checkResult checkImpl() = 0;
+
+  /// Default fallback for backends without native assumption support:
+  /// push a scope, assert each assumption, check, pop. Goes through the
+  /// public push/pop/addConstraint so the lazy constant-array journal
+  /// stays consistent.
+  virtual checkResult
+  checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions);
+
+  /// Only dispatched right after checkSatAssumingImpl returned UNSAT for a
+  /// non-empty assumption set (the wrapper answers the trivial cases).
+  /// Native backends map the solver's core back to the SMTExprRefs stored
+  /// in LastAssumptions.
+  virtual SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl();
 
   virtual void resetImpl() = 0;
 

@@ -127,6 +127,7 @@ void BitwuzlaSolver::initializeContext() {
   TermManager = bitwuzla_term_manager_new();
   Options = bitwuzla_options_new();
   bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_MODELS, 1);
+  bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
   Context = bitwuzla_new(TermManager, Options);
 }
@@ -974,6 +975,35 @@ checkResult BitwuzlaSolver::checkImpl() {
   if (res == BITWUZLA_UNSAT)
     return checkResult::UNSAT;
   return checkResult::UNKNOWN;
+}
+
+checkResult BitwuzlaSolver::checkSatAssumingImpl(
+    const std::vector<SMTExprRef> &Assumptions) {
+  std::vector<BitwuzlaTerm> assumptions;
+  assumptions.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toSolverExpr<BitwExpr>(*Assumption).Expr);
+
+  BitwuzlaResult res = bitwuzla_check_sat_assuming(
+      Context, static_cast<uint32_t>(assumptions.size()), assumptions.data());
+  if (res == BITWUZLA_SAT)
+    return checkResult::SAT;
+  if (res == BITWUZLA_UNSAT)
+    return checkResult::UNSAT;
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> BitwuzlaSolver::getUnsatAssumptionsImpl() {
+  size_t size = 0;
+  const BitwuzlaTerm *core = bitwuzla_get_unsat_assumptions(Context, &size);
+  std::vector<SMTExprRef> Result;
+  for (size_t i = 0; i < size; ++i)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (core[i] == toSolverExpr<BitwExpr>(*Assumption).Expr) {
+        Result.push_back(Assumption);
+        break;
+      }
+  return Result;
 }
 
 void BitwuzlaSolver::resetImpl() {
