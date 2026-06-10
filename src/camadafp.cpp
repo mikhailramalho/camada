@@ -370,6 +370,21 @@ mkRoundingDecision(SMTSolver &S, const SMTExprRef &R, const SMTExprRef &RMNeg,
   return S.mkIte(rm_is_even, inc_teven, inc_c2);
 }
 
+// Zero-extend by TotalBits. Camada's extension APIs take fixed-size integer
+// parameters, so very large extensions are applied in chunks instead of
+// relying on a single oversized call.
+static inline SMTExprRef chunkedZeroExt(SMTSolver &S, SMTExprRef Exp,
+                                        uint64_t TotalBits) {
+  constexpr uint64_t max_chunk = static_cast<uint64_t>(INT32_MAX);
+  while (TotalBits > max_chunk) {
+    Exp = S.mkBVZeroExt(static_cast<unsigned>(max_chunk), Exp);
+    TotalBits -= max_chunk;
+  }
+  if (TotalBits != 0)
+    Exp = S.mkBVZeroExt(static_cast<unsigned>(TotalBits), Exp);
+  return Exp;
+}
+
 static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
                           SMTExprRef &Sig, SMTExprRef &Exp, SMTExprRef &LZ,
                           bool Normalize) {
@@ -849,38 +864,15 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
 
   // CMW: This creates huge bit-vectors, which is potentially sub-optimal, but
   // the iterative remainder encodings are also very expensive. Lazy lowering
-  // would likely be the right long-term direction here too. Camada's extension
-  // APIs take fixed-size integer parameters, so apply very large extensions in
-  // chunks instead of relying on a single oversized call.
-  constexpr uint64_t max_chunk = static_cast<uint64_t>(INT32_MAX);
-  SMTExprRef a_sig_ext_l = a_sig;
-  SMTExprRef b_sig_ext_l = b_sig;
-  uint64_t remaining = max_exp_diff_u64;
-  while (remaining > max_chunk) {
-    a_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(max_chunk), a_sig_ext_l);
-    b_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(max_chunk), b_sig_ext_l);
-    remaining -= max_chunk;
-  }
-  if (remaining != 0) {
-    a_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(remaining), a_sig_ext_l);
-    b_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(remaining), b_sig_ext_l);
-  }
-  SMTExprRef a_sig_ext = mkBVConcat(a_sig_ext_l, mkBVZero3(*this));
-  SMTExprRef b_sig_ext = mkBVConcat(b_sig_ext_l, mkBVZero3(*this));
+  // would likely be the right long-term direction here too.
+  SMTExprRef a_sig_ext = mkBVConcat(
+      chunkedZeroExt(*this, a_sig, max_exp_diff_u64), mkBVZero3(*this));
+  SMTExprRef b_sig_ext = mkBVConcat(
+      chunkedZeroExt(*this, b_sig, max_exp_diff_u64), mkBVZero3(*this));
 
   uint64_t max_exp_diff_adj_u64 = max_exp_diff_u64 + sbits - ebits + 1;
-  SMTExprRef lshift = exp_diff;
-  SMTExprRef rshift = neg_exp_diff;
-  remaining = max_exp_diff_adj_u64;
-  while (remaining > max_chunk) {
-    lshift = mkBVZeroExt(static_cast<unsigned>(max_chunk), lshift);
-    rshift = mkBVZeroExt(static_cast<unsigned>(max_chunk), rshift);
-    remaining -= max_chunk;
-  }
-  if (remaining != 0) {
-    lshift = mkBVZeroExt(static_cast<unsigned>(remaining), lshift);
-    rshift = mkBVZeroExt(static_cast<unsigned>(remaining), rshift);
-  }
+  SMTExprRef lshift = chunkedZeroExt(*this, exp_diff, max_exp_diff_adj_u64);
+  SMTExprRef rshift = chunkedZeroExt(*this, neg_exp_diff, max_exp_diff_adj_u64);
 
   SMTExprRef shifted = mkIte(exp_diff_is_neg, mkBVAshr(a_sig_ext, rshift),
                              mkBVShl(a_sig_ext, lshift));
