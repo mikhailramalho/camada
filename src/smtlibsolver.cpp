@@ -761,10 +761,10 @@ SMTSortRef SMTLIBSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
 
 // --- straight-line expression builders ---
 
-#define CAMADA_SMTLIB_UNARY(Name, OpName)                                      \
+#define CAMADA_SMTLIB_UNARY(Name, OpStr, Kind, ResultSort)                     \
   SMTExprRef SMTLIBSolver::Name(const SMTExprRef &Exp) {                       \
-    return makeSMTLIBExpr(SMTExprKind::OpName, Exp->Sort,                      \
-                          "(" #OpName " " + textOf(Exp) + ")");                \
+    return makeSMTLIBExpr(SMTExprKind::Kind, ResultSort,                       \
+                          "(" OpStr " " + textOf(Exp) + ")");                  \
   }
 
 #define CAMADA_SMTLIB_BINARY(Name, OpStr, Kind, ResultSort)                    \
@@ -775,18 +775,18 @@ SMTSortRef SMTLIBSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                               ")");                                            \
   }
 
-SMTExprRef SMTLIBSolver::mkBVNegImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::BVNeg, Exp->Sort,
-                        "(bvneg " + textOf(Exp) + ")");
-}
-SMTExprRef SMTLIBSolver::mkBVNotImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::BVNot, Exp->Sort,
-                        "(bvnot " + textOf(Exp) + ")");
-}
-SMTExprRef SMTLIBSolver::mkNotImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::Not, Exp->Sort,
-                        "(not " + textOf(Exp) + ")");
-}
+// Rounded binary FP arithmetic: (op rm lhs rhs).
+#define CAMADA_SMTLIB_RM_BINARY(Name, OpStr, Kind)                             \
+  SMTExprRef SMTLIBSolver::Name(const SMTExprRef &LHS, const SMTExprRef &RHS,  \
+                                const SMTExprRef &R) {                         \
+    return makeSMTLIBExpr(SMTExprKind::Kind, LHS->Sort,                        \
+                          "(" OpStr " " + textOf(R) + " " + textOf(LHS) +      \
+                              " " + textOf(RHS) + ")");                        \
+  }
+
+CAMADA_SMTLIB_UNARY(mkBVNegImpl, "bvneg", BVNeg, Exp->Sort)
+CAMADA_SMTLIB_UNARY(mkBVNotImpl, "bvnot", BVNot, Exp->Sort)
+CAMADA_SMTLIB_UNARY(mkNotImpl, "not", Not, Exp->Sort)
 
 CAMADA_SMTLIB_BINARY(mkBVAddImpl, "bvadd", BVAdd, LHS->Sort)
 CAMADA_SMTLIB_BINARY(mkBVSubImpl, "bvsub", BVSub, LHS->Sort)
@@ -808,9 +808,6 @@ CAMADA_SMTLIB_BINARY(mkBVSleImpl, "bvsle", BVSle, mkBoolSort())
 CAMADA_SMTLIB_BINARY(mkEqualImpl, "=", Equal, mkBoolSort())
 CAMADA_SMTLIB_BINARY(mkAndImpl, "and", And, mkBoolSort())
 CAMADA_SMTLIB_BINARY(mkOrImpl, "or", Or, mkBoolSort())
-
-#undef CAMADA_SMTLIB_UNARY
-#undef CAMADA_SMTLIB_BINARY
 
 SMTExprRef SMTLIBSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                    const SMTExprRef &F) {
@@ -1004,10 +1001,7 @@ SMTExprRef SMTLIBSolver::mkInfImpl(bool Sgn, unsigned ExpWidth,
 
 // --- native FP arithmetic + predicates ---
 
-SMTExprRef SMTLIBSolver::mkFPAbsImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::FPAbs, Exp->Sort,
-                        "(fp.abs " + textOf(Exp) + ")");
-}
+CAMADA_SMTLIB_UNARY(mkFPAbsImpl, "fp.abs", FPAbs, Exp->Sort)
 
 SMTExprRef SMTLIBSolver::mkFPNegImpl(const SMTExprRef &Exp,
                                      FPNegBehavior Behavior) {
@@ -1032,68 +1026,20 @@ SMTExprRef SMTLIBSolver::mkFPNegImpl(const SMTExprRef &Exp,
                         SMTExprKind::FPNeg);
 }
 
-SMTExprRef SMTLIBSolver::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::FPIsInfinite, mkBoolSort(),
-                        "(fp.isInfinite " + textOf(Exp) + ")");
-}
+CAMADA_SMTLIB_UNARY(mkFPIsInfiniteImpl, "fp.isInfinite", FPIsInfinite,
+                    mkBoolSort())
+CAMADA_SMTLIB_UNARY(mkFPIsNaNImpl, "fp.isNaN", FPIsNaN, mkBoolSort())
+CAMADA_SMTLIB_UNARY(mkFPIsDenormalImpl, "fp.isSubnormal", FPIsDenormal,
+                    mkBoolSort())
+CAMADA_SMTLIB_UNARY(mkFPIsNormalImpl, "fp.isNormal", FPIsNormal, mkBoolSort())
+CAMADA_SMTLIB_UNARY(mkFPIsZeroImpl, "fp.isZero", FPIsZero, mkBoolSort())
 
-SMTExprRef SMTLIBSolver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::FPIsNaN, mkBoolSort(),
-                        "(fp.isNaN " + textOf(Exp) + ")");
-}
+CAMADA_SMTLIB_RM_BINARY(mkFPMulImpl, "fp.mul", FPMul)
+CAMADA_SMTLIB_RM_BINARY(mkFPDivImpl, "fp.div", FPDiv)
+CAMADA_SMTLIB_RM_BINARY(mkFPAddImpl, "fp.add", FPAdd)
+CAMADA_SMTLIB_RM_BINARY(mkFPSubImpl, "fp.sub", FPSub)
 
-SMTExprRef SMTLIBSolver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::FPIsDenormal, mkBoolSort(),
-                        "(fp.isSubnormal " + textOf(Exp) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPIsNormalImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::FPIsNormal, mkBoolSort(),
-                        "(fp.isNormal " + textOf(Exp) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPIsZeroImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::FPIsZero, mkBoolSort(),
-                        "(fp.isZero " + textOf(Exp) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPMulImpl(const SMTExprRef &LHS,
-                                     const SMTExprRef &RHS,
-                                     const SMTExprRef &R) {
-  return makeSMTLIBExpr(SMTExprKind::FPMul, LHS->Sort,
-                        "(fp.mul " + textOf(R) + " " + textOf(LHS) + " " +
-                            textOf(RHS) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPDivImpl(const SMTExprRef &LHS,
-                                     const SMTExprRef &RHS,
-                                     const SMTExprRef &R) {
-  return makeSMTLIBExpr(SMTExprKind::FPDiv, LHS->Sort,
-                        "(fp.div " + textOf(R) + " " + textOf(LHS) + " " +
-                            textOf(RHS) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPRemImpl(const SMTExprRef &LHS,
-                                     const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::FPRem, LHS->Sort,
-                        "(fp.rem " + textOf(LHS) + " " + textOf(RHS) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPAddImpl(const SMTExprRef &LHS,
-                                     const SMTExprRef &RHS,
-                                     const SMTExprRef &R) {
-  return makeSMTLIBExpr(SMTExprKind::FPAdd, LHS->Sort,
-                        "(fp.add " + textOf(R) + " " + textOf(LHS) + " " +
-                            textOf(RHS) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPSubImpl(const SMTExprRef &LHS,
-                                     const SMTExprRef &RHS,
-                                     const SMTExprRef &R) {
-  return makeSMTLIBExpr(SMTExprKind::FPSub, LHS->Sort,
-                        "(fp.sub " + textOf(R) + " " + textOf(LHS) + " " +
-                            textOf(RHS) + ")");
-}
+CAMADA_SMTLIB_BINARY(mkFPRemImpl, "fp.rem", FPRem, LHS->Sort)
 
 SMTExprRef SMTLIBSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
                                       const SMTExprRef &R) {
@@ -1108,35 +1054,15 @@ SMTExprRef SMTLIBSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                             textOf(Y) + " " + textOf(Z) + ")");
 }
 
-SMTExprRef SMTLIBSolver::mkFPLtImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::FPLt, mkBoolSort(),
-                        "(fp.lt " + textOf(LHS) + " " + textOf(RHS) + ")");
-}
+CAMADA_SMTLIB_BINARY(mkFPLtImpl, "fp.lt", FPLt, mkBoolSort())
+CAMADA_SMTLIB_BINARY(mkFPGtImpl, "fp.gt", FPGt, mkBoolSort())
+CAMADA_SMTLIB_BINARY(mkFPLeImpl, "fp.leq", FPLe, mkBoolSort())
+CAMADA_SMTLIB_BINARY(mkFPGeImpl, "fp.geq", FPGe, mkBoolSort())
+CAMADA_SMTLIB_BINARY(mkFPEqualImpl, "fp.eq", FPEqual, mkBoolSort())
 
-SMTExprRef SMTLIBSolver::mkFPGtImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::FPGt, mkBoolSort(),
-                        "(fp.gt " + textOf(LHS) + " " + textOf(RHS) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPLeImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::FPLe, mkBoolSort(),
-                        "(fp.leq " + textOf(LHS) + " " + textOf(RHS) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPGeImpl(const SMTExprRef &LHS,
-                                    const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::FPGe, mkBoolSort(),
-                        "(fp.geq " + textOf(LHS) + " " + textOf(RHS) + ")");
-}
-
-SMTExprRef SMTLIBSolver::mkFPEqualImpl(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::FPEqual, mkBoolSort(),
-                        "(fp.eq " + textOf(LHS) + " " + textOf(RHS) + ")");
-}
+#undef CAMADA_SMTLIB_UNARY
+#undef CAMADA_SMTLIB_BINARY
+#undef CAMADA_SMTLIB_RM_BINARY
 
 SMTExprRef SMTLIBSolver::mkFPtoFPImpl(const SMTExprRef &From,
                                       const SMTSortRef &To,
