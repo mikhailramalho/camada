@@ -165,6 +165,10 @@ endif()
 if(CAMADA_SOLVER_SMTLIB_ENABLE)
   target_compile_definitions(${REGRESSION_TARGET_NAME}
                              PRIVATE SOLVER_SMTLIB_ENABLED)
+  if(TARGET ${BENCH_TARGET_NAME})
+    target_compile_definitions(${BENCH_TARGET_NAME}
+                               PRIVATE SOLVER_SMTLIB_ENABLED)
+  endif()
 endif()
 
 if(${CAMADA_SOLVER_Z3_ENABLE})

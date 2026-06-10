@@ -1,6 +1,10 @@
 #include "ac_config.h"
 #include "camada.h"
 
+#if SOLVER_SMTLIB_ENABLED
+#include "smtlibsolver.h"
+#endif
+
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -81,6 +85,17 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 #endif
   }
 
+  if (backend == "smtlib") {
+#if SOLVER_SMTLIB_ENABLED
+    // Write-only mode to /dev/null: measures the text-emission layer without
+    // a child solver. The bench cases are construction-only, so the UNKNOWN
+    // check() result in this mode is irrelevant.
+    return std::make_unique<camada::SMTLIBSolver>("/dev/null");
+#else
+    throw std::runtime_error("SMTLIB backend is not enabled");
+#endif
+  }
+
   throw std::runtime_error("Unknown backend: " + backend);
 }
 
@@ -103,12 +118,28 @@ std::string defaultBackend() {
 }
 
 bool backendSupportsTuples(const std::string &backend) {
-  return backend == "cvc5" || backend == "z3";
+  return backend == "cvc5" || backend == "z3" || backend == "smtlib";
 }
+
+// The FP bench cases use the BV-blasted FP encoding. The SMT-LIB backend
+// stores each node as fully inlined text, so flattening the heavily shared
+// DAGs that encoding produces explodes combinatorially — even a single
+// iteration does not terminate in reasonable time. Skip those cases there.
+bool backendSupportsBlastedFP(const std::string &backend) {
+  return backend != "smtlib";
+}
+
+// Optional substring filter on benchmark case names (third CLI argument).
+// Empty means "run everything".
+std::string caseFilter;
+std::size_t casesRun = 0;
 
 void runCase(const std::string &backend, const std::string &name,
              std::size_t iterations,
              const std::function<void(camada::SMTSolver &, std::size_t)> &fn) {
+  if (!caseFilter.empty() && name.find(caseFilter) == std::string::npos)
+    return;
+  ++casesRun;
   const std::size_t rss_before_kb = readCurrentRSSKiB();
   auto start = Clock::now();
   {
@@ -445,8 +476,8 @@ void benchmarkResetCycleExprChain(camada::SMTSolver &solver,
 
 void printUsage(const char *argv0) {
   std::fprintf(stderr,
-               "Usage: %s [backend] [iterations]\n"
-               "Backends: bitwuzla cvc5 mathsat stp yices z3\n",
+               "Usage: %s [backend] [iterations] [case-substring]\n"
+               "Backends: bitwuzla cvc5 mathsat stp yices z3 smtlib\n",
                argv0);
 }
 
@@ -462,6 +493,9 @@ int main(int argc, char **argv) {
     if (iterations == 0)
       throw std::runtime_error("iterations must be greater than zero");
 
+    if (argc > 3)
+      caseFilter = argv[3];
+
     runCase(backend, "bv_sort_same", iterations, benchmarkBVSort);
     runCase(backend, "bv_const_same", iterations, benchmarkBVConstSame);
     runCase(backend, "bv_const_varied", iterations, benchmarkBVConstVaried);
@@ -474,19 +508,28 @@ int main(int argc, char **argv) {
     if (backendSupportsTuples(backend))
       runCase(backend, "tuple_sort_cache_hit", iterations,
               benchmarkTupleSortCacheHit);
-    runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
-    runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
-    runCase(backend, "fp_div_only", iterations, benchmarkFPDivOnly);
-    runCase(backend, "fp_integral_only", iterations, benchmarkFPIntegralOnly);
-    runCase(backend, "fp_ieee_to_bv_only", iterations, benchmarkFPIEEEToBVOnly);
-    runCase(backend, "fp_sqrt_only", iterations, benchmarkFPSqrtOnly);
-    runCase(backend, "fp_fma_only", iterations, benchmarkFPFMAOnly);
-    runCase(backend, "fp_rem_only", iterations, benchmarkFPRemOnly);
-    runCase(backend, "fp_construct", iterations, benchmarkFPConstruct);
+    if (backendSupportsBlastedFP(backend)) {
+      runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
+      runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
+      runCase(backend, "fp_div_only", iterations, benchmarkFPDivOnly);
+      runCase(backend, "fp_integral_only", iterations, benchmarkFPIntegralOnly);
+      runCase(backend, "fp_ieee_to_bv_only", iterations,
+              benchmarkFPIEEEToBVOnly);
+      runCase(backend, "fp_sqrt_only", iterations, benchmarkFPSqrtOnly);
+      runCase(backend, "fp_fma_only", iterations, benchmarkFPFMAOnly);
+      runCase(backend, "fp_rem_only", iterations, benchmarkFPRemOnly);
+      runCase(backend, "fp_construct", iterations, benchmarkFPConstruct);
+    }
     runCase(backend, "reset_cycle_memory", iterations,
             benchmarkResetCycleMemory);
     runCase(backend, "reset_cycle_expr_chain", iterations,
             benchmarkResetCycleExprChain);
+
+    if (casesRun == 0) {
+      std::fprintf(stderr, "No benchmark case matched filter '%s'\n",
+                   caseFilter.c_str());
+      return 1;
+    }
     return 0;
   } catch (const std::exception &Exn) {
     std::fprintf(stderr, "%s\n", Exn.what());
