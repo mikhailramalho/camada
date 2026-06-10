@@ -434,6 +434,58 @@ SMTExprRef Z3Solver::mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
                              toZ3Expr(LHS) >= toZ3Expr(RHS));
 }
 
+// Z3 exposes per-direction no_overflow/no_underflow predicates; camada's
+// API asks "is the exact result unrepresentable in either direction", so the
+// signed variants conjoin both directions before negating.
+SMTExprRef Z3Solver::mkBVAddOverflowImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS, bool IsSigned) {
+  z3::expr L = toZ3Expr(LHS), R = toZ3Expr(RHS);
+  z3::expr Ok =
+      z3::to_expr(*Context, Z3_mk_bvadd_no_overflow(*Context, L, R, IsSigned));
+  if (IsSigned)
+    Ok = Ok && z3::to_expr(*Context, Z3_mk_bvadd_no_underflow(*Context, L, R));
+  return makeExprRef<Z3Expr>(SMTExprKind::BVAddOverflow, Context, mkBoolSort(),
+                             !Ok);
+}
+
+SMTExprRef Z3Solver::mkBVSubOverflowImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS, bool IsSigned) {
+  z3::expr L = toZ3Expr(LHS), R = toZ3Expr(RHS);
+  z3::expr Ok =
+      z3::to_expr(*Context, Z3_mk_bvsub_no_underflow(*Context, L, R, IsSigned));
+  if (IsSigned)
+    Ok = Ok && z3::to_expr(*Context, Z3_mk_bvsub_no_overflow(*Context, L, R));
+  return makeExprRef<Z3Expr>(SMTExprKind::BVSubOverflow, Context, mkBoolSort(),
+                             !Ok);
+}
+
+SMTExprRef Z3Solver::mkBVMulOverflowImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS, bool IsSigned) {
+  z3::expr L = toZ3Expr(LHS), R = toZ3Expr(RHS);
+  z3::expr Ok =
+      z3::to_expr(*Context, Z3_mk_bvmul_no_overflow(*Context, L, R, IsSigned));
+  if (IsSigned)
+    Ok = Ok && z3::to_expr(*Context, Z3_mk_bvmul_no_underflow(*Context, L, R));
+  return makeExprRef<Z3Expr>(SMTExprKind::BVMulOverflow, Context, mkBoolSort(),
+                             !Ok);
+}
+
+SMTExprRef Z3Solver::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS) {
+  z3::expr Ok =
+      z3::to_expr(*Context, Z3_mk_bvsdiv_no_overflow(*Context, toZ3Expr(LHS),
+                                                     toZ3Expr(RHS)));
+  return makeExprRef<Z3Expr>(SMTExprKind::BVSDivOverflow, Context, mkBoolSort(),
+                             !Ok);
+}
+
+SMTExprRef Z3Solver::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
+  z3::expr Ok =
+      z3::to_expr(*Context, Z3_mk_bvneg_no_overflow(*Context, toZ3Expr(Exp)));
+  return makeExprRef<Z3Expr>(SMTExprKind::BVNegOverflow, Context, mkBoolSort(),
+                             !Ok);
+}
+
 SMTExprRef Z3Solver::mkImpliesImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return makeExprRef<Z3Expr>(SMTExprKind::Implies, Context, mkBoolSort(),

@@ -455,6 +455,52 @@ SMTExprRef BitwuzlaSolver::mkBVSgeImpl(const SMTExprRef &LHS,
       mkTerm2(TermManager, BITWUZLA_KIND_BV_SGE, LHS, RHS));
 }
 
+SMTExprRef BitwuzlaSolver::mkBVAddOverflowImpl(const SMTExprRef &LHS,
+                                               const SMTExprRef &RHS,
+                                               bool IsSigned) {
+  return makeExprRef<BitwExpr>(
+      SMTExprKind::BVAddOverflow, Context, mkBoolSort(),
+      mkTerm2(TermManager,
+              IsSigned ? BITWUZLA_KIND_BV_SADD_OVERFLOW
+                       : BITWUZLA_KIND_BV_UADD_OVERFLOW,
+              LHS, RHS));
+}
+
+SMTExprRef BitwuzlaSolver::mkBVSubOverflowImpl(const SMTExprRef &LHS,
+                                               const SMTExprRef &RHS,
+                                               bool IsSigned) {
+  return makeExprRef<BitwExpr>(
+      SMTExprKind::BVSubOverflow, Context, mkBoolSort(),
+      mkTerm2(TermManager,
+              IsSigned ? BITWUZLA_KIND_BV_SSUB_OVERFLOW
+                       : BITWUZLA_KIND_BV_USUB_OVERFLOW,
+              LHS, RHS));
+}
+
+SMTExprRef BitwuzlaSolver::mkBVMulOverflowImpl(const SMTExprRef &LHS,
+                                               const SMTExprRef &RHS,
+                                               bool IsSigned) {
+  return makeExprRef<BitwExpr>(
+      SMTExprKind::BVMulOverflow, Context, mkBoolSort(),
+      mkTerm2(TermManager,
+              IsSigned ? BITWUZLA_KIND_BV_SMUL_OVERFLOW
+                       : BITWUZLA_KIND_BV_UMUL_OVERFLOW,
+              LHS, RHS));
+}
+
+SMTExprRef BitwuzlaSolver::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                                const SMTExprRef &RHS) {
+  return makeExprRef<BitwExpr>(
+      SMTExprKind::BVSDivOverflow, Context, mkBoolSort(),
+      mkTerm2(TermManager, BITWUZLA_KIND_BV_SDIV_OVERFLOW, LHS, RHS));
+}
+
+SMTExprRef BitwuzlaSolver::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
+  return makeExprRef<BitwExpr>(
+      SMTExprKind::BVNegOverflow, Context, mkBoolSort(),
+      mkTerm1(TermManager, BITWUZLA_KIND_BV_NEG_OVERFLOW, Exp));
+}
+
 SMTExprRef BitwuzlaSolver::mkImpliesImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
   return makeExprRef<BitwExpr>(

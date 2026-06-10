@@ -47,6 +47,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(implies_semantics);
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
+  RESETANDTEST(bv_overflow_semantics);
   RESETANDTEST(wide_bv_decimal_model_value);
   RESETANDTEST(incremental_push_pop);
   RESETANDTEST(symbol_cache_survives_push_pop);

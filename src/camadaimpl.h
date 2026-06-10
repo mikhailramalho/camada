@@ -209,6 +209,15 @@ public:
                      const SMTExprRef &RHS) override final;
   SMTExprRef mkBVSge(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVAddOverflow(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                             bool IsSigned) override final;
+  SMTExprRef mkBVSubOverflow(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                             bool IsSigned) override final;
+  SMTExprRef mkBVMulOverflow(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                             bool IsSigned) override final;
+  SMTExprRef mkBVSDivOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVNegOverflow(const SMTExprRef &Exp) override final;
   SMTExprRef mkNot(const SMTExprRef &Exp) override final;
   SMTExprRef mkEqual(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final;
@@ -473,6 +482,23 @@ protected:
   virtual SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
 
   virtual SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS);
+
+  // Overflow predicates. The default implementations encode the checks with
+  // ordinary BV operations; backends with native overflow predicates
+  // override them.
+  virtual SMTExprRef mkBVAddOverflowImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS, bool IsSigned);
+
+  virtual SMTExprRef mkBVSubOverflowImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS, bool IsSigned);
+
+  virtual SMTExprRef mkBVMulOverflowImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS, bool IsSigned);
+
+  virtual SMTExprRef mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS);
+
+  virtual SMTExprRef mkBVNegOverflowImpl(const SMTExprRef &Exp);
 
   virtual SMTExprRef mkNotImpl(const SMTExprRef &Exp) = 0;
 
