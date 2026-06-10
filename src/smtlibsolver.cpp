@@ -41,6 +41,91 @@
 
 namespace camada {
 
+namespace {
+
+// Render a structural SMT-LIB term to text. Subterms referenced more than
+// once within one emission are bound to let temporaries at their first
+// occurrence (the strategy of ESBMC's emit_ast): bindings accumulate in
+// Prefix in dependency order and the matching closing parens are appended
+// at the end. Once-used subterms are inlined, so tree-shaped formulas are
+// emitted exactly as before, without lets.
+class SMTLIBRenderer {
+public:
+  std::string render(const SMTExpr &Root) {
+    countRefs(Root);
+    std::string Body = emit(Root);
+    if (OpenLets == 0)
+      return Body;
+    std::string Out = std::move(Prefix);
+    Out += Body;
+    Out.append(OpenLets, ')');
+    return Out;
+  }
+
+private:
+  static const SMTLIBTerm &termOf(const SMTExpr &E) {
+    return toSolverExpr<SMTLIBExpr>(E).Expr;
+  }
+
+  void countRefs(const SMTExpr &Root) {
+    std::vector<const SMTExpr *> Stack{&Root};
+    while (!Stack.empty()) {
+      const SMTExpr *E = Stack.back();
+      Stack.pop_back();
+      if (++RefCount[E] > 1)
+        continue;
+      const SMTLIBTerm &T = termOf(*E);
+      if (T.OwnScope)
+        continue; // binder args render in their own scope
+      for (const SMTExprRef &Arg : T.Args)
+        Stack.push_back(&*Arg);
+    }
+  }
+
+  std::string emit(const SMTExpr &E) {
+    const SMTLIBTerm &T = termOf(E);
+    if (T.Args.empty())
+      return T.Head; // terminals are cheap: always inline
+    if (auto It = Memo.find(&E); It != Memo.end())
+      return It->second;
+    std::string Text = "(";
+    Text += T.Head;
+    for (const SMTExprRef &Arg : T.Args) {
+      Text += " ";
+      // Binder arguments must not share subterms with the outside of the
+      // binder, so they render in a fresh scope. Inner let temporaries may
+      // shadow outer ones; that is harmless because a fresh scope never
+      // references outer temporaries.
+      Text += T.OwnScope ? SMTLIBRenderer().render(*Arg) : emit(*Arg);
+    }
+    Text += ")";
+    if (RefCount[&E] > 1) {
+      std::string Temp = "?x" + std::to_string(NextTemp++);
+      Prefix += "(let ((" + Temp + " " + Text + ")) ";
+      ++OpenLets;
+      Memo.emplace(&E, Temp);
+      return Temp;
+    }
+    return Text;
+  }
+
+  std::unordered_map<const SMTExpr *, unsigned> RefCount;
+  std::unordered_map<const SMTExpr *, std::string> Memo;
+  std::string Prefix;
+  unsigned OpenLets = 0;
+  unsigned NextTemp = 0;
+};
+
+std::string renderSMTLIBExpr(const SMTExpr &E) {
+  return SMTLIBRenderer().render(E);
+}
+
+std::string renderSMTLIBExpr(const SMTExprRef &E) {
+  return SMTLIBRenderer().render(*E);
+}
+
+} // namespace
+
 // ---------------------------------------------------------------------------
 // SMTLIBSort / SMTLIBExpr
 // ---------------------------------------------------------------------------
@@ -70,7 +155,14 @@ void SMTLIBSort::dump(std::string &Out) const {
 bool SMTLIBExpr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
-  return Expr == static_cast<const SMTLIBExpr &>(Other).Expr;
+  const auto &O = static_cast<const SMTLIBExpr &>(Other);
+  if (Expr.Head != O.Expr.Head || Expr.OwnScope != O.Expr.OwnScope ||
+      Expr.Args.size() != O.Expr.Args.size())
+    return false;
+  for (std::size_t I = 0; I < Expr.Args.size(); ++I)
+    if (!(*Expr.Args[I] == *O.Expr.Args[I]))
+      return false;
+  return true;
 }
 
 void SMTLIBExpr::dump() const {
@@ -80,7 +172,7 @@ void SMTLIBExpr::dump() const {
 }
 
 void SMTLIBExpr::dump(std::string &Out) const {
-  Out = Expr;
+  Out = renderSMTLIBExpr(*this);
   Out += "\n";
 }
 
@@ -538,10 +630,6 @@ std::string quoteSymbol(const std::string &Name) {
   return Out;
 }
 
-const std::string &textOf(const SMTExprRef &E) {
-  return toSolverExpr<SMTLIBExpr>(*E).Expr;
-}
-
 const std::string &textOf(const SMTSortRef &S) {
   return toSolverSort<SMTLIBSort>(*S).Sort;
 }
@@ -627,7 +715,17 @@ void SMTLIBSolver::emitLine(const std::string &Text) const {
 SMTExprRef SMTLIBSolver::makeSMTLIBExpr(SMTExprKind Kind,
                                         const SMTSortRef &Sort,
                                         std::string Text) {
-  return makeExprRef<SMTLIBExpr>(Kind, this, Sort, std::move(Text));
+  return makeExprRef<SMTLIBExpr>(Kind, this, Sort,
+                                 SMTLIBTerm{std::move(Text), {}, false});
+}
+
+SMTExprRef SMTLIBSolver::makeSMTLIBExpr(SMTExprKind Kind,
+                                        const SMTSortRef &Sort,
+                                        std::string Head,
+                                        std::vector<SMTExprRef> Args,
+                                        bool OwnScope) {
+  return makeExprRef<SMTLIBExpr>(
+      Kind, this, Sort, SMTLIBTerm{std::move(Head), std::move(Args), OwnScope});
 }
 
 // --- core dispatch helpers ---
@@ -640,7 +738,7 @@ SMTExprRef SMTLIBSolver::rewrapExprImpl(const SMTExpr &Exp,
 }
 
 void SMTLIBSolver::addConstraintImpl(const SMTExprRef &Exp) {
-  emitLine("(assert " + textOf(Exp) + ")");
+  emitLine("(assert " + renderSMTLIBExpr(Exp) + ")");
 }
 
 // --- sorts ---
@@ -758,25 +856,20 @@ SMTSortRef SMTLIBSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
 
 #define CAMADA_SMTLIB_UNARY(Name, OpStr, Kind, ResultSort)                     \
   SMTExprRef SMTLIBSolver::Name(const SMTExprRef &Exp) {                       \
-    return makeSMTLIBExpr(SMTExprKind::Kind, ResultSort,                       \
-                          "(" OpStr " " + textOf(Exp) + ")");                  \
+    return makeSMTLIBExpr(SMTExprKind::Kind, ResultSort, OpStr, {Exp});        \
   }
 
 #define CAMADA_SMTLIB_BINARY(Name, OpStr, Kind, ResultSort)                    \
   SMTExprRef SMTLIBSolver::Name(const SMTExprRef &LHS,                         \
                                 const SMTExprRef &RHS) {                       \
-    return makeSMTLIBExpr(SMTExprKind::Kind, ResultSort,                       \
-                          "(" OpStr " " + textOf(LHS) + " " + textOf(RHS) +    \
-                              ")");                                            \
+    return makeSMTLIBExpr(SMTExprKind::Kind, ResultSort, OpStr, {LHS, RHS});   \
   }
 
 // Rounded binary FP arithmetic: (op rm lhs rhs).
 #define CAMADA_SMTLIB_RM_BINARY(Name, OpStr, Kind)                             \
   SMTExprRef SMTLIBSolver::Name(const SMTExprRef &LHS, const SMTExprRef &RHS,  \
                                 const SMTExprRef &R) {                         \
-    return makeSMTLIBExpr(SMTExprKind::Kind, LHS->Sort,                        \
-                          "(" OpStr " " + textOf(R) + " " + textOf(LHS) +      \
-                              " " + textOf(RHS) + ")");                        \
+    return makeSMTLIBExpr(SMTExprKind::Kind, LHS->Sort, OpStr, {R, LHS, RHS}); \
   }
 
 CAMADA_SMTLIB_UNARY(mkBVNegImpl, "bvneg", BVNeg, Exp->Sort)
@@ -806,52 +899,47 @@ CAMADA_SMTLIB_BINARY(mkOrImpl, "or", Or, mkBoolSort())
 
 SMTExprRef SMTLIBSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                    const SMTExprRef &F) {
-  return makeSMTLIBExpr(SMTExprKind::Ite, T->Sort,
-                        "(ite " + textOf(Cond) + " " + textOf(T) + " " +
-                            textOf(F) + ")");
+  return makeSMTLIBExpr(SMTExprKind::Ite, T->Sort, "ite", {Cond, T, F});
 }
 
 SMTExprRef SMTLIBSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
   unsigned NewWidth = Exp->getWidth() + i;
   return makeSMTLIBExpr(SMTExprKind::BVSignExt, mkBVSort(NewWidth),
-                        "((_ sign_extend " + utoa(i) + ") " + textOf(Exp) +
-                            ")");
+                        "(_ sign_extend " + utoa(i) + ")", {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
   unsigned NewWidth = Exp->getWidth() + i;
   return makeSMTLIBExpr(SMTExprKind::BVZeroExt, mkBVSort(NewWidth),
-                        "((_ zero_extend " + utoa(i) + ") " + textOf(Exp) +
-                            ")");
+                        "(_ zero_extend " + utoa(i) + ")", {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkBVExtractImpl(unsigned High, unsigned Low,
                                          const SMTExprRef &Exp) {
   unsigned Width = High - Low + 1;
   return makeSMTLIBExpr(SMTExprKind::BVExtract, mkBVSort(Width),
-                        "((_ extract " + utoa(High) + " " + utoa(Low) + ") " +
-                            textOf(Exp) + ")");
+                        "(_ extract " + utoa(High) + " " + utoa(Low) + ")",
+                        {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkBVConcatImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
   unsigned Width = LHS->getWidth() + RHS->getWidth();
-  return makeSMTLIBExpr(SMTExprKind::BVConcat, mkBVSort(Width),
-                        "(concat " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::BVConcat, mkBVSort(Width), "concat",
+                        {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArraySelectImpl(const SMTExprRef &Array,
                                            const SMTExprRef &Index) {
   return makeSMTLIBExpr(SMTExprKind::ArraySelect, Array->Sort->getElementSort(),
-                        "(select " + textOf(Array) + " " + textOf(Index) + ")");
+                        "select", {Array, Index});
 }
 
 SMTExprRef SMTLIBSolver::mkArrayStoreImpl(const SMTExprRef &Array,
                                           const SMTExprRef &Index,
                                           const SMTExprRef &Element) {
-  return makeSMTLIBExpr(SMTExprKind::ArrayStore, Array->Sort,
-                        "(store " + textOf(Array) + " " + textOf(Index) + " " +
-                            textOf(Element) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArrayStore, Array->Sort, "store",
+                        {Array, Index, Element});
 }
 
 // --- constants and symbols ---
@@ -920,7 +1008,7 @@ SMTExprRef SMTLIBSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   const std::string Name = "__CAMADA_aconst" + std::to_string(NextArrConstId++);
   std::string Quoted = quoteSymbol(Name);
   std::string LiteralText =
-      "((as const " + textOf(Arr) + ") " + textOf(InitValue) + ")";
+      "((as const " + textOf(Arr) + ") " + renderSMTLIBExpr(InitValue) + ")";
   std::string Defn =
       "(define-fun " + Quoted + " () " + textOf(Arr) + " " + LiteralText + ")";
   emitLine(Defn);
@@ -1003,8 +1091,7 @@ SMTExprRef SMTLIBSolver::mkFPNegImpl(const SMTExprRef &Exp,
   // SMT-LIB's fp.neg has PreserveNaNPayload semantics — sign bit flipped on
   // non-NaNs, NaN payload preserved. That maps directly.
   if (Behavior == FPNegBehavior::PreserveNaNPayload)
-    return makeSMTLIBExpr(SMTExprKind::FPNeg, Exp->Sort,
-                          "(fp.neg " + textOf(Exp) + ")");
+    return makeSMTLIBExpr(SMTExprKind::FPNeg, Exp->Sort, "fp.neg", {Exp});
 
   // FlipSignBit must flip the top bit unconditionally, NaN included. SMT-LIB
   // has no direct op for that, so round-trip through the IEEE BV view: pull
@@ -1038,15 +1125,12 @@ CAMADA_SMTLIB_BINARY(mkFPRemImpl, "fp.rem", FPRem, LHS->Sort)
 
 SMTExprRef SMTLIBSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
                                       const SMTExprRef &R) {
-  return makeSMTLIBExpr(SMTExprKind::FPSqrt, Exp->Sort,
-                        "(fp.sqrt " + textOf(R) + " " + textOf(Exp) + ")");
+  return makeSMTLIBExpr(SMTExprKind::FPSqrt, Exp->Sort, "fp.sqrt", {R, Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                      const SMTExprRef &Z, const SMTExprRef &R) {
-  return makeSMTLIBExpr(SMTExprKind::FPFMA, X->Sort,
-                        "(fp.fma " + textOf(R) + " " + textOf(X) + " " +
-                            textOf(Y) + " " + textOf(Z) + ")");
+  return makeSMTLIBExpr(SMTExprKind::FPFMA, X->Sort, "fp.fma", {R, X, Y, Z});
 }
 
 CAMADA_SMTLIB_BINARY(mkFPLtImpl, "fp.lt", FPLt, mkBoolSort())
@@ -1062,64 +1146,55 @@ CAMADA_SMTLIB_BINARY(mkFPEqualImpl, "fp.eq", FPEqual, mkBoolSort())
 SMTExprRef SMTLIBSolver::mkFPtoFPImpl(const SMTExprRef &From,
                                       const SMTSortRef &To,
                                       const SMTExprRef &R) {
-  std::string Text = "((_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
-                     utoa(To->getFPSignificandWidth() + 1) + ") " + textOf(R) +
-                     " " + textOf(From) + ")";
-  return makeSMTLIBExpr(SMTExprKind::FPtoFP, To, std::move(Text));
+  std::string Head = "(_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
+                     utoa(To->getFPSignificandWidth() + 1) + ")";
+  return makeSMTLIBExpr(SMTExprKind::FPtoFP, To, std::move(Head), {R, From});
 }
 
 SMTExprRef SMTLIBSolver::mkSBVtoFPImpl(const SMTExprRef &From,
                                        const SMTSortRef &To,
                                        const SMTExprRef &R) {
   // Same opcode as fp→fp; SMT-LIB disambiguates by argument sort.
-  std::string Text = "((_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
-                     utoa(To->getFPSignificandWidth() + 1) + ") " + textOf(R) +
-                     " " + textOf(From) + ")";
-  return makeSMTLIBExpr(SMTExprKind::SBVtoFP, To, std::move(Text));
+  std::string Head = "(_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
+                     utoa(To->getFPSignificandWidth() + 1) + ")";
+  return makeSMTLIBExpr(SMTExprKind::SBVtoFP, To, std::move(Head), {R, From});
 }
 
 SMTExprRef SMTLIBSolver::mkUBVtoFPImpl(const SMTExprRef &From,
                                        const SMTSortRef &To,
                                        const SMTExprRef &R) {
-  std::string Text = "((_ to_fp_unsigned " + utoa(To->getFPExponentWidth()) +
-                     " " + utoa(To->getFPSignificandWidth() + 1) + ") " +
-                     textOf(R) + " " + textOf(From) + ")";
-  return makeSMTLIBExpr(SMTExprKind::UBVtoFP, To, std::move(Text));
+  std::string Head = "(_ to_fp_unsigned " + utoa(To->getFPExponentWidth()) +
+                     " " + utoa(To->getFPSignificandWidth() + 1) + ")";
+  return makeSMTLIBExpr(SMTExprKind::UBVtoFP, To, std::move(Head), {R, From});
 }
 
 SMTExprRef SMTLIBSolver::mkFPtoSBVImpl(const SMTExprRef &From,
                                        unsigned ToWidth) {
   const SMTExprRef &R = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
-  std::string Text = "((_ fp.to_sbv " + utoa(ToWidth) + ") " + textOf(R) + " " +
-                     textOf(From) + ")";
   return makeSMTLIBExpr(SMTExprKind::FPtoSBV, mkBVSort(ToWidth),
-                        std::move(Text));
+                        "(_ fp.to_sbv " + utoa(ToWidth) + ")", {R, From});
 }
 
 SMTExprRef SMTLIBSolver::mkFPtoUBVImpl(const SMTExprRef &From,
                                        unsigned ToWidth) {
   const SMTExprRef &R = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
-  std::string Text = "((_ fp.to_ubv " + utoa(ToWidth) + ") " + textOf(R) + " " +
-                     textOf(From) + ")";
   return makeSMTLIBExpr(SMTExprKind::FPtoUBV, mkBVSort(ToWidth),
-                        std::move(Text));
+                        "(_ fp.to_ubv " + utoa(ToWidth) + ")", {R, From});
 }
 
 SMTExprRef SMTLIBSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
                                             const SMTExprRef &R) {
   return makeSMTLIBExpr(SMTExprKind::FPtoIntegral, From->Sort,
-                        "(fp.roundToIntegral " + textOf(R) + " " +
-                            textOf(From) + ")");
+                        "fp.roundToIntegral", {R, From});
 }
 
 SMTExprRef SMTLIBSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                           const SMTSortRef &To) {
   // ((_ to_fp eb sb) bv) form (no rounding mode) reinterprets a same-width BV
   // as an IEEE FP.
-  std::string Text = "((_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
-                     utoa(To->getFPSignificandWidth() + 1) + ") " +
-                     textOf(Exp) + ")";
-  return makeSMTLIBExpr(SMTExprKind::BVToIEEEFP, To, std::move(Text));
+  std::string Head = "(_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
+                     utoa(To->getFPSignificandWidth() + 1) + ")";
+  return makeSMTLIBExpr(SMTExprKind::BVToIEEEFP, To, std::move(Head), {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
@@ -1210,26 +1285,22 @@ SMTExprRef SMTLIBSolver::mkRealImpl(int64_t num, int64_t den) {
 }
 
 SMTExprRef SMTLIBSolver::mkArithNegImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::ArithNeg, Exp->Sort,
-                        "(- " + textOf(Exp) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithNeg, Exp->Sort, "-", {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkArithAddImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithAdd, LHS->Sort,
-                        "(+ " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithAdd, LHS->Sort, "+", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithSubImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithSub, LHS->Sort,
-                        "(- " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithSub, LHS->Sort, "-", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithMulImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithMul, LHS->Sort,
-                        "(* " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithMul, LHS->Sort, "*", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithDivImpl(const SMTExprRef &LHS,
@@ -1238,54 +1309,44 @@ SMTExprRef SMTLIBSolver::mkArithDivImpl(const SMTExprRef &LHS,
   // Camada dispatches on operand sort, so this method receives both kinds —
   // pick the right token based on the LHS sort.
   const char *Op = LHS->Sort->isIntSort() ? "div" : "/";
-  return makeSMTLIBExpr(SMTExprKind::ArithDiv, LHS->Sort,
-                        std::string("(") + Op + " " + textOf(LHS) + " " +
-                            textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithDiv, LHS->Sort, Op, {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithModImpl(const SMTExprRef &LHS,
                                         const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithMod, mkIntSort(),
-                        "(mod " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithMod, mkIntSort(), "mod", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithLtImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithLt, mkBoolSort(),
-                        "(< " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithLt, mkBoolSort(), "<", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithGtImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithGt, mkBoolSort(),
-                        "(> " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithGt, mkBoolSort(), ">", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithLeImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithLe, mkBoolSort(),
-                        "(<= " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithLe, mkBoolSort(), "<=", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkArithGeImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
-  return makeSMTLIBExpr(SMTExprKind::ArithGe, mkBoolSort(),
-                        "(>= " + textOf(LHS) + " " + textOf(RHS) + ")");
+  return makeSMTLIBExpr(SMTExprKind::ArithGe, mkBoolSort(), ">=", {LHS, RHS});
 }
 
 SMTExprRef SMTLIBSolver::mkInt2RealImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::Int2Real, mkRealSort(),
-                        "(to_real " + textOf(Exp) + ")");
+  return makeSMTLIBExpr(SMTExprKind::Int2Real, mkRealSort(), "to_real", {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkReal2IntImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::Real2Int, mkIntSort(),
-                        "(to_int " + textOf(Exp) + ")");
+  return makeSMTLIBExpr(SMTExprKind::Real2Int, mkIntSort(), "to_int", {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkIsIntImpl(const SMTExprRef &Exp) {
-  return makeSMTLIBExpr(SMTExprKind::IsInt, mkBoolSort(),
-                        "(is_int " + textOf(Exp) + ")");
+  return makeSMTLIBExpr(SMTExprKind::IsInt, mkBoolSort(), "is_int", {Exp});
 }
 
 // --- UF + quantifiers ---
@@ -1294,18 +1355,14 @@ SMTExprRef SMTLIBSolver::mkIsIntImpl(const SMTExprRef &Exp) {
 // the function symbol name (set when the symbol was declared).
 SMTExprRef SMTLIBSolver::mkApplyImpl(const SMTExprRef &Function,
                                      const std::vector<SMTExprRef> &Args) {
-  std::string Text = "(" + textOf(Function);
-  for (const auto &Arg : Args) {
-    Text += " ";
-    Text += textOf(Arg);
-  }
-  Text += ")";
+  // Function is always a declared symbol, so its Head is the (quoted)
+  // function name; the application node carries the operands.
   return makeSMTLIBExpr(SMTExprKind::Apply, Function->Sort->getCodomainSort(),
-                        std::move(Text));
+                        toSolverExpr<SMTLIBExpr>(*Function).Expr.Head, Args);
 }
 
 // Render a quantifier's bound-variable list `((v1 S1) (v2 S2) ...)`. Each var
-// is a Symbol expression whose textOf() is the already-quoted variable name.
+// is a Symbol expression whose Head is the already-quoted variable name.
 //
 // Camada's regression tests pass quantifier vars that were created via
 // mkSymbol — which means we already emitted `(declare-fun v () S)` at the
@@ -1319,7 +1376,7 @@ static std::string renderBinders(const std::vector<SMTExprRef> &Vars) {
     if (I)
       Out += " ";
     Out += "(";
-    Out += static_cast<const SMTLIBExpr &>(*Vars[I]).Expr;
+    Out += static_cast<const SMTLIBExpr &>(*Vars[I]).Expr.Head;
     Out += " ";
     Out += static_cast<const SMTLIBSort &>(*Vars[I]->Sort).Sort;
     Out += ")";
@@ -1329,16 +1386,16 @@ static std::string renderBinders(const std::vector<SMTExprRef> &Vars) {
 
 SMTExprRef SMTLIBSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
                                       const SMTExprRef &Body) {
-  std::string Text =
-      "(forall (" + renderBinders(Vars) + ") " + textOf(Body) + ")";
-  return makeSMTLIBExpr(SMTExprKind::Forall, mkBoolSort(), std::move(Text));
+  return makeSMTLIBExpr(SMTExprKind::Forall, mkBoolSort(),
+                        "forall (" + renderBinders(Vars) + ")", {Body},
+                        /*OwnScope=*/true);
 }
 
 SMTExprRef SMTLIBSolver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                                       const SMTExprRef &Body) {
-  std::string Text =
-      "(exists (" + renderBinders(Vars) + ") " + textOf(Body) + ")";
-  return makeSMTLIBExpr(SMTExprKind::Exists, mkBoolSort(), std::move(Text));
+  return makeSMTLIBExpr(SMTExprKind::Exists, mkBoolSort(),
+                        "exists (" + renderBinders(Vars) + ")", {Body},
+                        /*OwnScope=*/true);
 }
 
 // --- tuples ---
@@ -1353,28 +1410,19 @@ SMTExprRef SMTLIBSolver::mkTupleImpl(const std::vector<SMTExprRef> &Elements) {
     ElementSorts.push_back(E->Sort);
   SMTSortRef TupleSort = mkTupleSort(ElementSorts);
   const std::string &Name = static_cast<const SMTLIBSort &>(*TupleSort).Sort;
-  std::string Text;
-  if (Elements.empty()) {
-    Text = Name + "_mk";
-  } else {
-    Text = "(" + Name + "_mk";
-    for (const auto &E : Elements) {
-      Text += " ";
-      Text += textOf(E);
-    }
-    Text += ")";
-  }
-  return makeSMTLIBExpr(SMTExprKind::TupleConst, TupleSort, std::move(Text));
+  if (Elements.empty())
+    return makeSMTLIBExpr(SMTExprKind::TupleConst, TupleSort, Name + "_mk");
+  return makeSMTLIBExpr(SMTExprKind::TupleConst, TupleSort, Name + "_mk",
+                        Elements);
 }
 
 // Project tuple field i: (<sortname>_p<i> t).
 SMTExprRef SMTLIBSolver::mkTupleSelectImpl(const SMTExprRef &Tuple,
                                            unsigned Index) {
   const std::string &Name = static_cast<const SMTLIBSort &>(*Tuple->Sort).Sort;
-  std::string Text =
-      "(" + Name + "_p" + utoa(Index) + " " + textOf(Tuple) + ")";
   SMTSortRef ElementSort = Tuple->Sort->getTupleElementSorts()[Index];
-  return makeSMTLIBExpr(SMTExprKind::TupleSelect, ElementSort, std::move(Text));
+  return makeSMTLIBExpr(SMTExprKind::TupleSelect, ElementSort,
+                        Name + "_p" + utoa(Index), {Tuple});
 }
 
 // --- write-only model queries / check ---
@@ -1976,7 +2024,7 @@ SMTResult<std::string> SMTLIBSolver::sendGetValue(const SMTExprRef &Exp,
     return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
                     "SMTLIBSolver write-only mode does not support get*"};
 
-  const std::string Cmd = "(get-value (" + textOf(Exp) + "))\n";
+  const std::string Cmd = "(get-value (" + renderSMTLIBExpr(Exp) + "))\n";
   if (File)
     File->emitRaw(Cmd);
   Proc->emitRaw(Cmd);
