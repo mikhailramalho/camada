@@ -149,12 +149,6 @@ void BitwuzlaSolver::addConstraintImpl(const SMTExprRef &Exp) {
   bitwuzla_assert(Context, toSolverExpr<BitwExpr>(*Exp).Expr);
 }
 
-SMTExprRef BitwuzlaSolver::newExprRefImpl(const SMTExpr &Exp) {
-  const auto &Wrapped = toSolverExpr<BitwExpr>(Exp);
-  return makeExprRef<BitwExpr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
-                               Wrapped.Expr);
-}
-
 SMTExprRef BitwuzlaSolver::rewrapExprImpl(const SMTExpr &Exp,
                                           const SMTSortRef &Sort,
                                           SMTExprKind Kind) {

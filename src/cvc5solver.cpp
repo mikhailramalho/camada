@@ -121,12 +121,6 @@ void CVC5Solver::addConstraintImpl(const SMTExprRef &Exp) {
   Context.assertFormula(toSolverExpr<CVC5Expr>(*Exp).Expr);
 }
 
-SMTExprRef CVC5Solver::newExprRefImpl(const SMTExpr &Exp) {
-  const auto &Wrapped = toSolverExpr<CVC5Expr>(Exp);
-  return makeExprRef<CVC5Expr>(Exp.getKind(), Wrapped.Context, Exp.Sort,
-                               Wrapped.Expr);
-}
-
 SMTExprRef CVC5Solver::rewrapExprImpl(const SMTExpr &Exp,
                                       const SMTSortRef &Sort,
                                       SMTExprKind Kind) {

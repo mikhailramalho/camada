@@ -24,7 +24,6 @@
 
 #include <cstdint>
 #include <string>
-#include <utility>
 
 namespace STP {
 #include <stp/c_interface.h>
@@ -53,21 +52,16 @@ public:
   void dump(std::string &Out) const override;
 }; // end class STPSort
 
+/// Wrapper for STP expressions. The underlying STP term nodes are owned by
+/// the validity-checker context, not by individual wrappers: they stay alive
+/// until `vc_Destroy`, which resetImpl()/~STPSolver always pair with the
+/// context. Wrappers are therefore plain borrows and may freely alias the
+/// same STP expression.
 class STPExpr : public SolverExpr<STPContextRef, STP::Expr> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::STP;
-  // STP allocates ordinary term nodes that must be released with
-  // `vc_DeleteExpr`. Arena-stored wrappers therefore need to remember whether
-  // they own the underlying STP expression so copied wrappers do not double
-  // free borrowed handles.
-  bool OwnsExpr = false;
-
-  STPExpr(SMTExprKind Kind, STPContextRef C, const SMTSortRef &S,
-          const STP::Expr &E, bool Owns = false)
-      : SolverExpr<STPContextRef, STP::Expr>(Kind, std::move(C), S, E),
-        OwnsExpr(Owns) {}
-
-  ~STPExpr() override;
+  using SolverExpr<STPContextRef, STP::Expr>::SolverExpr;
+  ~STPExpr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -89,7 +83,6 @@ protected:
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef newExprRefImpl(const SMTExpr &Exp) override;
   SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
                             SMTExprKind Kind) override;
 
