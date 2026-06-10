@@ -25,8 +25,10 @@
 #include "camada.h"
 #include "camadacommon.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <limits>
 #include <vector>
 #include <z3_api.h>
 #include <z3_ast_containers.h>
@@ -1062,6 +1064,19 @@ checkResult Z3Solver::checkImpl() {
     return checkResult::UNSAT;
 
   return checkResult::UNKNOWN;
+}
+
+bool Z3Solver::setTimeoutImpl(uint64_t Milliseconds) {
+  // Z3's solver-level "timeout" parameter is a per-query wall-clock limit
+  // in milliseconds, with UINT_MAX as the documented no-limit default.
+  // Parameters merge with any set elsewhere and survive Solver.reset().
+  constexpr uint64_t NoLimit = std::numeric_limits<unsigned>::max();
+  const uint64_t Value =
+      Milliseconds == 0 ? NoLimit : std::min(Milliseconds, NoLimit);
+  z3::params params(*Context);
+  params.set("timeout", static_cast<unsigned>(Value));
+  Solver.set(params);
+  return true;
 }
 
 void Z3Solver::resetImpl() { Solver.reset(); }

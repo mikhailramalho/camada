@@ -744,6 +744,15 @@ public:
   /// Check if the constraints are satisfiable
   virtual checkResult check() = 0;
 
+  /// Set a wall-clock time limit, in milliseconds, applied to each
+  /// subsequent check() individually; 0 removes the limit. A check that
+  /// hits the limit returns checkResult::UNKNOWN; reset() afterwards
+  /// restores the solver to a known-good state. The limit persists across
+  /// reset(). Returns false when the backend cannot enforce time limits
+  /// (STP; the SMT-LIB pipeline, where interrupting the child mid-query
+  /// would desynchronize the pipe protocol) — the limit is then ignored.
+  virtual bool setTimeout(uint64_t Milliseconds) = 0;
+
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
 

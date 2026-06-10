@@ -357,6 +357,8 @@ protected:
 
   checkResult checkImpl() override;
 
+  bool setTimeoutImpl(uint64_t Milliseconds) override;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;

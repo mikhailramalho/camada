@@ -22,6 +22,7 @@
 #ifndef BITWUZLASOLVER_H_
 #define BITWUZLASOLVER_H_
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -233,6 +234,7 @@ protected:
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
   checkResult checkImpl() override;
+  bool setTimeoutImpl(uint64_t Milliseconds) override;
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
@@ -245,6 +247,12 @@ private:
   BitwuzlaContextRef Context = nullptr;
   BitwuzlaOptions *Options = nullptr;
   BitwuzlaTermManager *TermManager = nullptr;
+
+  // Per-check wall-clock deadline enforced through bitwuzla's termination
+  // callback (registered in initializeContext, which passes this member's
+  // address as the callback state). The epoch value means "no deadline";
+  // checkImpl arms it from TimeoutMs before each query.
+  std::chrono::steady_clock::time_point CheckDeadline{};
 };
 
 } // namespace camada

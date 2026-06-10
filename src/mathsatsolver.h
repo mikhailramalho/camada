@@ -23,6 +23,7 @@
 #define MATHSATSOLVER_H_
 
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <mathsat.h>
 #include <string>
@@ -329,6 +330,8 @@ protected:
 
   checkResult checkImpl() override;
 
+  bool setTimeoutImpl(uint64_t Milliseconds) override;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
@@ -345,6 +348,12 @@ private:
 
   msat_config Config{};
   msat_env Context{};
+
+  // Per-check wall-clock deadline enforced through MathSAT's termination
+  // test (registered in initializeContext, which passes this member's
+  // address as the callback state). The epoch value means "no deadline";
+  // checkImpl arms it from TimeoutMs before each query.
+  std::chrono::steady_clock::time_point CheckDeadline{};
 }; // end class MathSATSolver
 
 } // namespace camada

@@ -1717,10 +1717,23 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
 
 checkResult SMTSolverImpl::check() { return checkImpl(); }
 
+bool SMTSolverImpl::setTimeout(uint64_t Milliseconds) {
+  const bool Supported = setTimeoutImpl(Milliseconds);
+  TimeoutMs = Supported ? Milliseconds : 0;
+  return Supported;
+}
+
+bool SMTSolverImpl::setTimeoutImpl(uint64_t) { return false; }
+
 void SMTSolverImpl::reset() {
   invalidateGeneratedObjects();
   resetImpl();
   initializeCommonSingletons();
+  // resetImpl() may recreate the backend context, dropping any limit
+  // configured on the old one; the limit itself is solver configuration
+  // and survives the reset.
+  if (TimeoutMs)
+    setTimeoutImpl(TimeoutMs);
 }
 
 void SMTSolverImpl::push(unsigned nscopes) {
