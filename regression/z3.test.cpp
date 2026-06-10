@@ -189,3 +189,28 @@ TEST_CASE("Lazy constant arrays via Z3", "[Z3]") {
   solver->reset();
   array_const_survives_push_pop(solver);
 }
+
+// The lazy lowering can also be requested explicitly on a backend with
+// native constant arrays, and the two lowerings interoperate: they share
+// array sorts, so lazy and native const arrays can appear in one formula.
+TEST_CASE("Explicitly lazy constant arrays via Z3", "[Z3]") {
+  auto solver = camada::createZ3Solver();
+
+  auto idx = solver->mkBVSort(8);
+  auto elem = solver->mkBVSort(8);
+  auto zero = solver->mkBVFromDec(0, elem);
+  auto one = solver->mkBVFromDec(1, elem);
+
+  auto lazy = solver->mkArrayConst(idx, zero, camada::ConstArrayLowering::Lazy);
+  auto native =
+      solver->mkArrayConst(idx, one, camada::ConstArrayLowering::Native);
+  REQUIRE(lazy->getKind() == camada::SMTExprKind::ArrayConst);
+  REQUIRE(lazy->Sort == native->Sort);
+
+  // select(lazy, i) + select(native, i) == 1 at every index.
+  auto i = solver->mkSymbol("exlz_i", idx);
+  auto sum = solver->mkBVAdd(solver->mkArraySelect(lazy, i),
+                             solver->mkArraySelect(native, i));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(sum, one)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}

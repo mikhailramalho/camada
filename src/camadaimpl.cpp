@@ -596,10 +596,27 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   // equalities.
   if (LHS->Sort->isTupleSort() && !nativeTupleSupport())
     return mkCamadaTupleEqual(*this, LHS, RHS);
-  fatalErrorIf(!LazyConstArrayRoots.empty() && LHS->Sort->isArraySort() &&
-                   (reachesLazyArray(LHS) || reachesLazyArray(RHS)),
-               "Array equality involving lazily lowered constant arrays is "
-               "not yet supported");
+  if (!LazyConstArrayRoots.empty() && LHS->Sort->isArraySort() &&
+      (reachesLazyArray(LHS) || reachesLazyArray(RHS))) {
+    // Extensionality witness for lazy constant arrays. The backend decides
+    // array equality natively, but a lazy root's default axiom is only
+    // instantiated at observed indexes, so a model could fake a difference
+    // (or agreement) at an unobserved index. The standard reduction plugs
+    // this: a fresh witness index per equality, the universally valid lemma
+    //   LHS = RHS  \/  select(LHS, K) != select(RHS, K)
+    // and default instantiation at K (done by mkArraySelect below). Any
+    // model claiming LHS != RHS must now exhibit the difference at K,
+    // where defaults are enforced.
+    SMTExprRef Witness = mkSymbolUnchecked(
+        "__CAMADA_lazyarr_ext" + std::to_string(LazyConstArrayCounter++),
+        LHS->Sort->getIndexSort());
+    SMTExprRef SelL = mkArraySelect(LHS, Witness);
+    SMTExprRef SelR = mkArraySelect(RHS, Witness);
+    SMTExprRef theEq = mkEqualImpl(LHS, RHS);
+    assert(theEq->isBoolSort());
+    addConstraint(mkOr(theEq, mkNot(mkEqual(SelL, SelR))));
+    return theEq;
+  }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
   assert(theExp->isBoolSort());
   return theExp;
@@ -1589,7 +1606,19 @@ SMTExprRef SMTSolverImpl::mkInf64(const bool Sgn, FPEncoding Encoding) {
 
 SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
                                        const SMTExprRef &InitValue) {
-  SMTExprRef theExp = nativeConstArraySupport()
+  return mkArrayConst(IndexSort, InitValue, ConstArrayLowering::Auto);
+}
+
+SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
+                                       const SMTExprRef &InitValue,
+                                       ConstArrayLowering Lowering) {
+  if (Lowering == ConstArrayLowering::Auto)
+    Lowering = nativeConstArraySupport() ? ConstArrayLowering::Native
+                                         : ConstArrayLowering::Lazy;
+  fatalErrorIf(Lowering == ConstArrayLowering::Native &&
+                   !nativeConstArraySupport(),
+               "Native constant arrays are not supported by this backend");
+  SMTExprRef theExp = Lowering == ConstArrayLowering::Native
                           ? mkArrayConstImpl(IndexSort, InitValue)
                           : mkLazyConstArray(IndexSort, InitValue);
   assert(theExp->isArraySort());

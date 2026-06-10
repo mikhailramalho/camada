@@ -30,20 +30,9 @@ TEST_CASE("Small constant array STP test", "[STP]") {
   REQUIRE(sel_res.value() == 7);
 }
 
-TEST_CASE("Large-width constant array STP aborts cleanly", "[STP]") {
+// Large index widths used to abort (the old lowering emitted one store per
+// index); the lazy constant-array lowering handles any width.
+TEST_CASE("Large-width constant array STP test", "[STP]") {
   auto stp = camada::createSTPSolver();
-  require_abort([&]() {
-    auto idx = stp->mkBVSort(64);
-    auto elem = stp->mkBVFromDec(1, 8);
-    (void)stp->mkArrayConst(idx, elem);
-  });
-}
-
-TEST_CASE("Impractical-width constant array STP aborts cleanly", "[STP]") {
-  auto stp = camada::createSTPSolver();
-  require_abort([&]() {
-    auto idx = stp->mkBVSort(21);
-    auto elem = stp->mkBVFromDec(1, 8);
-    (void)stp->mkArrayConst(idx, elem);
-  });
+  lazy_const_array_semantics(stp);
 }

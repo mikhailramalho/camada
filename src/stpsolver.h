@@ -197,8 +197,12 @@ protected:
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
 
+  // STP has no native constant arrays; the common layer lowers them lazily
+  // (nativeConstArraySupport() below), so this override is unreachable.
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
+
+  bool nativeConstArraySupport() const override { return false; }
 
   checkResult checkImpl() override;
 
