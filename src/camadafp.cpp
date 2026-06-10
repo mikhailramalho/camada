@@ -22,11 +22,11 @@
 #include "camadacommon.h"
 #include "camadaimpl.h"
 
+#include <algorithm>
 #include <bitset>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <stdexcept>
 
 namespace camada {
 namespace {
@@ -368,21 +368,6 @@ mkRoundingDecision(SMTSolver &S, const SMTExprRef &R, const SMTExprRef &RMNeg,
   SMTExprRef inc_c3 = S.mkIte(rm_is_to_pos, inc_pos, inc_c4);
   SMTExprRef inc_c2 = S.mkIte(rm_is_away, inc_taway, inc_c3);
   return S.mkIte(rm_is_even, inc_teven, inc_c2);
-}
-
-// Zero-extend by TotalBits. Camada's extension APIs take fixed-size integer
-// parameters, so very large extensions are applied in chunks instead of
-// relying on a single oversized call.
-static inline SMTExprRef chunkedZeroExt(SMTSolver &S, SMTExprRef Exp,
-                                        uint64_t TotalBits) {
-  constexpr uint64_t max_chunk = static_cast<uint64_t>(INT32_MAX);
-  while (TotalBits > max_chunk) {
-    Exp = S.mkBVZeroExt(static_cast<unsigned>(max_chunk), Exp);
-    TotalBits -= max_chunk;
-  }
-  if (TotalBits != 0)
-    Exp = S.mkBVZeroExt(static_cast<unsigned>(TotalBits), Exp);
-  return Exp;
 }
 
 static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
@@ -844,11 +829,6 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
 
-  if (ebits >= std::numeric_limits<uint64_t>::digits)
-    throw std::runtime_error("Huge exponents in fp.rem are not supported.");
-
-  uint64_t max_exp_diff_u64 = (uint64_t{1} << ebits) - 3;
-
   SMTExprRef a_exp_ext = mkBVSignExt(2, a_exp);
   SMTExprRef b_exp_ext = mkBVSignExt(2, b_exp);
   SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
@@ -862,29 +842,82 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef two_ebits_p2 = mkBVFromDec(2, ebits + 2);
   SMTExprRef exp_diff_is_neg = mkBVSle(exp_diff, zero_ebits_p2);
 
-  // CMW: This creates huge bit-vectors, which is potentially sub-optimal, but
-  // the iterative remainder encodings are also very expensive. Lazy lowering
-  // would likely be the right long-term direction here too.
-  SMTExprRef a_sig_ext = mkBVConcat(
-      chunkedZeroExt(*this, a_sig, max_exp_diff_u64), mkBVZero3(*this));
-  SMTExprRef b_sig_ext = mkBVConcat(
-      chunkedZeroExt(*this, b_sig, max_exp_diff_u64), mkBVZero3(*this));
+  // The classic (Z3-style) encoding shifts the dividend significand left by
+  // up to 2^ebits bits and divides, creating enormous bit-vectors. Instead,
+  // compute the same remainder with modular arithmetic over ~2*sbits-bit
+  // values: with d = exp_diff, M = b_sig, the candidate remainder is
+  // (a_sig * 2^d) mod M, and 2^d mod 2M is computed by square-and-multiply
+  // over the bits of d. Reducing modulo 2M instead of M also yields the
+  // integer quotient's parity, needed for the ties-to-even adjustment below:
+  // (a_sig * 2^d) mod 2M == (q mod 2)*M + r.
+  //
+  // Both significands carry a factor of 8 (three low guard bits) so the
+  // negative-d path keeps fractional bits, mirroring the classic encoding.
 
-  uint64_t max_exp_diff_adj_u64 = max_exp_diff_u64 + sbits - ebits + 1;
-  SMTExprRef lshift = chunkedZeroExt(*this, exp_diff, max_exp_diff_adj_u64);
-  SMTExprRef rshift = chunkedZeroExt(*this, neg_exp_diff, max_exp_diff_adj_u64);
+  // d <= 0: |x| < 2|y| at these scales, so the integer quotient is 0 or 1
+  // and the remainder needs only a compare-and-subtract. The shift below is
+  // well-defined for any d: bvlshr yields 0 once the amount reaches the
+  // width. This path's value is discarded by the ite when d > 0.
+  const unsigned wn = sbits + 4;
+  const unsigned wshift = std::max(wn, ebits + 2);
+  SMTExprRef a8 = mkBVZeroExt(1, mkBVConcat(a_sig, mkBVZero3(*this)));
+  SMTExprRef b8 = mkBVZeroExt(1, mkBVConcat(b_sig, mkBVZero3(*this)));
+  SMTExprRef shifted_neg = mkBVLshr(
+      wshift > wn ? mkBVZeroExt(wshift - wn, a8) : a8,
+      wshift > ebits + 2 ? mkBVZeroExt(wshift - (ebits + 2), neg_exp_diff)
+                         : neg_exp_diff);
+  if (wshift > wn)
+    shifted_neg = mkBVExtract(wn - 1, 0, shifted_neg);
+  SMTExprRef q_one_neg = mkBVUge(shifted_neg, b8);
+  SMTExprRef rem_neg = mkIte(q_one_neg, mkBVSub(shifted_neg, b8), shifted_neg);
+  SMTExprRef even_neg = mkNot(q_one_neg);
 
-  SMTExprRef shifted = mkIte(exp_diff_is_neg, mkBVAshr(a_sig_ext, rshift),
-                             mkBVShl(a_sig_ext, lshift));
-  SMTExprRef huge_rem = mkBVURem(shifted, b_sig_ext);
-  SMTExprRef huge_div = mkBVUDiv(shifted, b_sig_ext);
-  SMTExprRef huge_div_is_even =
-      mkEqual(mkBVExtract(0, 0, huge_div), mkBVZero1(*this));
+  // d > 0: square-and-multiply over the bits of d. d is positive here, so
+  // its sign bit is clear and bits [ebits:0] cover the whole value.
+  const unsigned w2 = sbits + 2;
+  const unsigned W = 2 * sbits + 3;
+  SMTExprRef one_W = mkBVFromDec(1, W);
+  SMTExprRef m2_W =
+      mkBVZeroExt(W - (sbits + 1), mkBVConcat(b_sig, mkBVZero1(*this)));
+  // Processing MSB-first, after consuming the top `lead` bits the
+  // accumulator is 2^(d >> (ebits+1-lead)), which stays below 2M as long as
+  // 2^lead - 1 <= sbits. Those first rounds therefore collapse into a single
+  // shift of 1, skipping their multiply/remainder pairs.
+  unsigned lead = 0;
+  while (lead < ebits + 1 && ((1u << (lead + 1)) - 1) <= sbits)
+    ++lead;
+  SMTExprRef acc;
+  if (lead > 0) {
+    SMTExprRef top_bits = mkBVExtract(ebits, ebits + 1 - lead, exp_diff);
+    acc = mkBVShl(mkBVFromDec(1, w2), mkBVZeroExt(w2 - lead, top_bits));
+  } else {
+    acc = mkBVFromDec(1, w2);
+  }
+  for (int i = static_cast<int>(ebits) - static_cast<int>(lead); i >= 0; --i) {
+    SMTExprRef sq = mkBVMul(mkBVZeroExt(W - w2, acc), mkBVZeroExt(W - w2, acc));
+    SMTExprRef bit_set =
+        mkEqual(mkBVExtract(static_cast<unsigned>(i), static_cast<unsigned>(i),
+                            exp_diff),
+                mkBVOne1(*this));
+    SMTExprRef dbl = mkIte(bit_set, mkBVShl(sq, one_W), sq);
+    acc = mkBVExtract(w2 - 1, 0, mkBVURem(dbl, m2_W));
+  }
+  SMTExprRef prod =
+      mkBVMul(mkBVZeroExt(W - sbits, a_sig), mkBVZeroExt(W - w2, acc));
+  SMTExprRef r2 = mkBVExtract(w2 - 1, 0, mkBVURem(prod, m2_W));
+  SMTExprRef m_w2 = mkBVZeroExt(2, b_sig);
+  SMTExprRef q_odd_pos = mkBVUge(r2, m_w2);
+  SMTExprRef r_pos = mkIte(q_odd_pos, mkBVSub(r2, m_w2), r2);
+  SMTExprRef rem_pos =
+      mkBVConcat(mkBVExtract(sbits, 0, r_pos), mkBVZero3(*this));
+  SMTExprRef even_pos = mkNot(q_odd_pos);
 
-  // Round the large remainder candidate to the target format first.
+  SMTExprRef huge_div_is_even = mkIte(exp_diff_is_neg, even_neg, even_pos);
+
+  // Round the remainder candidate to the target format first.
   SMTExprRef rndd_sgn = a_sgn;
   SMTExprRef rndd_exp = mkBVSub(b_exp_ext, b_lz_ext);
-  SMTExprRef rndd_sig = mkBVExtract(sbits + 3, 0, huge_rem);
+  SMTExprRef rndd_sig = mkIte(exp_diff_is_neg, rem_neg, rem_pos);
   SMTExprRef rne_bv = mkRM(RM::ROUND_TO_EVEN, FPEncoding::BV);
   SMTExprRef rndd_sig_lz = mkLeadingZeros(*this, rndd_sig, ebits + 2);
 

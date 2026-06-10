@@ -463,6 +463,12 @@ inline void fp_remainder_host_oracle(const camada::SMTSolverRef &solver,
       // Large exponent difference (the expensive encoding path).
       {1.0e38f, 3.0f},
       {1.0e30f, 1.1754944e-38f}, // y = min normal
+      // Exponent difference beyond 2^ebits - 3: y subnormal pushes the
+      // normalized difference up to (2^ebits - 3) + (sbits - 1). The
+      // classic Z3-style encoding under-allocates shift headroom here and
+      // returns wrong values; pins the modular encoding's fix.
+      {3.0e38f, 7.0e-39f},
+      {3.4028235e38f, 1.4012985e-45f}, // max finite over min subnormal
       // Subnormal operands.
       {1.0e-45f, 1.0e-44f},         // x, y both subnormal
       {1.0e-39f, 1.1754944e-38f},   // x subnormal, y min normal
