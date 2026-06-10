@@ -16,6 +16,10 @@
   solver->reset();                                                             \
   testname(solver);
 
+#define RESETANDARGTEST(testname, arg)                                         \
+  solver->reset();                                                             \
+  testname(solver, arg);
+
 #define RESETANDFPTEST(testname, encoding)                                     \
   solver->reset();                                                             \
   testname(solver, encoding);
@@ -57,6 +61,14 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array_const_survives_push_pop);
   RESETANDTEST(wide_index_const_array_semantics);
   RESETANDTEST(const_array_select_survives_pop);
+  constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
+  RESETANDARGTEST(array, LazyArrays);
+  RESETANDARGTEST(array_const_store_semantics, LazyArrays);
+  RESETANDARGTEST(bool_array_const_store_semantics, LazyArrays);
+  RESETANDARGTEST(array_const_survives_push_pop, LazyArrays);
+  RESETANDARGTEST(wide_index_const_array_semantics, LazyArrays);
+  RESETANDARGTEST(const_array_select_survives_pop, LazyArrays);
+  RESETANDTEST(const_array_lowering_interop);
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_structural_equality);
