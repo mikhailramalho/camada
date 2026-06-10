@@ -523,10 +523,21 @@ SMTExprRef STPSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef STPSolver::mkBVFromDecImpl(const int64_t Int,
                                       const SMTSortRef &Sort) {
+  const unsigned Width = Sort->getWidth();
+  if (Width <= 64) {
+    // Mask to the sort width so the value's bit representation always fits,
+    // skipping the binary-string round-trip.
+    uint64_t Bits = static_cast<uint64_t>(Int);
+    if (Width < 64)
+      Bits &= (uint64_t{1} << Width) - 1;
+    return makeExprRef<STPExpr>(
+        SMTExprKind::BVConst, &Context, Sort,
+        STP::vc_bvConstExprFromLL(Context, static_cast<int>(Width), Bits));
+  }
   return makeExprRef<STPExpr>(
       SMTExprKind::BVConst, &Context, Sort,
-      STP::vc_bvConstExprFromStr(
-          Context, toTwosComplementBin(Int, Sort->getWidth()).c_str()));
+      STP::vc_bvConstExprFromStr(Context,
+                                 toTwosComplementBin(Int, Width).c_str()));
 }
 
 SMTExprRef STPSolver::mkBVFromBinImpl(const std::string &Int,
