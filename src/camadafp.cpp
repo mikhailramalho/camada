@@ -832,9 +832,7 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
 
   // exp(x) < exp(y) -> x
   SMTExprRef x_sgn = extractSgn(*this, LHS);
-  SMTExprRef x_sig = extractSig(*this, LHS);
   SMTExprRef x_exp = extractExp(*this, LHS);
-  SMTExprRef y_sig = extractSig(*this, RHS);
   SMTExprRef y_exp = extractExp(*this, RHS);
 
   // else the actual remainder.
