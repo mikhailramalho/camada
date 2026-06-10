@@ -55,6 +55,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array_const_store_semantics);
   RESETANDTEST(bool_array_const_store_semantics);
   RESETANDTEST(array_const_survives_push_pop);
+  RESETANDTEST(wide_index_const_array_semantics);
+  RESETANDTEST(const_array_select_survives_pop);
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_structural_equality);

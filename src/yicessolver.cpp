@@ -814,17 +814,9 @@ SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
   return makeExprRef<YicesExpr>(SMTExprKind::Symbol, Context, Sort, t);
 }
 
-SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
-                                         const SMTExprRef &InitValue) {
-  const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
-  term_t index_var = yicesCheckTerm(
-      yices_new_variable(toSolverSort<YicesSort>(*IndexSort).Sort),
-      "Error when trying to create a Yices lambda variable");
-  return makeExprRef<YicesExpr>(
-      SMTExprKind::ArrayConst, Context, sort,
-      yicesCheckTerm(
-          yices_lambda(1, &index_var, toSolverExpr<YicesExpr>(*InitValue).Expr),
-          "Error when trying to create a Yices lambda"));
+SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &,
+                                         const SMTExprRef &) {
+  fatalError("Yices constant arrays are lowered lazily by the common layer");
 }
 
 checkResult YicesSolver::checkImpl() {

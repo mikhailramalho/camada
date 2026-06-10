@@ -252,8 +252,15 @@ protected:
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
 
+  // Yices can build a constant array as a lambda, but its context
+  // reasoning over lambda terms is incomplete (a symbolic-index read of
+  // the default satisfied formulas it should refute), so the common layer
+  // lowers constant arrays lazily instead and this override is
+  // unreachable.
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
+
+  bool nativeConstArraySupport() const override { return false; }
 
   checkResult checkImpl() override;
 

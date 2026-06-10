@@ -153,11 +153,11 @@ inline void array_const_survives_push_pop(const camada::SMTSolverRef &solver) {
   }
 }
 
-// Semantics that only the lazy constant-array lowering can provide: a
-// 64-bit index domain is impossible to materialize store-per-index. Runs on
-// solvers whose nativeConstArraySupport() is false (or overridden to false
-// in the regression suite).
-inline void lazy_const_array_semantics(const camada::SMTSolverRef &solver) {
+// Constant-array semantics over a 64-bit index domain — impossible to
+// materialize store-per-index, so this exercises native constant arrays on
+// capable backends and the lazy lowering elsewhere (STP).
+inline void
+wide_index_const_array_semantics(const camada::SMTSolverRef &solver) {
   {
     auto idx = solver->mkBVSort(64);
     auto elem = solver->mkBVSort(8);
@@ -209,12 +209,13 @@ inline void lazy_const_array_semantics(const camada::SMTSolverRef &solver) {
   }
 }
 
-// Pin the scope-escape case: a select over a lazy constant array built
-// inside a push scope and asserted only after the pop. The default axiom
-// asserted at construction time is popped with the scope, so the lowering
-// must re-assert journaled constraints at the outer level.
+// Pin the scope-escape case: a select over a constant array built inside a
+// push scope and asserted only after the pop. Trivial for native constant
+// arrays; under the lazy lowering the default axiom asserted at
+// construction time is popped with the scope, so journaled constraints
+// must be re-asserted at the outer level.
 inline void
-lazy_const_array_select_survives_pop(const camada::SMTSolverRef &solver) {
+const_array_select_survives_pop(const camada::SMTSolverRef &solver) {
   auto idx = solver->mkBVSort(64);
   auto elem = solver->mkBVSort(8);
   auto init = solver->mkBVFromDec(0, elem);
