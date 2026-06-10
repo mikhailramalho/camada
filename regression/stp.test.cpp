@@ -35,4 +35,6 @@ TEST_CASE("Small constant array STP test", "[STP]") {
 TEST_CASE("Large-width constant array STP test", "[STP]") {
   auto stp = camada::createSTPSolver();
   lazy_const_array_semantics(stp);
+  stp->reset();
+  lazy_const_array_select_survives_pop(stp);
 }

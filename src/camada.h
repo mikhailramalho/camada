@@ -70,6 +70,13 @@ enum class FPEncoding { Native, BV };
 ///   value is asserted on demand at each index the formula observes. Works
 ///   at any index width and is the entry point for initializers that have
 ///   no backend representation.
+///
+/// Lazily lowered arrays must stay observable by the lowering: storing one
+/// inside another array, placing one in a native tuple, or passing one to
+/// an uninterpreted function is rejected, and capturing one under a
+/// quantifier binder is unsupported (defaults are instantiated as ground
+/// constraints only, so a quantified body can observe uninstantiated
+/// indexes).
 enum class ConstArrayLowering { Auto, Native, Lazy };
 
 /// Selects how Camada lowers `mkFPNeg` for backends whose native FP

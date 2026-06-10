@@ -188,6 +188,8 @@ TEST_CASE("Lazy constant arrays via Z3", "[Z3]") {
   bool_array_const_store_semantics(solver);
   solver->reset();
   array_const_survives_push_pop(solver);
+  solver->reset();
+  lazy_const_array_select_survives_pop(solver);
 }
 
 // The lazy lowering can also be requested explicitly on a backend with

@@ -159,11 +159,12 @@ protected:
       LazyConstArrayReach;
   std::unordered_map<const SMTExpr *, LazyArrayStoreStep> LazyArrayStores;
   std::unordered_map<const SMTExpr *, LazyArrayIteStep> LazyArrayItes;
-  // Memo of instantiated (root, index term) pairs, plus per-push-level
-  // journal so pop() can drop entries whose constraints were popped.
+  // Memo of instantiated (root, index term) pairs. Default axioms and
+  // extensionality lemmas are scope-independent facts, so instead of
+  // forgetting them when a push scope pops, pop() re-asserts the journaled
+  // constraints at the outer level (see LazyConstraintLevels).
   std::set<std::pair<const SMTExpr *, const SMTExpr *>> LazyTouched;
-  std::vector<std::vector<std::pair<const SMTExpr *, const SMTExpr *>>>
-      LazyTouchedLevels{1};
+  std::vector<std::vector<SMTExprRef>> LazyConstraintLevels{1};
   uint64_t LazyConstArrayCounter = 0;
 
   /// True when the backend can express `((as const ...) v)` natively.

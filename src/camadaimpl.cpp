@@ -225,7 +225,7 @@ void SMTSolverImpl::clearExprCaches() {
   LazyArrayStores.clear();
   LazyArrayItes.clear();
   LazyTouched.clear();
-  LazyTouchedLevels.assign(1, {});
+  LazyConstraintLevels.assign(1, {});
 }
 
 void SMTSolverImpl::initializeCommonSingletons() {
@@ -614,7 +614,9 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     SMTExprRef SelR = mkArraySelect(RHS, Witness);
     SMTExprRef theEq = mkEqualImpl(LHS, RHS);
     assert(theEq->isBoolSort());
-    addConstraint(mkOr(theEq, mkNot(mkEqual(SelL, SelR))));
+    SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
+    addConstraint(Lemma);
+    LazyConstraintLevels.back().push_back(std::move(Lemma));
     return theEq;
   }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
@@ -1153,9 +1155,10 @@ void SMTSolverImpl::instantiateLazyDefaults(const SMTExprRef &Array,
     // root with this same index and must find the pair already recorded.
     if (!LazyTouched.insert({RootKey, &*Index}).second)
       continue;
-    LazyTouchedLevels.back().push_back({RootKey, &*Index});
     const LazyConstArrayRoot &Root = LazyConstArrayRoots.at(RootKey);
-    addConstraint(mkEqual(mkArraySelect(Root.Root, Index), Root.Init));
+    SMTExprRef Constraint = mkEqual(mkArraySelect(Root.Root, Index), Root.Init);
+    addConstraint(Constraint);
+    LazyConstraintLevels.back().push_back(std::move(Constraint));
   }
 }
 
@@ -1170,6 +1173,8 @@ SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
       SMTResult<bool> Value = getBool(E);
       return Value ? std::string(Value.value() ? "1" : "0") : std::string();
     }
+    if (!E->isBVSort())
+      return std::string(); // unsupported index sort: backend fallback
     SMTResult<std::string> Value = getBVInBin(E);
     return Value ? Value.value() : std::string();
   };
@@ -1207,6 +1212,15 @@ SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
   if (!nativeTupleSupport())
     return mkCamadaTuple(*this, Elements);
 
+  // A lazy array inside a native tuple would escape the lazy tracking:
+  // tuple equality and tuple selects would bypass the default-axiom
+  // instantiation. The Camada tuple lowering above composes fine.
+  if (!LazyConstArrayRoots.empty())
+    for (const auto &Element : Elements)
+      fatalErrorIf(Element->isArraySort() && reachesLazyArray(Element),
+                   "Lazily lowered constant arrays inside native tuples are "
+                   "not supported");
+
   std::vector<SMTSortRef> ElementSorts;
   ElementSorts.reserve(Elements.size());
   for (const auto &Element : Elements)
@@ -1237,6 +1251,13 @@ SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
   for (std::size_t i = 0; i < Args.size(); ++i)
     fatalErrorIf(Function->Sort->getDomainSorts()[i] != Args[i]->Sort,
                  "Function application argument sort mismatch");
+  // Uninterpreted functions observe whole arrays, not selected indexes, so
+  // a lazy array argument would escape the default-axiom instantiation.
+  if (!LazyConstArrayRoots.empty())
+    for (const auto &Arg : Args)
+      fatalErrorIf(Arg->isArraySort() && reachesLazyArray(Arg),
+                   "Lazily lowered constant arrays as uninterpreted-function "
+                   "arguments are not supported");
   SMTExprRef theExp = mkApplyImpl(Function, Args);
   assert(theExp->Sort == Function->Sort->getCodomainSort());
   return theExp;
@@ -1660,20 +1681,27 @@ void SMTSolverImpl::reset() {
 }
 
 void SMTSolverImpl::push(unsigned nscopes) {
-  LazyTouchedLevels.resize(LazyTouchedLevels.size() + nscopes);
+  LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
   pushImpl(nscopes);
 }
 
 void SMTSolverImpl::pop(unsigned nscopes) {
-  // Constraints asserted by lazy default instantiation inside the popped
-  // scopes disappear with them, so forget the touched pairs: a later select
-  // at the same index re-asserts the default.
-  for (unsigned I = 0; I < nscopes && LazyTouchedLevels.size() > 1; ++I) {
-    for (const auto &Entry : LazyTouchedLevels.back())
-      LazyTouched.erase(Entry);
-    LazyTouchedLevels.pop_back();
+  // Lazy default axioms and extensionality lemmas asserted inside the
+  // popped scopes are scope-independent facts about expressions that
+  // outlive the pop, so re-assert them at the outer level instead of
+  // forgetting them.
+  std::vector<SMTExprRef> Reassert;
+  for (unsigned I = 0; I < nscopes && LazyConstraintLevels.size() > 1; ++I) {
+    auto &Level = LazyConstraintLevels.back();
+    Reassert.insert(Reassert.end(), std::make_move_iterator(Level.begin()),
+                    std::make_move_iterator(Level.end()));
+    LazyConstraintLevels.pop_back();
   }
   popImpl(nscopes);
+  for (SMTExprRef &Constraint : Reassert) {
+    addConstraint(Constraint);
+    LazyConstraintLevels.back().push_back(std::move(Constraint));
+  }
 }
 
 void SMTSolverImpl::dump() {
