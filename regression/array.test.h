@@ -152,3 +152,59 @@ inline void array_const_survives_push_pop(const camada::SMTSolverRef &solver) {
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
 }
+
+// Semantics that only the lazy constant-array lowering can provide: a
+// 64-bit index domain is impossible to materialize store-per-index. Runs on
+// solvers whose nativeConstArraySupport() is false (or overridden to false
+// in the regression suite).
+inline void lazy_const_array_semantics(const camada::SMTSolverRef &solver) {
+  {
+    auto idx = solver->mkBVSort(64);
+    auto elem = solver->mkBVSort(8);
+    auto init = solver->mkBVFromDec(0, elem);
+    auto stored = solver->mkBVFromDec(9, elem);
+
+    auto arr = solver->mkArrayConst(idx, init);
+    REQUIRE(arr->getKind() == camada::SMTExprKind::ArrayConst);
+
+    // Every element of store(arr, k, 9) is 0 or 9, even at symbolic
+    // positions: the default must chase the index wherever the solver
+    // puts it.
+    auto k = solver->mkSymbol("lca_k", idx);
+    auto i = solver->mkSymbol("lca_i", idx);
+    auto updated = solver->mkArrayStore(arr, k, stored);
+    auto x = solver->mkArraySelect(updated, i);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(x, init)));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(x, stored)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+
+  solver->reset();
+
+  {
+    auto idx = solver->mkBVSort(64);
+    auto elem = solver->mkBVSort(8);
+    auto init = solver->mkBVFromDec(0, elem);
+    auto stored = solver->mkBVFromDec(9, elem);
+
+    auto arr = solver->mkArrayConst(idx, init);
+    auto idx_written = solver->mkBVFromDec(5, idx);
+    auto idx_untouched = solver->mkBVFromDec(7, idx);
+    auto updated = solver->mkArrayStore(arr, idx_written, stored);
+
+    solver->addConstraint(
+        solver->mkEqual(solver->mkArraySelect(updated, idx_written), stored));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+
+    // The model query at an index the formula never touched must still
+    // report the default, resolved from the tracked derivation chain.
+    auto read_written = solver->getArrayElement(updated, idx_written);
+    auto read_untouched = solver->getArrayElement(updated, idx_untouched);
+    auto read_written_res = solver->getBVInBin(read_written);
+    auto read_untouched_res = solver->getBVInBin(read_untouched);
+    REQUIRE(read_written_res);
+    REQUIRE(read_untouched_res);
+    REQUIRE(read_written_res.value() == "00001001");
+    REQUIRE(read_untouched_res.value() == "00000000");
+  }
+}

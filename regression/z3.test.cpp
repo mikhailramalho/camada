@@ -169,3 +169,23 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
 
 #undef CAMADA_Z3_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED
+
+// Force the common-layer lazy constant-array lowering on a backend that has
+// native constant arrays, so the machinery is exercised regardless of which
+// backends opt in. Runs the existing const-array semantics tests plus the
+// lazy-only ones (64-bit index domains).
+TEST_CASE("Lazy constant arrays via Z3", "[Z3]") {
+  class lazyArrayZ3Solver : public camada::Z3Solver {
+  protected:
+    bool nativeConstArraySupport() const override { return false; }
+  };
+
+  camada::SMTSolverRef solver = std::make_unique<lazyArrayZ3Solver>();
+  lazy_const_array_semantics(solver);
+  solver->reset();
+  array_const_store_semantics(solver);
+  solver->reset();
+  bool_array_const_store_semantics(solver);
+  solver->reset();
+  array_const_survives_push_pop(solver);
+}
