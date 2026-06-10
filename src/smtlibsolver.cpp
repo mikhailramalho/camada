@@ -733,11 +733,11 @@ SMTLIBSolver::mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
 SMTSortRef
 SMTLIBSolver::mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) {
   std::string Name = "__camada_tup" + utoa(NextTupleId++);
+  const std::string Prefix = Name + "_p";
   std::string Decl = "(declare-datatypes ((" + Name + " 0)) (((" + Name + "_mk";
   for (std::size_t I = 0; I < ElementSorts.size(); ++I) {
     Decl += " (";
-    Decl += Name;
-    Decl += "_p";
+    Decl += Prefix;
     Decl += utoa(I);
     Decl += " ";
     Decl += textOf(ElementSorts[I]);
