@@ -16,9 +16,9 @@
   solver->reset();                                                             \
   testname(solver);
 
-#define RESETANDFPTEST(testname, encoding)                                     \
+#define RESETANDARGTEST(testname, arg)                                         \
   solver->reset();                                                             \
-  testname(solver, encoding);
+  testname(solver, arg);
 
 template <typename Fn> inline void require_abort(Fn &&Body) {
 #if defined(_WIN32)
@@ -56,6 +56,16 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array_const_store_semantics);
   RESETANDTEST(bool_array_const_store_semantics);
   RESETANDTEST(array_const_survives_push_pop);
+  RESETANDTEST(wide_index_const_array_semantics);
+  RESETANDTEST(const_array_select_survives_pop);
+  constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
+  RESETANDARGTEST(array, LazyArrays);
+  RESETANDARGTEST(array_const_store_semantics, LazyArrays);
+  RESETANDARGTEST(bool_array_const_store_semantics, LazyArrays);
+  RESETANDARGTEST(array_const_survives_push_pop, LazyArrays);
+  RESETANDARGTEST(wide_index_const_array_semantics, LazyArrays);
+  RESETANDARGTEST(const_array_select_survives_pop, LazyArrays);
+  RESETANDTEST(const_array_lowering_interop);
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_structural_equality);
@@ -63,28 +73,28 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
-  RESETANDFPTEST(fp_equal, NativeFP);
-  RESETANDFPTEST(fp_equal, BVFP);
-  RESETANDFPTEST(fp_infinity_model_value, NativeFP);
-  RESETANDFPTEST(fp_nan_model_value, NativeFP);
-  RESETANDFPTEST(fp_neg_flip_nan_via_bv_round_trip, BVFP);
-  RESETANDFPTEST(fp_arithmetics, NativeFP);
-  RESETANDFPTEST(fp_arithmetics, BVFP);
-  RESETANDFPTEST(fp_round_to_away, NativeFP);
-  RESETANDFPTEST(fp_round_to_away, BVFP);
-  RESETANDFPTEST(fp_bv_conversions, NativeFP);
-  RESETANDFPTEST(fp_bv_conversions, BVFP);
-  RESETANDFPTEST(fp_to_signed_bv_multiple_widths, BVFP);
-  RESETANDFPTEST(fp_denormal_round_to_integral, NativeFP);
-  RESETANDFPTEST(fp_denormal_round_to_integral, BVFP);
-  RESETANDFPTEST(fp_div_overflow_to_inf, NativeFP);
-  RESETANDFPTEST(fp_div_overflow_to_inf, BVFP);
-  RESETANDFPTEST(fp_remainder_semantics, NativeFP);
-  RESETANDFPTEST(fp_remainder_semantics, BVFP);
-  RESETANDFPTEST(fp_remainder_host_oracle, NativeFP);
-  RESETANDFPTEST(fp_remainder_host_oracle, BVFP);
+  RESETANDARGTEST(fp_equal, NativeFP);
+  RESETANDARGTEST(fp_equal, BVFP);
+  RESETANDARGTEST(fp_infinity_model_value, NativeFP);
+  RESETANDARGTEST(fp_nan_model_value, NativeFP);
+  RESETANDARGTEST(fp_neg_flip_nan_via_bv_round_trip, BVFP);
+  RESETANDARGTEST(fp_arithmetics, NativeFP);
+  RESETANDARGTEST(fp_arithmetics, BVFP);
+  RESETANDARGTEST(fp_round_to_away, NativeFP);
+  RESETANDARGTEST(fp_round_to_away, BVFP);
+  RESETANDARGTEST(fp_bv_conversions, NativeFP);
+  RESETANDARGTEST(fp_bv_conversions, BVFP);
+  RESETANDARGTEST(fp_to_signed_bv_multiple_widths, BVFP);
+  RESETANDARGTEST(fp_denormal_round_to_integral, NativeFP);
+  RESETANDARGTEST(fp_denormal_round_to_integral, BVFP);
+  RESETANDARGTEST(fp_div_overflow_to_inf, NativeFP);
+  RESETANDARGTEST(fp_div_overflow_to_inf, BVFP);
+  RESETANDARGTEST(fp_remainder_semantics, NativeFP);
+  RESETANDARGTEST(fp_remainder_semantics, BVFP);
+  RESETANDARGTEST(fp_remainder_host_oracle, NativeFP);
+  RESETANDARGTEST(fp_remainder_host_oracle, BVFP);
   RESETANDTEST(arena_stress_test);
-  RESETANDFPTEST(fp_non_standard_widths, BVFP);
-  RESETANDFPTEST(fp_cancellation_and_normalization, NativeFP);
-  RESETANDFPTEST(fp_cancellation_and_normalization, BVFP);
+  RESETANDARGTEST(fp_non_standard_widths, BVFP);
+  RESETANDARGTEST(fp_cancellation_and_normalization, NativeFP);
+  RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
 }

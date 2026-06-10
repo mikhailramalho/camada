@@ -560,25 +560,8 @@ SMTExprRef STPSolver::mkSymbolImpl(const std::string &Name,
                       toSolverSort<STPSort>(*Sort).Sort));
 }
 
-SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
-                                       const SMTExprRef &InitValue) {
-  const std::string name = "__CAMADA_arr" + std::to_string(ConstArrayCounter++);
-  SMTExprRef arr =
-      mkSymbolUnchecked(name, mkArraySort(IndexSort, InitValue->Sort));
-
-  // Constant arrays are lowered to one store per index, so the formula grows
-  // as 2^width; beyond ~20 bits the lowering is impractically large.
-  const unsigned width = IndexSort->getWidth();
-  if (width > 20)
-    fatalError(
-        "STP constant-array lowering does not support index widths > 20");
-
-  uint64_t size = uint64_t{1} << width;
-  for (uint64_t i = 0; i < size; i++)
-    arr = mkArrayStore(arr, mkBVFromDec(i, IndexSort), InitValue);
-
-  return makeExprRef<STPExpr>(SMTExprKind::ArrayConst, &Context, arr->Sort,
-                              toSolverExpr<STPExpr>(*arr).Expr);
+SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &, const SMTExprRef &) {
+  fatalError("STP constant arrays are lowered lazily by the common layer");
 }
 
 checkResult STPSolver::checkImpl() {

@@ -26,6 +26,7 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -130,6 +131,65 @@ protected:
       SmallTupleSortCache;
   std::unordered_map<TupleSortCacheKey, SMTSortRef, TupleSortCacheKeyHash>
       TupleSortCache;
+
+  // --- Lazy constant-array lowering ---
+  // A lazy constant array is an ordinary backend array symbol whose
+  // "every element equals Init" semantics live here, not in the backend:
+  // the default axiom is instantiated as a ground constraint
+  // `select(Root, i) = Init` at every index term the formula observes.
+  // Derivations through store/ite are tracked so selects on derived arrays
+  // reach their roots, and so model queries can resolve untouched indexes
+  // to the default (the solver's model is unconstrained there).
+  struct LazyConstArrayRoot {
+    SMTExprRef Root;
+    SMTExprRef Init;
+  };
+  struct LazyArrayStoreStep {
+    const SMTExpr *Parent;
+    SMTExprRef Index;
+    SMTExprRef Value;
+  };
+  struct LazyArrayIteStep {
+    SMTExprRef Cond;
+    const SMTExpr *TrueArr;
+    const SMTExpr *FalseArr;
+  };
+  std::unordered_map<const SMTExpr *, LazyConstArrayRoot> LazyConstArrayRoots;
+  std::unordered_map<const SMTExpr *, std::vector<const SMTExpr *>>
+      LazyConstArrayReach;
+  std::unordered_map<const SMTExpr *, LazyArrayStoreStep> LazyArrayStores;
+  std::unordered_map<const SMTExpr *, LazyArrayIteStep> LazyArrayItes;
+  // Memo of instantiated (root, index term) pairs. Default axioms and
+  // extensionality lemmas are scope-independent facts, so instead of
+  // forgetting them when a push scope pops, pop() re-asserts the journaled
+  // constraints at the outer level (see LazyConstraintLevels).
+  std::set<std::pair<const SMTExpr *, const SMTExpr *>> LazyTouched;
+  std::vector<std::vector<SMTExprRef>> LazyConstraintLevels{1};
+  uint64_t LazyConstArrayCounter = 0;
+
+  /// True when the backend can express `((as const ...) v)` natively.
+  /// Backends without it get constant arrays through mkLazyConstArray().
+  virtual bool nativeConstArraySupport() const { return true; }
+
+  /// Lower a constant array as a fresh backend array symbol whose
+  /// "every element equals InitValue" semantics are enforced lazily: the
+  /// default axiom is instantiated at each index term the formula observes
+  /// (see the bookkeeping above). Reached through
+  /// mkArrayConst(..., ConstArrayLowering::Lazy), which is how lowerings
+  /// with no backend representation for the initializer (Camada tuple
+  /// decomposition) should request it. The emitted constraints go through
+  /// the public mkEqual/mkArraySelect, so such initializers compose with
+  /// the other Camada lowerings.
+  SMTExprRef mkLazyConstArray(const SMTSortRef &IndexSort,
+                              const SMTExprRef &InitValue);
+
+  std::vector<const SMTExpr *> lazyArrayRootsOf(const SMTExprRef &Exp) const;
+  bool reachesLazyArray(const SMTExprRef &Exp) const;
+  void instantiateLazyDefaults(const SMTExprRef &Array,
+                               const SMTExprRef &Index);
+  SMTExprRef resolveLazyArrayElement(const SMTExprRef &Array,
+                                     const SMTExprRef &Index);
+
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 
@@ -355,6 +415,9 @@ public:
   SMTExprRef mkInf64(const bool Sgn, FPEncoding Encoding) override final;
   SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
                           const SMTExprRef &InitValue) override final;
+  SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
+                          const SMTExprRef &InitValue,
+                          ConstArrayLowering Lowering) override final;
   SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
                           const SMTSortRef &To) override final;
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final;
