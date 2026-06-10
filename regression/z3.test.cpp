@@ -45,8 +45,7 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
-    explicit myZ3Solver(std::unique_ptr<z3::context> C)
-        : camada::Z3Solver(std::move(C)) {
+    explicit myZ3Solver(z3::context C) : camada::Z3Solver(std::move(C)) {
       setSolver(makeSolver(context()));
     }
 
@@ -59,8 +58,7 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
   };
 
   // Create Z3 Solver
-  camada::SMTSolverRef z3 =
-      std::make_unique<myZ3Solver>(std::make_unique<z3::context>());
+  camada::SMTSolverRef z3 = std::make_unique<myZ3Solver>(z3::context{});
 
   tests(z3);
 }

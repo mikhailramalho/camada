@@ -23,7 +23,6 @@
 #define Z3SOLVER_H_
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <utility>
 #include <z3++.h>
@@ -69,13 +68,13 @@ public:
 class Z3Solver : public SMTSolverImpl {
 public:
   Z3Solver();
-  explicit Z3Solver(std::unique_ptr<z3::context> C);
-  explicit Z3Solver(std::unique_ptr<z3::context> C, z3::solver S);
+  explicit Z3Solver(z3::context C);
+  explicit Z3Solver(z3::context C, z3::solver S);
   ~Z3Solver() override;
 
 protected:
-  z3::context &context() { return *Context; }
-  const z3::context &context() const { return *Context; }
+  z3::context &context() { return Context; }
+  const z3::context &context() const { return Context; }
   z3::solver &solver() { return Solver; }
   const z3::solver &solver() const { return Solver; }
   void setSolver(z3::solver S) { Solver = std::move(S); }
@@ -377,12 +376,7 @@ protected:
   void dumpModelImpl(std::string &Out) override;
 
 private:
-  // Z3 < 4.16 makes z3::context non-copyable and non-movable, so a
-  // caller-provided context cannot be passed by value. Own it through a
-  // unique_ptr and hold a raw pointer (Z3ContextRef) that the sort/expr
-  // handles and mk*Sort impls reference.
-  std::unique_ptr<z3::context> OwnedContext;
-  Z3ContextRef Context = nullptr;
+  z3::context Context;
   z3::solver Solver;
   unsigned TupleCounter = 0;
 }; // end class Z3Solver
