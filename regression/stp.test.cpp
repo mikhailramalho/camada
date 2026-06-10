@@ -38,3 +38,12 @@ TEST_CASE("Large-width constant array STP aborts cleanly", "[STP]") {
     (void)stp->mkArrayConst(idx, elem);
   });
 }
+
+TEST_CASE("Impractical-width constant array STP aborts cleanly", "[STP]") {
+  auto stp = camada::createSTPSolver();
+  require_abort([&]() {
+    auto idx = stp->mkBVSort(21);
+    auto elem = stp->mkBVFromDec(1, 8);
+    (void)stp->mkArrayConst(idx, elem);
+  });
+}
