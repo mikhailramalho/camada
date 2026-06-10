@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 inline void fp_native_bv_predicate_parity(const camada::SMTSolverRef &solver) {
   const auto backend = solver->mkBool(true)->getBackendKind();
@@ -401,6 +402,92 @@ inline void fp_remainder_semantics(const camada::SMTSolverRef &solver,
   solver->addConstraint(solver->mkEqual(rem, expected));
 
   REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+// Checks one concrete fp.rem result against the host CPU, which computes
+// IEEE-754 remainder exactly (std::remainder is correctly rounded). mkEqual
+// is object equality on FP, so signed zeros are distinguished; NaN results
+// are checked via fp.isNaN since payloads are unspecified.
+inline void check_rem_pair_f32(const camada::SMTSolverRef &solver,
+                               camada::FPEncoding Encoding, float X, float Y) {
+  const bool IsBVEncoding = Encoding == camada::FPEncoding::BV;
+  CAPTURE(X, Y, IsBVEncoding);
+  solver->reset();
+  auto rem =
+      solver->mkFPRem(solver->mkFP32(X, Encoding), solver->mkFP32(Y, Encoding));
+  float Expected = std::remainder(X, Y);
+  if (std::isnan(Expected))
+    solver->addConstraint(solver->mkFPIsNaN(rem));
+  else
+    solver->addConstraint(
+        solver->mkEqual(rem, solver->mkFP32(Expected, Encoding)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void check_rem_pair_f64(const camada::SMTSolverRef &solver,
+                               camada::FPEncoding Encoding, double X,
+                               double Y) {
+  const bool IsBVEncoding = Encoding == camada::FPEncoding::BV;
+  CAPTURE(X, Y, IsBVEncoding);
+  solver->reset();
+  auto rem =
+      solver->mkFPRem(solver->mkFP64(X, Encoding), solver->mkFP64(Y, Encoding));
+  double Expected = std::remainder(X, Y);
+  if (std::isnan(Expected))
+    solver->addConstraint(solver->mkFPIsNaN(rem));
+  else
+    solver->addConstraint(
+        solver->mkEqual(rem, solver->mkFP64(Expected, Encoding)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void fp_remainder_host_oracle(const camada::SMTSolverRef &solver,
+                                     camada::FPEncoding Encoding) {
+  const std::pair<float, float> Pairs[] = {
+      // Quotient rounding and ties-to-even.
+      {5.0f, 2.0f},  // q = 2.5 -> 2 (even), rem = 1
+      {7.0f, 2.0f},  // q = 3.5 -> 4 (even), rem = -1
+      {6.0f, 4.0f},  // q = 1.5 -> 2 (even), rem = -2
+      {10.0f, 4.0f}, // q = 2.5 -> 2 (even), rem = 2
+      {7.5f, 2.5f},  // exact q = 3, rem = 0
+      // Sign combinations; rem keeps the sign of x.
+      {-5.0f, 2.0f},
+      {5.0f, -2.0f},
+      {-5.0f, -2.0f},
+      {-7.0f, 2.0f},
+      // Signed zero results.
+      {4.0f, 2.0f},  // +0
+      {-4.0f, 2.0f}, // -0
+      {0.0f, 3.0f},
+      {-0.0f, 3.0f},
+      // Large exponent difference (the expensive encoding path).
+      {1.0e38f, 3.0f},
+      {1.0e30f, 1.1754944e-38f}, // y = min normal
+      // Subnormal operands.
+      {1.0e-45f, 1.0e-44f},         // x, y both subnormal
+      {1.0e-39f, 1.1754944e-38f},   // x subnormal, y min normal
+      {1.0f, 1.4012985e-45f},       // y = min subnormal, huge diff
+      {1.9999998f, 1.4012985e-45f}, // full mantissa over min subnormal
+      {1.4012985e-45f, 1.0e-38f},   // x min subnormal, y near min normal
+      {2.3509886e-38f, 2.3509887e-38f},
+      // y subnormal with x slightly above: exercises the negative
+      // exponent-difference path while the raw-exponent guard is disabled
+      // (raw exp(y) == 0).
+      {1.4012985e-45f, 1.1754942e-38f}, // |x| << |y|, y max subnormal
+      {5.8774718e-39f, 1.1754942e-38f}, // q = 0.5, tie with q even
+      {8.8162076e-39f, 1.1754942e-38f}, // q = 0.75 -> 1
+      // x < y/2 just below the raw-exponent guard boundary.
+      {0.49999997f, 2.0f},
+      {0.5f, 2.0f}, // tie: q = 0.25 -> 0, rem = x
+      // Specials.
+      {3.0f, std::numeric_limits<float>::infinity()},  // -> x
+      {-3.0f, std::numeric_limits<float>::infinity()}, // -> x
+      {std::numeric_limits<float>::infinity(), 3.0f},  // -> NaN
+      {3.0f, 0.0f},                                    // -> NaN
+      {0.0f, 0.0f},                                    // -> NaN
+  };
+  for (const auto &P : Pairs)
+    check_rem_pair_f32(solver, Encoding, P.first, P.second);
 }
 
 inline void fp_non_standard_widths(const camada::SMTSolverRef &solver,
