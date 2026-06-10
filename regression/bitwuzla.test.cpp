@@ -6,10 +6,40 @@
 
 #include <bitwuzlasolver.h>
 #include <catch2/catch_test_macros.hpp>
+#include <cstring>
+#include <random>
 
 TEST_CASE("Simple Bitwuzla test", "[Bitwuzla]") {
   auto bitwuzla = camada::createBitwuzlaSolver();
   tests(bitwuzla);
+}
+
+// Randomized cross-check of the BV-encoded fp.rem against the host CPU,
+// which computes IEEE-754 remainder exactly. Full-bit-pattern inputs cover
+// NaN/inf/subnormal operands; the seed is fixed for reproducibility.
+TEST_CASE("FP remainder randomized host oracle Bitwuzla", "[Bitwuzla]") {
+  auto solver = camada::createBitwuzlaSolver();
+
+  // Raw mt19937 outputs are fully specified by the standard, so the sweep is
+  // bit-identical across standard libraries.
+  std::mt19937 Rng32(0xCA3ADAu);
+  std::mt19937_64 Rng64(0xCA3ADAu);
+
+  for (int I = 0; I < 200; ++I) {
+    uint32_t XB = Rng32(), YB = Rng32();
+    float X, Y;
+    std::memcpy(&X, &XB, sizeof(X));
+    std::memcpy(&Y, &YB, sizeof(Y));
+    check_rem_pair_f32(solver, camada::FPEncoding::BV, X, Y);
+  }
+
+  for (int I = 0; I < 25; ++I) {
+    uint64_t XB = Rng64(), YB = Rng64();
+    double X, Y;
+    std::memcpy(&X, &XB, sizeof(X));
+    std::memcpy(&Y, &YB, sizeof(Y));
+    check_rem_pair_f64(solver, camada::FPEncoding::BV, X, Y);
+  }
 }
 
 TEST_CASE("Quantifiers Bitwuzla test", "[Bitwuzla]") {
