@@ -390,6 +390,11 @@ private:
   // Emit a single line (newline appended) to the active emitter(s).
   void emitLine(const std::string &Text) const;
 
+  // Send (get-value (Exp)) to the child solver and extract the value text
+  // from its response. Fails in write-only mode (no child process). Resp
+  // receives the raw response for use in error messages.
+  SMTResult<std::string> sendGetValue(const SMTExprRef &Exp, std::string &Resp);
+
   // Emit the standard preamble (set-option, set-logic, set-info).
   void emitPreamble();
 

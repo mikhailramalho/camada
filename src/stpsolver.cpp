@@ -25,7 +25,6 @@
 #include "camada.h"
 #include "camadacommon.h"
 
-#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 
@@ -554,12 +553,9 @@ SMTExprRef STPSolver::mkSymbolImpl(const std::string &Name,
                                    const SMTSortRef &Sort) {
 
   std::string new_name = Name;
-  std::replace(new_name.begin(), new_name.end(), '@', '_');
-  std::replace(new_name.begin(), new_name.end(), '!', '_');
-  std::replace(new_name.begin(), new_name.end(), '&', '_');
-  std::replace(new_name.begin(), new_name.end(), '#', '_');
-  std::replace(new_name.begin(), new_name.end(), '$', '_');
-  std::replace(new_name.begin(), new_name.end(), ':', '_');
+  for (char &c : new_name)
+    if (c == '@' || c == '!' || c == '&' || c == '#' || c == '$' || c == ':')
+      c = '_';
 
   return makeExprRef<STPExpr>(
       SMTExprKind::Symbol, &Context, Sort,
@@ -573,10 +569,12 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
   SMTExprRef arr =
       mkSymbolUnchecked(name, mkArraySort(IndexSort, InitValue->Sort));
 
+  // Constant arrays are lowered to one store per index, so the formula grows
+  // as 2^width; beyond ~20 bits the lowering is impractically large.
   const unsigned width = IndexSort->getWidth();
-  if (width >= 64)
+  if (width > 20)
     fatalError(
-        "STP constant-array lowering does not support index widths >= 64");
+        "STP constant-array lowering does not support index widths > 20");
 
   uint64_t size = uint64_t{1} << width;
   for (uint64_t i = 0; i < size; i++)

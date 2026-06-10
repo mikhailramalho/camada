@@ -80,6 +80,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDFPTEST(fp_div_overflow_to_inf, BVFP);
   RESETANDFPTEST(fp_remainder_semantics, NativeFP);
   RESETANDFPTEST(fp_remainder_semantics, BVFP);
+  RESETANDFPTEST(fp_remainder_host_oracle, NativeFP);
+  RESETANDFPTEST(fp_remainder_host_oracle, BVFP);
   RESETANDTEST(arena_stress_test);
   RESETANDFPTEST(fp_non_standard_widths, BVFP);
   RESETANDFPTEST(fp_cancellation_and_normalization, NativeFP);

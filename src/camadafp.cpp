@@ -22,11 +22,11 @@
 #include "camadacommon.h"
 #include "camadaimpl.h"
 
+#include <algorithm>
 #include <bitset>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <stdexcept>
 
 namespace camada {
 namespace {
@@ -316,43 +316,22 @@ static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
   }
 }
 
+static inline SMTExprRef
+mkRoundingDecision(SMTSolver &S, const SMTExprRef &R, const SMTExprRef &RMNeg,
+                   const SMTExprRef &RMPos, const SMTExprRef &RMAway,
+                   const SMTExprRef &RMEven, const SMTExprRef &Sgn,
+                   const SMTExprRef &Last, const SMTExprRef &Round,
+                   const SMTExprRef &Sticky);
+
 static inline SMTExprRef mkRoundingDecision(SMTSolver &S, const SMTExprRef &R,
                                             const SMTExprRef &Sgn,
                                             const SMTExprRef &Last,
                                             const SMTExprRef &Round,
                                             const SMTExprRef &Sticky) {
-  assert(Sgn->getWidth() == 1 && "mkRoundingDecision: Sgn must be 1-bit");
-  assert(Last->getWidth() == 1 && "mkRoundingDecision: Last must be 1-bit");
-  assert(Round->getWidth() == 1 && "mkRoundingDecision: Round must be 1-bit");
-  assert(Sticky->getWidth() == 1 && "mkRoundingDecision: Sticky must be 1-bit");
-  SMTExprRef last_or_sticky = S.mkBVOr(Last, Sticky);
-  SMTExprRef round_or_sticky = S.mkBVOr(Round, Sticky);
-
-  SMTExprRef not_round = S.mkBVNot(Round);
-  SMTExprRef not_lors = S.mkBVNot(last_or_sticky);
-  SMTExprRef not_rors = S.mkBVNot(round_or_sticky);
-  SMTExprRef not_sgn = S.mkBVNot(Sgn);
-
-  SMTExprRef inc_teven = S.mkBVNot(S.mkBVOr(not_round, not_lors));
-  const SMTExprRef &inc_taway = Round;
-  SMTExprRef inc_pos = S.mkBVNot(S.mkBVOr(Sgn, not_rors));
-  SMTExprRef inc_neg = S.mkBVNot(S.mkBVOr(not_sgn, not_rors));
-
-  SMTExprRef nil_1 = mkBVZero1(S);
-  SMTExprRef rm_neg = mkRMLit(S, RM::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_pos = mkRMLit(S, RM::ROUND_TO_PLUS_INF);
-  SMTExprRef rm_away = mkRMLit(S, RM::ROUND_TO_AWAY);
-  SMTExprRef rm_even = mkRMLit(S, RM::ROUND_TO_EVEN);
-
-  SMTExprRef rm_is_to_neg = S.mkEqual(R, rm_neg);
-  SMTExprRef rm_is_to_pos = S.mkEqual(R, rm_pos);
-  SMTExprRef rm_is_away = S.mkEqual(R, rm_away);
-  SMTExprRef rm_is_even = S.mkEqual(R, rm_even);
-
-  SMTExprRef inc_c4 = S.mkIte(rm_is_to_neg, inc_neg, nil_1);
-  SMTExprRef inc_c3 = S.mkIte(rm_is_to_pos, inc_pos, inc_c4);
-  SMTExprRef inc_c2 = S.mkIte(rm_is_away, inc_taway, inc_c3);
-  return S.mkIte(rm_is_even, inc_teven, inc_c2);
+  return mkRoundingDecision(
+      S, R, mkRMLit(S, RM::ROUND_TO_MINUS_INF),
+      mkRMLit(S, RM::ROUND_TO_PLUS_INF), mkRMLit(S, RM::ROUND_TO_AWAY),
+      mkRMLit(S, RM::ROUND_TO_EVEN), Sgn, Last, Round, Sticky);
 }
 
 static inline SMTExprRef
@@ -832,9 +811,7 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
 
   // exp(x) < exp(y) -> x
   SMTExprRef x_sgn = extractSgn(*this, LHS);
-  SMTExprRef x_sig = extractSig(*this, LHS);
   SMTExprRef x_exp = extractExp(*this, LHS);
-  SMTExprRef y_sig = extractSig(*this, RHS);
   SMTExprRef y_exp = extractExp(*this, RHS);
 
   // else the actual remainder.
@@ -852,16 +829,14 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
 
-  if (ebits >= std::numeric_limits<uint64_t>::digits)
-    throw std::runtime_error("Huge exponents in fp.rem are not supported.");
-
-  uint64_t max_exp_diff_u64 = (uint64_t{1} << ebits) - 3;
-
   SMTExprRef a_exp_ext = mkBVSignExt(2, a_exp);
   SMTExprRef b_exp_ext = mkBVSignExt(2, b_exp);
   SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
   SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
 
+  // ebits+2 bits hold the maximal normalized difference
+  // (2^ebits - 3) + (sbits - 1) only while sbits <= 2^ebits + 3; every IEEE
+  // format satisfies this, and the classic encoding had the same bound.
   SMTExprRef exp_diff =
       mkBVSub(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
   SMTExprRef neg_exp_diff = mkBVNeg(exp_diff);
@@ -870,52 +845,83 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef two_ebits_p2 = mkBVFromDec(2, ebits + 2);
   SMTExprRef exp_diff_is_neg = mkBVSle(exp_diff, zero_ebits_p2);
 
-  // CMW: This creates huge bit-vectors, which is potentially sub-optimal, but
-  // the iterative remainder encodings are also very expensive. Lazy lowering
-  // would likely be the right long-term direction here too. Camada's extension
-  // APIs take fixed-size integer parameters, so apply very large extensions in
-  // chunks instead of relying on a single oversized call.
-  constexpr uint64_t max_chunk = static_cast<uint64_t>(INT32_MAX);
-  SMTExprRef a_sig_ext_l = a_sig;
-  SMTExprRef b_sig_ext_l = b_sig;
-  uint64_t remaining = max_exp_diff_u64;
-  while (remaining > max_chunk) {
-    a_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(max_chunk), a_sig_ext_l);
-    b_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(max_chunk), b_sig_ext_l);
-    remaining -= max_chunk;
-  }
-  if (remaining != 0) {
-    a_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(remaining), a_sig_ext_l);
-    b_sig_ext_l = mkBVZeroExt(static_cast<unsigned>(remaining), b_sig_ext_l);
-  }
-  SMTExprRef a_sig_ext = mkBVConcat(a_sig_ext_l, mkBVZero3(*this));
-  SMTExprRef b_sig_ext = mkBVConcat(b_sig_ext_l, mkBVZero3(*this));
+  // The classic (Z3-style) encoding shifts the dividend significand left by
+  // up to 2^ebits bits and divides, creating enormous bit-vectors. Instead,
+  // compute the same remainder with modular arithmetic over ~2*sbits-bit
+  // values: with d = exp_diff, M = b_sig, the candidate remainder is
+  // (a_sig * 2^d) mod M, and 2^d mod 2M is computed by square-and-multiply
+  // over the bits of d. Reducing modulo 2M instead of M also yields the
+  // integer quotient's parity, needed for the ties-to-even adjustment below:
+  // (a_sig * 2^d) mod 2M == (q mod 2)*M + r.
+  //
+  // Both significands carry a factor of 8 (three low guard bits) so the
+  // negative-d path keeps fractional bits, mirroring the classic encoding.
 
-  uint64_t max_exp_diff_adj_u64 = max_exp_diff_u64 + sbits - ebits + 1;
-  SMTExprRef lshift = exp_diff;
-  SMTExprRef rshift = neg_exp_diff;
-  remaining = max_exp_diff_adj_u64;
-  while (remaining > max_chunk) {
-    lshift = mkBVZeroExt(static_cast<unsigned>(max_chunk), lshift);
-    rshift = mkBVZeroExt(static_cast<unsigned>(max_chunk), rshift);
-    remaining -= max_chunk;
-  }
-  if (remaining != 0) {
-    lshift = mkBVZeroExt(static_cast<unsigned>(remaining), lshift);
-    rshift = mkBVZeroExt(static_cast<unsigned>(remaining), rshift);
-  }
+  // d <= 0: |x| < 2|y| at these scales, so the integer quotient is 0 or 1
+  // and the remainder needs only a compare-and-subtract. The shift below is
+  // well-defined for any d: bvlshr yields 0 once the amount reaches the
+  // width. This path's value is discarded by the ite when d > 0.
+  const unsigned wn = sbits + 4;
+  const unsigned wshift = std::max(wn, ebits + 2);
+  SMTExprRef a8 = mkBVZeroExt(1, mkBVConcat(a_sig, mkBVZero3(*this)));
+  SMTExprRef b8 = mkBVZeroExt(1, mkBVConcat(b_sig, mkBVZero3(*this)));
+  SMTExprRef shifted_neg = mkBVLshr(
+      wshift > wn ? mkBVZeroExt(wshift - wn, a8) : a8,
+      wshift > ebits + 2 ? mkBVZeroExt(wshift - (ebits + 2), neg_exp_diff)
+                         : neg_exp_diff);
+  if (wshift > wn)
+    shifted_neg = mkBVExtract(wn - 1, 0, shifted_neg);
+  SMTExprRef q_one_neg = mkBVUge(shifted_neg, b8);
+  SMTExprRef rem_neg = mkIte(q_one_neg, mkBVSub(shifted_neg, b8), shifted_neg);
+  SMTExprRef even_neg = mkNot(q_one_neg);
 
-  SMTExprRef shifted = mkIte(exp_diff_is_neg, mkBVAshr(a_sig_ext, rshift),
-                             mkBVShl(a_sig_ext, lshift));
-  SMTExprRef huge_rem = mkBVURem(shifted, b_sig_ext);
-  SMTExprRef huge_div = mkBVUDiv(shifted, b_sig_ext);
-  SMTExprRef huge_div_is_even =
-      mkEqual(mkBVExtract(0, 0, huge_div), mkBVZero1(*this));
+  // d > 0: square-and-multiply over the bits of d. d is positive here, so
+  // its sign bit is clear and bits [ebits:0] cover the whole value.
+  const unsigned w2 = sbits + 2;
+  const unsigned W = 2 * sbits + 3;
+  SMTExprRef one_W = mkBVFromDec(1, W);
+  SMTExprRef m2_W =
+      mkBVZeroExt(W - (sbits + 1), mkBVConcat(b_sig, mkBVZero1(*this)));
+  // Processing MSB-first, after consuming the top `lead` bits the
+  // accumulator is 2^(d >> (ebits+1-lead)), which stays within [1, 2M] (and
+  // congruent mod 2M) as long as 2^lead - 1 <= sbits. Those first rounds
+  // therefore collapse into a single shift of 1, skipping their
+  // multiply/remainder pairs.
+  unsigned lead = 0;
+  while (lead < ebits + 1 && ((1ull << (lead + 1)) - 1) <= sbits)
+    ++lead;
+  SMTExprRef acc;
+  if (lead > 0) {
+    SMTExprRef top_bits = mkBVExtract(ebits, ebits + 1 - lead, exp_diff);
+    acc = mkBVShl(mkBVFromDec(1, w2), mkBVZeroExt(w2 - lead, top_bits));
+  } else {
+    acc = mkBVFromDec(1, w2);
+  }
+  for (int i = static_cast<int>(ebits) - static_cast<int>(lead); i >= 0; --i) {
+    SMTExprRef sq = mkBVMul(mkBVZeroExt(W - w2, acc), mkBVZeroExt(W - w2, acc));
+    SMTExprRef bit_set =
+        mkEqual(mkBVExtract(static_cast<unsigned>(i), static_cast<unsigned>(i),
+                            exp_diff),
+                mkBVOne1(*this));
+    SMTExprRef dbl = mkIte(bit_set, mkBVShl(sq, one_W), sq);
+    acc = mkBVExtract(w2 - 1, 0, mkBVURem(dbl, m2_W));
+  }
+  SMTExprRef prod =
+      mkBVMul(mkBVZeroExt(W - sbits, a_sig), mkBVZeroExt(W - w2, acc));
+  SMTExprRef r2 = mkBVExtract(w2 - 1, 0, mkBVURem(prod, m2_W));
+  SMTExprRef m_w2 = mkBVZeroExt(2, b_sig);
+  SMTExprRef q_odd_pos = mkBVUge(r2, m_w2);
+  SMTExprRef r_pos = mkIte(q_odd_pos, mkBVSub(r2, m_w2), r2);
+  SMTExprRef rem_pos =
+      mkBVConcat(mkBVExtract(sbits, 0, r_pos), mkBVZero3(*this));
+  SMTExprRef even_pos = mkNot(q_odd_pos);
 
-  // Round the large remainder candidate to the target format first.
+  SMTExprRef huge_div_is_even = mkIte(exp_diff_is_neg, even_neg, even_pos);
+
+  // Round the remainder candidate to the target format first.
   SMTExprRef rndd_sgn = a_sgn;
   SMTExprRef rndd_exp = mkBVSub(b_exp_ext, b_lz_ext);
-  SMTExprRef rndd_sig = mkBVExtract(sbits + 3, 0, huge_rem);
+  SMTExprRef rndd_sig = mkIte(exp_diff_is_neg, rem_neg, rem_pos);
   SMTExprRef rne_bv = mkRM(RM::ROUND_TO_EVEN, FPEncoding::BV);
   SMTExprRef rndd_sig_lz = mkLeadingZeros(*this, rndd_sig, ebits + 2);
 
