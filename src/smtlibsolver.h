@@ -54,13 +54,26 @@ public:
   void dump(std::string &Out) const override;
 };
 
-/// SMT-LIB expression. The "native" representation is the SMT-LIB text for
-/// the expression — either inline like "(bvadd a b)" or, after let-binding,
-/// a temporary symbol name like "?x3".
-class SMTLIBExpr : public SolverExpr<SMTLIBContextRef, std::string> {
+/// Structural SMT-LIB term. Head is either the complete text of a terminal
+/// (symbol, literal) or the operator head of a compound term whose operands
+/// are in Args. Text is produced only at emission time (assert, get-value,
+/// define-fun, dump): subterms referenced more than once within an emission
+/// are bound to let temporaries, so heavily shared DAGs cost wire text
+/// linear in the DAG size instead of their unfolded tree size.
+struct SMTLIBTerm {
+  std::string Head;
+  std::vector<SMTExprRef> Args;
+  /// Binder-style nodes (quantifiers): every Arg is rendered in its own
+  /// let scope, since hoisting a subterm that mentions a bound variable
+  /// past the binder would unbind it.
+  bool OwnScope = false;
+};
+
+/// SMT-LIB expression carrying a structural SMTLIBTerm.
+class SMTLIBExpr : public SolverExpr<SMTLIBContextRef, SMTLIBTerm> {
 public:
   static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::SMTLIB;
-  using SolverExpr<SMTLIBContextRef, std::string>::SolverExpr;
+  using SolverExpr<SMTLIBContextRef, SMTLIBTerm>::SolverExpr;
   ~SMTLIBExpr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
@@ -382,9 +395,14 @@ public:
   static std::string parseIntModelValueForTest(const std::string &Value);
 
 private:
-  // Build a bare expression carrying the given SMT-LIB text.
+  // Build a terminal expression (symbol or literal) carrying its full text.
   SMTExprRef makeSMTLIBExpr(SMTExprKind Kind, const SMTSortRef &Sort,
                             std::string Text);
+
+  // Build a compound expression from an operator head and its operands.
+  SMTExprRef makeSMTLIBExpr(SMTExprKind Kind, const SMTSortRef &Sort,
+                            std::string Head, std::vector<SMTExprRef> Args,
+                            bool OwnScope = false);
 
   // Emit a single line (newline appended) to the active emitter(s).
   void emitLine(const std::string &Text) const;

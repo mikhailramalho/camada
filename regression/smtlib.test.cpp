@@ -256,3 +256,96 @@ TEST_CASE("SMTLIB getInt accepts integral unreduced rationals", "[SMTLIB]") {
   REQUIRE(SMTLIBSolver::parseIntModelValueForTest(
               "(/ 100000000000000000000 50000000000000000000)") == "2");
 }
+
+// Pin the let-binding emission for shared subterms: a DAG node referenced
+// twice is bound to a %t temporary at its first occurrence and referenced
+// by name afterwards; once-used nodes stay inline.
+TEST_CASE("SMTLIB write-only let-binds shared subterms", "[SMTLIB]") {
+  std::string Path = makeTempPath();
+
+  {
+    auto Solver = std::make_unique<camada::SMTLIBSolver>(Path);
+    auto BV8 = Solver->mkBVSort(8);
+    auto X = Solver->mkSymbol("x", BV8);
+    auto Y = Solver->mkSymbol("y", BV8);
+    auto Sum = Solver->mkBVAdd(X, Y);      // shared twice
+    auto Prod = Solver->mkBVMul(Sum, Sum); // shares Sum
+    Solver->addConstraint(Solver->mkEqual(Prod, X));
+    Solver->check();
+  }
+
+  const std::string Expected =
+      "(set-option :print-success false)\n"
+      "(set-option :produce-models true)\n"
+      "(set-option :global-declarations true)\n"
+      "(set-info :status unknown)\n"
+      "(set-logic ALL)\n"
+      "(declare-fun |x| () (_ BitVec 8))\n"
+      "(declare-fun |y| () (_ BitVec 8))\n"
+      "(assert (let ((%t0 (bvadd |x| |y|))) (= (bvmul %t0 %t0) |x|)))\n"
+      "(check-sat)\n";
+
+  std::string Got = readFile(Path);
+  std::remove(Path.c_str());
+
+  REQUIRE(Got == Expected);
+}
+
+// Symbols spelled like let temporaries must not be captured: quoteSymbol
+// encodes every literal '%' as "%25", so a user symbol "%t0" renders as
+// |%25t0| and can never alias the unquoted %t0 temporary.
+TEST_CASE("SMTLIB write-only let temporaries cannot capture user symbols",
+          "[SMTLIB]") {
+  std::string Path = makeTempPath();
+
+  {
+    auto Solver = std::make_unique<camada::SMTLIBSolver>(Path);
+    auto BV8 = Solver->mkBVSort(8);
+    auto Hostile = Solver->mkSymbol("%t0", BV8);
+    auto Y = Solver->mkSymbol("y", BV8);
+    auto Sum = Solver->mkBVAdd(Y, Y); // let-bound as %t0
+    Solver->addConstraint(Solver->mkEqual(
+        Solver->mkBVAdd(Solver->mkBVMul(Sum, Sum), Hostile), Y));
+    Solver->check();
+  }
+
+  const std::string Expected = "(set-option :print-success false)\n"
+                               "(set-option :produce-models true)\n"
+                               "(set-option :global-declarations true)\n"
+                               "(set-info :status unknown)\n"
+                               "(set-logic ALL)\n"
+                               "(declare-fun |%25t0| () (_ BitVec 8))\n"
+                               "(declare-fun |y| () (_ BitVec 8))\n"
+                               "(assert (let ((%t0 (bvadd |y| |y|))) "
+                               "(= (bvadd (bvmul %t0 %t0) |%25t0|) |y|)))\n"
+                               "(check-sat)\n";
+
+  std::string Got = readFile(Path);
+  std::remove(Path.c_str());
+
+  REQUIRE(Got == Expected);
+}
+
+// Deep, lightly shared chains must emit without exhausting the stack: the
+// renderer is iterative (a 50k-node linear chain overflows a recursive
+// emitter long before this size).
+TEST_CASE("SMTLIB write-only emits deep expression chains", "[SMTLIB]") {
+  std::string Path = makeTempPath();
+
+  {
+    auto Solver = std::make_unique<camada::SMTLIBSolver>(Path);
+    auto BV8 = Solver->mkBVSort(8);
+    auto X = Solver->mkSymbol("x", BV8);
+    auto One = Solver->mkBVFromBin("00000001", BV8);
+    auto Chain = X;
+    for (int I = 0; I < 50000; ++I)
+      Chain = Solver->mkBVAdd(Chain, One);
+    Solver->addConstraint(Solver->mkEqual(Chain, X));
+    Solver->check();
+  }
+
+  std::string Got = readFile(Path);
+  std::remove(Path.c_str());
+
+  REQUIRE(Got.find("(check-sat)") != std::string::npos);
+}
