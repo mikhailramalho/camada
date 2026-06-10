@@ -187,6 +187,23 @@ private:
   bool HasValue_ = false;
 };
 
+/// Sparse model of an array expression, produced by
+/// SMTSolver::getArrayValues after a SAT check.
+///
+/// The model value of the array at index `i` is the element of the first
+/// entry whose index has the same model value as `i`, or the value of
+/// `Base` when no entry matches. `Base` is a null ref when the solver did
+/// not report a default — every constrained index is then covered by an
+/// entry, and unlisted indexes are unconstrained.
+///
+/// Both expressions in each entry and `Base` are valid arguments to the
+/// model-value getters (getBV, getBool, ...) for as long as the model that
+/// produced them stays current (no new constraints or checks).
+struct ArrayModel {
+  SMTExprRef Base;
+  std::vector<std::pair<SMTExprRef, SMTExprRef>> Entries;
+};
+
 /// Generic base class for SMT Solvers
 ///
 /// This class is responsible for wrapping all sorts and expression generation,
@@ -635,6 +652,16 @@ public:
   /// If a model is available, returns the Expr in position Index of Array
   virtual SMTExprRef getArrayElement(const SMTExprRef &Array,
                                      const SMTExprRef &Index) = 0;
+
+  /// If a model is available, returns the model's sparse representation of
+  /// an array expression: the finite set of (index, element) entries the
+  /// solver's model distinguishes, plus the default element every other
+  /// index reads (see ArrayModel). The entry list is whatever finite shape
+  /// the model uses — it is not an enumeration of the index space, and its
+  /// size is unspecified. Backends without a walkable array model (STP
+  /// symbol arrays, the SMT-LIB pipeline) return an UnsupportedOperation
+  /// error.
+  virtual SMTResult<ArrayModel> getArrayValues(const SMTExprRef &Array) = 0;
 
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;

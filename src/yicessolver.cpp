@@ -757,6 +757,88 @@ SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
       result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
 
+SMTResult<ArrayModel> YicesSolver::getArrayValuesImpl(const SMTExprRef &Array) {
+  model_t *Model = yices_get_model(Context, 1);
+  yval_t Root;
+  if (yices_get_value(Model, toSolverExpr<YicesExpr>(*Array).Expr, &Root) !=
+          0 ||
+      Root.node_tag != YVAL_FUNCTION)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices did not produce a function value for the array"};
+
+  // Camada arrays are unary Yices functions; the expansion below writes
+  // one index descriptor per mapping into a one-slot buffer.
+  if (yices_val_function_arity(Model, &Root) != 1)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices array model has unexpected function arity"};
+
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  // Yices model values are descriptor nodes, not terms: rebuild each leaf
+  // as a constant term of the Camada-facing sort. Returns a null ref for
+  // shapes the backend cannot hold (nested functions).
+  const auto wrap = [&](const yval_t &Value,
+                        const SMTSortRef &Sort) -> SMTExprRef {
+    if (Sort->isBoolSort()) {
+      int32_t B = 0;
+      if (yices_val_get_bool(Model, &Value, &B) != 0)
+        return {};
+      return makeExprRef<YicesExpr>(SMTExprKind::BoolConst, Context, Sort,
+                                    B ? yices_true() : yices_false());
+    }
+    std::vector<int32_t> Bits(Sort->getWidth());
+    if (Bits.empty() || yices_val_get_bv(Model, &Value, Bits.data()) != 0)
+      return {};
+    return makeExprRef<YicesExpr>(
+        valueKindForSort(Sort), Context, Sort,
+        yices_bvconst_from_array(static_cast<uint32_t>(Bits.size()),
+                                 Bits.data()));
+  };
+
+  yval_t Def;
+  yval_vector_t Mappings;
+  yices_init_yval_vector(&Mappings);
+  if (yices_val_expand_function(Model, &Root, &Def, &Mappings) != 0) {
+    yices_delete_yval_vector(&Mappings);
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices could not expand the array's function value"};
+  }
+
+  ArrayModel Result;
+  for (uint32_t I = 0; I < Mappings.size; ++I) {
+    yval_t IndexVal[1];
+    yval_t ElemVal;
+    if (yices_val_expand_mapping(Model, &Mappings.data[I], IndexVal,
+                                 &ElemVal) != 0) {
+      // A mapping the model distinguishes but we cannot read would decode
+      // as the default value — error out instead of dropping it.
+      yices_delete_yval_vector(&Mappings);
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                      "Yices could not expand an array model mapping"};
+    }
+    SMTExprRef IndexExpr = wrap(IndexVal[0], IndexSort);
+    SMTExprRef ElemExpr = wrap(ElemVal, ElemSort);
+    if (!IndexExpr || !ElemExpr) {
+      yices_delete_yval_vector(&Mappings);
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                      "Yices array model entry has an unsupported shape"};
+    }
+    Result.Entries.emplace_back(std::move(IndexExpr), std::move(ElemExpr));
+  }
+  if (Def.node_tag != YVAL_UNKNOWN) {
+    Result.Base = wrap(Def, ElemSort);
+    if (!Result.Base) {
+      // Yices reported a default we cannot read; a null Base would claim
+      // the unlisted indexes are unconstrained.
+      yices_delete_yval_vector(&Mappings);
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                      "Yices array model default has an unsupported shape"};
+    }
+  }
+  yices_delete_yval_vector(&Mappings);
+  return Result;
+}
+
 SMTExprRef YicesSolver::mkBoolImpl(const bool b) {
   return makeExprRef<YicesExpr>(SMTExprKind::BoolConst, Context, mkBoolSort(),
                                 b ? yices_true() : yices_false());

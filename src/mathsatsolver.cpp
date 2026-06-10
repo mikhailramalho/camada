@@ -933,6 +933,30 @@ SMTExprRef MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
       msat_get_model_value(Context, toMathSATTerm(sel)));
 }
 
+SMTResult<ArrayModel>
+MathSATSolver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](msat_term Value, const SMTSortRef &Sort) {
+    return makeExprRef<MathSATExpr>(valueKindForSort(Sort), &Context, Sort,
+                                    Value);
+  };
+
+  msat_term Val = msat_get_model_value(Context, toMathSATTerm(Array));
+  if (MSAT_ERROR_TERM(Val))
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::MathSAT,
+                    "MathSAT could not evaluate the array in the model"};
+  ArrayModel Result;
+  while (msat_term_is_array_write(Context, Val)) {
+    Result.Entries.emplace_back(wrap(msat_term_get_arg(Val, 1), IndexSort),
+                                wrap(msat_term_get_arg(Val, 2), ElemSort));
+    Val = msat_term_get_arg(Val, 0);
+  }
+  if (msat_term_is_array_const(Context, Val))
+    Result.Base = wrap(msat_term_get_arg(Val, 0), ElemSort);
+  return Result;
+}
+
 SMTExprRef MathSATSolver::mkBoolImpl(const bool Bool) {
   return makeExprRef<MathSATExpr>(
       SMTExprKind::BoolConst, &Context, mkBoolSort(),

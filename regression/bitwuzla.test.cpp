@@ -126,6 +126,8 @@ CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
                                    symbol_cache_survives_push_pop(solver),
                                    makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array", array(solver), makeSMTLIBSolver)
+CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array_model_values",
+                                   array_model_values(solver), makeSMTLIBSolver)
 CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array_const_store_semantics",
                                    array_const_store_semantics(solver),
                                    makeSMTLIBSolver)

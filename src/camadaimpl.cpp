@@ -1205,6 +1205,17 @@ void SMTSolverImpl::instantiateLazyDefaults(const SMTExprRef &Array,
   }
 }
 
+std::string SMTSolverImpl::lazyIndexModelBits(const SMTExprRef &Exp) {
+  if (Exp->isBoolSort()) {
+    SMTResult<bool> Value = getBool(Exp);
+    return Value ? std::string(Value.value() ? "1" : "0") : std::string();
+  }
+  if (!Exp->isBVSort())
+    return std::string(); // unsupported index sort: backend fallback
+  SMTResult<std::string> Value = getBVInBin(Exp);
+  return Value ? Value.value() : std::string();
+}
+
 SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
                                                   const SMTExprRef &Index) {
   // Post-check model query: the solver's model is unconstrained at indexes
@@ -1212,14 +1223,7 @@ SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
   // derivation chain instead. Returns a null ref when the chain cannot be
   // resolved, in which case the caller falls back to the backend.
   const auto modelBits = [this](const SMTExprRef &E) {
-    if (E->isBoolSort()) {
-      SMTResult<bool> Value = getBool(E);
-      return Value ? std::string(Value.value() ? "1" : "0") : std::string();
-    }
-    if (!E->isBVSort())
-      return std::string(); // unsupported index sort: backend fallback
-    SMTResult<std::string> Value = getBVInBin(E);
-    return Value ? Value.value() : std::string();
+    return lazyIndexModelBits(E);
   };
 
   const std::string QueryBits = modelBits(Index);
@@ -1434,6 +1438,78 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   SMTExprRef theExp = getArrayElementImpl(Array, Index);
   assert(theExp->Sort == Array->Sort->getElementSort());
   return theExp;
+}
+
+SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
+  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
+    return lazyArrayModel(Array);
+  return getArrayValuesImpl(Array);
+}
+
+SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
+  // The backend's model is unconstrained at indexes whose lazy defaults
+  // were never instantiated, so walk the tracked derivation chain instead:
+  // stores become entries (outermost first, so shadowed stores at the same
+  // model index are skipped), ites follow the model's branch, and the
+  // reached root's initializer becomes the default.
+  ArrayModel Model;
+  std::set<std::string> SeenIndexBits;
+  const SMTExpr *Cur = &*Array;
+  while (true) {
+    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
+      const std::string StepBits = lazyIndexModelBits(It->second.Index);
+      if (StepBits.empty())
+        return SMTError{SMTErrorCode::BackendError,
+                        CachedBoolExprs[0]->getBackendKind(),
+                        "Could not evaluate a store index while walking a "
+                        "lazily lowered array model"};
+      if (SeenIndexBits.insert(StepBits).second)
+        Model.Entries.emplace_back(It->second.Index, It->second.Value);
+      Cur = It->second.Parent;
+      continue;
+    }
+    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
+      SMTResult<bool> Cond = getBool(It->second.Cond);
+      if (!Cond)
+        return Cond.error();
+      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
+      continue;
+    }
+    if (auto It = LazyConstArrayRoots.find(Cur);
+        It != LazyConstArrayRoots.end()) {
+      Model.Base = It->second.Init;
+      return Model;
+    }
+    return SMTError{SMTErrorCode::BackendError,
+                    CachedBoolExprs[0]->getBackendKind(),
+                    "Untracked derivation while walking a lazily lowered "
+                    "array model"};
+  }
+}
+
+SMTResult<ArrayModel> SMTSolverImpl::getArrayValuesImpl(const SMTExprRef &) {
+  return SMTError{SMTErrorCode::UnsupportedOperation,
+                  CachedBoolExprs[0]->getBackendKind(),
+                  "Array model extraction is not supported by this backend"};
+}
+
+SMTExprKind SMTSolverImpl::valueKindForSort(const SMTSortRef &Sort) {
+  if (Sort->isBoolSort())
+    return SMTExprKind::BoolConst;
+  if (Sort->isBVSort())
+    return SMTExprKind::BVConst;
+  if (Sort->isFPSort())
+    return SMTExprKind::FPConst;
+  if (Sort->isRMSort())
+    return SMTExprKind::RMConst;
+  if (Sort->isArraySort())
+    return SMTExprKind::ArrayConst;
+  if (Sort->isIntSort())
+    return SMTExprKind::IntConst;
+  if (Sort->isRealSort())
+    return SMTExprKind::RealConst;
+  return SMTExprKind::Unknown;
 }
 
 SMTExprRef SMTSolverImpl::mkBool(const bool b) {
