@@ -834,6 +834,9 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
   SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
 
+  // ebits+2 bits hold the maximal normalized difference
+  // (2^ebits - 3) + (sbits - 1) only while sbits <= 2^ebits + 3; every IEEE
+  // format satisfies this, and the classic encoding had the same bound.
   SMTExprRef exp_diff =
       mkBVSub(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
   SMTExprRef neg_exp_diff = mkBVNeg(exp_diff);
@@ -880,11 +883,12 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef m2_W =
       mkBVZeroExt(W - (sbits + 1), mkBVConcat(b_sig, mkBVZero1(*this)));
   // Processing MSB-first, after consuming the top `lead` bits the
-  // accumulator is 2^(d >> (ebits+1-lead)), which stays below 2M as long as
-  // 2^lead - 1 <= sbits. Those first rounds therefore collapse into a single
-  // shift of 1, skipping their multiply/remainder pairs.
+  // accumulator is 2^(d >> (ebits+1-lead)), which stays within [1, 2M] (and
+  // congruent mod 2M) as long as 2^lead - 1 <= sbits. Those first rounds
+  // therefore collapse into a single shift of 1, skipping their
+  // multiply/remainder pairs.
   unsigned lead = 0;
-  while (lead < ebits + 1 && ((1u << (lead + 1)) - 1) <= sbits)
+  while (lead < ebits + 1 && ((1ull << (lead + 1)) - 1) <= sbits)
     ++lead;
   SMTExprRef acc;
   if (lead > 0) {

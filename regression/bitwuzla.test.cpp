@@ -20,12 +20,13 @@ TEST_CASE("Simple Bitwuzla test", "[Bitwuzla]") {
 TEST_CASE("FP remainder randomized host oracle Bitwuzla", "[Bitwuzla]") {
   auto solver = camada::createBitwuzlaSolver();
 
-  std::mt19937 Rng(0xCA3ADAu);
-  std::uniform_int_distribution<uint32_t> Bits32;
-  std::uniform_int_distribution<uint64_t> Bits64;
+  // Raw mt19937 outputs are fully specified by the standard, so the sweep is
+  // bit-identical across standard libraries.
+  std::mt19937 Rng32(0xCA3ADAu);
+  std::mt19937_64 Rng64(0xCA3ADAu);
 
   for (int I = 0; I < 200; ++I) {
-    uint32_t XB = Bits32(Rng), YB = Bits32(Rng);
+    uint32_t XB = Rng32(), YB = Rng32();
     float X, Y;
     std::memcpy(&X, &XB, sizeof(X));
     std::memcpy(&Y, &YB, sizeof(Y));
@@ -33,7 +34,7 @@ TEST_CASE("FP remainder randomized host oracle Bitwuzla", "[Bitwuzla]") {
   }
 
   for (int I = 0; I < 25; ++I) {
-    uint64_t XB = Bits64(Rng), YB = Bits64(Rng);
+    uint64_t XB = Rng64(), YB = Rng64();
     double X, Y;
     std::memcpy(&X, &XB, sizeof(X));
     std::memcpy(&Y, &YB, sizeof(Y));
