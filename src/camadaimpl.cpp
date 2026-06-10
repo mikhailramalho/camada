@@ -23,6 +23,7 @@
 #include "camadacommon.h"
 #include "camadatuple.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <limits>
 
@@ -219,6 +220,12 @@ void SMTSolverImpl::clearExprCaches() {
   SymbolExprCache.clear();
   FPSpecialExprCache.clear();
   FPConstExprCache.clear();
+  LazyConstArrayRoots.clear();
+  LazyConstArrayReach.clear();
+  LazyArrayStores.clear();
+  LazyArrayItes.clear();
+  LazyTouched.clear();
+  LazyConstraintLevels.assign(1, {});
 }
 
 void SMTSolverImpl::initializeCommonSingletons() {
@@ -632,6 +639,29 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   // equalities.
   if (LHS->Sort->isTupleSort() && !nativeTupleSupport())
     return mkCamadaTupleEqual(*this, LHS, RHS);
+  if (!LazyConstArrayRoots.empty() && LHS->Sort->isArraySort() &&
+      (reachesLazyArray(LHS) || reachesLazyArray(RHS))) {
+    // Extensionality witness for lazy constant arrays. The backend decides
+    // array equality natively, but a lazy root's default axiom is only
+    // instantiated at observed indexes, so a model could fake a difference
+    // (or agreement) at an unobserved index. The standard reduction plugs
+    // this: a fresh witness index per equality, the universally valid lemma
+    //   LHS = RHS  \/  select(LHS, K) != select(RHS, K)
+    // and default instantiation at K (done by mkArraySelect below). Any
+    // model claiming LHS != RHS must now exhibit the difference at K,
+    // where defaults are enforced.
+    SMTExprRef Witness = mkSymbolUnchecked(
+        "__CAMADA_lazyarr_ext" + std::to_string(LazyConstArrayCounter++),
+        LHS->Sort->getIndexSort());
+    SMTExprRef SelL = mkArraySelect(LHS, Witness);
+    SMTExprRef SelR = mkArraySelect(RHS, Witness);
+    SMTExprRef theEq = mkEqualImpl(LHS, RHS);
+    assert(theEq->isBoolSort());
+    SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
+    addConstraint(Lemma);
+    LazyConstraintLevels.back().push_back(std::move(Lemma));
+    return theEq;
+  }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
   assert(theExp->isBoolSort());
   return theExp;
@@ -817,6 +847,16 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
     return mkCamadaTupleIte(*this, Cond, T, F);
   SMTExprRef theExp = mkIteImpl(Cond, T, F);
   assert(theExp->Sort == F->Sort);
+  if (!LazyConstArrayRoots.empty() && T->Sort->isArraySort()) {
+    std::vector<const SMTExpr *> Roots = lazyArrayRootsOf(T);
+    for (const SMTExpr *Root : lazyArrayRootsOf(F))
+      if (std::find(Roots.begin(), Roots.end(), Root) == Roots.end())
+        Roots.push_back(Root);
+    if (!Roots.empty()) {
+      LazyConstArrayReach.emplace(&*theExp, std::move(Roots));
+      LazyArrayItes.emplace(&*theExp, LazyArrayIteStep{Cond, &*T, &*F});
+    }
+  }
   return theExp;
 }
 
@@ -1093,6 +1133,8 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
+  if (!LazyConstArrayRoots.empty())
+    instantiateLazyDefaults(Array, Index);
   SMTExprRef theExp = mkArraySelectImpl(Array, Index);
   assert(theExp->Sort == Array->Sort->getElementSort());
   return theExp;
@@ -1106,14 +1148,121 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
                "Expected array index with matching sort");
   fatalErrorIf(Array->Sort->getElementSort() != Element->Sort,
                "Expected array element with matching sort");
+  fatalErrorIf(!LazyConstArrayRoots.empty() && reachesLazyArray(Element),
+               "Storing a lazily lowered constant array inside another array "
+               "is not supported");
   SMTExprRef theExp = mkArrayStoreImpl(Array, Index, Element);
   assert(theExp->Sort == Array->Sort);
+  if (!LazyConstArrayRoots.empty()) {
+    std::vector<const SMTExpr *> Roots = lazyArrayRootsOf(Array);
+    if (!Roots.empty()) {
+      LazyConstArrayReach.emplace(&*theExp, std::move(Roots));
+      LazyArrayStores.emplace(&*theExp,
+                              LazyArrayStoreStep{&*Array, Index, Element});
+    }
+  }
   return theExp;
+}
+
+std::vector<const SMTExpr *>
+SMTSolverImpl::lazyArrayRootsOf(const SMTExprRef &Exp) const {
+  if (LazyConstArrayRoots.count(&*Exp) != 0)
+    return {&*Exp};
+  auto It = LazyConstArrayReach.find(&*Exp);
+  return It != LazyConstArrayReach.end() ? It->second
+                                         : std::vector<const SMTExpr *>{};
+}
+
+bool SMTSolverImpl::reachesLazyArray(const SMTExprRef &Exp) const {
+  return LazyConstArrayRoots.count(&*Exp) != 0 ||
+         LazyConstArrayReach.count(&*Exp) != 0;
+}
+
+SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
+                                           const SMTExprRef &InitValue) {
+  fatalErrorIf(InitValue->isArraySort() && reachesLazyArray(InitValue),
+               "Lazily lowered constant arrays cannot be nested inside one "
+               "another");
+  SMTSortRef ArraySort = mkArraySort(IndexSort, InitValue->Sort);
+  SMTExprRef Root = mkSymbolUnchecked(
+      "__CAMADA_lazyarr" + std::to_string(LazyConstArrayCounter++), ArraySort);
+  Root = rewrapExprImpl(*Root, Root->Sort, SMTExprKind::ArrayConst);
+  LazyConstArrayRoots.emplace(&*Root, LazyConstArrayRoot{Root, InitValue});
+  return Root;
+}
+
+void SMTSolverImpl::instantiateLazyDefaults(const SMTExprRef &Array,
+                                            const SMTExprRef &Index) {
+  for (const SMTExpr *RootKey : lazyArrayRootsOf(Array)) {
+    // Memo-first: the select built below re-enters mkArraySelect on the
+    // root with this same index and must find the pair already recorded.
+    if (!LazyTouched.insert({RootKey, &*Index}).second)
+      continue;
+    const LazyConstArrayRoot &Root = LazyConstArrayRoots.at(RootKey);
+    SMTExprRef Constraint = mkEqual(mkArraySelect(Root.Root, Index), Root.Init);
+    addConstraint(Constraint);
+    LazyConstraintLevels.back().push_back(std::move(Constraint));
+  }
+}
+
+SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
+                                                  const SMTExprRef &Index) {
+  // Post-check model query: the solver's model is unconstrained at indexes
+  // whose defaults were never instantiated, so answer from the tracked
+  // derivation chain instead. Returns a null ref when the chain cannot be
+  // resolved, in which case the caller falls back to the backend.
+  const auto modelBits = [this](const SMTExprRef &E) {
+    if (E->isBoolSort()) {
+      SMTResult<bool> Value = getBool(E);
+      return Value ? std::string(Value.value() ? "1" : "0") : std::string();
+    }
+    if (!E->isBVSort())
+      return std::string(); // unsupported index sort: backend fallback
+    SMTResult<std::string> Value = getBVInBin(E);
+    return Value ? Value.value() : std::string();
+  };
+
+  const std::string QueryBits = modelBits(Index);
+  if (QueryBits.empty())
+    return {};
+
+  const SMTExpr *Cur = &*Array;
+  while (true) {
+    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
+      const std::string StepBits = modelBits(It->second.Index);
+      if (StepBits.empty())
+        return {};
+      if (StepBits == QueryBits)
+        return It->second.Value;
+      Cur = It->second.Parent;
+      continue;
+    }
+    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
+      SMTResult<bool> Cond = getBool(It->second.Cond);
+      if (!Cond)
+        return {};
+      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
+      continue;
+    }
+    if (auto It = LazyConstArrayRoots.find(Cur);
+        It != LazyConstArrayRoots.end())
+      return It->second.Init;
+    return {};
+  }
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
   if (!nativeTupleSupport())
     return mkCamadaTuple(*this, Elements);
+
+  // A lazy array inside a native tuple would escape the lazy tracking:
+  // tuple equality and tuple selects would bypass the default-axiom
+  // instantiation. The Camada tuple lowering above composes fine.
+  if (!LazyConstArrayRoots.empty())
+    for (const auto &Element : Elements)
+      fatalErrorIf(Element->isArraySort() && reachesLazyArray(Element),
+                   "Lazily lowered constant arrays inside native tuples are "
+                   "not supported");
 
   std::vector<SMTSortRef> ElementSorts;
   ElementSorts.reserve(Elements.size());
@@ -1145,6 +1294,13 @@ SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
   for (std::size_t i = 0; i < Args.size(); ++i)
     fatalErrorIf(Function->Sort->getDomainSorts()[i] != Args[i]->Sort,
                  "Function application argument sort mismatch");
+  // Uninterpreted functions observe whole arrays, not selected indexes, so
+  // a lazy array argument would escape the default-axiom instantiation.
+  if (!LazyConstArrayRoots.empty())
+    for (const auto &Arg : Args)
+      fatalErrorIf(Arg->isArraySort() && reachesLazyArray(Arg),
+                   "Lazily lowered constant arrays as uninterpreted-function "
+                   "arguments are not supported");
   SMTExprRef theExp = mkApplyImpl(Function, Args);
   assert(theExp->Sort == Function->Sort->getCodomainSort());
   return theExp;
@@ -1272,6 +1428,9 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
+  if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
+    if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
+      return Resolved;
   SMTExprRef theExp = getArrayElementImpl(Array, Index);
   assert(theExp->Sort == Array->Sort->getElementSort());
   return theExp;
@@ -1511,7 +1670,21 @@ SMTExprRef SMTSolverImpl::mkInf64(const bool Sgn, FPEncoding Encoding) {
 
 SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
                                        const SMTExprRef &InitValue) {
-  SMTExprRef theExp = mkArrayConstImpl(IndexSort, InitValue);
+  return mkArrayConst(IndexSort, InitValue, ConstArrayLowering::Auto);
+}
+
+SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
+                                       const SMTExprRef &InitValue,
+                                       ConstArrayLowering Lowering) {
+  if (Lowering == ConstArrayLowering::Auto)
+    Lowering = nativeConstArraySupport() ? ConstArrayLowering::Native
+                                         : ConstArrayLowering::Lazy;
+  fatalErrorIf(Lowering == ConstArrayLowering::Native &&
+                   !nativeConstArraySupport(),
+               "Native constant arrays are not supported by this backend");
+  SMTExprRef theExp = Lowering == ConstArrayLowering::Native
+                          ? mkArrayConstImpl(IndexSort, InitValue)
+                          : mkLazyConstArray(IndexSort, InitValue);
   assert(theExp->isArraySort());
   assert(theExp->Sort->getIndexSort() == IndexSort);
   assert(theExp->Sort->getElementSort() == InitValue->Sort);
@@ -1550,9 +1723,29 @@ void SMTSolverImpl::reset() {
   initializeCommonSingletons();
 }
 
-void SMTSolverImpl::push(unsigned nscopes) { pushImpl(nscopes); }
+void SMTSolverImpl::push(unsigned nscopes) {
+  LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
+  pushImpl(nscopes);
+}
 
-void SMTSolverImpl::pop(unsigned nscopes) { popImpl(nscopes); }
+void SMTSolverImpl::pop(unsigned nscopes) {
+  // Lazy default axioms and extensionality lemmas asserted inside the
+  // popped scopes are scope-independent facts about expressions that
+  // outlive the pop, so re-assert them at the outer level instead of
+  // forgetting them.
+  std::vector<SMTExprRef> Reassert;
+  for (unsigned I = 0; I < nscopes && LazyConstraintLevels.size() > 1; ++I) {
+    auto &Level = LazyConstraintLevels.back();
+    Reassert.insert(Reassert.end(), std::make_move_iterator(Level.begin()),
+                    std::make_move_iterator(Level.end()));
+    LazyConstraintLevels.pop_back();
+  }
+  popImpl(nscopes);
+  for (SMTExprRef &Constraint : Reassert) {
+    addConstraint(Constraint);
+    LazyConstraintLevels.back().push_back(std::move(Constraint));
+  }
+}
 
 void SMTSolverImpl::dump() {
   std::string Out;

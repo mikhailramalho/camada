@@ -793,11 +793,23 @@ SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef BitwuzlaSolver::mkBVFromDecImpl(const int64_t Int,
                                            const SMTSortRef &Sort) {
+  const unsigned Width = Sort->getWidth();
+  if (Width <= 64) {
+    // Mask to the sort width so the value always satisfies bitwuzla's
+    // requirement that it fit the sort. This skips the binary-string
+    // round-trip (building the string here, re-parsing it inside bitwuzla).
+    uint64_t Bits = static_cast<uint64_t>(Int);
+    if (Width < 64)
+      Bits &= (uint64_t{1} << Width) - 1;
+    return makeExprRef<BitwExpr>(
+        SMTExprKind::BVConst, Context, Sort,
+        bitwuzla_mk_bv_value_uint64(TermManager,
+                                    toSolverSort<BitwSort>(*Sort).Sort, Bits));
+  }
   return makeExprRef<BitwExpr>(
       SMTExprKind::BVConst, Context, Sort,
       bitwuzla_mk_bv_value(TermManager, toSolverSort<BitwSort>(*Sort).Sort,
-                           toTwosComplementBin(Int, Sort->getWidth()).c_str(),
-                           2));
+                           toTwosComplementBin(Int, Width).c_str(), 2));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVFromBinImpl(const std::string &Int,

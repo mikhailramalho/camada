@@ -4,13 +4,15 @@
 #include <bitset>
 #include <catch2/catch_test_macros.hpp>
 
-inline void array(const camada::SMTSolverRef &solver) {
+inline void
+array(const camada::SMTSolverRef &solver,
+      camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
   // An array
   auto indexsort = solver->mkBVSort(2);
   auto elemsort = solver->mkBVSort(10);
   auto init = solver->mkBVFromDec(5, 10);
   REQUIRE(init->getKind() == camada::SMTExprKind::BVConst);
-  auto arr = solver->mkArrayConst(indexsort, init);
+  auto arr = solver->mkArrayConst(indexsort, init, Lowering);
   REQUIRE(arr->getKind() == camada::SMTExprKind::ArrayConst);
 
   auto arr1 = solver->mkSymbol("f1", solver->mkArraySort(indexsort, elemsort));
@@ -36,7 +38,9 @@ inline void array(const camada::SMTSolverRef &solver) {
   REQUIRE(selected_res.value() == "0000001010");
 }
 
-inline void array_const_store_semantics(const camada::SMTSolverRef &solver) {
+inline void array_const_store_semantics(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
   auto indexsort = solver->mkBVSort(3);
   auto elemsort = solver->mkBVSort(8);
 
@@ -45,7 +49,7 @@ inline void array_const_store_semantics(const camada::SMTSolverRef &solver) {
   auto idx_written = solver->mkBVFromDec(3, indexsort);
   auto idx_other = solver->mkBVFromDec(5, indexsort);
 
-  auto arr = solver->mkArrayConst(indexsort, init);
+  auto arr = solver->mkArrayConst(indexsort, init, Lowering);
   auto updated = solver->mkArrayStore(arr, idx_written, stored);
 
   solver->addConstraint(
@@ -68,8 +72,9 @@ inline void array_const_store_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(read_other_res.value() == "10101010");
 }
 
-inline void
-bool_array_const_store_semantics(const camada::SMTSolverRef &solver) {
+inline void bool_array_const_store_semantics(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
   auto indexsort = solver->mkBVSort(2);
   auto boolsort = solver->mkBoolSort();
 
@@ -78,7 +83,7 @@ bool_array_const_store_semantics(const camada::SMTSolverRef &solver) {
   auto idx_written = solver->mkBVFromDec(1, indexsort);
   auto idx_other = solver->mkBVFromDec(2, indexsort);
 
-  auto arr = solver->mkArrayConst(indexsort, init);
+  auto arr = solver->mkArrayConst(indexsort, init, Lowering);
   REQUIRE(arr->getKind() == camada::SMTExprKind::ArrayConst);
   REQUIRE(arr->Sort->getElementSort() == boolsort);
 
@@ -113,14 +118,16 @@ bool_array_const_store_semantics(const camada::SMTSolverRef &solver) {
 // constraint, leaving the array silently unconstrained. The current
 // encoding uses (define-fun), which is permanent under
 // :global-declarations true.
-inline void array_const_survives_push_pop(const camada::SMTSolverRef &solver) {
+inline void array_const_survives_push_pop(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
   {
     auto idx = solver->mkBVSort(3);
     auto elem = solver->mkBVSort(8);
     auto fill = solver->mkBVFromDec(170, elem); // 0b10101010
 
     solver->push();
-    auto a = solver->mkArrayConst(idx, fill);
+    auto a = solver->mkArrayConst(idx, fill, Lowering);
     solver->pop();
 
     // After the pop, the const-array reference is still in effect: every
@@ -141,7 +148,7 @@ inline void array_const_survives_push_pop(const camada::SMTSolverRef &solver) {
     auto fill = solver->mkBVFromDec(170, elem);
 
     solver->push();
-    auto a = solver->mkArrayConst(idx, fill);
+    auto a = solver->mkArrayConst(idx, fill, Lowering);
     solver->pop();
 
     auto sample_idx = solver->mkBVFromDec(3, idx);
@@ -151,4 +158,106 @@ inline void array_const_survives_push_pop(const camada::SMTSolverRef &solver) {
         solver->mkEqual(solver->mkArraySelect(a, sample_idx), fill)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
+}
+
+// Constant-array semantics over a 64-bit index domain — impossible to
+// materialize store-per-index, so this exercises native constant arrays on
+// capable backends and the lazy lowering elsewhere (STP).
+inline void wide_index_const_array_semantics(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  {
+    auto idx = solver->mkBVSort(64);
+    auto elem = solver->mkBVSort(8);
+    auto init = solver->mkBVFromDec(0, elem);
+    auto stored = solver->mkBVFromDec(9, elem);
+
+    auto arr = solver->mkArrayConst(idx, init, Lowering);
+    REQUIRE(arr->getKind() == camada::SMTExprKind::ArrayConst);
+
+    // Every element of store(arr, k, 9) is 0 or 9, even at symbolic
+    // positions: the default must chase the index wherever the solver
+    // puts it.
+    auto k = solver->mkSymbol("lca_k", idx);
+    auto i = solver->mkSymbol("lca_i", idx);
+    auto updated = solver->mkArrayStore(arr, k, stored);
+    auto x = solver->mkArraySelect(updated, i);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(x, init)));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(x, stored)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+
+  solver->reset();
+
+  {
+    auto idx = solver->mkBVSort(64);
+    auto elem = solver->mkBVSort(8);
+    auto init = solver->mkBVFromDec(0, elem);
+    auto stored = solver->mkBVFromDec(9, elem);
+
+    auto arr = solver->mkArrayConst(idx, init, Lowering);
+    auto idx_written = solver->mkBVFromDec(5, idx);
+    auto idx_untouched = solver->mkBVFromDec(7, idx);
+    auto updated = solver->mkArrayStore(arr, idx_written, stored);
+
+    solver->addConstraint(
+        solver->mkEqual(solver->mkArraySelect(updated, idx_written), stored));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+
+    // The model query at an index the formula never touched must still
+    // report the default, resolved from the tracked derivation chain.
+    auto read_written = solver->getArrayElement(updated, idx_written);
+    auto read_untouched = solver->getArrayElement(updated, idx_untouched);
+    auto read_written_res = solver->getBVInBin(read_written);
+    auto read_untouched_res = solver->getBVInBin(read_untouched);
+    REQUIRE(read_written_res);
+    REQUIRE(read_untouched_res);
+    REQUIRE(read_written_res.value() == "00001001");
+    REQUIRE(read_untouched_res.value() == "00000000");
+  }
+}
+
+// Pin the scope-escape case: a select over a constant array built inside a
+// push scope and asserted only after the pop. Trivial for native constant
+// arrays; under the lazy lowering the default axiom asserted at
+// construction time is popped with the scope, so journaled constraints
+// must be re-asserted at the outer level.
+inline void const_array_select_survives_pop(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto idx = solver->mkBVSort(64);
+  auto elem = solver->mkBVSort(8);
+  auto init = solver->mkBVFromDec(0, elem);
+
+  auto arr = solver->mkArrayConst(idx, init, Lowering);
+  auto i = solver->mkSymbol("lcasp_i", idx);
+
+  solver->push();
+  auto sel = solver->mkArraySelect(arr, i); // default asserted in the scope
+  solver->pop();
+
+  // The handle outlives the pop; the default must still bind it.
+  solver->addConstraint(solver->mkNot(solver->mkEqual(sel, init)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// The lowerings interoperate: lazily and natively (or Auto-) lowered
+// constant arrays share array sorts and can appear in one formula.
+inline void const_array_lowering_interop(const camada::SMTSolverRef &solver) {
+  auto idx = solver->mkBVSort(8);
+  auto elem = solver->mkBVSort(8);
+  auto zero = solver->mkBVFromDec(0, elem);
+  auto one = solver->mkBVFromDec(1, elem);
+
+  auto lazy = solver->mkArrayConst(idx, zero, camada::ConstArrayLowering::Lazy);
+  auto other = solver->mkArrayConst(idx, one, camada::ConstArrayLowering::Auto);
+  REQUIRE(lazy->getKind() == camada::SMTExprKind::ArrayConst);
+  REQUIRE(lazy->Sort == other->Sort);
+
+  // select(lazy, i) + select(other, i) == 1 at every index.
+  auto i = solver->mkSymbol("cali_i", idx);
+  auto sum = solver->mkBVAdd(solver->mkArraySelect(lazy, i),
+                             solver->mkArraySelect(other, i));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(sum, one)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }

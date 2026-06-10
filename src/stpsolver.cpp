@@ -523,10 +523,21 @@ SMTExprRef STPSolver::mkBoolImpl(const bool b) {
 
 SMTExprRef STPSolver::mkBVFromDecImpl(const int64_t Int,
                                       const SMTSortRef &Sort) {
+  const unsigned Width = Sort->getWidth();
+  if (Width <= 64) {
+    // Mask to the sort width so the value's bit representation always fits,
+    // skipping the binary-string round-trip.
+    uint64_t Bits = static_cast<uint64_t>(Int);
+    if (Width < 64)
+      Bits &= (uint64_t{1} << Width) - 1;
+    return makeExprRef<STPExpr>(
+        SMTExprKind::BVConst, &Context, Sort,
+        STP::vc_bvConstExprFromLL(Context, static_cast<int>(Width), Bits));
+  }
   return makeExprRef<STPExpr>(
       SMTExprKind::BVConst, &Context, Sort,
-      STP::vc_bvConstExprFromStr(
-          Context, toTwosComplementBin(Int, Sort->getWidth()).c_str()));
+      STP::vc_bvConstExprFromStr(Context,
+                                 toTwosComplementBin(Int, Width).c_str()));
 }
 
 SMTExprRef STPSolver::mkBVFromBinImpl(const std::string &Int,
@@ -549,25 +560,8 @@ SMTExprRef STPSolver::mkSymbolImpl(const std::string &Name,
                       toSolverSort<STPSort>(*Sort).Sort));
 }
 
-SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
-                                       const SMTExprRef &InitValue) {
-  const std::string name = "__CAMADA_arr" + std::to_string(ConstArrayCounter++);
-  SMTExprRef arr =
-      mkSymbolUnchecked(name, mkArraySort(IndexSort, InitValue->Sort));
-
-  // Constant arrays are lowered to one store per index, so the formula grows
-  // as 2^width; beyond ~20 bits the lowering is impractically large.
-  const unsigned width = IndexSort->getWidth();
-  if (width > 20)
-    fatalError(
-        "STP constant-array lowering does not support index widths > 20");
-
-  uint64_t size = uint64_t{1} << width;
-  for (uint64_t i = 0; i < size; i++)
-    arr = mkArrayStore(arr, mkBVFromDec(i, IndexSort), InitValue);
-
-  return makeExprRef<STPExpr>(SMTExprKind::ArrayConst, &Context, arr->Sort,
-                              toSolverExpr<STPExpr>(*arr).Expr);
+SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &, const SMTExprRef &) {
+  fatalError("STP constant arrays are lowered lazily by the common layer");
 }
 
 checkResult STPSolver::checkImpl() {

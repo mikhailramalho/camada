@@ -57,6 +57,28 @@ namespace camada {
 /// returns the raw bits when the sort was Native.
 enum class FPEncoding { Native, BV };
 
+/// Selects how `mkArrayConst` lowers a constant array. Unlike `FPEncoding`
+/// this is not a sort property: lazily and natively lowered constant arrays
+/// share the same array sorts and interoperate freely (stores, selects, and
+/// ites may mix them); the choice only affects how the "every element
+/// equals InitValue" semantics are produced.
+///
+/// - Auto: native `((as const ...) v)` when the backend supports it, the
+///   Camada lazy lowering otherwise. The right default for almost all uses.
+/// - Native: force the backend operator; fails on backends without one.
+/// - Lazy: force the Camada lowering — a fresh array symbol whose default
+///   value is asserted on demand at each index the formula observes. Works
+///   at any index width and is the entry point for initializers that have
+///   no backend representation.
+///
+/// Lazily lowered arrays must stay observable by the lowering: storing one
+/// inside another array, placing one in a native tuple, or passing one to
+/// an uninterpreted function is rejected, and capturing one under a
+/// quantifier binder is unsupported (defaults are instantiated as ground
+/// constraints only, so a quantified body can observe uninstantiated
+/// indexes).
+enum class ConstArrayLowering { Auto, Native, Lazy };
+
 /// Selects how Camada lowers `mkFPNeg` for backends whose native FP
 /// implementation diverges from the IEEE-754 sign-bit-flip semantics
 /// some users expect.
@@ -693,9 +715,16 @@ public:
   /// Convenience method to create 64 bits long Inf
   virtual SMTExprRef mkInf64(const bool Sgn, FPEncoding Encoding) = 0;
 
-  /// Creates an array and initializes all elements to InitValue
+  /// Creates an array and initializes all elements to InitValue, choosing
+  /// the lowering automatically (see ConstArrayLowering::Auto).
   virtual SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
                                   const SMTExprRef &InitValue) = 0;
+
+  /// Creates an array and initializes all elements to InitValue with an
+  /// explicit lowering strategy.
+  virtual SMTExprRef mkArrayConst(const SMTSortRef &IndexSort,
+                                  const SMTExprRef &InitValue,
+                                  ConstArrayLowering Lowering) = 0;
 
   /// Reinterpret a bitvector as a floating-point, using the IEEE format
   virtual SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
