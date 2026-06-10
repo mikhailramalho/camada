@@ -27,6 +27,7 @@
 
 #include <cstdio>
 #include <gmp.h>
+#include <limits>
 #include <type_traits>
 #include <vector>
 
@@ -969,11 +970,18 @@ SMTExprRef MathSATSolver::mkRealImpl(int64_t num, int64_t den) {
 
 SMTExprRef MathSATSolver::mkBVFromDecImpl(const int64_t Int,
                                           const SMTSortRef &Sort) {
+  const unsigned Width = Sort->getWidth();
+  // msat_make_bv_int_number takes a non-negative int that must fit the
+  // width; everything else falls back to the binary-string path.
+  if (Int >= 0 && Int <= std::numeric_limits<int>::max() &&
+      (Width >= 63 || static_cast<uint64_t>(Int) < (uint64_t{1} << Width)))
+    return makeExprRef<MathSATExpr>(
+        SMTExprKind::BVConst, &Context, Sort,
+        msat_make_bv_int_number(Context, static_cast<int>(Int), Width));
   return makeExprRef<MathSATExpr>(
       SMTExprKind::BVConst, &Context, Sort,
-      msat_make_bv_number(Context,
-                          toTwosComplementBin(Int, Sort->getWidth()).c_str(),
-                          Sort->getWidth(), 2));
+      msat_make_bv_number(Context, toTwosComplementBin(Int, Width).c_str(),
+                          Width, 2));
 }
 
 SMTExprRef MathSATSolver::mkBVFromBinImpl(const std::string &Int,

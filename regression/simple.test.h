@@ -93,6 +93,31 @@ inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Pins the narrow (width <= 64) decimal-constant path, which backends may
+// serve through native integer APIs: negative values must produce the
+// two's-complement pattern and values must be masked to the sort width.
+inline void narrow_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
+  auto bv32 = solver->mkBVSort(32);
+  auto x = solver->mkSymbol("x", bv32);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(-42, bv32)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto bin = solver->getBVInBin(x);
+  REQUIRE(bin);
+  // -42 in 32-bit two's complement.
+  REQUIRE(bin.value() == "11111111111111111111111111010110");
+
+  solver->reset();
+  auto bv3 = solver->mkBVSort(3);
+  auto y = solver->mkSymbol("y", bv3);
+  solver->addConstraint(solver->mkEqual(y, solver->mkBVFromDec(-1, bv3)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto bin3 = solver->getBVInBin(y);
+  REQUIRE(bin3);
+  REQUIRE(bin3.value() == "111");
+}
+
 // Pin model parsing for bit-vector widths above 64. Solvers that emit BV
 // model values in the `(_ bv<n> <w>)` decimal form (mathsat is the canonical
 // example over the SMT-LIB pipe) need an arbitrary-precision decimal-to-
