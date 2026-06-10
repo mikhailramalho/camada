@@ -1,6 +1,10 @@
 #include "ac_config.h"
 #include "camada.h"
 
+#if SOLVER_SMTLIB_ENABLED
+#include "smtlibsolver.h"
+#endif
+
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -81,6 +85,17 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 #endif
   }
 
+  if (backend == "smtlib") {
+#if SOLVER_SMTLIB_ENABLED
+    // Write-only mode to /dev/null: measures the text-emission layer without
+    // a child solver. The bench cases are construction-only, so the UNKNOWN
+    // check() result in this mode is irrelevant.
+    return std::make_unique<camada::SMTLIBSolver>("/dev/null");
+#else
+    throw std::runtime_error("SMTLIB backend is not enabled");
+#endif
+  }
+
   throw std::runtime_error("Unknown backend: " + backend);
 }
 
@@ -103,12 +118,18 @@ std::string defaultBackend() {
 }
 
 bool backendSupportsTuples(const std::string &backend) {
-  return backend == "cvc5" || backend == "z3";
+  return backend == "cvc5" || backend == "z3" || backend == "smtlib";
 }
+
+// Optional substring filter on benchmark case names (third CLI argument).
+// Empty means "run everything".
+std::string caseFilter;
 
 void runCase(const std::string &backend, const std::string &name,
              std::size_t iterations,
              const std::function<void(camada::SMTSolver &, std::size_t)> &fn) {
+  if (!caseFilter.empty() && name.find(caseFilter) == std::string::npos)
+    return;
   const std::size_t rss_before_kb = readCurrentRSSKiB();
   auto start = Clock::now();
   {
@@ -445,8 +466,8 @@ void benchmarkResetCycleExprChain(camada::SMTSolver &solver,
 
 void printUsage(const char *argv0) {
   std::fprintf(stderr,
-               "Usage: %s [backend] [iterations]\n"
-               "Backends: bitwuzla cvc5 mathsat stp yices z3\n",
+               "Usage: %s [backend] [iterations] [case-substring]\n"
+               "Backends: bitwuzla cvc5 mathsat stp yices z3 smtlib\n",
                argv0);
 }
 
@@ -461,6 +482,9 @@ int main(int argc, char **argv) {
 
     if (iterations == 0)
       throw std::runtime_error("iterations must be greater than zero");
+
+    if (argc > 3)
+      caseFilter = argv[3];
 
     runCase(backend, "bv_sort_same", iterations, benchmarkBVSort);
     runCase(backend, "bv_const_same", iterations, benchmarkBVConstSame);
