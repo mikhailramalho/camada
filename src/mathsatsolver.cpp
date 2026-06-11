@@ -946,6 +946,30 @@ SMTExprRef MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
       msat_get_model_value(Context, toMathSATTerm(sel)));
 }
 
+SMTResult<ArrayModel>
+MathSATSolver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](msat_term Value, const SMTSortRef &Sort) {
+    return makeExprRef<MathSATExpr>(valueKindForSort(Sort), &Context, Sort,
+                                    Value);
+  };
+
+  msat_term Val = msat_get_model_value(Context, toMathSATTerm(Array));
+  if (MSAT_ERROR_TERM(Val))
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::MathSAT,
+                    "MathSAT could not evaluate the array in the model"};
+  ArrayModel Result;
+  while (msat_term_is_array_write(Context, Val)) {
+    Result.Entries.emplace_back(wrap(msat_term_get_arg(Val, 1), IndexSort),
+                                wrap(msat_term_get_arg(Val, 2), ElemSort));
+    Val = msat_term_get_arg(Val, 0);
+  }
+  if (msat_term_is_array_const(Context, Val))
+    Result.Base = wrap(msat_term_get_arg(Val, 0), ElemSort);
+  return Result;
+}
+
 SMTExprRef MathSATSolver::mkBoolImpl(const bool Bool) {
   return makeExprRef<MathSATExpr>(
       SMTExprKind::BoolConst, &Context, mkBoolSort(),
@@ -1103,10 +1127,32 @@ SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                             backend_init));
 }
 
-checkResult MathSATSolver::checkImpl() {
+bool MathSATSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::Quantifiers:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
+void MathSATSolver::armCheckDeadline() {
   CheckDeadline = TimeoutMs == 0 ? std::chrono::steady_clock::time_point{}
                                  : std::chrono::steady_clock::now() +
                                        std::chrono::milliseconds(TimeoutMs);
+}
+
+checkResult MathSATSolver::checkImpl() {
+  armCheckDeadline();
   msat_result res = msat_solve(Context);
   if (res == MSAT_SAT)
     return checkResult::SAT;
@@ -1121,7 +1167,57 @@ checkResult MathSATSolver::checkImpl() {
 // check (above) is all that is needed.
 bool MathSATSolver::setTimeoutImpl(uint64_t) { return true; }
 
+checkResult MathSATSolver::checkSatAssumingImpl(
+    const std::vector<SMTExprRef> &Assumptions) {
+  // msat_solve_with_assumptions rejects anything but (negated) Boolean
+  // constants, so activate each assumption through a fresh literal:
+  // assert (=> lit assumption), then assume the literal. Equisatisfiable
+  // with assuming the term directly, and the core maps back through the
+  // literals. The implications stay asserted at the current backtrack
+  // level after the call; with the literals otherwise unconstrained they
+  // are vacuously satisfiable, so later checks are unaffected.
+  LastAssumptionLits.clear();
+  std::vector<msat_term> lits;
+  lits.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions) {
+    const SMTExprRef Lit = mkSymbolUnchecked(
+        "__CAMADA_assume_" + std::to_string(NextAssumeId++), mkBoolSort());
+    addConstraint(mkImplies(Lit, Assumption));
+    lits.push_back(toMathSATTerm(Lit));
+    LastAssumptionLits.emplace_back(msat_term_id(lits.back()), Assumption);
+  }
+
+  armCheckDeadline();
+  msat_result res =
+      msat_solve_with_assumptions(Context, lits.data(), lits.size());
+  if (res == MSAT_SAT)
+    return checkResult::SAT;
+
+  if (res == MSAT_UNSAT)
+    return checkResult::UNSAT;
+
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> MathSATSolver::getUnsatAssumptionsImpl() {
+  size_t size = 0;
+  msat_term *core = msat_get_unsat_assumptions(Context, &size);
+  if (!core)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::MathSAT,
+                    "MathSAT could not retrieve the unsat assumptions"};
+  std::vector<SMTExprRef> Result;
+  for (size_t i = 0; i < size; ++i)
+    for (const auto &[LitId, Assumption] : LastAssumptionLits)
+      if (msat_term_id(core[i]) == LitId) {
+        Result.push_back(Assumption);
+        break;
+      }
+  msat_free(core);
+  return Result;
+}
+
 void MathSATSolver::resetImpl() {
+  LastAssumptionLits.clear();
   destroyContext();
   initializeContext();
 }

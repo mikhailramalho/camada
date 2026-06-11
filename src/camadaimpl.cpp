@@ -210,6 +210,11 @@ void SMTSolverImpl::clearSortCaches() {
   TupleSortCache.clear();
 }
 
+void SMTSolverImpl::invalidateUnsatAssumptions() {
+  LastAssumptions.clear();
+  UnsatAssumptionsValid = false;
+}
+
 void SMTSolverImpl::clearExprCaches() {
   CachedBoolExprs.fill({});
   CachedBVOne1Expr = {};
@@ -226,6 +231,7 @@ void SMTSolverImpl::clearExprCaches() {
   LazyArrayItes.clear();
   LazyTouched.clear();
   LazyConstraintLevels.assign(1, {});
+  invalidateUnsatAssumptions();
 }
 
 void SMTSolverImpl::initializeCommonSingletons() {
@@ -479,6 +485,7 @@ SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
 
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
   requireBoolSort(Exp, "Expected boolean constraint");
+  invalidateUnsatAssumptions();
   return addConstraintImpl(Exp);
 }
 
@@ -1205,6 +1212,17 @@ void SMTSolverImpl::instantiateLazyDefaults(const SMTExprRef &Array,
   }
 }
 
+std::string SMTSolverImpl::lazyIndexModelBits(const SMTExprRef &Exp) {
+  if (Exp->isBoolSort()) {
+    SMTResult<bool> Value = getBool(Exp);
+    return Value ? std::string(Value.value() ? "1" : "0") : std::string();
+  }
+  if (!Exp->isBVSort())
+    return std::string(); // unsupported index sort: backend fallback
+  SMTResult<std::string> Value = getBVInBin(Exp);
+  return Value ? Value.value() : std::string();
+}
+
 SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
                                                   const SMTExprRef &Index) {
   // Post-check model query: the solver's model is unconstrained at indexes
@@ -1212,14 +1230,7 @@ SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
   // derivation chain instead. Returns a null ref when the chain cannot be
   // resolved, in which case the caller falls back to the backend.
   const auto modelBits = [this](const SMTExprRef &E) {
-    if (E->isBoolSort()) {
-      SMTResult<bool> Value = getBool(E);
-      return Value ? std::string(Value.value() ? "1" : "0") : std::string();
-    }
-    if (!E->isBVSort())
-      return std::string(); // unsupported index sort: backend fallback
-    SMTResult<std::string> Value = getBVInBin(E);
-    return Value ? Value.value() : std::string();
+    return lazyIndexModelBits(E);
   };
 
   const std::string QueryBits = modelBits(Index);
@@ -1434,6 +1445,78 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   SMTExprRef theExp = getArrayElementImpl(Array, Index);
   assert(theExp->Sort == Array->Sort->getElementSort());
   return theExp;
+}
+
+SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
+  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
+    return lazyArrayModel(Array);
+  return getArrayValuesImpl(Array);
+}
+
+SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
+  // The backend's model is unconstrained at indexes whose lazy defaults
+  // were never instantiated, so walk the tracked derivation chain instead:
+  // stores become entries (outermost first, so shadowed stores at the same
+  // model index are skipped), ites follow the model's branch, and the
+  // reached root's initializer becomes the default.
+  ArrayModel Model;
+  std::set<std::string> SeenIndexBits;
+  const SMTExpr *Cur = &*Array;
+  while (true) {
+    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
+      const std::string StepBits = lazyIndexModelBits(It->second.Index);
+      if (StepBits.empty())
+        return SMTError{SMTErrorCode::BackendError,
+                        CachedBoolExprs[0]->getBackendKind(),
+                        "Could not evaluate a store index while walking a "
+                        "lazily lowered array model"};
+      if (SeenIndexBits.insert(StepBits).second)
+        Model.Entries.emplace_back(It->second.Index, It->second.Value);
+      Cur = It->second.Parent;
+      continue;
+    }
+    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
+      SMTResult<bool> Cond = getBool(It->second.Cond);
+      if (!Cond)
+        return Cond.error();
+      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
+      continue;
+    }
+    if (auto It = LazyConstArrayRoots.find(Cur);
+        It != LazyConstArrayRoots.end()) {
+      Model.Base = It->second.Init;
+      return Model;
+    }
+    return SMTError{SMTErrorCode::BackendError,
+                    CachedBoolExprs[0]->getBackendKind(),
+                    "Untracked derivation while walking a lazily lowered "
+                    "array model"};
+  }
+}
+
+SMTResult<ArrayModel> SMTSolverImpl::getArrayValuesImpl(const SMTExprRef &) {
+  return SMTError{SMTErrorCode::UnsupportedOperation,
+                  CachedBoolExprs[0]->getBackendKind(),
+                  "Array model extraction is not supported by this backend"};
+}
+
+SMTExprKind SMTSolverImpl::valueKindForSort(const SMTSortRef &Sort) {
+  if (Sort->isBoolSort())
+    return SMTExprKind::BoolConst;
+  if (Sort->isBVSort())
+    return SMTExprKind::BVConst;
+  if (Sort->isFPSort())
+    return SMTExprKind::FPConst;
+  if (Sort->isRMSort())
+    return SMTExprKind::RMConst;
+  if (Sort->isArraySort())
+    return SMTExprKind::ArrayConst;
+  if (Sort->isIntSort())
+    return SMTExprKind::IntConst;
+  if (Sort->isRealSort())
+    return SMTExprKind::RealConst;
+  return SMTExprKind::Unknown;
 }
 
 SMTExprRef SMTSolverImpl::mkBool(const bool b) {
@@ -1715,7 +1798,84 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   return theExp;
 }
 
-checkResult SMTSolverImpl::check() { return checkImpl(); }
+checkResult SMTSolverImpl::check() {
+  invalidateUnsatAssumptions();
+  return checkImpl();
+}
+
+checkResult
+SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
+  for (const SMTExprRef &Assumption : Assumptions)
+    requireBoolSort(Assumption, "Expected boolean assumption");
+  // checkSatAssumingImpl may route through the public
+  // addConstraint/push/pop (the default fallback and the activation-literal
+  // lowerings do), all of which invalidate the unsat-assumption state, so
+  // record it only after the check completes.
+  const checkResult Result =
+      Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions);
+  UnsatAssumptionsValid = Result == checkResult::UNSAT;
+  LastAssumptions =
+      UnsatAssumptionsValid ? Assumptions : std::vector<SMTExprRef>{};
+  return Result;
+}
+
+checkResult SMTSolverImpl::checkSatAssumingImpl(
+    const std::vector<SMTExprRef> &Assumptions) {
+  push();
+  for (const SMTExprRef &Assumption : Assumptions)
+    addConstraint(Assumption);
+  const checkResult Result = checkImpl();
+  pop();
+  return Result;
+}
+
+SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
+  if (!UnsatAssumptionsValid)
+    return SMTError{SMTErrorCode::BackendError,
+                    CachedBoolExprs[0]->getBackendKind(),
+                    "getUnsatAssumptions is only valid right after a "
+                    "checkSatAssuming call that returned UNSAT, before the "
+                    "solver state is mutated or checked again"};
+  if (LastAssumptions.empty())
+    return std::vector<SMTExprRef>{};
+  SMTResult<std::vector<SMTExprRef>> Core = getUnsatAssumptionsImpl();
+  if (!Core)
+    return Core;
+  // Normalize across backends: a duplicated assumption must not yield a
+  // duplicated core entry (activation-literal lowerings mint one literal
+  // per position, so their raw cores can repeat an expression).
+  std::vector<SMTExprRef> Deduped;
+  for (SMTExprRef &Assumption : Core.value()) {
+    bool Seen = false;
+    for (const SMTExprRef &Kept : Deduped)
+      if (&*Kept == &*Assumption) {
+        Seen = true;
+        break;
+      }
+    if (!Seen)
+      Deduped.push_back(std::move(Assumption));
+  }
+  return Deduped;
+}
+
+SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptionsImpl() {
+  return SMTError{SMTErrorCode::UnsupportedOperation,
+                  CachedBoolExprs[0]->getBackendKind(),
+                  "Unsat assumptions are not supported by this backend"};
+}
+
+bool SMTSolverImpl::supports(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::NativeTuples:
+    return nativeTupleSupport();
+  case SolverFeature::NativeConstantArrays:
+    return nativeConstArraySupport();
+  default:
+    return supportsImpl(Feature);
+  }
+}
+
+bool SMTSolverImpl::supportsImpl(SolverFeature) const { return false; }
 
 bool SMTSolverImpl::setTimeout(uint64_t Milliseconds) {
   const bool Supported = setTimeoutImpl(Milliseconds);
@@ -1737,11 +1897,13 @@ void SMTSolverImpl::reset() {
 }
 
 void SMTSolverImpl::push(unsigned nscopes) {
+  invalidateUnsatAssumptions();
   LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
   pushImpl(nscopes);
 }
 
 void SMTSolverImpl::pop(unsigned nscopes) {
+  invalidateUnsatAssumptions();
   // Lazy default axioms and extensionality lemmas asserted inside the
   // popped scopes are scope-independent facts about expressions that
   // outlive the pop, so re-assert them at the outer level instead of

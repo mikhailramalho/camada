@@ -135,6 +135,7 @@ void BitwuzlaSolver::initializeContext() {
   TermManager = bitwuzla_term_manager_new();
   Options = bitwuzla_options_new();
   bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_MODELS, 1);
+  bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
   Context = bitwuzla_new(TermManager, Options);
   bitwuzla_set_termination_callback(Context, bitwuzlaTerminationCallback,
@@ -795,6 +796,34 @@ SMTExprRef BitwuzlaSolver::getArrayElementImpl(const SMTExprRef &Array,
       bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*select).Expr));
 }
 
+SMTResult<ArrayModel>
+BitwuzlaSolver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](BitwuzlaTerm Value, const SMTSortRef &Sort) {
+    return makeExprRef<BitwExpr>(valueKindForSort(Sort), Context, Sort, Value);
+  };
+
+  BitwuzlaTerm Val =
+      bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Array).Expr);
+  ArrayModel Result;
+  while (bitwuzla_term_get_kind(Val) == BITWUZLA_KIND_ARRAY_STORE) {
+    size_t Size = 0;
+    BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
+    fatalErrorIf(Size != 3, "Malformed bitwuzla array store in model");
+    Result.Entries.emplace_back(wrap(Children[1], IndexSort),
+                                wrap(Children[2], ElemSort));
+    Val = Children[0];
+  }
+  if (bitwuzla_term_get_kind(Val) == BITWUZLA_KIND_CONST_ARRAY) {
+    size_t Size = 0;
+    BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
+    fatalErrorIf(Size != 1, "Malformed bitwuzla constant array in model");
+    Result.Base = wrap(Children[0], ElemSort);
+  }
+  return Result;
+}
+
 SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
   return makeExprRef<BitwExpr>(SMTExprKind::BoolConst, Context, mkBoolSort(),
                                b ? bitwuzla_mk_true(TermManager)
@@ -977,10 +1006,32 @@ SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   return newSymbol;
 }
 
-checkResult BitwuzlaSolver::checkImpl() {
+bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::Quantifiers: // BV/FP quantifiers only
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::IntRealArithmetic:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
+void BitwuzlaSolver::armCheckDeadline() {
   CheckDeadline = TimeoutMs == 0 ? std::chrono::steady_clock::time_point{}
                                  : std::chrono::steady_clock::now() +
                                        std::chrono::milliseconds(TimeoutMs);
+}
+
+checkResult BitwuzlaSolver::checkImpl() {
+  armCheckDeadline();
   BitwuzlaResult res = bitwuzla_check_sat(Context);
   if (res == BITWUZLA_SAT)
     return checkResult::SAT;
@@ -992,6 +1043,36 @@ checkResult BitwuzlaSolver::checkImpl() {
 // The termination callback is always registered; arming the deadline per
 // check (above) is all that is needed.
 bool BitwuzlaSolver::setTimeoutImpl(uint64_t) { return true; }
+
+checkResult BitwuzlaSolver::checkSatAssumingImpl(
+    const std::vector<SMTExprRef> &Assumptions) {
+  std::vector<BitwuzlaTerm> assumptions;
+  assumptions.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toSolverExpr<BitwExpr>(*Assumption).Expr);
+
+  armCheckDeadline();
+  BitwuzlaResult res = bitwuzla_check_sat_assuming(
+      Context, static_cast<uint32_t>(assumptions.size()), assumptions.data());
+  if (res == BITWUZLA_SAT)
+    return checkResult::SAT;
+  if (res == BITWUZLA_UNSAT)
+    return checkResult::UNSAT;
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> BitwuzlaSolver::getUnsatAssumptionsImpl() {
+  size_t size = 0;
+  const BitwuzlaTerm *core = bitwuzla_get_unsat_assumptions(Context, &size);
+  std::vector<SMTExprRef> Result;
+  for (size_t i = 0; i < size; ++i)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (core[i] == toSolverExpr<BitwExpr>(*Assumption).Expr) {
+        Result.push_back(Assumption);
+        break;
+      }
+  return Result;
+}
 
 void BitwuzlaSolver::resetImpl() {
   destroyContext();

@@ -78,6 +78,10 @@ protected:
   void initializeContext();
   void destroyContext();
 
+  // Arm CheckDeadline from TimeoutMs; both check paths call it before
+  // querying the solver.
+  void armCheckDeadline();
+
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
@@ -214,6 +218,8 @@ protected:
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 
+  SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array) override;
+
   SMTExprRef mkBoolImpl(const bool b) override;
   SMTExprRef mkBVFromDecImpl(const int64_t Int,
                              const SMTSortRef &Sort) override;
@@ -235,6 +241,12 @@ protected:
 
   checkResult checkImpl() override;
   bool setTimeoutImpl(uint64_t Milliseconds) override;
+
+  checkResult
+  checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
+  SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
+
+  bool supportsImpl(SolverFeature Feature) const override;
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;

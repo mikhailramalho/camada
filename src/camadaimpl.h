@@ -197,6 +197,28 @@ protected:
   /// read the current value.
   uint64_t TimeoutMs = 0;
 
+  // --- Assumption-based solving ---
+  // The assumptions of the most recent checkSatAssuming() call, kept so
+  // backends can map the solver's native unsat core back to the caller's
+  // SMTExprRefs. UnsatAssumptionsValid gates getUnsatAssumptions(): it is
+  // set only when that call returned UNSAT and cleared by anything that
+  // invalidates the solver's core — a plain check(), addConstraint(),
+  // push(), pop(), or reset().
+  std::vector<SMTExprRef> LastAssumptions;
+  bool UnsatAssumptionsValid = false;
+  void invalidateUnsatAssumptions();
+
+  /// Model bits of a bool/BV-sorted expression after a SAT check, used to
+  /// compare index terms by model value. Empty string when the sort is
+  /// unsupported or the model query fails.
+  std::string lazyIndexModelBits(const SMTExprRef &Exp);
+
+  /// Sparse model for an expression that reaches a lazily lowered constant
+  /// array, built from the tracked derivation chain instead of the backend
+  /// model (the backend's model is unconstrained at indexes whose defaults
+  /// were never instantiated).
+  SMTResult<ArrayModel> lazyArrayModel(const SMTExprRef &Array);
+
   std::shared_ptr<SMTHandleState> HandleState =
       std::make_shared<SMTHandleState>();
 
@@ -400,6 +422,7 @@ public:
   SMTResult<double> getFP64(const SMTExprRef &Exp) override final;
   SMTExprRef getArrayElement(const SMTExprRef &Array,
                              const SMTExprRef &Index) override final;
+  SMTResult<ArrayModel> getArrayValues(const SMTExprRef &Array) override final;
   SMTExprRef mkBool(const bool b) override final;
   SMTExprRef mkInt(int64_t v) override final;
   SMTExprRef mkInt(const std::string &v) override final;
@@ -439,6 +462,12 @@ public:
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final;
   checkResult check() override final;
   bool setTimeout(uint64_t Milliseconds) override final;
+
+  checkResult
+  checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) override final;
+  SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() override final;
+
+  bool supports(SolverFeature Feature) const override final;
   void reset() override final;
   void push(unsigned nscopes = 1) override final;
   void pop(unsigned nscopes = 1) override final;
@@ -733,6 +762,16 @@ protected:
   virtual SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                          const SMTExprRef &Index) = 0;
 
+  /// Walk the backend model's representation of Array (store chains over a
+  /// constant array, function interpretations, ...) into an ArrayModel.
+  /// The default returns UnsupportedOperation for backends without a
+  /// walkable array model.
+  virtual SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array);
+
+  /// SMTExprKind of a model-value constant of the given sort, for backends
+  /// wrapping walked model terms.
+  static SMTExprKind valueKindForSort(const SMTSortRef &Sort);
+
   virtual SMTExprRef mkBoolImpl(const bool b) = 0;
 
   virtual SMTExprRef mkIntImpl(int64_t);
@@ -791,6 +830,25 @@ protected:
   /// reset() re-applies the stored limit through this hook, so overrides
   /// must be idempotent and callable right after resetImpl().
   virtual bool setTimeoutImpl(uint64_t Milliseconds);
+
+  /// Default fallback for backends without native assumption support:
+  /// push a scope, assert each assumption, check, pop. Goes through the
+  /// public push/pop/addConstraint so the lazy constant-array journal
+  /// stays consistent.
+  virtual checkResult
+  checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions);
+
+  /// Only dispatched right after checkSatAssumingImpl returned UNSAT for a
+  /// non-empty assumption set (the wrapper answers the trivial cases).
+  /// Native backends map the solver's core back to the SMTExprRefs stored
+  /// in LastAssumptions.
+  virtual SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl();
+
+  /// Backend feature bits for everything supports() cannot answer from
+  /// the existing capability hooks (nativeTupleSupport,
+  /// nativeConstArraySupport). The default claims nothing; backends
+  /// override with a switch over the features they implement.
+  virtual bool supportsImpl(SolverFeature Feature) const;
 
   virtual void resetImpl() = 0;
 

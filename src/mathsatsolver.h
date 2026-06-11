@@ -294,6 +294,8 @@ protected:
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 
+  SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array) override;
+
   SMTExprRef mkBoolImpl(const bool b) override;
   SMTExprRef mkIntImpl(int64_t v) override;
   SMTExprRef mkIntImpl(const std::string &v) override;
@@ -332,6 +334,13 @@ protected:
 
   bool setTimeoutImpl(uint64_t Milliseconds) override;
 
+  checkResult
+  checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
+
+  SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
+
+  bool supportsImpl(SolverFeature Feature) const override;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
@@ -346,6 +355,10 @@ private:
   void initializeContext();
   void destroyContext();
 
+  // Arm CheckDeadline from TimeoutMs; both check paths call it before
+  // querying the solver.
+  void armCheckDeadline();
+
   msat_config Config{};
   msat_env Context{};
 
@@ -354,6 +367,14 @@ private:
   // address as the callback state). The epoch value means "no deadline";
   // checkImpl arms it from TimeoutMs before each query.
   std::chrono::steady_clock::time_point CheckDeadline{};
+
+  // msat_solve_with_assumptions accepts only (negated) Boolean constants,
+  // so checkSatAssumingImpl assumes fresh activation literals
+  // (`__CAMADA_assume_N`) implying the caller's terms instead. This maps
+  // each literal's term id from the most recent call back to the
+  // assumption it activates, for decoding msat_get_unsat_assumptions.
+  uint64_t NextAssumeId = 0;
+  std::vector<std::pair<size_t, SMTExprRef>> LastAssumptionLits;
 }; // end class MathSATSolver
 
 } // namespace camada

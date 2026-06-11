@@ -894,6 +894,48 @@ SMTExprRef Z3Solver::getArrayElementImpl(const SMTExprRef &Array,
                              Solver.get_model().eval(toZ3Expr(sel), true));
 }
 
+SMTResult<ArrayModel> Z3Solver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](const z3::expr &Value, const SMTSortRef &Sort) {
+    return makeExprRef<Z3Expr>(valueKindForSort(Sort), Context, Sort, Value);
+  };
+
+  z3::model Model = Solver.get_model();
+  z3::expr Val = Model.eval(toZ3Expr(Array), true);
+  ArrayModel Result;
+  while (Val.is_app() && Val.decl().decl_kind() == Z3_OP_STORE) {
+    Result.Entries.emplace_back(wrap(Val.arg(1), IndexSort),
+                                wrap(Val.arg(2), ElemSort));
+    Val = Val.arg(0);
+  }
+  if (Val.is_app() && Val.decl().decl_kind() == Z3_OP_CONST_ARRAY) {
+    Result.Base = wrap(Val.arg(0), ElemSort);
+    return Result;
+  }
+  if (Val.is_app() && Val.decl().decl_kind() == Z3_OP_AS_ARRAY) {
+    // The model chose a function-graph representation: read the entries
+    // and the else-branch off the function interpretation.
+    z3::func_decl Decl(*Context, Z3_get_as_array_func_decl(*Context, Val));
+    z3::func_interp Interp = Model.get_func_interp(Decl);
+    for (unsigned I = 0; I < Interp.num_entries(); ++I) {
+      z3::func_entry Entry = Interp.entry(I);
+      Result.Entries.emplace_back(wrap(Entry.arg(0), IndexSort),
+                                  wrap(Entry.value(), ElemSort));
+    }
+    Result.Base = wrap(Interp.else_value(), ElemSort);
+    return Result;
+  }
+  // A bare uninterpreted constant is a true bottom: the array really is
+  // unconstrained at the remaining indexes. Any other shape (e.g. a lambda
+  // model) is one this walk does not understand — error out rather than
+  // return a model the contract decodes as unconstrained.
+  if (Val.is_const())
+    return Result;
+  return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Z3,
+                  "Unrecognized Z3 array model shape: " + Val.to_string()};
+}
+
 SMTExprRef Z3Solver::mkBoolImpl(const bool b) {
   return makeExprRef<Z3Expr>(SMTExprKind::BoolConst, Context, mkBoolSort(),
                              Context->bool_val(b));
@@ -1055,6 +1097,23 @@ SMTExprRef Z3Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                              z3::exists(bound_vars, toZ3Expr(Body)));
 }
 
+bool Z3Solver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult Z3Solver::checkImpl() {
   z3::check_result res = Solver.check();
   if (res == z3::check_result::sat)
@@ -1077,6 +1136,43 @@ bool Z3Solver::setTimeoutImpl(uint64_t Milliseconds) {
   params.set("timeout", static_cast<unsigned>(Value));
   Solver.set(params);
   return true;
+}
+
+checkResult
+Z3Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  // Tactic-built solvers (see setSolver) do not track assumption cores
+  // unless asked: they answer UNSAT with an empty unsat_core(). The plain
+  // smt solver tracks them regardless, so setting the parameter here is a
+  // harmless no-op for it. Set per call because setSolver can swap the
+  // solver instance at any time.
+  z3::params params(*Context);
+  params.set("unsat_core", true);
+  Solver.set(params);
+
+  z3::expr_vector assumptions(*Context);
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toZ3Expr(Assumption));
+
+  z3::check_result res = Solver.check(assumptions);
+  if (res == z3::check_result::sat)
+    return checkResult::SAT;
+
+  if (res == z3::check_result::unsat)
+    return checkResult::UNSAT;
+
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> Z3Solver::getUnsatAssumptionsImpl() {
+  z3::expr_vector core = Solver.unsat_core();
+  std::vector<SMTExprRef> Result;
+  for (unsigned i = 0; i < core.size(); ++i)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (z3::eq(core[static_cast<int>(i)], toZ3Expr(Assumption))) {
+        Result.push_back(Assumption);
+        break;
+      }
+  return Result;
 }
 
 void Z3Solver::resetImpl() { Solver.reset(); }

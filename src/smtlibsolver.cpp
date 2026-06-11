@@ -719,6 +719,19 @@ void SMTLIBSolver::emitPreamble() {
   // explicitly enabled; z3 and yices-smt2 default to producing models. Set
   // the option unconditionally for protocol portability.
   emitLine("(set-option :produce-models true)");
+  // Needed for (get-unsat-assumptions). Unlike the options above, not every
+  // child implements it, and the standard reply for an unimplemented option
+  // is `unsupported` — not an error — so this one bypasses emitLine's
+  // success-or-die handling and records the answer instead.
+  const std::string UnsatAssumptionsOpt =
+      "(set-option :produce-unsat-assumptions true)\n";
+  if (File)
+    File->emitRaw(UnsatAssumptionsOpt);
+  if (Proc) {
+    Proc->emitRaw(UnsatAssumptionsOpt);
+    Proc->flush();
+    UnsatAssumptionsSupported = Proc->readResponse() == "success";
+  }
   // Without :global-declarations true, declarations made inside a (push) are
   // discarded on (pop). Camada's API lets a caller mkSymbol() inside a pushed
   // scope and use the returned expression after pop(); without this option,
@@ -2153,6 +2166,27 @@ SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
   return mkArraySelect(Array, Index);
 }
 
+bool SMTLIBSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  // These bits describe what the emitter can put on the wire; a given
+  // child solver may still reject a construct at runtime (yices-smt2 has
+  // no FP, bitwuzla no Int/Real, ...).
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+    return true;
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult SMTLIBSolver::checkImpl() {
   // (check-sat) is a query — it does NOT produce a `success` ack even when
   // :print-success is true. Bypass emitLine's resync logic; write the
@@ -2174,6 +2208,96 @@ checkResult SMTLIBSolver::checkImpl() {
   if (File)
     File->flush();
   return checkResult::UNKNOWN;
+}
+
+checkResult
+SMTLIBSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  // Activate each assumption through a fresh literal: assert
+  // (=> lit assumption), then assume the literal. This is equisatisfiable
+  // with assuming the term directly, stays inside the standard's
+  // literals-only grammar for (check-sat-assuming ...), and makes the
+  // (get-unsat-assumptions) response trivially decodable by symbol name.
+  // The implications remain asserted at the current push level after the
+  // call; with the literals otherwise unconstrained they are vacuously
+  // satisfiable, so later checks are unaffected.
+  LastAssumptionLits.clear();
+  std::string Cmd = "(check-sat-assuming (";
+  for (const SMTExprRef &Assumption : Assumptions) {
+    std::string Lit = "__CAMADA_assume_" + std::to_string(NextAssumeId++);
+    addConstraint(mkImplies(mkSymbolUnchecked(Lit, mkBoolSort()), Assumption));
+    if (!LastAssumptionLits.empty())
+      Cmd.push_back(' ');
+    Cmd.append(Lit);
+    LastAssumptionLits.emplace_back(std::move(Lit), Assumption);
+  }
+  Cmd.append("))\n");
+
+  // Like (check-sat), this is a query — no `success` ack, so bypass
+  // emitLine and read the verdict directly.
+  if (File)
+    File->emitRaw(Cmd);
+  if (Proc) {
+    Proc->emitRaw(Cmd);
+    Proc->flush();
+    std::string Resp = Proc->readResponse();
+    if (Resp == "sat")
+      return checkResult::SAT;
+    if (Resp == "unsat")
+      return checkResult::UNSAT;
+    return checkResult::UNKNOWN;
+  }
+  if (File)
+    File->flush();
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> SMTLIBSolver::getUnsatAssumptionsImpl() {
+  if (!Proc)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver: no child process to query for unsat "
+                    "assumptions in write-only mode"};
+  if (!UnsatAssumptionsSupported)
+    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
+                    "The child solver does not support "
+                    ":produce-unsat-assumptions"};
+
+  const std::string Cmd = "(get-unsat-assumptions)\n";
+  if (File)
+    File->emitRaw(Cmd);
+  Proc->emitRaw(Cmd);
+  Proc->flush();
+  std::string Resp = Proc->readResponse();
+  if (Resp.compare(0, 6, "(error") == 0 || Resp.empty())
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver: (get-unsat-assumptions) failed: " + Resp};
+
+  // The response is a list of the assumed activation literals, e.g.
+  // `(__CAMADA_assume_0 __CAMADA_assume_2)`. Tokenize and map each literal
+  // back to the assumption it activated. `|` is a delimiter too: quoting
+  // is semantically transparent in SMT-LIB, so a child may legally echo
+  // the literals as `|__CAMADA_assume_0|`, and the names contain no `|`.
+  std::vector<SMTExprRef> Result;
+  std::string Token;
+  auto FlushToken = [&]() {
+    if (Token.empty())
+      return;
+    for (const auto &[Lit, Assumption] : LastAssumptionLits)
+      if (Token == Lit) {
+        Result.push_back(Assumption);
+        break;
+      }
+    Token.clear();
+  };
+  for (const char C : Resp) {
+    if (C == '(' || C == ')' || C == '|' || C == ' ' || C == '\t' ||
+        C == '\n' || C == '\r') {
+      FlushToken();
+      continue;
+    }
+    Token.push_back(C);
+  }
+  FlushToken();
+  return Result;
 }
 
 void SMTLIBSolver::resetImpl() {
@@ -2210,6 +2334,7 @@ void SMTLIBSolver::resetImpl() {
     // is already in the kernel pipe by the time we reach this point.
     Proc->drainResponses(200);
   }
+  LastAssumptionLits.clear();
   emitPreamble();
 }
 

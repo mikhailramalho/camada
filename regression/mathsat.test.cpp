@@ -167,6 +167,9 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("implies_semantics",
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("implies_true_implies_false",
                                   implies_true_implies_false(solver),
                                   makeSMTLIBSolver)
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("check_sat_assuming_semantics",
+                                  check_sat_assuming_semantics(solver),
+                                  makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("bv_lshr_semantics",
                                   bv_lshr_semantics(solver), makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("incremental_push_pop",
@@ -176,6 +179,8 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
                                   symbol_cache_survives_push_pop(solver),
                                   makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array", array(solver), makeSMTLIBSolver)
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array_model_values",
+                                  array_model_values(solver), makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array_const_store_semantics",
                                   array_const_store_semantics(solver),
                                   makeSMTLIBSolver)
@@ -214,3 +219,17 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
 
 #undef CAMADA_MATHSAT_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED
+
+TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
+  auto solver = camada::createMathSATSolver();
+  using camada::SolverFeature;
+  REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Quantifiers));
+  REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
+  REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
+  REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
+  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  REQUIRE(solver->supports(SolverFeature::Timeouts));
+  REQUIRE(solver->supports(SolverFeature::ArrayModels));
+}

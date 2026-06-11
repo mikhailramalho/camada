@@ -81,19 +81,19 @@ set(CAMADA_BITWUZLA_MACOS_ARM64_URL
 # and its libbitwuzla.a is not link-compatible with MSVC. ESBMC does not enable
 # Bitwuzla on Windows for the same reason.
 set(CAMADA_MATHSAT_VERSION
-    "5.6.16"
+    "5.6.17"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
 set(CAMADA_MATHSAT_LINUX_X86_64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.16-linux-x86_64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.17-linux-x86_64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux x86_64")
 set(CAMADA_MATHSAT_LINUX_AARCH64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.16-linux-aarch64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.17-linux-aarch64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux aarch64")
 set(CAMADA_MATHSAT_MACOS_X86_64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.16-macos.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.17-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS x86_64")
 set(CAMADA_MATHSAT_MACOS_ARM64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.16-macos.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.17-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS arm64")
 # No Windows prebuilt for MathSAT: mathsat.h pulls in <gmp.h> and Camada calls
 # mpq_*/mpz_* APIs directly, but Windows has no system GMP and the win64 vendor
