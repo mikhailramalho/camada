@@ -174,7 +174,9 @@ shared fixtures from `tests.h`):
 The Camada preamble unconditionally sends `(set-option :print-success true)`,
 `(set-option :produce-models true)`,
 `(set-option :produce-unsat-assumptions true)` (a child answering
-`unsupported` still solves normally; only `getUnsatAssumptions` degrades),
+`unsupported` still solves normally; only `getUnsatAssumptions` degrades,
+and `supports(SolverFeature::UnsatAssumptions)` reflects the child's
+answer),
 `(set-option :global-declarations true)`, `(set-info :status unknown)`, and
 `(set-logic ALL)` at startup, so any solver that honors the SMT-LIB option
 contract should work. Other solvers should be
@@ -251,6 +253,10 @@ even if it lacks native floating-point support.
 | Uninterpreted functions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 | Tuples | ✔️<sup>2</sup> | ✔️ | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️ |
 | Quantifiers | ✔️ | ✔️ |   |   |   | ✔️ |
+| Overflow predicates | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Unsat assumptions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
+| Timeouts (`setTimeout`) | ✔️ | ✔️ | ✔️ |   | ✔️<sup>3</sup> | ✔️ |
+| Array models (`getArrayValues`) | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 
 <sup>1</sup> On `MathSAT`, `fp.fma` and `fp.rem` are lowered through the
 common BV path, and native `ROUND_TO_AWAY` is unsupported.
@@ -258,6 +264,15 @@ common BV path, and native `ROUND_TO_AWAY` is unsupported.
 <sup>2</sup> Via Camada's per-field tuple lowering rather than native
 datatypes; some gaps remain (e.g. arrays of tuples). Query
 `supports(SolverFeature::NativeTuples)` to tell the two apart.
+
+<sup>3</sup> POSIX only, enforced through a process-global SIGALRM timer —
+at most one timed Yices check may run at a time process-wide.
+
+The last four rows (and any platform splits) are queryable at runtime via
+`supports(SolverFeature)`; `checkSatAssuming` itself works on every
+backend through a push/assert/check/pop fallback — the unsat-assumptions
+row covers `getUnsatAssumptions`. On STP, `getArrayValues` still answers
+for lazily lowered constant arrays, which the common layer handles.
 
 ## Backend Caveats
 
@@ -290,6 +305,9 @@ limitations still matter in day-to-day use.
   - global Yices initialization/teardown is hardened for multiple wrappers, but
     simultaneously live Yices solver instances can still collide on shared
     symbol names.
+  - `setTimeout` is enforced with a process-global SIGALRM timer plus
+    `yices_stop_search` (Yices has no native time limit), so it is POSIX-only
+    and at most one timed Yices check may run at a time process-wide.
 - `Bitwuzla`
   - integers and reals are not supported.
   - quantifiers are available, but the strongest coverage in Camada is still in
