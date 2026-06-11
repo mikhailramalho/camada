@@ -50,7 +50,7 @@ namespace {
 // a time process-wide: concurrent timed checks on Yices instances in
 // different threads would clobber each other's timer and deadline.
 std::atomic<context_t *> YicesSearchContext{nullptr};
-struct sigaction YicesOldAlarmAction{};
+struct sigaction YicesOldAlarmAction = {};
 
 void yicesAlarmHandler(int) {
   if (context_t *Ctx = YicesSearchContext.load())
@@ -849,7 +849,7 @@ void YicesSolver::armTimeout() {
   if (TimeoutMs == 0)
     return;
   YicesSearchContext.store(Context);
-  struct sigaction Action{};
+  struct sigaction Action = {};
   Action.sa_handler = yicesAlarmHandler;
   // yices_stop_search works through a flag the search loop polls, so the
   // handler needs no syscall interruption: restart slow syscalls instead
@@ -879,7 +879,7 @@ void YicesSolver::disarmTimeout() {
   pthread_sigmask(SIG_BLOCK, &AlarmSet, &OldSet);
   itimerval Off{};
   setitimer(ITIMER_REAL, &Off, nullptr);
-  struct sigaction Ignore{};
+  struct sigaction Ignore = {};
   Ignore.sa_handler = SIG_IGN;
   sigemptyset(&Ignore.sa_mask);
   sigaction(SIGALRM, &Ignore, nullptr);
