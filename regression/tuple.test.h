@@ -448,6 +448,117 @@ inline void tuple_array_const_nested(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
 
+// Model extraction for decomposed tuple arrays: getArrayElement returns
+// a tuple value whose fields read back per leaf, and getArrayValues zips
+// the per-leaf sparse models into one tuple-valued model. Native-datatype
+// backends evaluate the array element directly; the decomposed path
+// reassembles from per-leaf model values.
+inline void tuple_array_model_values(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+
+  // Constant array of {bool, bv8} with two distinct stores.
+  auto init = solver->mkTuple({solver->mkBool(true), idx(7)});
+  auto arr = solver->mkArrayConst(bv8, init, Lowering);
+  arr = solver->mkArrayStore(arr, idx(3),
+                             solver->mkTuple({solver->mkBool(false), idx(9)}));
+  arr = solver->mkArrayStore(arr, idx(5),
+                             solver->mkTuple({solver->mkBool(true), idx(11)}));
+  // Touch an untouched index so every backend has the array in the formula.
+  solver->addConstraint(solver->mkEqual(
+      solver->mkTupleSelect(solver->mkArraySelect(arr, idx(0)), 1), idx(7)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Exact single-index recovery: getArrayElement at a written and an
+  // untouched index, read each tuple field back.
+  auto fieldsAt = [&](int64_t Index, bool &Flag, int64_t &Num) {
+    auto e = solver->getArrayElement(arr, idx(Index));
+    REQUIRE(e->Sort->isTupleSort());
+    auto b = solver->getBool(solver->mkTupleSelect(e, 0));
+    auto n = solver->getBV(solver->mkTupleSelect(e, 1));
+    REQUIRE(b);
+    REQUIRE(n);
+    Flag = b.value();
+    Num = n.value();
+  };
+  bool flag = false;
+  int64_t num = 0;
+  fieldsAt(3, flag, num);
+  REQUIRE_FALSE(flag);
+  REQUIRE(num == 9);
+  fieldsAt(5, flag, num);
+  REQUIRE(flag);
+  REQUIRE(num == 11);
+  fieldsAt(200, flag, num); // never mentioned: the constant default
+  REQUIRE(flag);
+  REQUIRE(num == 7);
+
+  // Sparse model: zip the per-leaf models, then resolve the tuple value
+  // at an index by its model value (first matching entry, else base).
+  auto Model = solver->getArrayValues(arr);
+  if (!Model) {
+    REQUIRE(Model.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+    return;
+  }
+  auto tupleAt = [&](int64_t Index, bool &Flag, int64_t &Num) {
+    for (const auto &Entry : Model.value().Entries) {
+      auto iv = solver->getBV(Entry.first);
+      REQUIRE(iv);
+      if (iv.value() == Index) {
+        auto b = solver->getBool(solver->mkTupleSelect(Entry.second, 0));
+        auto n = solver->getBV(solver->mkTupleSelect(Entry.second, 1));
+        REQUIRE(b);
+        REQUIRE(n);
+        Flag = b.value();
+        Num = n.value();
+        return;
+      }
+    }
+    REQUIRE(Model.value().Base);
+    auto b = solver->getBool(solver->mkTupleSelect(Model.value().Base, 0));
+    auto n = solver->getBV(solver->mkTupleSelect(Model.value().Base, 1));
+    REQUIRE(b);
+    REQUIRE(n);
+    Flag = b.value();
+    Num = n.value();
+  };
+  tupleAt(3, flag, num);
+  REQUIRE_FALSE(flag);
+  REQUIRE(num == 9);
+  tupleAt(5, flag, num);
+  REQUIRE(flag);
+  REQUIRE(num == 11);
+  tupleAt(200, flag, num); // base default
+  REQUIRE(flag);
+  REQUIRE(num == 7);
+
+  // Symbolic tuple array with a single store and no constant default:
+  // exercises the no-base zip path. getArrayValues either yields a model
+  // (native backends) or reports UnsupportedOperation (decomposed
+  // backends whose leaves have no base) — both are contract-valid, and
+  // exact single-index recovery must hold either way.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  auto tupSort = solver->mkTupleSort({solver->mkBoolSort(), bv8});
+  auto sym = solver->mkSymbol("sym_ta", solver->mkArraySort(bv8, tupSort));
+  auto stored = solver->mkTuple({solver->mkBool(true), idx(33)});
+  auto sym1 = solver->mkArrayStore(sym, idx(4), stored);
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto e = solver->getArrayElement(sym1, idx(4));
+  auto eb = solver->getBool(solver->mkTupleSelect(e, 0));
+  auto en = solver->getBV(solver->mkTupleSelect(e, 1));
+  REQUIRE(eb);
+  REQUIRE(en);
+  REQUIRE(eb.value());
+  REQUIRE(en.value() == 33);
+  auto SymModel = solver->getArrayValues(sym1);
+  if (!SymModel)
+    REQUIRE(SymModel.error().Code ==
+            camada::SMTErrorCode::UnsupportedOperation);
+}
+
 // Deep nesting: tuple { array of tuple { bv, array of tuple { bool, bv } } }
 // — five levels of alternation; everything must flatten to native
 // nested-arrays-of-scalars and recurse leaf-wise.

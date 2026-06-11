@@ -85,6 +85,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_array_equality_ite);
   RESETANDTEST(tuple_array_const);
   RESETANDARGTEST(tuple_array_const, LazyArrays);
+  RESETANDTEST(tuple_array_model_values);
+  RESETANDARGTEST(tuple_array_model_values, LazyArrays);
   RESETANDTEST(empty_tuple_semantics);
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(fp_native_bv_predicate_parity);

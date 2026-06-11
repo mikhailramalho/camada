@@ -24,6 +24,7 @@
 #include "camadacommon.h"
 #include "camadaimpl.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace camada {
@@ -543,6 +544,135 @@ SMTExprRef mkCamadaTupleArrayIte(SMTSolverImpl &Solver, const SMTExprRef &Cond,
     Leaves.push_back(Solver.mkIte(Cond, TE->LeafArrays[I], FE->LeafArrays[I]));
   return Solver.makeExprRef<CamadaTupleArrayExpr>(
       SMTExprKind::Ite, T->getBackendKind(), T->Sort, std::move(Leaves));
+}
+
+SMTExprRef getCamadaTupleArrayElement(SMTSolverImpl &Solver,
+                                      const SMTExprRef &Array,
+                                      const SMTExprRef &Index) {
+  const CamadaTupleArrayExpr *AE = toCamadaTupleArrayExpr(Array);
+  fatalErrorIf(AE == nullptr,
+               "getCamadaTupleArrayElement on a non-bundle expression");
+  std::vector<SMTExprRef> ElementLeaves;
+  ElementLeaves.reserve(AE->LeafArrays.size());
+  for (const auto &Leaf : AE->LeafArrays)
+    ElementLeaves.push_back(Solver.getArrayElement(Leaf, Index));
+  std::size_t Pos = 0;
+  SMTExprRef Element = assembleFromLeaves(Solver, Array->Sort->getElementSort(),
+                                          ElementLeaves, Pos);
+  fatalErrorIf(Pos != ElementLeaves.size(), "Tuple-array leaf overflow");
+  return Element;
+}
+
+SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
+                                                const SMTExprRef &Array) {
+  const CamadaTupleArrayExpr *AE = toCamadaTupleArrayExpr(Array);
+  fatalErrorIf(AE == nullptr,
+               "getCamadaTupleArrayValues on a non-bundle expression");
+
+  // One sparse model per leaf array. Each entry/base value is a leaf-sort
+  // value (scalar or native array) usable as a tuple component.
+  std::vector<ArrayModel> LeafModels;
+  LeafModels.reserve(AE->LeafArrays.size());
+  for (const auto &Leaf : AE->LeafArrays) {
+    SMTResult<ArrayModel> Leaf_M = Solver.getArrayValues(Leaf);
+    if (!Leaf_M)
+      return Leaf_M.error();
+    LeafModels.push_back(std::move(Leaf_M.value()));
+  }
+
+  const SMTSortRef &ElementSort = Array->Sort->getElementSort();
+
+  // Canonicalize an index by its model value (the ArrayModel contract is
+  // value-based, never term identity). Bool and BV index sorts are the
+  // only ones the lazy machinery produces entries for; anything else
+  // cannot be canonicalized.
+  auto indexBitsOf = [&](const SMTExprRef &Idx) -> std::string {
+    if (Idx->isBoolSort()) {
+      SMTResult<bool> V = Solver.getBool(Idx);
+      return V ? std::string(V.value() ? "1" : "0") : std::string();
+    }
+    if (Idx->isBVSort()) {
+      SMTResult<std::string> V = Solver.getBVInBin(Idx);
+      return V ? V.value() : std::string();
+    }
+    return std::string();
+  };
+
+  // The defined indexes are the union across leaves, canonicalized by
+  // model value — aliased indexes across leaves merge to one tuple entry.
+  // Keep the first index expression seen for each value; iteration order
+  // is leaf-major so the result is deterministic.
+  std::vector<SMTExprRef> IndexExprs;
+  std::vector<std::string> IndexBits;
+  for (const ArrayModel &M : LeafModels) {
+    for (const auto &Entry : M.Entries) {
+      const std::string Bits = indexBitsOf(Entry.first);
+      if (Bits.empty())
+        return SMTError{SMTErrorCode::BackendError, Array->getBackendKind(),
+                        "Could not canonicalize a tuple-array model index"};
+      if (std::find(IndexBits.begin(), IndexBits.end(), Bits) ==
+          IndexBits.end()) {
+        IndexBits.push_back(Bits);
+        IndexExprs.push_back(Entry.first);
+      }
+    }
+  }
+
+  // Per leaf, resolve the value at a given index by its model value: the
+  // first matching entry wins, else the leaf base.
+  auto leafValueAt = [&](const ArrayModel &M, const std::string &Bits,
+                         bool &Found) -> SMTExprRef {
+    for (const auto &Entry : M.Entries) {
+      if (indexBitsOf(Entry.first) == Bits) {
+        Found = true;
+        return Entry.second;
+      }
+    }
+    if (M.Base) {
+      Found = true;
+      return M.Base;
+    }
+    Found = false;
+    return {};
+  };
+
+  ArrayModel Result;
+  for (std::size_t K = 0; K < IndexExprs.size(); ++K) {
+    std::vector<SMTExprRef> LeafValues;
+    LeafValues.reserve(LeafModels.size());
+    for (const ArrayModel &M : LeafModels) {
+      bool Found = false;
+      SMTExprRef V = leafValueAt(M, IndexBits[K], Found);
+      if (!Found)
+        return SMTError{SMTErrorCode::UnsupportedOperation,
+                        Array->getBackendKind(),
+                        "A tuple-array leaf has no value at a defined index "
+                        "and no base default"};
+      LeafValues.push_back(V);
+    }
+    std::size_t Pos = 0;
+    Result.Entries.emplace_back(
+        IndexExprs[K],
+        assembleFromLeaves(Solver, ElementSort, LeafValues, Pos));
+  }
+
+  // Base: a tuple of the per-leaf bases, only when every leaf has one.
+  bool AllBases = true;
+  std::vector<SMTExprRef> BaseLeaves;
+  BaseLeaves.reserve(LeafModels.size());
+  for (const ArrayModel &M : LeafModels) {
+    if (!M.Base) {
+      AllBases = false;
+      break;
+    }
+    BaseLeaves.push_back(M.Base);
+  }
+  if (AllBases) {
+    std::size_t Pos = 0;
+    Result.Base = assembleFromLeaves(Solver, ElementSort, BaseLeaves, Pos);
+  }
+
+  return Result;
 }
 
 } // namespace camada

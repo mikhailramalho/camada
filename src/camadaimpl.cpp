@@ -1611,12 +1611,10 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
-  // Tuple-array model extraction is the model-extraction tuple-plan
-  // phase; the bundle has no backend representation to evaluate yet.
-  fatalErrorIf(!nativeTupleSupport() &&
-                   sortContainsTuple(Array->Sort->getElementSort()),
-               "Model extraction for arrays of tuples is not yet supported "
-               "on this backend; see tuple-plan.md");
+  // Decomposed tuple arrays read each leaf at Index and reassemble the
+  // per-leaf values into a tuple; the per-leaf reads re-enter this wrapper.
+  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+    return getCamadaTupleArrayElement(*this, Array, Index);
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
       return Resolved;
@@ -1636,10 +1634,10 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  // Decomposed tuple arrays zip the per-leaf sparse models into one
+  // tuple-valued model; the per-leaf queries re-enter this wrapper.
   if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
-    return SMTError{SMTErrorCode::UnsupportedOperation, Array->getBackendKind(),
-                    "Sparse models for arrays of tuples are not yet "
-                    "supported on this backend; see tuple-plan.md"};
+    return getCamadaTupleArrayValues(*this, Array);
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     return lazyArrayModel(Array);
   return getArrayValuesImpl(Array);

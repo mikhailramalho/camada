@@ -100,6 +100,20 @@ SMTExprRef mkCamadaTupleArrayEqual(SMTSolverImpl &Solver, const SMTExprRef &LHS,
 SMTExprRef mkCamadaTupleArrayIte(SMTSolverImpl &Solver, const SMTExprRef &Cond,
                                  const SMTExprRef &T, const SMTExprRef &F);
 
+/// Model extraction for decomposed tuple arrays. getCamadaTupleArrayElement
+/// reads each leaf array at Index through the public getArrayElement and
+/// reassembles the per-leaf values into a tuple value — exact single-index
+/// recovery. getCamadaTupleArrayValues zips the per-leaf sparse ArrayModels
+/// into one tuple-valued ArrayModel: indexes are unioned by model value,
+/// and the Base is a tuple of the per-leaf bases only when every leaf
+/// reports one (otherwise null — no fabricated partial default).
+SMTExprRef getCamadaTupleArrayElement(SMTSolverImpl &Solver,
+                                      const SMTExprRef &Array,
+                                      const SMTExprRef &Index);
+
+SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
+                                                const SMTExprRef &Array);
+
 } // namespace camada
 
 #endif
