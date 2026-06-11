@@ -20,8 +20,14 @@ feature gaps in backends that are missing parts of the SMT-LIB surface.
 Current encoded/common-layer features:
 
 - floating-point fallback via bit-vector encoding
-- array support, with some remaining tuple-related gaps
-- tuple encoding layer: planned for backends without native tuple support
+- array support, including lazily lowered constant arrays for backends
+  without a native `((as const ...))` operator
+- tuple lowering for backends without native datatype support (native
+  datatypes on CVC5, Z3, and the SMT-LIB pipe; per-field decomposition
+  elsewhere, with some remaining gaps such as arrays of tuples)
+- bit-vector overflow predicates, assumption-based solving with unsat
+  assumptions, per-check wall-clock timeouts, sparse array model
+  extraction, and a queryable capability API (`supports(SolverFeature)`)
 
 ## What Camada Is
 
@@ -94,12 +100,15 @@ Downloaded sources and locally installed solver artifacts are stored under
 
 When CMake downloads dependencies itself:
 - `Bitwuzla` uses the prebuilt static release archive from `0.9.1`.
-- `Z3` uses the prebuilt release archive from `z3-4.15.4`.
+- `Z3` uses the prebuilt release archive from `z3-4.16.0`.
 - `CVC5` uses the prebuilt static release archive from `cvc5-1.3.4`.
 - `Yices` uses a source build.
 - `GMP` uses a source build when it is needed by downloaded dependencies and no
   suitable staged copy is already available.
-- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.16`.
+- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.17` on
+  Linux. macOS stays pinned to `5.6.16`: the `5.6.17` macOS tarball ships
+  `libmathsat.a` as a plain `ar` archive of fat Mach-O objects, a layout
+  Apple's `ld` rejects.
 - `STP` still falls back to a source build. The `2.3.4_cadical` GitHub release
   only ships a standalone `stp` executable, not the headers and libraries that
   Camada needs to link against the STP C++ API.
@@ -119,7 +128,7 @@ location during the build.
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
 | [STP](https://stp.github.io/)              |  2.3.4          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
-| [Z3](https://github.com/Z3Prover/z3)       |  4.15.4         | ✔️ |
+| [Z3](https://github.com/Z3Prover/z3)       |  4.16.0         | ✔️ |
 | SMT-LIB (any external solver) | n/a | depends on child |
 
 <sup>1</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
@@ -163,9 +172,12 @@ shared fixtures from `tests.h`):
 | mathsat      | `{"mathsat"}`                                                   | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
 
 The Camada preamble unconditionally sends `(set-option :print-success true)`,
-`(set-option :produce-models true)`, `(set-option :global-declarations true)`,
-`(set-info :status unknown)`, and `(set-logic ALL)` at startup, so any solver
-that honors the SMT-LIB option contract should work. Other solvers should be
+`(set-option :produce-models true)`,
+`(set-option :produce-unsat-assumptions true)` (a child answering
+`unsupported` still solves normally; only `getUnsatAssumptions` degrades),
+`(set-option :global-declarations true)`, `(set-info :status unknown)`, and
+`(set-logic ALL)` at startup, so any solver that honors the SMT-LIB option
+contract should work. Other solvers should be
 straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
 
 Caveats:
@@ -204,7 +216,16 @@ Camada currently provides public APIs for:
 - uninterpreted functions
 - quantifiers on supporting backends
 - incremental solving (`push`/`pop`)
-- model queries for supported value kinds
+- assumption-based solving (`checkSatAssuming`) with unsat-assumption
+  extraction (`getUnsatAssumptions`)
+- per-check wall-clock timeouts (`setTimeout`; checks that hit the limit
+  return `UNKNOWN`)
+- bit-vector overflow predicates (`mkBVAddOverflow`, `mkBVSubOverflow`,
+  `mkBVMulOverflow`, `mkBVSDivOverflow`, `mkBVNegOverflow`)
+- model queries for supported value kinds, including sparse array models
+  (`getArrayValues`)
+- a queryable capability API (`supports(SolverFeature)`) so callers can
+  select backends without discovering gaps through errors
 
 Array support is currently partial in the larger structured-data sense:
 
@@ -227,11 +248,15 @@ even if it lacks native floating-point support.
 | BV FP encoding | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Arrays | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Uninterpreted functions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
-| Tuples |   | ✔️ |   |   |   | ✔️ |
+| Tuples | ✔️<sup>2</sup> | ✔️ | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️ |
 | Quantifiers | ✔️ | ✔️ |   |   |   | ✔️ |
 
 <sup>1</sup> On `MathSAT`, `fp.fma` and `fp.rem` are lowered through the
 common BV path, and native `ROUND_TO_AWAY` is unsupported.
+
+<sup>2</sup> Via Camada's per-field tuple lowering rather than native
+datatypes; some gaps remain (e.g. arrays of tuples). Query
+`supports(SolverFeature::NativeTuples)` to tell the two apart.
 
 ## Backend Caveats
 
@@ -251,12 +276,16 @@ limitations still matter in day-to-day use.
     quantifier, and native floating-point support are not available.
   - constant arrays and boolean arrays are adapted internally by the wrapper,
     so some behavior is implemented through backend-specific lowering.
-  - constant arrays are still lowered through explicit store chains, so they
-    are only practical for small index widths.
+  - constant arrays use Camada's lazy lowering (the default-value axiom is
+    instantiated at each index the formula observes), so they work at any
+    index width.
 - `Yices`
   - there is no native floating-point support, so FP always goes through
     Camada's bit-vector encoding.
-  - constant arrays are implemented with a backend-native lambda encoding.
+  - constant arrays use Camada's lazy lowering: the Yices lambda encoding
+    was found unsound (context reasoning over lambda terms is incomplete —
+    a symbolic-index read of the default could satisfy formulas it should
+    refute), a limitation smt-switch independently refuses to support.
   - global Yices initialization/teardown is hardened for multiple wrappers, but
     simultaneously live Yices solver instances can still collide on shared
     symbol names.
@@ -329,7 +358,8 @@ This is useful for:
 
 ### Tuples
 
-Tuples are currently supported natively on `CVC5` and `Z3`.
+Tuples use native datatypes on `CVC5`, `Z3`, and the SMT-LIB pipe; every
+other backend routes tuple operations through Camada's per-field lowering.
 
 For example:
 
@@ -345,10 +375,9 @@ Camada also smooths over backend quirks where practical. For example:
 
 - MathSAT and STP now lower `Array<Idx, Bool>` through backend `Array<Idx, BV1>`
   representations internally
-- STP constant arrays still use eager store-based lowering rather than a lazy
-  default-value representation
-- Yices constant arrays use a backend-native lambda encoding instead of a full
-  store chain
+- STP and Yices constant arrays use Camada's lazy lowering (a fresh array
+  symbol whose default-value axiom is instantiated at each observed index);
+  `ConstArrayLowering::Lazy` forces the same lowering on any backend
 - MathSAT native FP still falls back for unsupported operations such as
   `fp.rem`
 
@@ -443,7 +472,7 @@ int main() {
   } else if (result == camada::checkResult::UNSAT) {
     /* The formula is unsatisfiable */
   } else if (result == camada::checkResult::UNKNOWN) {
-    /* Something went wrong when checking the formula, timeouts, etc. */
+    /* Timeout (see setTimeout) or the solver gave up on the formula */
   }
 }
 ```
@@ -452,24 +481,24 @@ int main() {
 
 The regression tests are also a good source of small usage examples:
 
-- [`regression/simple.test.h`](/home/mgadelha/tools/camada/regression/simple.test.h)
-- [`regression/array.test.h`](/home/mgadelha/tools/camada/regression/array.test.h)
-- [`regression/fp.test.h`](/home/mgadelha/tools/camada/regression/fp.test.h)
-- [`regression/tuple.test.h`](/home/mgadelha/tools/camada/regression/tuple.test.h)
+- [`regression/simple.test.h`](regression/simple.test.h)
+- [`regression/array.test.h`](regression/array.test.h)
+- [`regression/fp.test.h`](regression/fp.test.h)
+- [`regression/tuple.test.h`](regression/tuple.test.h)
 
 Backend-specific feature coverage is also demonstrated in:
 
-- [`regression/cvc5.test.cpp`](/home/mgadelha/tools/camada/regression/cvc5.test.cpp)
-- [`regression/mathsat.test.cpp`](/home/mgadelha/tools/camada/regression/mathsat.test.cpp)
-- [`regression/yices.test.cpp`](/home/mgadelha/tools/camada/regression/yices.test.cpp)
-- [`regression/z3.test.cpp`](/home/mgadelha/tools/camada/regression/z3.test.cpp)
+- [`regression/cvc5.test.cpp`](regression/cvc5.test.cpp)
+- [`regression/mathsat.test.cpp`](regression/mathsat.test.cpp)
+- [`regression/yices.test.cpp`](regression/yices.test.cpp)
+- [`regression/z3.test.cpp`](regression/z3.test.cpp)
 
 ## Benchmarking
 
 Camada includes a standalone benchmark driver:
 
-- [`regression/bench/main.cpp`](/home/mgadelha/tools/camada/regression/bench/main.cpp)
-- [`scripts/compare-bench.py`](/home/mgadelha/tools/camada/scripts/compare-bench.py)
+- [`regression/bench/main.cpp`](regression/bench/main.cpp)
+- [`scripts/compare-bench.py`](scripts/compare-bench.py)
 
 Typical local workflow:
 
@@ -479,6 +508,6 @@ python3 scripts/compare-bench.py ./build/bin/camada-bench 200
 ```
 
 This runs repeated pinned benchmark samples, computes medians, and compares the
-result against [`scripts/baseline.txt`](/home/mgadelha/tools/camada/scripts/baseline.txt).
+result against [`scripts/baseline.txt`](scripts/baseline.txt).
 The benchmark output also records retained RSS (`rss_after_kb` and
 `rss_delta_kb`) alongside timing data.
