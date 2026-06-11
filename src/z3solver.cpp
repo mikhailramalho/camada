@@ -1123,6 +1123,43 @@ checkResult Z3Solver::checkImpl() {
   return checkResult::UNKNOWN;
 }
 
+checkResult
+Z3Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  // Tactic-built solvers (see setSolver) do not track assumption cores
+  // unless asked: they answer UNSAT with an empty unsat_core(). The plain
+  // smt solver tracks them regardless, so setting the parameter here is a
+  // harmless no-op for it. Set per call because setSolver can swap the
+  // solver instance at any time.
+  z3::params params(*Context);
+  params.set("unsat_core", true);
+  Solver.set(params);
+
+  z3::expr_vector assumptions(*Context);
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toZ3Expr(Assumption));
+
+  z3::check_result res = Solver.check(assumptions);
+  if (res == z3::check_result::sat)
+    return checkResult::SAT;
+
+  if (res == z3::check_result::unsat)
+    return checkResult::UNSAT;
+
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> Z3Solver::getUnsatAssumptionsImpl() {
+  z3::expr_vector core = Solver.unsat_core();
+  std::vector<SMTExprRef> Result;
+  for (unsigned i = 0; i < core.size(); ++i)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (z3::eq(core[static_cast<int>(i)], toZ3Expr(Assumption))) {
+        Result.push_back(Assumption);
+        break;
+      }
+  return Result;
+}
+
 void Z3Solver::resetImpl() { Solver.reset(); }
 
 void Z3Solver::pushImpl(unsigned nscopes) {

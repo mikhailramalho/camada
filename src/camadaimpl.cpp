@@ -210,6 +210,11 @@ void SMTSolverImpl::clearSortCaches() {
   TupleSortCache.clear();
 }
 
+void SMTSolverImpl::invalidateUnsatAssumptions() {
+  LastAssumptions.clear();
+  UnsatAssumptionsValid = false;
+}
+
 void SMTSolverImpl::clearExprCaches() {
   CachedBoolExprs.fill({});
   CachedBVOne1Expr = {};
@@ -226,6 +231,7 @@ void SMTSolverImpl::clearExprCaches() {
   LazyArrayItes.clear();
   LazyTouched.clear();
   LazyConstraintLevels.assign(1, {});
+  invalidateUnsatAssumptions();
 }
 
 void SMTSolverImpl::initializeCommonSingletons() {
@@ -479,6 +485,7 @@ SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
 
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
   requireBoolSort(Exp, "Expected boolean constraint");
+  invalidateUnsatAssumptions();
   return addConstraintImpl(Exp);
 }
 
@@ -1791,7 +1798,71 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   return theExp;
 }
 
-checkResult SMTSolverImpl::check() { return checkImpl(); }
+checkResult SMTSolverImpl::check() {
+  invalidateUnsatAssumptions();
+  return checkImpl();
+}
+
+checkResult
+SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
+  for (const SMTExprRef &Assumption : Assumptions)
+    requireBoolSort(Assumption, "Expected boolean assumption");
+  // checkSatAssumingImpl may route through the public
+  // addConstraint/push/pop (the default fallback and the activation-literal
+  // lowerings do), all of which invalidate the unsat-assumption state, so
+  // record it only after the check completes.
+  const checkResult Result =
+      Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions);
+  UnsatAssumptionsValid = Result == checkResult::UNSAT;
+  LastAssumptions =
+      UnsatAssumptionsValid ? Assumptions : std::vector<SMTExprRef>{};
+  return Result;
+}
+
+checkResult SMTSolverImpl::checkSatAssumingImpl(
+    const std::vector<SMTExprRef> &Assumptions) {
+  push();
+  for (const SMTExprRef &Assumption : Assumptions)
+    addConstraint(Assumption);
+  const checkResult Result = checkImpl();
+  pop();
+  return Result;
+}
+
+SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
+  if (!UnsatAssumptionsValid)
+    return SMTError{SMTErrorCode::BackendError,
+                    CachedBoolExprs[0]->getBackendKind(),
+                    "getUnsatAssumptions is only valid right after a "
+                    "checkSatAssuming call that returned UNSAT, before the "
+                    "solver state is mutated or checked again"};
+  if (LastAssumptions.empty())
+    return std::vector<SMTExprRef>{};
+  SMTResult<std::vector<SMTExprRef>> Core = getUnsatAssumptionsImpl();
+  if (!Core)
+    return Core;
+  // Normalize across backends: a duplicated assumption must not yield a
+  // duplicated core entry (activation-literal lowerings mint one literal
+  // per position, so their raw cores can repeat an expression).
+  std::vector<SMTExprRef> Deduped;
+  for (SMTExprRef &Assumption : Core.value()) {
+    bool Seen = false;
+    for (const SMTExprRef &Kept : Deduped)
+      if (&*Kept == &*Assumption) {
+        Seen = true;
+        break;
+      }
+    if (!Seen)
+      Deduped.push_back(std::move(Assumption));
+  }
+  return Deduped;
+}
+
+SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptionsImpl() {
+  return SMTError{SMTErrorCode::UnsupportedOperation,
+                  CachedBoolExprs[0]->getBackendKind(),
+                  "Unsat assumptions are not supported by this backend"};
+}
 
 bool SMTSolverImpl::supports(SolverFeature Feature) const {
   switch (Feature) {
@@ -1813,11 +1884,13 @@ void SMTSolverImpl::reset() {
 }
 
 void SMTSolverImpl::push(unsigned nscopes) {
+  invalidateUnsatAssumptions();
   LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
   pushImpl(nscopes);
 }
 
 void SMTSolverImpl::pop(unsigned nscopes) {
+  invalidateUnsatAssumptions();
   // Lazy default axioms and extensionality lemmas asserted inside the
   // popped scopes are scope-independent facts about expressions that
   // outlive the pop, so re-assert them at the outer level instead of

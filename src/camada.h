@@ -808,6 +808,20 @@ public:
   /// Check if the constraints are satisfiable
   virtual checkResult check() = 0;
 
+  /// Check if the constraints conjoined with the given boolean assumptions
+  /// are satisfiable. The assumptions are only active for this query; they
+  /// are not asserted and do not persist into later checks.
+  virtual checkResult
+  checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) = 0;
+
+  /// Returns the subset of the assumptions the solver used to derive
+  /// unsatisfiability. Only valid right after a checkSatAssuming() call
+  /// that returned UNSAT: any solver mutation (addConstraint, push, pop,
+  /// reset) or later check invalidates the result, and querying it then is
+  /// an error. Backends without native unsat-assumption support (STP)
+  /// return an UnsupportedOperation error.
+  virtual SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() = 0;
+
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
 

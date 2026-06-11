@@ -80,6 +80,51 @@ inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
 
+inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
+  auto a = solver->mkSymbol("a", solver->mkBoolSort());
+  auto b = solver->mkSymbol("b", solver->mkBoolSort());
+  solver->addConstraint(solver->mkOr(a, b));
+
+  // Assuming both false contradicts (or a b).
+  const std::vector<camada::SMTExprRef> negBoth = {solver->mkNot(a),
+                                                   solver->mkNot(b)};
+  REQUIRE(solver->checkSatAssuming(negBoth) == camada::checkResult::UNSAT);
+
+  auto core = solver->getUnsatAssumptions();
+  if (core) {
+    // The core must be a non-empty subset that is itself sufficient:
+    // re-checking under only the returned assumptions stays UNSAT.
+    REQUIRE(!core.value().empty());
+    REQUIRE(solver->checkSatAssuming(core.value()) ==
+            camada::checkResult::UNSAT);
+  } else {
+    REQUIRE(core.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+  }
+
+  // A compound (non-literal) assumption must work too — backends whose
+  // native API only accepts literals lower it through activation literals.
+  REQUIRE(solver->checkSatAssuming({solver->mkNot(solver->mkOr(a, b))}) ==
+          camada::checkResult::UNSAT);
+
+  // Assumptions are per-query: they do not persist into later checks.
+  REQUIRE(solver->checkSatAssuming({a}) == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // After a check that was not an UNSAT checkSatAssuming, the unsat
+  // assumptions are stale and querying them is an error.
+  REQUIRE(!solver->getUnsatAssumptions());
+
+  // Mutating the solver state after an UNSAT checkSatAssuming also
+  // invalidates the unsat assumptions.
+  REQUIRE(solver->checkSatAssuming(negBoth) == camada::checkResult::UNSAT);
+  solver->push();
+  REQUIRE(!solver->getUnsatAssumptions());
+  solver->pop();
+
+  // An empty assumption set degenerates to a plain check.
+  REQUIRE(solver->checkSatAssuming({}) == camada::checkResult::SAT);
+}
+
 inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
   auto value = solver->mkBVFromBin("1000", 4);
   auto shift = solver->mkBVFromDec(1, 4);

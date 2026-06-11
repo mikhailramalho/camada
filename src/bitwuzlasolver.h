@@ -235,6 +235,9 @@ protected:
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
   checkResult checkImpl() override;
+  checkResult
+  checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
+  SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
   bool supportsImpl(SolverFeature Feature) const override;
   void resetImpl() override;
