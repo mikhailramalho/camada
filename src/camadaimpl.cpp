@@ -1418,6 +1418,29 @@ SMTExprRef SMTSolverImpl::mkTupleSelect(const SMTExprRef &Tuple,
   return theExp;
 }
 
+SMTExprRef SMTSolverImpl::mkTupleUpdate(const SMTExprRef &Tuple, unsigned Index,
+                                        const SMTExprRef &Value) {
+  fatalErrorIf(!Tuple->Sort->isTupleSort(), "Expected tuple expression");
+  fatalErrorIf(Index >= Tuple->Sort->getTupleElementSorts().size(),
+               "Tuple element index is out of bounds");
+  fatalErrorIf(Tuple->Sort->getTupleElementSorts()[Index] != Value->Sort,
+               "Expected tuple update value with the element's sort");
+  SMTExprRef theExp = mkTupleUpdateImpl(Tuple, Index, Value);
+  assert(theExp->Sort == Tuple->Sort);
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkTupleUpdateImpl(const SMTExprRef &Tuple,
+                                            unsigned Index,
+                                            const SMTExprRef &Value) {
+  const std::size_t ElementCount = Tuple->Sort->getTupleElementSorts().size();
+  std::vector<SMTExprRef> Elements;
+  Elements.reserve(ElementCount);
+  for (unsigned I = 0; I < ElementCount; ++I)
+    Elements.push_back(I == Index ? Value : mkTupleSelect(Tuple, I));
+  return mkTuple(Elements);
+}
+
 SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
                                   const std::vector<SMTExprRef> &Args) {
   fatalErrorIf(!Function->isFunctionSort(), "Expected function expression");

@@ -105,6 +105,138 @@ inline void tuple_with_array_field(const camada::SMTSolverRef &solver) {
 // compare unequal. Native-tuple backends already get this for free via
 // their backend term; the encoded path needs to implement it on
 // CamadaTupleExpr explicitly.
+// mkTupleUpdate is ESBMC's `with`-on-struct choke point: a tuple equal
+// to the original except at one field. Bool + BV only, like
+// tuple_semantics, so every backend (native datatypes and the Camada
+// per-field lowering) runs it.
+inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
+  auto boolSort = solver->mkBoolSort();
+  auto bv8Sort = solver->mkBVSort(8);
+  auto tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+
+  // Value tuple: the updated field changes, the others are preserved.
+  auto t = solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(1, 8),
+                            solver->mkBVFromDec(2, 8)});
+  auto u = solver->mkTupleUpdate(t, 1, solver->mkBVFromDec(9, 8));
+  REQUIRE(u->Sort == t->Sort);
+  auto expected =
+      solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(9, 8),
+                       solver->mkBVFromDec(2, 8)});
+  solver->addConstraint(solver->mkNot(solver->mkEqual(u, expected)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Symbol tuple: non-updated fields stay tied to the original symbol's
+  // fields, and the updated field equals the new value.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+  auto s = solver->mkSymbol("st", tupleSort);
+  auto v = solver->mkTupleUpdate(s, 2, solver->mkBVFromDec(7, 8));
+  auto preserved = solver->mkAnd(
+      solver->mkEqual(solver->mkTupleSelect(v, 0), solver->mkTupleSelect(s, 0)),
+      solver->mkEqual(solver->mkTupleSelect(v, 1),
+                      solver->mkTupleSelect(s, 1)));
+  auto updated =
+      solver->mkEqual(solver->mkTupleSelect(v, 2), solver->mkBVFromDec(7, 8));
+  solver->addConstraint(solver->mkNot(solver->mkAnd(preserved, updated)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Chained updates of the same field — ESBMC's pointer-arithmetic hot
+  // pattern — collapse to the last value with the other fields preserved.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+  auto base = solver->mkSymbol("base", tupleSort);
+  auto twice = solver->mkTupleUpdate(
+      solver->mkTupleUpdate(base, 1, solver->mkBVFromDec(1, 8)), 1,
+      solver->mkBVFromDec(2, 8));
+  auto chainOk = solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(twice, 1),
+                                               solver->mkBVFromDec(2, 8)),
+                               solver->mkEqual(solver->mkTupleSelect(twice, 2),
+                                               solver->mkTupleSelect(base, 2)));
+  solver->addConstraint(solver->mkNot(chainOk));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Update of an ite-shaped tuple distributes through both branches.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+  auto ta = solver->mkSymbol("ta", tupleSort);
+  auto tb = solver->mkSymbol("tb", tupleSort);
+  auto cond = solver->mkSymbol("cond", solver->mkBoolSort());
+  auto picked = solver->mkIte(cond, ta, tb);
+  auto pickedUpd = solver->mkTupleUpdate(picked, 1, solver->mkBVFromDec(4, 8));
+  auto iteOk = solver->mkAnd(
+      solver->mkEqual(solver->mkTupleSelect(pickedUpd, 1),
+                      solver->mkBVFromDec(4, 8)),
+      solver->mkEqual(solver->mkTupleSelect(pickedUpd, 2),
+                      solver->mkIte(cond, solver->mkTupleSelect(ta, 2),
+                                    solver->mkTupleSelect(tb, 2))));
+  solver->addConstraint(solver->mkNot(iteOk));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Updating the scalar field of a tuple that carries an array field
+  // composes with the verbatim array storage in the Camada lowering.
+  solver->reset();
+  bv8Sort = solver->mkBVSort(8);
+  auto arrSort = solver->mkArraySort(bv8Sort, bv8Sort);
+  auto mixSort = solver->mkTupleSort({bv8Sort, arrSort});
+  auto mix = solver->mkSymbol("mix", mixSort);
+  auto mixUpd = solver->mkTupleUpdate(mix, 0, solver->mkBVFromDec(6, 8));
+  auto arrPreserved =
+      solver->mkEqual(solver->mkArraySelect(solver->mkTupleSelect(mixUpd, 1),
+                                            solver->mkBVFromDec(0, 8)),
+                      solver->mkArraySelect(solver->mkTupleSelect(mix, 1),
+                                            solver->mkBVFromDec(0, 8)));
+  auto scalarUpdated = solver->mkEqual(solver->mkTupleSelect(mixUpd, 0),
+                                       solver->mkBVFromDec(6, 8));
+  solver->addConstraint(
+      solver->mkNot(solver->mkAnd(arrPreserved, scalarUpdated)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Nested tuples: updating an inner tuple through an outer update.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  auto innerSort = solver->mkTupleSort({bv8Sort, bv8Sort});
+  auto outerSort = solver->mkTupleSort({boolSort, innerSort});
+  auto outer = solver->mkSymbol("outer", outerSort);
+  auto newInner = solver->mkTupleUpdate(solver->mkTupleSelect(outer, 1), 0,
+                                        solver->mkBVFromDec(3, 8));
+  auto newOuter = solver->mkTupleUpdate(outer, 1, newInner);
+  // inner[0] is 3, inner[1] is preserved, outer[0] is preserved
+  auto innerOfNew = solver->mkTupleSelect(newOuter, 1);
+  auto ok = solver->mkAnd(
+      solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(innerOfNew, 0),
+                                    solver->mkBVFromDec(3, 8)),
+                    solver->mkEqual(solver->mkTupleSelect(innerOfNew, 1),
+                                    solver->mkTupleSelect(
+                                        solver->mkTupleSelect(outer, 1), 1))),
+      solver->mkEqual(solver->mkTupleSelect(newOuter, 0),
+                      solver->mkTupleSelect(outer, 0)));
+  solver->addConstraint(solver->mkNot(ok));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Model extraction through an update.
+  solver->reset();
+  bv8Sort = solver->mkBVSort(8);
+  auto pairSort = solver->mkTupleSort({bv8Sort, bv8Sort});
+  auto p = solver->mkSymbol("p", pairSort);
+  auto q = solver->mkTupleUpdate(p, 0, solver->mkBVFromDec(11, 8));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkTupleSelect(p, 1), solver->mkBVFromDec(5, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto f0 = solver->getBV(solver->mkTupleSelect(q, 0));
+  REQUIRE(f0);
+  REQUIRE(f0.value() == 11);
+  auto f1 = solver->getBV(solver->mkTupleSelect(q, 1));
+  REQUIRE(f1);
+  REQUIRE(f1.value() == 5);
+}
+
 inline void tuple_structural_equality(const camada::SMTSolverRef &solver) {
   auto boolSort = solver->mkBoolSort();
   auto bv8Sort = solver->mkBVSort(8);
