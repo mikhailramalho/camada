@@ -412,6 +412,10 @@ private:
   // Emit a single line (newline appended) to the active emitter(s).
   void emitLine(const std::string &Text) const;
 
+  // Emit a check command (a query: no `success` ack) and read the
+  // sat/unsat/unknown verdict; UNKNOWN in write-only mode.
+  checkResult emitCheckCommand(const std::string &Cmd);
+
   // Send (get-value (Exp)) to the child solver and extract the value text
   // from its response. Fails in write-only mode (no child process). Resp
   // receives the raw response for use in error messages.

@@ -2175,8 +2175,13 @@ bool SMTLIBSolver::supportsImpl(SolverFeature Feature) const {
   case SolverFeature::Quantifiers:
   case SolverFeature::UninterpretedFunctions:
   case SolverFeature::NativeFloatingPoint:
-  case SolverFeature::UnsatAssumptions:
     return true;
+  // Unlike the wire-capability bits above, this one IS known: the
+  // preamble already learned whether the child accepted
+  // :produce-unsat-assumptions (false in write-only mode, where there is
+  // no model to query either).
+  case SolverFeature::UnsatAssumptions:
+    return UnsatAssumptionsSupported;
   case SolverFeature::Timeouts:
   case SolverFeature::ArrayModels:
     return false;
@@ -2187,27 +2192,28 @@ bool SMTLIBSolver::supportsImpl(SolverFeature Feature) const {
   return false;
 }
 
-checkResult SMTLIBSolver::checkImpl() {
-  // (check-sat) is a query — it does NOT produce a `success` ack even when
-  // :print-success is true. Bypass emitLine's resync logic; write the
-  // command directly and read the sat/unsat/unknown line ourselves.
-  const std::string Cmd = "(check-sat)\n";
+checkResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
+  // Check commands are queries — they do NOT produce a `success` ack even
+  // when :print-success is true. Bypass emitLine's resync logic; write the
+  // command directly and read the sat/unsat/unknown line ourselves. In
+  // write-only mode there is no response to read.
   if (File)
     File->emitRaw(Cmd);
   if (Proc) {
     Proc->emitRaw(Cmd);
     Proc->flush();
-    std::string Resp = Proc->readResponse();
-    if (Resp == "sat")
-      return checkResult::SAT;
-    if (Resp == "unsat")
-      return checkResult::UNSAT;
-    return checkResult::UNKNOWN;
+    const std::string Resp = Proc->readResponse();
+    return Resp == "sat"     ? checkResult::SAT
+           : Resp == "unsat" ? checkResult::UNSAT
+                             : checkResult::UNKNOWN;
   }
-  // Write-only mode: no response to read.
   if (File)
     File->flush();
   return checkResult::UNKNOWN;
+}
+
+checkResult SMTLIBSolver::checkImpl() {
+  return emitCheckCommand("(check-sat)\n");
 }
 
 checkResult
@@ -2231,24 +2237,7 @@ SMTLIBSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
     LastAssumptionLits.emplace_back(std::move(Lit), Assumption);
   }
   Cmd.append("))\n");
-
-  // Like (check-sat), this is a query — no `success` ack, so bypass
-  // emitLine and read the verdict directly.
-  if (File)
-    File->emitRaw(Cmd);
-  if (Proc) {
-    Proc->emitRaw(Cmd);
-    Proc->flush();
-    std::string Resp = Proc->readResponse();
-    if (Resp == "sat")
-      return checkResult::SAT;
-    if (Resp == "unsat")
-      return checkResult::UNSAT;
-    return checkResult::UNKNOWN;
-  }
-  if (File)
-    File->flush();
-  return checkResult::UNKNOWN;
+  return emitCheckCommand(Cmd);
 }
 
 SMTResult<std::vector<SMTExprRef>> SMTLIBSolver::getUnsatAssumptionsImpl() {
