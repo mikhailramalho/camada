@@ -967,6 +967,24 @@ SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   return newSymbol;
 }
 
+bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::Quantifiers: // BV/FP quantifiers only
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::IntRealArithmetic:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult BitwuzlaSolver::checkImpl() {
   BitwuzlaResult res = bitwuzla_check_sat(Context);
   if (res == BITWUZLA_SAT)

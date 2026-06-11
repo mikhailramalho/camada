@@ -819,6 +819,30 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &,
   fatalError("Yices constant arrays are lowered lazily by the common layer");
 }
 
+bool YicesSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::Timeouts:
+    // Enforced through SIGALRM + yices_stop_search; POSIX only.
+#if defined(_WIN32)
+    return false;
+#else
+    return true;
+#endif
+  case SolverFeature::Quantifiers:
+  case SolverFeature::NativeFloatingPoint:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult YicesSolver::checkImpl() {
   smt_status_t res = yices_check_context(Context, nullptr);
   if (res == YICES_STATUS_SAT)

@@ -1053,6 +1053,23 @@ SMTExprRef Z3Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                              z3::exists(bound_vars, toZ3Expr(Body)));
 }
 
+bool Z3Solver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult Z3Solver::checkImpl() {
   z3::check_result res = Solver.check();
   if (res == z3::check_result::sat)

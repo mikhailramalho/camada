@@ -1717,6 +1717,19 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
 
 checkResult SMTSolverImpl::check() { return checkImpl(); }
 
+bool SMTSolverImpl::supports(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::NativeTuples:
+    return nativeTupleSupport();
+  case SolverFeature::NativeConstantArrays:
+    return nativeConstArraySupport();
+  default:
+    return supportsImpl(Feature);
+  }
+}
+
+bool SMTSolverImpl::supportsImpl(SolverFeature) const { return false; }
+
 void SMTSolverImpl::reset() {
   invalidateGeneratedObjects();
   resetImpl();
