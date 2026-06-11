@@ -233,3 +233,10 @@ TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 }
+
+// Registered per backend rather than in tests(): the depth-5 shape
+// flattens to nested-array leaves, which STP's array theory lacks.
+TEST_CASE("Deep tuple/array nesting MathSAT test", "[MathSAT]") {
+  auto solver = camada::createMathSATSolver();
+  tuple_array_deep_nesting(solver);
+}

@@ -81,6 +81,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_update_semantics);
   RESETANDTEST(tuple_structural_equality);
+  RESETANDTEST(tuple_array_semantics);
+  RESETANDTEST(tuple_array_equality_ite);
   RESETANDTEST(empty_tuple_semantics);
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(fp_native_bv_predicate_parity);

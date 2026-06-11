@@ -131,6 +131,11 @@ SMTSortRef STPSolver::mkBVRMSortImpl() {
 
 SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
+  // STP's array theory is strictly BV-indexed, BV-valued (bools are
+  // adapted below); arrays of arrays do not exist in it, and passing one
+  // through would trip STP's own fatal handler with a cryptic message.
+  fatalErrorIf(IndexSort->isArraySort() || ElemSort->isArraySort(),
+               "Nested arrays are not supported by STP");
   const SMTSortRef &backend_elem_sort =
       ElemSort->isBoolSort() ? mkBVSort(1) : ElemSort;
   return makeSortRef<STPSort>(
