@@ -596,29 +596,54 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSge,
                                     mkBVSgeImpl(LHS, RHS),
                                     assert(theExp->Sort->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkBVAddOverflow(const SMTExprRef &LHS,
-                                          const SMTExprRef &RHS,
-                                          bool IsSigned) {
+// The public surface follows the mkBVS*/mkBVU* naming convention of the
+// other signed/unsigned BV pairs; the protected *Impl hooks keep a single
+// IsSigned-parameterized entry point per operation, since every backend
+// implements both signednesses in one place.
+SMTExprRef SMTSolverImpl::mkBVSAddOverflow(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS) {
   requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVAddOverflowImpl(LHS, RHS, IsSigned);
+  SMTExprRef theExp = mkBVAddOverflowImpl(LHS, RHS, /*IsSigned=*/true);
   assert(theExp->Sort->isBoolSort());
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkBVSubOverflow(const SMTExprRef &LHS,
-                                          const SMTExprRef &RHS,
-                                          bool IsSigned) {
+SMTExprRef SMTSolverImpl::mkBVUAddOverflow(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS) {
   requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVSubOverflowImpl(LHS, RHS, IsSigned);
+  SMTExprRef theExp = mkBVAddOverflowImpl(LHS, RHS, /*IsSigned=*/false);
   assert(theExp->Sort->isBoolSort());
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkBVMulOverflow(const SMTExprRef &LHS,
-                                          const SMTExprRef &RHS,
-                                          bool IsSigned) {
+SMTExprRef SMTSolverImpl::mkBVSSubOverflow(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS) {
   requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVMulOverflowImpl(LHS, RHS, IsSigned);
+  SMTExprRef theExp = mkBVSubOverflowImpl(LHS, RHS, /*IsSigned=*/true);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBVUSubOverflow(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS) {
+  requireBVSameSort(LHS, RHS);
+  SMTExprRef theExp = mkBVSubOverflowImpl(LHS, RHS, /*IsSigned=*/false);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBVSMulOverflow(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS) {
+  requireBVSameSort(LHS, RHS);
+  SMTExprRef theExp = mkBVMulOverflowImpl(LHS, RHS, /*IsSigned=*/true);
+  assert(theExp->Sort->isBoolSort());
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBVUMulOverflow(const SMTExprRef &LHS,
+                                           const SMTExprRef &RHS) {
+  requireBVSameSort(LHS, RHS);
+  SMTExprRef theExp = mkBVMulOverflowImpl(LHS, RHS, /*IsSigned=*/false);
   assert(theExp->Sort->isBoolSort());
   return theExp;
 }

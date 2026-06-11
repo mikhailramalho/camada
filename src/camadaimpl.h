@@ -298,12 +298,18 @@ public:
                      const SMTExprRef &RHS) override final;
   SMTExprRef mkBVSge(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final;
-  SMTExprRef mkBVAddOverflow(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             bool IsSigned) override final;
-  SMTExprRef mkBVSubOverflow(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             bool IsSigned) override final;
-  SMTExprRef mkBVMulOverflow(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                             bool IsSigned) override final;
+  SMTExprRef mkBVSAddOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVUAddOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVSSubOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVUSubOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVSMulOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVUMulOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
   SMTExprRef mkBVSDivOverflow(const SMTExprRef &LHS,
                               const SMTExprRef &RHS) override final;
   SMTExprRef mkBVNegOverflow(const SMTExprRef &Exp) override final;

@@ -220,8 +220,9 @@ Camada currently provides public APIs for:
   extraction (`getUnsatAssumptions`)
 - per-check wall-clock timeouts (`setTimeout`; checks that hit the limit
   return `UNKNOWN`)
-- bit-vector overflow predicates (`mkBVAddOverflow`, `mkBVSubOverflow`,
-  `mkBVMulOverflow`, `mkBVSDivOverflow`, `mkBVNegOverflow`)
+- bit-vector overflow predicates (`mkBVSAddOverflow`/`mkBVUAddOverflow`,
+  `mkBVSSubOverflow`/`mkBVUSubOverflow`, `mkBVSMulOverflow`/`mkBVUMulOverflow`,
+  `mkBVSDivOverflow`, `mkBVNegOverflow`)
 - model queries for supported value kinds, including sparse array models
   (`getArrayValues`)
 - a queryable capability API (`supports(SolverFeature)`) so callers can

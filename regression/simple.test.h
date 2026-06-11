@@ -233,21 +233,21 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
       auto [x, y] = symbols();
       auto Exact =
           solver->mkBVAdd(solver->mkBVSignExt(1, x), solver->mkBVSignExt(1, y));
-      requireEquiv("saddo", solver->mkBVAddOverflow(x, y, true),
+      requireEquiv("saddo", solver->mkBVSAddOverflow(x, y),
                    signedOutOfRange(Exact, W + 1));
     }
     {
       auto [x, y] = symbols();
       auto Exact =
           solver->mkBVAdd(solver->mkBVZeroExt(1, x), solver->mkBVZeroExt(1, y));
-      requireEquiv("uaddo", solver->mkBVAddOverflow(x, y, false),
+      requireEquiv("uaddo", solver->mkBVUAddOverflow(x, y),
                    unsignedOutOfRange(Exact, W + 1));
     }
     {
       auto [x, y] = symbols();
       auto Exact =
           solver->mkBVSub(solver->mkBVSignExt(1, x), solver->mkBVSignExt(1, y));
-      requireEquiv("ssubo", solver->mkBVSubOverflow(x, y, true),
+      requireEquiv("ssubo", solver->mkBVSSubOverflow(x, y),
                    signedOutOfRange(Exact, W + 1));
     }
     {
@@ -256,7 +256,7 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
       auto [x, y] = symbols();
       auto Exact =
           solver->mkBVSub(solver->mkBVZeroExt(1, x), solver->mkBVZeroExt(1, y));
-      requireEquiv("usubo", solver->mkBVSubOverflow(x, y, false),
+      requireEquiv("usubo", solver->mkBVUSubOverflow(x, y),
                    solver->mkEqual(solver->mkBVExtract(W, W, Exact),
                                    solver->mkBVFromDec(1, 1)));
     }
@@ -264,14 +264,14 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
       auto [x, y] = symbols();
       auto Exact =
           solver->mkBVMul(solver->mkBVSignExt(W, x), solver->mkBVSignExt(W, y));
-      requireEquiv("smulo", solver->mkBVMulOverflow(x, y, true),
+      requireEquiv("smulo", solver->mkBVSMulOverflow(x, y),
                    signedOutOfRange(Exact, 2 * W));
     }
     {
       auto [x, y] = symbols();
       auto Exact =
           solver->mkBVMul(solver->mkBVZeroExt(W, x), solver->mkBVZeroExt(W, y));
-      requireEquiv("umulo", solver->mkBVMulOverflow(x, y, false),
+      requireEquiv("umulo", solver->mkBVUMulOverflow(x, y),
                    unsignedOutOfRange(Exact, 2 * W));
     }
     {
