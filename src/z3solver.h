@@ -330,6 +330,8 @@ protected:
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 
+  SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array) override;
+
   SMTExprRef mkBoolImpl(const bool b) override;
   SMTExprRef mkIntImpl(int64_t v) override;
   SMTExprRef mkIntImpl(const std::string &v) override;

@@ -1020,6 +1020,25 @@ SMTExprRef CVC5Solver::getArrayElementImpl(const SMTExprRef &Array,
       Context.getValue(toSolverExpr<CVC5Expr>(*sel).Expr));
 }
 
+SMTResult<ArrayModel> CVC5Solver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](const cvc5::Term &Value, const SMTSortRef &Sort) {
+    return makeExprRef<CVC5Expr>(valueKindForSort(Sort), &Context, Sort, Value);
+  };
+
+  cvc5::Term Val = Context.getValue(toSolverExpr<CVC5Expr>(*Array).Expr);
+  ArrayModel Result;
+  while (Val.getKind() == cvc5::Kind::STORE) {
+    Result.Entries.emplace_back(wrap(Val[1], IndexSort),
+                                wrap(Val[2], ElemSort));
+    Val = Val[0];
+  }
+  if (Val.getKind() == cvc5::Kind::CONST_ARRAY)
+    Result.Base = wrap(Val.getConstArrayBase(), ElemSort);
+  return Result;
+}
+
 SMTExprRef CVC5Solver::mkBoolImpl(const bool b) {
   return makeExprRef<CVC5Expr>(SMTExprKind::BoolConst, &Context, mkBoolSort(),
                                Terms.mkBoolean(b));
