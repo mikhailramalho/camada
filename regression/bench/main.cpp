@@ -121,6 +121,9 @@ bool backendSupportsTuples(const std::string &backend) {
   return backend == "cvc5" || backend == "z3" || backend == "smtlib";
 }
 
+// STP has no uninterpreted functions; mkFunctionSort aborts there.
+bool backendSupportsUF(const std::string &backend) { return backend != "stp"; }
+
 // Optional substring filter on benchmark case names (third CLI argument).
 // Empty means "run everything".
 std::string caseFilter;
@@ -495,8 +498,9 @@ int main(int argc, char **argv) {
     runCase(backend, "expr_construction_only", iterations,
             benchmarkExprConstructionOnly);
     runCase(backend, "array_store_chain", iterations, benchmarkArrayStoreChain);
-    runCase(backend, "function_sort_cache_hit", iterations,
-            benchmarkFunctionSortCacheHit);
+    if (backendSupportsUF(backend))
+      runCase(backend, "function_sort_cache_hit", iterations,
+              benchmarkFunctionSortCacheHit);
     if (backendSupportsTuples(backend))
       runCase(backend, "tuple_sort_cache_hit", iterations,
               benchmarkTupleSortCacheHit);
