@@ -121,6 +121,43 @@ std::string getCamadaVersion();
 
 enum class checkResult { SAT, UNSAT, UNKNOWN };
 
+/// Capabilities a backend may or may not implement, queryable through
+/// SMTSolver::supports() instead of discovering them through aborts or
+/// UnsupportedOperation errors.
+///
+/// A true bit means the corresponding API surface is implemented for the
+/// backend; individual calls can still fail for input-specific reasons
+/// through their SMTResult. On the SMT-LIB pipeline backend the bits
+/// describe what Camada emits — a particular child solver may still
+/// reject a construct at runtime.
+enum class SolverFeature {
+  /// Int/Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
+  IntRealArithmetic,
+  /// Quantified formulas (mkForall, mkExists).
+  Quantifiers,
+  /// Uninterpreted functions (mkFunctionSort, mkApply).
+  UninterpretedFunctions,
+  /// FPEncoding::Native sorts and operations; FPEncoding::BV works on
+  /// every backend regardless.
+  NativeFloatingPoint,
+  /// Backend-native tuple/datatype sorts; other backends route tuples
+  /// through the Camada per-field lowering.
+  NativeTuples,
+  /// Backend-native `((as const ...) v)` constant arrays; other backends
+  /// lower them lazily (see ConstArrayLowering).
+  NativeConstantArrays,
+  /// Unsat-assumption extraction after an UNSAT checkSatAssuming()
+  /// (see issue #76). checkSatAssuming itself works on every backend
+  /// through a push/assert/check/pop fallback.
+  UnsatAssumptions,
+  /// Per-check wall-clock limits via setTimeout() (see issue #77).
+  Timeouts,
+  /// Sparse array model extraction via getArrayValues() for arbitrary
+  /// arrays (see issue #79). Lazily lowered constant arrays are answered
+  /// by the common layer on every backend regardless.
+  ArrayModels,
+};
+
 /// Coarse-grained error categories for operations that return `SMTResult<T>`.
 ///
 /// These are intended for user-triggerable failures such as unsupported
@@ -185,6 +222,23 @@ private:
   T Value_{};
   SMTError Error_{};
   bool HasValue_ = false;
+};
+
+/// Sparse model of an array expression, produced by
+/// SMTSolver::getArrayValues after a SAT check.
+///
+/// The model value of the array at index `i` is the element of the first
+/// entry whose index has the same model value as `i`, or the value of
+/// `Base` when no entry matches. `Base` is a null ref when the solver did
+/// not report a default — every constrained index is then covered by an
+/// entry, and unlisted indexes are unconstrained.
+///
+/// Both expressions in each entry and `Base` are valid arguments to the
+/// model-value getters (getBV, getBool, ...) for as long as the model that
+/// produced them stays current (no new constraints or checks).
+struct ArrayModel {
+  SMTExprRef Base;
+  std::vector<std::pair<SMTExprRef, SMTExprRef>> Entries;
 };
 
 /// Generic base class for SMT Solvers
@@ -636,6 +690,16 @@ public:
   virtual SMTExprRef getArrayElement(const SMTExprRef &Array,
                                      const SMTExprRef &Index) = 0;
 
+  /// If a model is available, returns the model's sparse representation of
+  /// an array expression: the finite set of (index, element) entries the
+  /// solver's model distinguishes, plus the default element every other
+  /// index reads (see ArrayModel). The entry list is whatever finite shape
+  /// the model uses — it is not an enumeration of the index space, and its
+  /// size is unspecified. Backends without a walkable array model (STP
+  /// symbol arrays, the SMT-LIB pipeline) return an UnsupportedOperation
+  /// error.
+  virtual SMTResult<ArrayModel> getArrayValues(const SMTExprRef &Array) = 0;
+
   /// Constructs an SMTExprRef from a boolean.
   virtual SMTExprRef mkBool(const bool b) = 0;
 
@@ -744,6 +808,30 @@ public:
   /// Check if the constraints are satisfiable
   virtual checkResult check() = 0;
 
+  /// Set a wall-clock time limit, in milliseconds, applied to each
+  /// subsequent check() or checkSatAssuming() individually; 0 removes
+  /// the limit. A check that
+  /// hits the limit returns checkResult::UNKNOWN; reset() afterwards
+  /// restores the solver to a known-good state. The limit persists across
+  /// reset(). Returns false when the backend cannot enforce time limits
+  /// (STP; the SMT-LIB pipeline, where interrupting the child mid-query
+  /// would desynchronize the pipe protocol) — the limit is then ignored.
+  virtual bool setTimeout(uint64_t Milliseconds) = 0;
+
+  /// Check if the constraints conjoined with the given boolean assumptions
+  /// are satisfiable. The assumptions are only active for this query; they
+  /// are not asserted and do not persist into later checks.
+  virtual checkResult
+  checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) = 0;
+
+  /// Returns the subset of the assumptions the solver used to derive
+  /// unsatisfiability. Only valid right after a checkSatAssuming() call
+  /// that returned UNSAT: any solver mutation (addConstraint, push, pop,
+  /// reset) or later check invalidates the result, and querying it then is
+  /// an error. Backends without native unsat-assumption support (STP)
+  /// return an UnsupportedOperation error.
+  virtual SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() = 0;
+
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
 
@@ -752,6 +840,10 @@ public:
 
   /// Pop one or more assertion scopes.
   virtual void pop(unsigned nscopes = 1) = 0;
+
+  /// Returns whether this backend implements the given feature. See the
+  /// SolverFeature enumerators for what each bit covers.
+  virtual bool supports(SolverFeature Feature) const = 0;
 
   /// Returns the solver name and version
   virtual std::string getSolverNameAndVersion() const = 0;

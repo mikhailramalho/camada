@@ -80,6 +80,94 @@ inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
 
+inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
+  if (!solver->setTimeout(150)) {
+    // Backends without enforceable limits must report so and stay usable.
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    return;
+  }
+
+  // A generous limit must not affect an easy query.
+  auto x = solver->mkSymbol("x", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Factoring a 64-bit semiprime exactly (the 128-bit extension rules out
+  // wrap-around shortcuts) is far beyond a 150ms budget on every backend,
+  // so the limit must turn the query into UNKNOWN instead of a hang. The
+  // reset also pins that the limit itself survives reset().
+  solver->reset();
+  auto a = solver->mkSymbol("a", solver->mkBVSort(64));
+  auto b = solver->mkSymbol("b", solver->mkBVSort(64));
+  constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
+  auto prod =
+      solver->mkBVMul(solver->mkBVZeroExt(64, a), solver->mkBVZeroExt(64, b));
+  auto k = solver->mkBVZeroExt(
+      64, solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64));
+  solver->addConstraint(solver->mkEqual(prod, k));
+  auto one = solver->mkBVFromDec(1, 64);
+  solver->addConstraint(solver->mkBVUgt(a, one));
+  solver->addConstraint(solver->mkBVUgt(b, one));
+  REQUIRE(solver->check() == camada::checkResult::UNKNOWN);
+
+  // The limit applies to assumption-based checks too.
+  auto t = solver->mkSymbol("t", solver->mkBoolSort());
+  REQUIRE(solver->checkSatAssuming({t}) == camada::checkResult::UNKNOWN);
+
+  // Clearing the limit restores normal solving.
+  solver->reset();
+  REQUIRE(solver->setTimeout(0));
+  auto y = solver->mkSymbol("y", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(y, solver->mkBVFromDec(9, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
+  auto a = solver->mkSymbol("a", solver->mkBoolSort());
+  auto b = solver->mkSymbol("b", solver->mkBoolSort());
+  solver->addConstraint(solver->mkOr(a, b));
+
+  // Assuming both false contradicts (or a b).
+  const std::vector<camada::SMTExprRef> negBoth = {solver->mkNot(a),
+                                                   solver->mkNot(b)};
+  REQUIRE(solver->checkSatAssuming(negBoth) == camada::checkResult::UNSAT);
+
+  auto core = solver->getUnsatAssumptions();
+  if (core) {
+    // The core must be a non-empty subset that is itself sufficient:
+    // re-checking under only the returned assumptions stays UNSAT.
+    REQUIRE(!core.value().empty());
+    REQUIRE(solver->checkSatAssuming(core.value()) ==
+            camada::checkResult::UNSAT);
+  } else {
+    REQUIRE(core.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+  }
+
+  // A compound (non-literal) assumption must work too — backends whose
+  // native API only accepts literals lower it through activation literals.
+  REQUIRE(solver->checkSatAssuming({solver->mkNot(solver->mkOr(a, b))}) ==
+          camada::checkResult::UNSAT);
+
+  // Assumptions are per-query: they do not persist into later checks.
+  REQUIRE(solver->checkSatAssuming({a}) == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // After a check that was not an UNSAT checkSatAssuming, the unsat
+  // assumptions are stale and querying them is an error.
+  REQUIRE(!solver->getUnsatAssumptions());
+
+  // Mutating the solver state after an UNSAT checkSatAssuming also
+  // invalidates the unsat assumptions.
+  REQUIRE(solver->checkSatAssuming(negBoth) == camada::checkResult::UNSAT);
+  solver->push();
+  REQUIRE(!solver->getUnsatAssumptions());
+  solver->pop();
+
+  // An empty assumption set degenerates to a plain check.
+  REQUIRE(solver->checkSatAssuming({}) == camada::checkResult::SAT);
+}
+
 inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
   auto value = solver->mkBVFromBin("1000", 4);
   auto shift = solver->mkBVFromDec(1, 4);
@@ -260,11 +348,11 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   REQUIRE(x_res.value() == 1);
 }
 
-// Locks in the documented behavior that symbols are cached by (name, sort) for
-// the solver's lifetime, including across push/pop. mkSymbol returns the same
-// handle as before the push, even though SMT-LIB strict semantics would scope
-// declarations to the popped frame. This matches every supported backend's
-// actual C/C++ API behavior.
+// Locks in the documented behavior that symbols are cached by (name, sort)
+// for the solver's lifetime, including across push/pop. mkSymbol returns the
+// same handle as before the push, even though SMT-LIB strict semantics would
+// scope declarations to the popped frame. This matches every supported
+// backend's actual C/C++ API behavior.
 inline void symbol_cache_survives_push_pop(const camada::SMTSolverRef &solver) {
   auto bv8 = solver->mkBVSort(8);
   auto x_before = solver->mkSymbol("cached", bv8);

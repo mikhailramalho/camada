@@ -108,6 +108,7 @@ CVC5Solver::CVC5Solver() : Context(Terms) {
   Context.setOption("arrays-exp", "true");
   Context.setOption("produce-models", "true");
   Context.setOption("produce-assertions", "true");
+  Context.setOption("produce-unsat-assumptions", "true");
   initializeCommonSingletons();
 }
 
@@ -1020,6 +1021,25 @@ SMTExprRef CVC5Solver::getArrayElementImpl(const SMTExprRef &Array,
       Context.getValue(toSolverExpr<CVC5Expr>(*sel).Expr));
 }
 
+SMTResult<ArrayModel> CVC5Solver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](const cvc5::Term &Value, const SMTSortRef &Sort) {
+    return makeExprRef<CVC5Expr>(valueKindForSort(Sort), &Context, Sort, Value);
+  };
+
+  cvc5::Term Val = Context.getValue(toSolverExpr<CVC5Expr>(*Array).Expr);
+  ArrayModel Result;
+  while (Val.getKind() == cvc5::Kind::STORE) {
+    Result.Entries.emplace_back(wrap(Val[1], IndexSort),
+                                wrap(Val[2], ElemSort));
+    Val = Val[0];
+  }
+  if (Val.getKind() == cvc5::Kind::CONST_ARRAY)
+    Result.Base = wrap(Val.getConstArrayBase(), ElemSort);
+  return Result;
+}
+
 SMTExprRef CVC5Solver::mkBoolImpl(const bool b) {
   return makeExprRef<CVC5Expr>(SMTExprKind::BoolConst, &Context, mkBoolSort(),
                                Terms.mkBoolean(b));
@@ -1204,6 +1224,23 @@ SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
       Terms.mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body}));
 }
 
+bool CVC5Solver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult CVC5Solver::checkImpl() {
   cvc5::Result res = Context.checkSat();
   if (res.isSat())
@@ -1213,6 +1250,42 @@ checkResult CVC5Solver::checkImpl() {
     return checkResult::UNKNOWN;
 
   return checkResult::UNSAT;
+}
+
+bool CVC5Solver::setTimeoutImpl(uint64_t Milliseconds) {
+  // tlimit-per is cvc5's per-query wall-clock limit in milliseconds;
+  // 0 disables it. cvc5 allows (re)setting it at any point.
+  Context.setOption("tlimit-per", std::to_string(Milliseconds));
+  return true;
+}
+
+checkResult
+CVC5Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  std::vector<cvc5::Term> assumptions;
+  assumptions.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toSolverExpr<CVC5Expr>(*Assumption).Expr);
+
+  cvc5::Result res = Context.checkSatAssuming(assumptions);
+  if (res.isSat())
+    return checkResult::SAT;
+
+  if (res.isUnknown())
+    return checkResult::UNKNOWN;
+
+  return checkResult::UNSAT;
+}
+
+SMTResult<std::vector<SMTExprRef>> CVC5Solver::getUnsatAssumptionsImpl() {
+  std::vector<cvc5::Term> core = Context.getUnsatAssumptions();
+  std::vector<SMTExprRef> Result;
+  for (const cvc5::Term &Term : core)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (Term == toSolverExpr<CVC5Expr>(*Assumption).Expr) {
+        Result.push_back(Assumption);
+        break;
+      }
+  return Result;
 }
 
 void CVC5Solver::resetImpl() { Context.resetAssertions(); }

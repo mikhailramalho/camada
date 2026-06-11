@@ -172,6 +172,9 @@ CAMADA_YICES_SMTLIB_SHARED_TEST("implies_semantics", implies_semantics(solver),
 CAMADA_YICES_SMTLIB_SHARED_TEST("implies_true_implies_false",
                                 implies_true_implies_false(solver),
                                 makeSMTLIBSolver)
+CAMADA_YICES_SMTLIB_SHARED_TEST("check_sat_assuming_semantics",
+                                check_sat_assuming_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("bv_lshr_semantics", bv_lshr_semantics(solver),
                                 makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("incremental_push_pop",
@@ -210,3 +213,21 @@ CAMADA_YICES_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
 
 #undef CAMADA_YICES_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED
+
+TEST_CASE("Yices feature capabilities", "[Yices]") {
+  auto solver = camada::createYicesSolver();
+  using camada::SolverFeature;
+  REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Quantifiers));
+  REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
+  REQUIRE_FALSE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
+  REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
+  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+#if defined(_WIN32)
+  REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
+#else
+  REQUIRE(solver->supports(SolverFeature::Timeouts));
+#endif
+  REQUIRE(solver->supports(SolverFeature::ArrayModels));
+}

@@ -30,9 +30,34 @@
 #include <mutex>
 #include <utility>
 #include <vector>
+
+#if !defined(_WIN32)
+#include <atomic>
+#include <csignal>
+#include <sys/time.h>
+#endif
 #include <yices.h>
 
 namespace camada {
+
+#if !defined(_WIN32)
+namespace {
+// Yices has no native time limit; the documented interruption mechanism is
+// calling yices_stop_search from a signal handler (the same pattern
+// smt-switch uses). The solver running the current check parks its context
+// here for the handler. The timer, handler slot, and this context are all
+// process-global, so at most one Yices check may run under a time limit at
+// a time process-wide: concurrent timed checks on Yices instances in
+// different threads would clobber each other's timer and deadline.
+std::atomic<context_t *> YicesSearchContext{nullptr};
+struct sigaction YicesOldAlarmAction = {};
+
+void yicesAlarmHandler(int) {
+  if (context_t *Ctx = YicesSearchContext.load())
+    yices_stop_search(Ctx);
+}
+} // namespace
+#endif
 
 namespace {
 
@@ -757,6 +782,88 @@ SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
       result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }
 
+SMTResult<ArrayModel> YicesSolver::getArrayValuesImpl(const SMTExprRef &Array) {
+  model_t *Model = yices_get_model(Context, 1);
+  yval_t Root;
+  if (yices_get_value(Model, toSolverExpr<YicesExpr>(*Array).Expr, &Root) !=
+          0 ||
+      Root.node_tag != YVAL_FUNCTION)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices did not produce a function value for the array"};
+
+  // Camada arrays are unary Yices functions; the expansion below writes
+  // one index descriptor per mapping into a one-slot buffer.
+  if (yices_val_function_arity(Model, &Root) != 1)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices array model has unexpected function arity"};
+
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  // Yices model values are descriptor nodes, not terms: rebuild each leaf
+  // as a constant term of the Camada-facing sort. Returns a null ref for
+  // shapes the backend cannot hold (nested functions).
+  const auto wrap = [&](const yval_t &Value,
+                        const SMTSortRef &Sort) -> SMTExprRef {
+    if (Sort->isBoolSort()) {
+      int32_t B = 0;
+      if (yices_val_get_bool(Model, &Value, &B) != 0)
+        return {};
+      return makeExprRef<YicesExpr>(SMTExprKind::BoolConst, Context, Sort,
+                                    B ? yices_true() : yices_false());
+    }
+    std::vector<int32_t> Bits(Sort->getWidth());
+    if (Bits.empty() || yices_val_get_bv(Model, &Value, Bits.data()) != 0)
+      return {};
+    return makeExprRef<YicesExpr>(
+        valueKindForSort(Sort), Context, Sort,
+        yices_bvconst_from_array(static_cast<uint32_t>(Bits.size()),
+                                 Bits.data()));
+  };
+
+  yval_t Def;
+  yval_vector_t Mappings;
+  yices_init_yval_vector(&Mappings);
+  if (yices_val_expand_function(Model, &Root, &Def, &Mappings) != 0) {
+    yices_delete_yval_vector(&Mappings);
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices could not expand the array's function value"};
+  }
+
+  ArrayModel Result;
+  for (uint32_t I = 0; I < Mappings.size; ++I) {
+    yval_t IndexVal[1];
+    yval_t ElemVal;
+    if (yices_val_expand_mapping(Model, &Mappings.data[I], IndexVal,
+                                 &ElemVal) != 0) {
+      // A mapping the model distinguishes but we cannot read would decode
+      // as the default value — error out instead of dropping it.
+      yices_delete_yval_vector(&Mappings);
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                      "Yices could not expand an array model mapping"};
+    }
+    SMTExprRef IndexExpr = wrap(IndexVal[0], IndexSort);
+    SMTExprRef ElemExpr = wrap(ElemVal, ElemSort);
+    if (!IndexExpr || !ElemExpr) {
+      yices_delete_yval_vector(&Mappings);
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                      "Yices array model entry has an unsupported shape"};
+    }
+    Result.Entries.emplace_back(std::move(IndexExpr), std::move(ElemExpr));
+  }
+  if (Def.node_tag != YVAL_UNKNOWN) {
+    Result.Base = wrap(Def, ElemSort);
+    if (!Result.Base) {
+      // Yices reported a default we cannot read; a null Base would claim
+      // the unlisted indexes are unconstrained.
+      yices_delete_yval_vector(&Mappings);
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                      "Yices array model default has an unsupported shape"};
+    }
+  }
+  yices_delete_yval_vector(&Mappings);
+  return Result;
+}
+
 SMTExprRef YicesSolver::mkBoolImpl(const bool b) {
   return makeExprRef<YicesExpr>(SMTExprKind::BoolConst, Context, mkBoolSort(),
                                 b ? yices_true() : yices_false());
@@ -819,8 +926,87 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &,
   fatalError("Yices constant arrays are lowered lazily by the common layer");
 }
 
+void YicesSolver::armTimeout() {
+#if !defined(_WIN32)
+  if (TimeoutMs == 0)
+    return;
+  YicesSearchContext.store(Context);
+  struct sigaction Action = {};
+  Action.sa_handler = yicesAlarmHandler;
+  // yices_stop_search works through a flag the search loop polls, so the
+  // handler needs no syscall interruption: restart slow syscalls instead
+  // of surfacing spurious EINTRs to the rest of the process.
+  Action.sa_flags = SA_RESTART;
+  sigemptyset(&Action.sa_mask);
+  sigaction(SIGALRM, &Action, &YicesOldAlarmAction);
+  itimerval Timer{};
+  Timer.it_value.tv_sec = static_cast<time_t>(TimeoutMs / 1000);
+  Timer.it_value.tv_usec = static_cast<suseconds_t>((TimeoutMs % 1000) * 1000);
+  setitimer(ITIMER_REAL, &Timer, nullptr);
+#endif
+}
+
+void YicesSolver::disarmTimeout() {
+#if !defined(_WIN32)
+  if (TimeoutMs == 0)
+    return;
+  // A timer that expired between the check returning and the cancel below
+  // leaves SIGALRM pending; delivering it after the old disposition is
+  // restored could terminate the process (SIG_DFL). Block the signal,
+  // cancel the timer, discard any pending instance (POSIX guarantees
+  // setting SIG_IGN discards pending signals), then restore.
+  sigset_t AlarmSet, OldSet;
+  sigemptyset(&AlarmSet);
+  sigaddset(&AlarmSet, SIGALRM);
+  pthread_sigmask(SIG_BLOCK, &AlarmSet, &OldSet);
+  itimerval Off{};
+  setitimer(ITIMER_REAL, &Off, nullptr);
+  struct sigaction Ignore = {};
+  Ignore.sa_handler = SIG_IGN;
+  sigemptyset(&Ignore.sa_mask);
+  sigaction(SIGALRM, &Ignore, nullptr);
+  sigaction(SIGALRM, &YicesOldAlarmAction, nullptr);
+  YicesSearchContext.store(nullptr);
+  pthread_sigmask(SIG_SETMASK, &OldSet, nullptr);
+#endif
+}
+
+bool YicesSolver::setTimeoutImpl(uint64_t) {
+#if defined(_WIN32)
+  return false;
+#else
+  return true;
+#endif
+}
+
+bool YicesSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::Timeouts:
+    // Enforced through SIGALRM + yices_stop_search; POSIX only.
+#if defined(_WIN32)
+    return false;
+#else
+    return true;
+#endif
+  case SolverFeature::Quantifiers:
+  case SolverFeature::NativeFloatingPoint:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult YicesSolver::checkImpl() {
+  armTimeout();
   smt_status_t res = yices_check_context(Context, nullptr);
+  disarmTimeout();
   if (res == YICES_STATUS_SAT)
     return checkResult::SAT;
 
@@ -828,6 +1014,46 @@ checkResult YicesSolver::checkImpl() {
     return checkResult::UNSAT;
 
   return checkResult::UNKNOWN;
+}
+
+checkResult
+YicesSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  std::vector<term_t> assumptions;
+  assumptions.reserve(Assumptions.size());
+  for (const SMTExprRef &Assumption : Assumptions)
+    assumptions.push_back(toSolverExpr<YicesExpr>(*Assumption).Expr);
+
+  armTimeout();
+  smt_status_t res = yices_check_context_with_assumptions(
+      Context, nullptr, static_cast<uint32_t>(assumptions.size()),
+      assumptions.data());
+  disarmTimeout();
+  if (res == YICES_STATUS_SAT)
+    return checkResult::SAT;
+
+  if (res == YICES_STATUS_UNSAT)
+    return checkResult::UNSAT;
+
+  return checkResult::UNKNOWN;
+}
+
+SMTResult<std::vector<SMTExprRef>> YicesSolver::getUnsatAssumptionsImpl() {
+  term_vector_t core;
+  yices_init_term_vector(&core);
+  if (yices_get_unsat_core(Context, &core) != 0) {
+    yices_delete_term_vector(&core);
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Yices,
+                    "Yices could not retrieve the unsat core"};
+  }
+  std::vector<SMTExprRef> Result;
+  for (uint32_t i = 0; i < core.size; ++i)
+    for (const SMTExprRef &Assumption : LastAssumptions)
+      if (core.data[i] == toSolverExpr<YicesExpr>(*Assumption).Expr) {
+        Result.push_back(Assumption);
+        break;
+      }
+  yices_delete_term_vector(&core);
+  return Result;
 }
 
 void YicesSolver::resetImpl() {
