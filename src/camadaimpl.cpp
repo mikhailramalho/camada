@@ -680,36 +680,21 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   if (LHS->Sort->isArraySort()) {
     const bool LazyInvolved = !LazyConstArrayRoots.empty() &&
                               (reachesLazyArray(LHS) || reachesLazyArray(RHS));
-    // Backends without native array extensionality (STP) cannot decide
-    // array equality at all — their only array predicate is select — so
-    // every array equality is lowered to the witness + observed-index
-    // congruence encoding. Its witness selects also instantiate any lazy
-    // defaults, so this subsumes the lazy lemma below.
-    if (!nativeArrayExtensionality())
+    // Two cases need the witness + observed-index congruence encoding:
+    //  - Backends without native array extensionality (STP) cannot decide
+    //    array equality at all — their only array predicate is select.
+    //  - A lazy root's default axiom binds only at observed indexes, so on
+    //    any backend native equality alone could fake a difference (or
+    //    agreement) at an unobserved index.
+    // Both route through mkEncodedArrayEqual, whose witness selects also
+    // instantiate lazy defaults. Crucially, when the element sort is itself
+    // an array the encoded witness's inner equality re-enters this same
+    // path, strictly decreasing element-array depth — so nested lazy const
+    // arrays (array_of(array_of(v))) terminate. An inline native witness
+    // here would instead recurse through mkEqual, spawning a fresh witness
+    // index per level whose observation re-fires the default unboundedly.
+    if (!nativeArrayExtensionality() || LazyInvolved)
       return mkEncodedArrayEqual(LHS, RHS);
-    if (LazyInvolved) {
-      // Extensionality witness for lazy constant arrays. The backend
-      // decides array equality natively, but a lazy root's default axiom
-      // is only instantiated at observed indexes, so a model could fake a
-      // difference (or agreement) at an unobserved index. The standard
-      // reduction plugs this: a fresh witness index per equality, the
-      // universally valid lemma
-      //   LHS = RHS  \/  select(LHS, K) != select(RHS, K)
-      // and default instantiation at K (done by mkArraySelect below). Any
-      // model claiming LHS != RHS must now exhibit the difference at K,
-      // where defaults are enforced.
-      SMTExprRef Witness = mkSymbolUnchecked(
-          "__CAMADA_lazyarr_ext" + std::to_string(LazyConstArrayCounter++),
-          LHS->Sort->getIndexSort());
-      SMTExprRef SelL = mkArraySelect(LHS, Witness);
-      SMTExprRef SelR = mkArraySelect(RHS, Witness);
-      SMTExprRef theEq = mkEqualImpl(LHS, RHS);
-      assert(theEq->isBoolSort());
-      SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
-      addConstraint(Lemma);
-      LazyConstraintLevels.back().push_back(std::move(Lemma));
-      return theEq;
-    }
   }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
   assert(theExp->isBoolSort());
@@ -1189,6 +1174,17 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   return theExp;
 }
 
+SMTExprRef SMTSolverImpl::mkArraySelectUnobserved(const SMTExprRef &Array,
+                                                  const SMTExprRef &Index) {
+  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
+               "Expected array index with matching sort");
+  // Deliberately NOT observeArrayIndex(Index): see the header.
+  SMTExprRef theExp = mkArraySelectImpl(Array, Index);
+  assert(theExp->Sort == Array->Sort->getElementSort());
+  return theExp;
+}
+
 SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
                                        const SMTExprRef &Index,
                                        const SMTExprRef &Element) {
@@ -1229,9 +1225,14 @@ bool SMTSolverImpl::reachesLazyArray(const SMTExprRef &Exp) const {
 
 SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
                                            const SMTExprRef &InitValue) {
-  fatalErrorIf(InitValue->isArraySort() && reachesLazyArray(InitValue),
-               "Lazily lowered constant arrays cannot be nested inside one "
-               "another");
+  // A lazy const array whose initializer is itself a lazy const array
+  // (array_of(array_of(v))) is sound: the outer default axiom is the
+  // array equality select(outer, i) == inner, which routes through the
+  // extensionality witness (native-extensionality backends) or the
+  // encoded-equality congruence (STP). A read select(select(outer,i), j)
+  // observes j at the inner index sort, firing inner's default there, and
+  // the equality propagates it to j. Model extraction returns the inner
+  // lazy array as the base; the consumer re-queries it via getArrayElement.
   SMTSortRef ArraySort = mkArraySort(IndexSort, InitValue->Sort);
   SMTExprRef Root = mkSymbolUnchecked(
       "__CAMADA_lazyarr" + std::to_string(LazyConstArrayCounter++), ArraySort);
@@ -1260,6 +1261,26 @@ void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
   // Copy: the maps may rehash while the constraint is built.
   const LazyConstArrayRoot Root = LazyConstArrayRoots.at(RootKey);
   SMTExprRef Constraint = mkEqual(mkArraySelect(Root.Root, Index), Root.Init);
+  addConstraint(Constraint);
+  LazyConstraintLevels.back().push_back(std::move(Constraint));
+}
+
+void SMTSolverImpl::instantiateLazyDefaultAtUnobserved(
+    const SMTExpr *RootKey, const SMTExprRef &Index) {
+  // Memo-first, like instantiateLazyDefaultAt: here it guards the nested
+  // recursion (the mkEqual below re-enters mkEncodedArrayEqual for array
+  // initializers), not an observeArrayIndex re-entry — the select is
+  // unobserved.
+  if (!LazyTouched.insert({RootKey, &*Index}).second)
+    return;
+  const LazyConstArrayRoot Root = LazyConstArrayRoots.at(RootKey);
+  // The select is built on the unobserved path: Index is a witness, read
+  // only inside the equality lemma that produced it. When Root.Init is
+  // itself an array (the nested lazy case) this mkEqual re-enters
+  // mkEncodedArrayEqual with a fresh witness, again unobserved — strictly
+  // decreasing element-array depth, so it terminates.
+  SMTExprRef Constraint =
+      mkEqual(mkArraySelectUnobserved(Root.Root, Index), Root.Init);
   addConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
@@ -1319,17 +1340,41 @@ SMTExprRef SMTSolverImpl::mkEncodedArrayEqual(const SMTExprRef &LHS,
   }
 
   // Negative direction: a claimed difference must be exhibitable at the
-  // witness. The selects below also flow through mkArraySelect, which
-  // asserts this link's congruence at W and instantiates lazy defaults,
-  // so EqVar is fully tied to the arrays' contents at W.
+  // witness. The witness is a fresh index read ONLY here, so its selects
+  // use the unobserved path — registering it as a sort-global observed
+  // index would re-fire every lazy root (including ones registered under
+  // the witness's own sort) at a brand-new index, which for nested lazy
+  // const arrays never terminates (each cycle mints another witness).
+  // enforceWitnessFacts instead pins exactly LHS's and RHS's lazy defaults
+  // at the witness, which is all soundness needs. When the element sort is
+  // itself an array, the inner mkEqual below re-enters this function with a
+  // fresh witness, strictly decreasing element-array depth, so it
+  // terminates.
   SMTExprRef Witness = mkSymbolUnchecked(
       "__CAMADA_arreq_wit" + std::to_string(ArrayEqualCounter++),
       LHS->Sort->getIndexSort());
-  SMTExprRef Lemma = mkOr(EqVar, mkNot(mkEqual(mkArraySelect(LHS, Witness),
-                                               mkArraySelect(RHS, Witness))));
+  SMTExprRef LSel = mkArraySelectUnobserved(LHS, Witness);
+  SMTExprRef RSel = mkArraySelectUnobserved(RHS, Witness);
+  enforceWitnessFacts(LHS, RHS, Witness);
+  SMTExprRef Lemma = mkOr(EqVar, mkNot(mkEqual(LSel, RSel)));
   addConstraint(Lemma);
   LazyConstraintLevels.back().push_back(std::move(Lemma));
   return EqVar;
+}
+
+void SMTSolverImpl::enforceWitnessFacts(const SMTExprRef &LHS,
+                                        const SMTExprRef &RHS,
+                                        const SMTExprRef &Witness) {
+  if (LazyConstArrayRoots.empty())
+    return;
+  // Pin each operand's lazy-root default at the witness so select(op, W)
+  // is determined (modulo the operand's store/ite chain, which the backend
+  // select already models). Scoped to these two operands; the sort-global
+  // root/link fan-out is intentionally not touched. The unobserved
+  // instantiation keeps the witness out of the global observed set.
+  for (const SMTExprRef &Operand : {LHS, RHS})
+    for (const SMTExpr *RootKey : lazyArrayRootsOf(Operand))
+      instantiateLazyDefaultAtUnobserved(RootKey, Witness);
 }
 
 void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,

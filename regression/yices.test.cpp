@@ -231,3 +231,16 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
 #endif
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 }
+
+// Registered per backend, not in tests(): array_of(array_of(v)) needs a
+// nested array sort, which STP's BV-only array theory lacks.
+TEST_CASE("Nested constant arrays Yices test", "[Yices]") {
+  auto solver = camada::createYicesSolver();
+  nested_const_array_semantics(solver);
+  solver->reset();
+  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
+  solver->reset();
+  nested_const_array_survives_pop(solver);
+  solver->reset();
+  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
+}

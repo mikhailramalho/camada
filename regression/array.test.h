@@ -457,6 +457,198 @@ inline void const_array_equality_semantics(
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
 
+// A symbol array equated to one lazy const array, then disequated from a
+// second — exercises the encoded-equality witness over an operand that is
+// itself a plain symbol equated (via a separate encoded equality) to a
+// lazy root. The disequality's witness is unobserved, so the symbol=root
+// congruence does not bind there: the model must be free to exhibit a real
+// difference, yet a forced agreement at a concrete index must still hold.
+inline void lazy_array_transitive_equality(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  auto arrsort = solver->mkArraySort(bv8, bv8);
+
+  // B = array_of(7); C = array_of(9); B != C is satisfiable (they differ
+  // at every index, exhibitable at the disequality's own witness).
+  auto b = solver->mkSymbol("lat_b", arrsort);
+  auto c = solver->mkSymbol("lat_c", arrsort);
+  solver->addConstraint(
+      solver->mkEqual(b, solver->mkArrayConst(bv8, idx(7), Lowering)));
+  solver->addConstraint(
+      solver->mkEqual(c, solver->mkArrayConst(bv8, idx(9), Lowering)));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(b, c)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // But B's value is still pinned: reading B at any index must be 7, even
+  // though B != C let the solver pick a witness where B and C differ.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  arrsort = solver->mkArraySort(bv8, bv8);
+  auto b2 = solver->mkSymbol("lat_b2", arrsort);
+  auto c2 = solver->mkSymbol("lat_c2", arrsort);
+  solver->addConstraint(
+      solver->mkEqual(b2, solver->mkArrayConst(bv8, idx(7), Lowering)));
+  solver->addConstraint(
+      solver->mkEqual(c2, solver->mkArrayConst(bv8, idx(9), Lowering)));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(b2, c2)));
+  auto m = solver->mkSymbol("lat_m", bv8);
+  solver->addConstraint(
+      solver->mkNot(solver->mkEqual(solver->mkArraySelect(b2, m), idx(7))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// Constant array whose initializer is itself a constant array —
+// array_of(array_of(v)), ESBMC's multidimensional `array_of`. On native
+// constant-array backends the inner const array is just an array-sorted
+// element; on lazy backends both levels lower lazily, so the outer
+// default axiom is an array equality between select(outer, i) and the
+// inner lazy root. This pins read-through, store-over-inner, the
+// negative direction, equality propagation, and model round-trip.
+inline void nested_const_array_semantics(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  auto innerSort = solver->mkArraySort(bv8, bv8);
+
+  // Default read-through: every cell of the outer array is the inner
+  // const array, whose every cell is v. So select(select(outer,i),j)==v.
+  auto inner = solver->mkArrayConst(bv8, idx(7), Lowering);
+  auto outer = solver->mkArrayConst(bv8, inner, Lowering);
+  REQUIRE(outer->Sort->getElementSort() == innerSort);
+  auto i = solver->mkSymbol("i", bv8);
+  auto j = solver->mkSymbol("j", bv8);
+  auto deep = solver->mkArraySelect(solver->mkArraySelect(outer, i), j);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(deep, idx(7))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Store into the inner array at a concrete index, read elsewhere: the
+  // written cell holds the stored value, every other cell the default.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  inner = solver->mkArrayConst(bv8, idx(7), Lowering);
+  auto innerStored = solver->mkArrayStore(inner, idx(2), idx(99));
+  auto k = solver->mkSymbol("k", bv8);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(k, idx(2))));
+  auto ok = solver->mkAnd(
+      solver->mkEqual(solver->mkArraySelect(innerStored, idx(2)), idx(99)),
+      solver->mkEqual(solver->mkArraySelect(innerStored, k), idx(7)));
+  solver->addConstraint(solver->mkNot(ok));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Negative direction must stay satisfiable: a deep read equal to a
+  // value different from the default is impossible, but equal to the
+  // default is fine — no false UNSAT, and no spurious model either.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  inner = solver->mkArrayConst(bv8, idx(7), Lowering);
+  outer = solver->mkArrayConst(bv8, inner, Lowering);
+  i = solver->mkSymbol("i2", bv8);
+  j = solver->mkSymbol("j2", bv8);
+  deep = solver->mkArraySelect(solver->mkArraySelect(outer, i), j);
+  solver->addConstraint(solver->mkEqual(deep, idx(7)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  inner = solver->mkArrayConst(bv8, idx(7), Lowering);
+  outer = solver->mkArrayConst(bv8, inner, Lowering);
+  i = solver->mkSymbol("i3", bv8);
+  j = solver->mkSymbol("j3", bv8);
+  deep = solver->mkArraySelect(solver->mkArraySelect(outer, i), j);
+  solver->addConstraint(solver->mkEqual(deep, idx(8))); // != default 7
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Equality propagation: two equal nested const arrays agree on a deep
+  // read even when one side was derived before the equality.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  innerSort = solver->mkArraySort(bv8, bv8);
+  auto outerSort = solver->mkArraySort(bv8, innerSort);
+  auto a = solver->mkSymbol("a", outerSort);
+  i = solver->mkSymbol("i4", bv8);
+  j = solver->mkSymbol("j4", bv8);
+  auto aDeep = solver->mkArraySelect(solver->mkArraySelect(a, i), j);
+  solver->addConstraint(solver->mkEqual(
+      a, solver->mkArrayConst(bv8, solver->mkArrayConst(bv8, idx(5), Lowering),
+                              Lowering)));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(aDeep, idx(5))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Model round-trip: getArrayElement on the outer returns an inner
+  // array whose deep read matches the default.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  inner = solver->mkArrayConst(bv8, idx(7), Lowering);
+  outer = solver->mkArrayConst(bv8, inner, Lowering);
+  // Touch a deep cell so the array is in the formula on every backend.
+  solver->addConstraint(solver->mkEqual(
+      solver->mkArraySelect(solver->mkArraySelect(outer, idx(0)), idx(0)),
+      idx(7)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto innerModel = solver->getArrayElement(outer, idx(1));
+  REQUIRE(innerModel->Sort == solver->mkArraySort(bv8, bv8));
+  auto cell = solver->getBV(solver->getArrayElement(innerModel, idx(3)));
+  REQUIRE(cell);
+  REQUIRE(cell.value() == 7);
+
+  // Adversarial: two independent inner-array disequalities must each be
+  // exhibitable at their OWN witness index — a shared witness would
+  // conflate them and force a spurious UNSAT. Each equality's negative
+  // witness is fresh, so this stays SAT.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  innerSort = solver->mkArraySort(bv8, bv8);
+  auto m1 = solver->mkSymbol("m1", innerSort);
+  auto n1 = solver->mkSymbol("n1", innerSort);
+  auto m2 = solver->mkSymbol("m2", innerSort);
+  auto n2 = solver->mkSymbol("n2", innerSort);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(m1, n1)));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(m2, n2)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Adversarial negative direction with a lazy const array: a difference
+  // claimed against the default must be a real one. select(outer,i) is the
+  // inner const array (all 7s); claiming select(select(outer,i),j) == 4 is
+  // impossible, but the model must not fabricate a difference at an
+  // unobserved index — pinned by the witness default. UNSAT.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  inner = solver->mkArrayConst(bv8, idx(7), Lowering);
+  outer = solver->mkArrayConst(bv8, inner, Lowering);
+  auto sym = solver->mkSymbol("sym", solver->mkArraySort(bv8, bv8));
+  i = solver->mkSymbol("i5", bv8);
+  // sym equals the inner const array, but disagrees with it at j: UNSAT,
+  // because sym = select(outer,i) = inner forces agreement everywhere
+  // observed.
+  solver->addConstraint(solver->mkEqual(sym, solver->mkArraySelect(outer, i)));
+  auto j5 = solver->mkSymbol("j5", bv8);
+  solver->addConstraint(
+      solver->mkNot(solver->mkEqual(solver->mkArraySelect(sym, j5), idx(7))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// nested_const_array_semantics inside a pushed scope: the deep default
+// asserted in the scope must still bind handles that outlive the pop.
+inline void nested_const_array_survives_pop(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  auto inner = solver->mkArrayConst(bv8, idx(7), Lowering);
+  auto outer = solver->mkArrayConst(bv8, inner, Lowering);
+  auto i = solver->mkSymbol("ncsp_i", bv8);
+  auto j = solver->mkSymbol("ncsp_j", bv8);
+
+  solver->push();
+  auto deep = solver->mkArraySelect(solver->mkArraySelect(outer, i), j);
+  solver->pop();
+
+  solver->addConstraint(solver->mkNot(solver->mkEqual(deep, idx(7))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
 inline void const_array_lowering_interop(const camada::SMTSolverRef &solver) {
   auto idx = solver->mkBVSort(8);
   auto elem = solver->mkBVSort(8);

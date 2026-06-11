@@ -180,6 +180,16 @@ protected:
       ObservedIndexesBySort;
   std::set<std::pair<const SMTSort *, const SMTExpr *>> ObservedIndexSeen;
   void observeArrayIndex(const SMTExprRef &Index);
+
+  // Build select(Array, Index) WITHOUT registering Index as a sort-global
+  // observed index. Used only for encoded-equality witnesses: a fresh
+  // witness is read at exactly one syntactic position (its equality's
+  // lemma), so the sort-global fan-out observeArrayIndex performs is never
+  // needed for it — and for nested lazy const arrays that fan-out is
+  // exactly what fails to terminate, since the witness's own observation
+  // re-fires the roots it was minted under, each time at a new witness.
+  SMTExprRef mkArraySelectUnobserved(const SMTExprRef &Array,
+                                     const SMTExprRef &Index);
   // True while a model query (getArrayElement) is evaluating: selects
   // built for evaluation must not instantiate default axioms or count as
   // formula observations — asserting after check() invalidates the
@@ -219,6 +229,16 @@ protected:
   SMTExprRef mkEncodedArrayEqual(const SMTExprRef &LHS, const SMTExprRef &RHS);
   void assertArrayEqualCongruence(std::size_t LinkId, const SMTExprRef &Index);
 
+  // Enforce, at an encoded equality's fresh (non-observed) witness, exactly
+  // the lazy default axioms its two operands need so a claimed difference at
+  // the witness is a real one and not fabricated where a value is
+  // unconstrained. Scoped to LHS/RHS only — never the sort-global root set —
+  // and uses the unobserved select path so the witness is never globally
+  // observed. Array-element operands are handled by the structural recursion
+  // in mkEncodedArrayEqual (the inner select equality re-enters it).
+  void enforceWitnessFacts(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                           const SMTExprRef &Witness);
+
   /// Lower a constant array as a fresh backend array symbol whose
   /// "every element equals InitValue" semantics are enforced lazily: the
   /// default axiom is instantiated at each index term the formula observes
@@ -235,6 +255,11 @@ protected:
   bool reachesLazyArray(const SMTExprRef &Exp) const;
   void instantiateLazyDefaultAt(const SMTExpr *RootKey,
                                 const SMTExprRef &Index);
+  // As instantiateLazyDefaultAt, but the default's select is built on the
+  // unobserved path: used for encoded-equality witnesses (see
+  // enforceWitnessFacts) so the witness index is not globally observed.
+  void instantiateLazyDefaultAtUnobserved(const SMTExpr *RootKey,
+                                          const SMTExprRef &Index);
   SMTExprRef resolveLazyArrayElement(const SMTExprRef &Array,
                                      const SMTExprRef &Index);
 

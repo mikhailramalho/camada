@@ -32,3 +32,8 @@ TEST_CASE("STP feature capabilities", "[STP]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
 }
+
+TEST_CASE("Unsupported nested constant arrays STP test", "[STP]") {
+  auto stp = camada::createSTPSolver();
+  require_abort([&]() { nested_const_array_semantics(stp); });
+}
