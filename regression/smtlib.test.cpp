@@ -363,7 +363,10 @@ TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
   REQUIRE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
-  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  // UnsatAssumptions reflects the runtime probe: in write-only mode there
+  // is no child to answer :produce-unsat-assumptions, so it is false here
+  // and true against children that accept the option.
+  REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
 
