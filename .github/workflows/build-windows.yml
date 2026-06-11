@@ -24,13 +24,13 @@ jobs:
 
       # Setup/cache dependencies
     - name: Cache deps
-      id: cache-deps-v8
+      id: cache-deps-v9
       uses: actions/cache@v4
       with:
         path: |
           build/deps
           build/_deps
-        key: ${{ runner.os }}-deps-v8
+        key: ${{ runner.os }}-deps-v9
 
     - name: Configure Camada
       shell: pwsh
