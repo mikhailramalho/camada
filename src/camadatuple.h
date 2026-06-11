@@ -89,6 +89,11 @@ SMTExprRef mkCamadaTupleArrayStore(SMTSolverImpl &Solver,
                                    const SMTExprRef &Index,
                                    const SMTExprRef &Element);
 
+SMTExprRef mkCamadaTupleArrayConst(SMTSolverImpl &Solver,
+                                   const SMTSortRef &IndexSort,
+                                   const SMTExprRef &InitValue,
+                                   ConstArrayLowering Lowering);
+
 SMTExprRef mkCamadaTupleArrayEqual(SMTSolverImpl &Solver, const SMTExprRef &LHS,
                                    const SMTExprRef &RHS);
 

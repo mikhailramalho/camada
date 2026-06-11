@@ -229,6 +229,93 @@ inline void tuple_array_equality_ite(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
 
+// Constant arrays of tuples: on backends without native datatypes the
+// initializer decomposes into one constant array per scalar leaf (each
+// lowered natively or lazily per the backend); native backends lower
+// the whole thing directly. Checks are solver-side only — model
+// extraction on decomposed arrays is a later tuple-plan phase.
+inline void tuple_array_const(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+
+  // The default value is visible at an arbitrary symbolic index.
+  auto init = solver->mkTuple({solver->mkBool(true), idx(170)});
+  auto arr = solver->mkArrayConst(bv8, init, Lowering);
+  auto i = solver->mkSymbol("i", bv8);
+  solver->addConstraint(
+      solver->mkNot(solver->mkEqual(solver->mkArraySelect(arr, i), init)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Store over the constant array: the stored tuple at the written
+  // index, the default elsewhere.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  init = solver->mkTuple({solver->mkBool(false), idx(7)});
+  auto stored = solver->mkTuple({solver->mkBool(true), idx(99)});
+  auto upd = solver->mkArrayStore(solver->mkArrayConst(bv8, init, Lowering),
+                                  idx(3), stored);
+  auto ok =
+      solver->mkAnd(solver->mkEqual(solver->mkArraySelect(upd, idx(3)), stored),
+                    solver->mkEqual(solver->mkArraySelect(upd, idx(5)), init));
+  solver->addConstraint(solver->mkNot(ok));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // The default survives a store made inside a pushed scope: after pop,
+  // reads at the previously written index see the default again.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  init = solver->mkTuple({solver->mkBool(true), idx(21)});
+  auto arr3 = solver->mkArrayConst(bv8, init, Lowering);
+  solver->push();
+  auto scratch = solver->mkTuple({solver->mkBool(false), idx(1)});
+  auto inPush = solver->mkArrayStore(arr3, idx(2), scratch);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(inPush, idx(2)), scratch));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  solver->pop();
+  solver->addConstraint(solver->mkNot(
+      solver->mkEqual(solver->mkArraySelect(arr3, idx(2)), init)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Homogeneous fields pin per-leaf default order semantically: a leaf
+  // transposition would hand 22 to field 0 with no sort mismatch.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  auto homoInit = solver->mkTuple({idx(11), idx(22)});
+  auto homoArr = solver->mkArrayConst(bv8, homoInit, Lowering);
+  auto k = solver->mkSymbol("k", bv8);
+  auto homoRd = solver->mkArraySelect(homoArr, k);
+  auto fieldsOk =
+      solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(homoRd, 0), idx(11)),
+                    solver->mkEqual(solver->mkTupleSelect(homoRd, 1), idx(22)));
+  solver->addConstraint(solver->mkNot(fieldsOk));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// Nested constant arrays of tuples: array_of(array_of(tuple)). On the
+// decomposed path the inner constant array's leaves become the per-leaf
+// initializers of the outer one. Registered per backend: lazily lowered
+// constant arrays cannot nest (bitwuzla/yices/stp abort), so this runs
+// only where constant arrays are native.
+inline void tuple_array_const_nested(const camada::SMTSolverRef &solver) {
+  auto bv4 = solver->mkBVSort(4);
+  auto init =
+      solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(5, 8)});
+  auto innerConst = solver->mkArrayConst(bv4, init);
+  auto outerConst = solver->mkArrayConst(bv4, innerConst);
+
+  auto i = solver->mkSymbol("i", bv4);
+  auto j = solver->mkSymbol("j", bv4);
+  auto rd = solver->mkArraySelect(solver->mkArraySelect(outerConst, i), j);
+  // Guard against a vacuously UNSAT context (e.g. contradictory default
+  // axioms) before pinning the property itself.
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(rd, init)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
 // Deep nesting: tuple { array of tuple { bv, array of tuple { bool, bv } } }
 // — five levels of alternation; everything must flatten to native
 // nested-arrays-of-scalars and recurse leaf-wise.
