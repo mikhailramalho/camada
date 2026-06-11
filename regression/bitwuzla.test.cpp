@@ -176,3 +176,24 @@ TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 }
+
+// Registered per backend rather than in tests(): the depth-5 shape
+// flattens to nested-array leaves, which STP's array theory lacks.
+TEST_CASE("Deep tuple/array nesting Bitwuzla test", "[Bitwuzla]") {
+  auto solver = camada::createBitwuzlaSolver();
+  tuple_array_deep_nesting(solver);
+}
+
+// Nested constant tuple arrays need every per-leaf constant array to
+// nest, and lazily lowered constant arrays cannot — pin the abort.
+TEST_CASE("Unsupported nested constant tuple arrays Bitwuzla test",
+          "[Bitwuzla]") {
+  auto solver = camada::createBitwuzlaSolver();
+  require_abort([&]() {
+    auto bv4 = solver->mkBVSort(4);
+    auto init =
+        solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(5, 8)});
+    auto innerConst = solver->mkArrayConst(bv4, init);
+    (void)solver->mkArrayConst(bv4, innerConst);
+  });
+}

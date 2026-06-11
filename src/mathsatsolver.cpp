@@ -954,6 +954,17 @@ MathSATSolver::getArrayValuesImpl(const SMTExprRef &Array) {
     return makeExprRef<MathSATExpr>(valueKindForSort(Sort), &Context, Sort,
                                     Value);
   };
+  // Bool-element arrays are stored as BV1 (mkArraySortImpl), so the model
+  // write chain yields BV1 constants where a Bool value is expected;
+  // recover the Bool literal the same way mkArraySelectImpl does.
+  const auto wrapElem = [&](msat_term Value) {
+    if (!ElemSort->isBoolSort())
+      return wrap(Value, ElemSort);
+    const SMTExprRef &one = mkBVFromDec(1, mkBVSort(1));
+    return makeExprRef<MathSATExpr>(
+        SMTExprKind::BoolConst, &Context, mkBoolSort(),
+        msat_make_eq(Context, Value, toMathSATTerm(one)));
+  };
 
   msat_term Val = msat_get_model_value(Context, toMathSATTerm(Array));
   if (MSAT_ERROR_TERM(Val))
@@ -962,11 +973,11 @@ MathSATSolver::getArrayValuesImpl(const SMTExprRef &Array) {
   ArrayModel Result;
   while (msat_term_is_array_write(Context, Val)) {
     Result.Entries.emplace_back(wrap(msat_term_get_arg(Val, 1), IndexSort),
-                                wrap(msat_term_get_arg(Val, 2), ElemSort));
+                                wrapElem(msat_term_get_arg(Val, 2)));
     Val = msat_term_get_arg(Val, 0);
   }
   if (msat_term_is_array_const(Context, Val))
-    Result.Base = wrap(msat_term_get_arg(Val, 0), ElemSort);
+    Result.Base = wrapElem(msat_term_get_arg(Val, 0));
   return Result;
 }
 

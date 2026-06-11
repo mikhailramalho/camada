@@ -456,6 +456,8 @@ public:
   SMTExprRef mkTuple(const std::vector<SMTExprRef> &Elements) override final;
   SMTExprRef mkTupleSelect(const SMTExprRef &Tuple,
                            unsigned Index) override final;
+  SMTExprRef mkTupleUpdate(const SMTExprRef &Tuple, unsigned Index,
+                           const SMTExprRef &Value) override final;
   SMTExprRef mkApply(const SMTExprRef &Function,
                      const std::vector<SMTExprRef> &Args) override final;
   SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
@@ -786,6 +788,13 @@ protected:
   virtual SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &);
 
   virtual SMTExprRef mkTupleSelectImpl(const SMTExprRef &, unsigned);
+
+  /// Default: select-and-rebuild through the public mkTupleSelect/mkTuple,
+  /// which dispatch per regime (native datatypes vs the Camada per-field
+  /// lowering) — the semantic definition of the operation. Backends with a
+  /// native datatype updater can override if profiling ever justifies it.
+  virtual SMTExprRef mkTupleUpdateImpl(const SMTExprRef &Tuple, unsigned Index,
+                                       const SMTExprRef &Value);
 
   virtual SMTExprRef mkApplyImpl(const SMTExprRef &,
                                  const std::vector<SMTExprRef> &);

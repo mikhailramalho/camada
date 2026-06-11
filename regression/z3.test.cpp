@@ -186,3 +186,17 @@ TEST_CASE("Z3 feature capabilities", "[Z3]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 }
+
+// Registered per backend rather than in tests(): the depth-5 shape
+// flattens to nested-array leaves, which STP's array theory lacks.
+TEST_CASE("Deep tuple/array nesting Z3 test", "[Z3]") {
+  auto solver = camada::createZ3Solver();
+  tuple_array_deep_nesting(solver);
+}
+
+// Registered per backend: nested constant arrays require native constant
+// arrays (lazily lowered constant arrays cannot nest).
+TEST_CASE("Nested constant tuple arrays Z3 test", "[Z3]") {
+  auto solver = camada::createZ3Solver();
+  tuple_array_const_nested(solver);
+}

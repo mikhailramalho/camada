@@ -105,6 +105,138 @@ inline void tuple_with_array_field(const camada::SMTSolverRef &solver) {
 // compare unequal. Native-tuple backends already get this for free via
 // their backend term; the encoded path needs to implement it on
 // CamadaTupleExpr explicitly.
+// mkTupleUpdate is ESBMC's `with`-on-struct choke point: a tuple equal
+// to the original except at one field. Bool + BV only, like
+// tuple_semantics, so every backend (native datatypes and the Camada
+// per-field lowering) runs it.
+inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
+  auto boolSort = solver->mkBoolSort();
+  auto bv8Sort = solver->mkBVSort(8);
+  auto tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+
+  // Value tuple: the updated field changes, the others are preserved.
+  auto t = solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(1, 8),
+                            solver->mkBVFromDec(2, 8)});
+  auto u = solver->mkTupleUpdate(t, 1, solver->mkBVFromDec(9, 8));
+  REQUIRE(u->Sort == t->Sort);
+  auto expected =
+      solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(9, 8),
+                       solver->mkBVFromDec(2, 8)});
+  solver->addConstraint(solver->mkNot(solver->mkEqual(u, expected)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Symbol tuple: non-updated fields stay tied to the original symbol's
+  // fields, and the updated field equals the new value.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+  auto s = solver->mkSymbol("st", tupleSort);
+  auto v = solver->mkTupleUpdate(s, 2, solver->mkBVFromDec(7, 8));
+  auto preserved = solver->mkAnd(
+      solver->mkEqual(solver->mkTupleSelect(v, 0), solver->mkTupleSelect(s, 0)),
+      solver->mkEqual(solver->mkTupleSelect(v, 1),
+                      solver->mkTupleSelect(s, 1)));
+  auto updated =
+      solver->mkEqual(solver->mkTupleSelect(v, 2), solver->mkBVFromDec(7, 8));
+  solver->addConstraint(solver->mkNot(solver->mkAnd(preserved, updated)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Chained updates of the same field — ESBMC's pointer-arithmetic hot
+  // pattern — collapse to the last value with the other fields preserved.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+  auto base = solver->mkSymbol("base", tupleSort);
+  auto twice = solver->mkTupleUpdate(
+      solver->mkTupleUpdate(base, 1, solver->mkBVFromDec(1, 8)), 1,
+      solver->mkBVFromDec(2, 8));
+  auto chainOk = solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(twice, 1),
+                                               solver->mkBVFromDec(2, 8)),
+                               solver->mkEqual(solver->mkTupleSelect(twice, 2),
+                                               solver->mkTupleSelect(base, 2)));
+  solver->addConstraint(solver->mkNot(chainOk));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Update of an ite-shaped tuple distributes through both branches.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({boolSort, bv8Sort, bv8Sort});
+  auto ta = solver->mkSymbol("ta", tupleSort);
+  auto tb = solver->mkSymbol("tb", tupleSort);
+  auto cond = solver->mkSymbol("cond", solver->mkBoolSort());
+  auto picked = solver->mkIte(cond, ta, tb);
+  auto pickedUpd = solver->mkTupleUpdate(picked, 1, solver->mkBVFromDec(4, 8));
+  auto iteOk = solver->mkAnd(
+      solver->mkEqual(solver->mkTupleSelect(pickedUpd, 1),
+                      solver->mkBVFromDec(4, 8)),
+      solver->mkEqual(solver->mkTupleSelect(pickedUpd, 2),
+                      solver->mkIte(cond, solver->mkTupleSelect(ta, 2),
+                                    solver->mkTupleSelect(tb, 2))));
+  solver->addConstraint(solver->mkNot(iteOk));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Updating the scalar field of a tuple that carries an array field
+  // composes with the verbatim array storage in the Camada lowering.
+  solver->reset();
+  bv8Sort = solver->mkBVSort(8);
+  auto arrSort = solver->mkArraySort(bv8Sort, bv8Sort);
+  auto mixSort = solver->mkTupleSort({bv8Sort, arrSort});
+  auto mix = solver->mkSymbol("mix", mixSort);
+  auto mixUpd = solver->mkTupleUpdate(mix, 0, solver->mkBVFromDec(6, 8));
+  auto arrPreserved =
+      solver->mkEqual(solver->mkArraySelect(solver->mkTupleSelect(mixUpd, 1),
+                                            solver->mkBVFromDec(0, 8)),
+                      solver->mkArraySelect(solver->mkTupleSelect(mix, 1),
+                                            solver->mkBVFromDec(0, 8)));
+  auto scalarUpdated = solver->mkEqual(solver->mkTupleSelect(mixUpd, 0),
+                                       solver->mkBVFromDec(6, 8));
+  solver->addConstraint(
+      solver->mkNot(solver->mkAnd(arrPreserved, scalarUpdated)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Nested tuples: updating an inner tuple through an outer update.
+  solver->reset();
+  boolSort = solver->mkBoolSort();
+  bv8Sort = solver->mkBVSort(8);
+  auto innerSort = solver->mkTupleSort({bv8Sort, bv8Sort});
+  auto outerSort = solver->mkTupleSort({boolSort, innerSort});
+  auto outer = solver->mkSymbol("outer", outerSort);
+  auto newInner = solver->mkTupleUpdate(solver->mkTupleSelect(outer, 1), 0,
+                                        solver->mkBVFromDec(3, 8));
+  auto newOuter = solver->mkTupleUpdate(outer, 1, newInner);
+  // inner[0] is 3, inner[1] is preserved, outer[0] is preserved
+  auto innerOfNew = solver->mkTupleSelect(newOuter, 1);
+  auto ok = solver->mkAnd(
+      solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(innerOfNew, 0),
+                                    solver->mkBVFromDec(3, 8)),
+                    solver->mkEqual(solver->mkTupleSelect(innerOfNew, 1),
+                                    solver->mkTupleSelect(
+                                        solver->mkTupleSelect(outer, 1), 1))),
+      solver->mkEqual(solver->mkTupleSelect(newOuter, 0),
+                      solver->mkTupleSelect(outer, 0)));
+  solver->addConstraint(solver->mkNot(ok));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Model extraction through an update.
+  solver->reset();
+  bv8Sort = solver->mkBVSort(8);
+  auto pairSort = solver->mkTupleSort({bv8Sort, bv8Sort});
+  auto p = solver->mkSymbol("p", pairSort);
+  auto q = solver->mkTupleUpdate(p, 0, solver->mkBVFromDec(11, 8));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkTupleSelect(p, 1), solver->mkBVFromDec(5, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto f0 = solver->getBV(solver->mkTupleSelect(q, 0));
+  REQUIRE(f0);
+  REQUIRE(f0.value() == 11);
+  auto f1 = solver->getBV(solver->mkTupleSelect(q, 1));
+  REQUIRE(f1);
+  REQUIRE(f1.value() == 5);
+}
+
 inline void tuple_structural_equality(const camada::SMTSolverRef &solver) {
   auto boolSort = solver->mkBoolSort();
   auto bv8Sort = solver->mkBVSort(8);
@@ -128,6 +260,359 @@ inline void tuple_structural_equality(const camada::SMTSolverRef &solver) {
   // even when handle identity coincides with structural identity.
   REQUIRE(*sym_a == *sym_a);
   REQUIRE_FALSE(*sym_a == *sym_b);
+}
+
+// Arrays of tuples: on native-datatype backends these are native
+// (Array Idx (Tuple ...)) sorts; elsewhere they decompose into one
+// backend array per scalar leaf field, so all array reasoning stays in
+// the solver's native theory (no software array encoding).
+inline void tuple_array_semantics(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto tupleSort = solver->mkTupleSort({solver->mkBoolSort(), bv8});
+  auto arrSort = solver->mkArraySort(bv8, tupleSort);
+  REQUIRE(arrSort->isArraySort());
+  REQUIRE(arrSort->getElementSort()->isTupleSort());
+
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  auto a = solver->mkSymbol("a", arrSort);
+
+  // Store a tuple value, read it back at the same index.
+  auto t = solver->mkTuple({solver->mkBool(true), idx(42)});
+  auto a1 = solver->mkArrayStore(a, idx(3), t);
+  auto rd = solver->mkArraySelect(a1, idx(3));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(rd, t)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Reads at other indexes stay tied to the original array.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({solver->mkBoolSort(), bv8});
+  arrSort = solver->mkArraySort(bv8, tupleSort);
+  auto b = solver->mkSymbol("b", arrSort);
+  auto t2 = solver->mkTuple({solver->mkBool(false), idx(1)});
+  auto b1 = solver->mkArrayStore(b, idx(3), t2);
+  auto preserved = solver->mkEqual(solver->mkArraySelect(b1, idx(5)),
+                                   solver->mkArraySelect(b, idx(5)));
+  solver->addConstraint(solver->mkNot(preserved));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Homogeneous fields pin leaf-order identity solver-side: a leaf
+  // transposition between flatten and assemble would swap 1 and 2
+  // without any sort mismatch to catch it.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  auto homoSort = solver->mkTupleSort({bv8, bv8});
+  auto homoArr = solver->mkArraySort(bv8, homoSort);
+  auto h = solver->mkSymbol("h", homoArr);
+  auto hv = solver->mkTuple({idx(1), idx(2)});
+  auto h1 = solver->mkArrayStore(h, idx(0), hv);
+  auto hRead = solver->mkArraySelect(h1, idx(0));
+  auto fieldsOk =
+      solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(hRead, 0), idx(1)),
+                    solver->mkEqual(solver->mkTupleSelect(hRead, 1), idx(2)));
+  solver->addConstraint(solver->mkNot(fieldsOk));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Read-over-write at a distinct symbolic index.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({solver->mkBoolSort(), bv8});
+  arrSort = solver->mkArraySort(bv8, tupleSort);
+  auto c = solver->mkSymbol("c", arrSort);
+  auto i = solver->mkSymbol("i", bv8);
+  auto j = solver->mkSymbol("j", bv8);
+  auto t3 = solver->mkTuple({solver->mkBool(true), idx(9)});
+  auto c1 = solver->mkArrayStore(c, i, t3);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(i, j)));
+  auto rd2 = solver->mkArraySelect(c1, j);
+  solver->addConstraint(
+      solver->mkNot(solver->mkEqual(rd2, solver->mkArraySelect(c, j))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+inline void tuple_array_equality_ite(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto tupleSort = solver->mkTupleSort({bv8, bv8});
+  auto arrSort = solver->mkArraySort(bv8, tupleSort);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+
+  // Equality forces agreement at observed indexes.
+  auto a = solver->mkSymbol("a", arrSort);
+  auto b = solver->mkSymbol("b", arrSort);
+  solver->addConstraint(solver->mkEqual(a, b));
+  auto fa = solver->mkTupleSelect(solver->mkArraySelect(a, idx(0)), 1);
+  auto fb = solver->mkTupleSelect(solver->mkArraySelect(b, idx(0)), 1);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(fa, fb)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Ite distributes; selecting from the chosen branch agrees.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  tupleSort = solver->mkTupleSort({bv8, bv8});
+  arrSort = solver->mkArraySort(bv8, tupleSort);
+  auto c = solver->mkSymbol("c", arrSort);
+  auto d = solver->mkSymbol("d", arrSort);
+  auto cond = solver->mkSymbol("cond", solver->mkBoolSort());
+  auto picked = solver->mkIte(cond, c, d);
+  auto sel = solver->mkArraySelect(picked, idx(2));
+  auto expected = solver->mkIte(cond, solver->mkArraySelect(c, idx(2)),
+                                solver->mkArraySelect(d, idx(2)));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(sel, expected)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// Constant arrays of tuples: on backends without native datatypes the
+// initializer decomposes into one constant array per scalar leaf (each
+// lowered natively or lazily per the backend); native backends lower
+// the whole thing directly. Checks are solver-side only — model
+// extraction on decomposed arrays is a later tuple-plan phase.
+inline void tuple_array_const(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+
+  // The default value is visible at an arbitrary symbolic index.
+  auto init = solver->mkTuple({solver->mkBool(true), idx(170)});
+  auto arr = solver->mkArrayConst(bv8, init, Lowering);
+  auto i = solver->mkSymbol("i", bv8);
+  solver->addConstraint(
+      solver->mkNot(solver->mkEqual(solver->mkArraySelect(arr, i), init)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Store over the constant array: the stored tuple at the written
+  // index, the default elsewhere.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  init = solver->mkTuple({solver->mkBool(false), idx(7)});
+  auto stored = solver->mkTuple({solver->mkBool(true), idx(99)});
+  auto upd = solver->mkArrayStore(solver->mkArrayConst(bv8, init, Lowering),
+                                  idx(3), stored);
+  auto ok =
+      solver->mkAnd(solver->mkEqual(solver->mkArraySelect(upd, idx(3)), stored),
+                    solver->mkEqual(solver->mkArraySelect(upd, idx(5)), init));
+  solver->addConstraint(solver->mkNot(ok));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // The default survives a store made inside a pushed scope: after pop,
+  // reads at the previously written index see the default again.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  init = solver->mkTuple({solver->mkBool(true), idx(21)});
+  auto arr3 = solver->mkArrayConst(bv8, init, Lowering);
+  solver->push();
+  auto scratch = solver->mkTuple({solver->mkBool(false), idx(1)});
+  auto inPush = solver->mkArrayStore(arr3, idx(2), scratch);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(inPush, idx(2)), scratch));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  solver->pop();
+  solver->addConstraint(solver->mkNot(
+      solver->mkEqual(solver->mkArraySelect(arr3, idx(2)), init)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Homogeneous fields pin per-leaf default order semantically: a leaf
+  // transposition would hand 22 to field 0 with no sort mismatch.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  auto homoInit = solver->mkTuple({idx(11), idx(22)});
+  auto homoArr = solver->mkArrayConst(bv8, homoInit, Lowering);
+  auto k = solver->mkSymbol("k", bv8);
+  auto homoRd = solver->mkArraySelect(homoArr, k);
+  auto fieldsOk =
+      solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(homoRd, 0), idx(11)),
+                    solver->mkEqual(solver->mkTupleSelect(homoRd, 1), idx(22)));
+  solver->addConstraint(solver->mkNot(fieldsOk));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// Nested constant arrays of tuples: array_of(array_of(tuple)). On the
+// decomposed path the inner constant array's leaves become the per-leaf
+// initializers of the outer one. Registered per backend: lazily lowered
+// constant arrays cannot nest (bitwuzla/yices/stp abort), so this runs
+// only where constant arrays are native.
+inline void tuple_array_const_nested(const camada::SMTSolverRef &solver) {
+  auto bv4 = solver->mkBVSort(4);
+  auto init =
+      solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(5, 8)});
+  auto innerConst = solver->mkArrayConst(bv4, init);
+  auto outerConst = solver->mkArrayConst(bv4, innerConst);
+
+  auto i = solver->mkSymbol("i", bv4);
+  auto j = solver->mkSymbol("j", bv4);
+  auto rd = solver->mkArraySelect(solver->mkArraySelect(outerConst, i), j);
+  // Guard against a vacuously UNSAT context (e.g. contradictory default
+  // axioms) before pinning the property itself.
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(rd, init)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// Model extraction for decomposed tuple arrays: getArrayElement returns
+// a tuple value whose fields read back per leaf, and getArrayValues zips
+// the per-leaf sparse models into one tuple-valued model. Native-datatype
+// backends evaluate the array element directly; the decomposed path
+// reassembles from per-leaf model values.
+inline void tuple_array_model_values(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+
+  // Constant array of {bool, bv8} with two distinct stores.
+  auto init = solver->mkTuple({solver->mkBool(true), idx(7)});
+  auto arr = solver->mkArrayConst(bv8, init, Lowering);
+  arr = solver->mkArrayStore(arr, idx(3),
+                             solver->mkTuple({solver->mkBool(false), idx(9)}));
+  arr = solver->mkArrayStore(arr, idx(5),
+                             solver->mkTuple({solver->mkBool(true), idx(11)}));
+  // Touch an untouched index so every backend has the array in the formula.
+  solver->addConstraint(solver->mkEqual(
+      solver->mkTupleSelect(solver->mkArraySelect(arr, idx(0)), 1), idx(7)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Exact single-index recovery: getArrayElement at a written and an
+  // untouched index, read each tuple field back.
+  auto fieldsAt = [&](int64_t Index, bool &Flag, int64_t &Num) {
+    auto e = solver->getArrayElement(arr, idx(Index));
+    REQUIRE(e->Sort->isTupleSort());
+    auto b = solver->getBool(solver->mkTupleSelect(e, 0));
+    auto n = solver->getBV(solver->mkTupleSelect(e, 1));
+    REQUIRE(b);
+    REQUIRE(n);
+    Flag = b.value();
+    Num = n.value();
+  };
+  bool flag = false;
+  int64_t num = 0;
+  fieldsAt(3, flag, num);
+  REQUIRE_FALSE(flag);
+  REQUIRE(num == 9);
+  fieldsAt(5, flag, num);
+  REQUIRE(flag);
+  REQUIRE(num == 11);
+  fieldsAt(200, flag, num); // never mentioned: the constant default
+  REQUIRE(flag);
+  REQUIRE(num == 7);
+
+  // Sparse model: zip the per-leaf models, then resolve the tuple value
+  // at an index by its model value (first matching entry, else base).
+  auto Model = solver->getArrayValues(arr);
+  if (!Model) {
+    REQUIRE(Model.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+    return;
+  }
+  auto tupleAt = [&](int64_t Index, bool &Flag, int64_t &Num) {
+    for (const auto &Entry : Model.value().Entries) {
+      auto iv = solver->getBV(Entry.first);
+      REQUIRE(iv);
+      if (iv.value() == Index) {
+        auto b = solver->getBool(solver->mkTupleSelect(Entry.second, 0));
+        auto n = solver->getBV(solver->mkTupleSelect(Entry.second, 1));
+        REQUIRE(b);
+        REQUIRE(n);
+        Flag = b.value();
+        Num = n.value();
+        return;
+      }
+    }
+    REQUIRE(Model.value().Base);
+    auto b = solver->getBool(solver->mkTupleSelect(Model.value().Base, 0));
+    auto n = solver->getBV(solver->mkTupleSelect(Model.value().Base, 1));
+    REQUIRE(b);
+    REQUIRE(n);
+    Flag = b.value();
+    Num = n.value();
+  };
+  tupleAt(3, flag, num);
+  REQUIRE_FALSE(flag);
+  REQUIRE(num == 9);
+  tupleAt(5, flag, num);
+  REQUIRE(flag);
+  REQUIRE(num == 11);
+  tupleAt(200, flag, num); // base default
+  REQUIRE(flag);
+  REQUIRE(num == 7);
+
+  // Symbolic tuple array with a single store and no constant default:
+  // exercises the no-base zip path. getArrayValues either yields a model
+  // (native backends) or reports UnsupportedOperation (decomposed
+  // backends whose leaves have no base) — both are contract-valid, and
+  // exact single-index recovery must hold either way.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  auto tupSort = solver->mkTupleSort({solver->mkBoolSort(), bv8});
+  auto sym = solver->mkSymbol("sym_ta", solver->mkArraySort(bv8, tupSort));
+  auto stored = solver->mkTuple({solver->mkBool(true), idx(33)});
+  auto sym1 = solver->mkArrayStore(sym, idx(4), stored);
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto e = solver->getArrayElement(sym1, idx(4));
+  auto eb = solver->getBool(solver->mkTupleSelect(e, 0));
+  auto en = solver->getBV(solver->mkTupleSelect(e, 1));
+  REQUIRE(eb);
+  REQUIRE(en);
+  REQUIRE(eb.value());
+  REQUIRE(en.value() == 33);
+  auto SymModel = solver->getArrayValues(sym1);
+  if (!SymModel)
+    REQUIRE(SymModel.error().Code ==
+            camada::SMTErrorCode::UnsupportedOperation);
+}
+
+// Deep nesting: tuple { array of tuple { bv, array of tuple { bool, bv } } }
+// — five levels of alternation; everything must flatten to native
+// nested-arrays-of-scalars and recurse leaf-wise.
+inline void tuple_array_deep_nesting(const camada::SMTSolverRef &solver) {
+  auto bv4 = solver->mkBVSort(4);
+  auto bv8 = solver->mkBVSort(8);
+  auto idx4 = [&](int64_t V) { return solver->mkBVFromDec(V, 4); };
+  auto idx8 = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+
+  auto inner = solver->mkTupleSort({solver->mkBoolSort(), bv8});
+  auto innerArr = solver->mkArraySort(bv4, inner);
+  auto mid = solver->mkTupleSort({bv8, innerArr});
+  auto midArr = solver->mkArraySort(bv4, mid);
+  auto outer = solver->mkTupleSort({solver->mkBoolSort(), midArr});
+
+  auto o = solver->mkSymbol("o", outer);
+  // Walk down: outer.1 is an array of mid; select one, take its inner
+  // array, store an inner tuple, walk back up through stores/updates.
+  auto midArrV = solver->mkTupleSelect(o, 1);
+  auto midV = solver->mkArraySelect(midArrV, idx4(2));
+  auto innerArrV = solver->mkTupleSelect(midV, 1);
+  auto innerT = solver->mkTuple({solver->mkBool(true), idx8(7)});
+  auto innerArr1 = solver->mkArrayStore(innerArrV, idx4(1), innerT);
+  // Rebuild the enclosing tuples field-wise (mkTupleUpdate lands in a
+  // separate PR; select-and-rebuild is its definition anyway).
+  auto midV1 = solver->mkTuple({solver->mkTupleSelect(midV, 0), innerArr1});
+  auto midArr1 = solver->mkArrayStore(midArrV, idx4(2), midV1);
+  auto o1 = solver->mkTuple({solver->mkTupleSelect(o, 0), midArr1});
+
+  // Reading the stored inner tuple back through the whole chain.
+  auto back = solver->mkArraySelect(
+      solver->mkTupleSelect(
+          solver->mkArraySelect(solver->mkTupleSelect(o1, 1), idx4(2)), 1),
+      idx4(1));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(back, innerT)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // An untouched path stays tied to the original.
+  solver->reset();
+  bv4 = solver->mkBVSort(4);
+  bv8 = solver->mkBVSort(8);
+  inner = solver->mkTupleSort({solver->mkBoolSort(), bv8});
+  innerArr = solver->mkArraySort(bv4, inner);
+  mid = solver->mkTupleSort({bv8, innerArr});
+  midArr = solver->mkArraySort(bv4, mid);
+  auto p = solver->mkSymbol("p", midArr);
+  auto q = solver->mkSymbol("q", midArr);
+  solver->addConstraint(solver->mkEqual(p, q));
+  auto deepP = solver->mkArraySelect(
+      solver->mkTupleSelect(solver->mkArraySelect(p, idx4(0)), 1), idx4(3));
+  auto deepQ = solver->mkArraySelect(
+      solver->mkTupleSelect(solver->mkArraySelect(q, idx4(0)), 1), idx4(3));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(deepP, deepQ)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
 }
 
 inline void empty_tuple_semantics(const camada::SMTSolverRef &solver) {

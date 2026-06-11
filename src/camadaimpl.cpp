@@ -369,17 +369,23 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
   // no backend sort handle) through mkArraySortImpl, where the backend
   // would static_cast it as one of its own sorts. Reject up front. The
   // per-field array decomposition is tracked in issue #17.
-  fatalErrorIf(IndexSort->isTupleSort() && !nativeTupleSupport(),
-               "Arrays whose index sort is a tuple are not yet supported "
+  fatalErrorIf(sortContainsTuple(IndexSort) && !nativeTupleSupport(),
+               "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
-  fatalErrorIf(ElemSort->isTupleSort() && !nativeTupleSupport(),
-               "Arrays whose element sort is a tuple are not yet supported "
-               "on this backend; see issue #17");
-
   ArraySortCacheKey Key{IndexSort.get(), ElemSort.get()};
   auto It = ArraySortCache.find(Key);
   if (It != ArraySortCache.end())
     return It->second;
+
+  // Element sorts involving tuples have no backend representation on
+  // backends without native datatype support: the array decomposes into
+  // a bundle of per-leaf-field backend arrays (see camadatuple.cpp).
+  if (!nativeTupleSupport() && sortContainsTuple(ElemSort)) {
+    SMTSortRef theSort = mkCamadaTupleArraySort(*this, IndexSort, ElemSort);
+    assert(theSort->isArraySort());
+    ArraySortCache.emplace(Key, theSort);
+    return theSort;
+  }
 
   SMTSortRef theSort = mkArraySortImpl(IndexSort, ElemSort);
   assert(theSort->isArraySort());
@@ -398,13 +404,14 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
   // support would static_cast a CamadaTupleSort as a backend sort.
   // Reject up front; structural lowering is part of the issue #17 work.
   if (!nativeTupleSupport()) {
-    fatalErrorIf(CodomainSort->isTupleSort(),
-                 "Functions returning tuples are not yet supported on this "
-                 "backend; see issue #17");
+    fatalErrorIf(sortContainsTuple(CodomainSort),
+                 "Functions returning tuples (or tuple-involving arrays) "
+                 "are not yet supported on this backend; see issue #17");
     for (const auto &D : DomainSorts)
-      fatalErrorIf(D->isTupleSort(),
-                   "Functions taking tuple arguments are not yet supported "
-                   "on this backend; see issue #17");
+      fatalErrorIf(sortContainsTuple(D),
+                   "Functions taking tuple (or tuple-involving array) "
+                   "arguments are not yet supported on this backend; see "
+                   "issue #17");
   }
   if (DomainSorts.size() <= 4) {
     SmallFunctionSortCacheKey SmallKey{};
@@ -678,6 +685,11 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   if (LHS->Sort->isTupleSort() && !nativeTupleSupport())
     return mkCamadaTupleEqual(*this, LHS, RHS);
   if (LHS->Sort->isArraySort()) {
+    // Decomposed tuple arrays compare as the conjunction of their leaf
+    // equalities; each leaf re-enters this wrapper and engages the
+    // normal array-equality machinery (lazy witness, STP encoding).
+    if (!nativeTupleSupport() && sortContainsTuple(LHS->Sort->getElementSort()))
+      return mkCamadaTupleArrayEqual(*this, LHS, RHS);
     const bool LazyInvolved = !LazyConstArrayRoots.empty() &&
                               (reachesLazyArray(LHS) || reachesLazyArray(RHS));
     // Backends without native array extensionality (STP) cannot decide
@@ -894,6 +906,11 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
   // node that distributes selection over its fields lazily.
   if (T->Sort->isTupleSort() && !nativeTupleSupport())
     return mkCamadaTupleIte(*this, Cond, T, F);
+  // Decomposed tuple arrays ite leaf-wise; the per-leaf ites re-enter
+  // this wrapper, so the lazy-root union tracking below applies per leaf.
+  if (!nativeTupleSupport() && T->Sort->isArraySort() &&
+      sortContainsTuple(T->Sort->getElementSort()))
+    return mkCamadaTupleArrayIte(*this, Cond, T, F);
   SMTExprRef theExp = mkIteImpl(Cond, T, F);
   assert(theExp->Sort == F->Sort);
   if (!LazyConstArrayRoots.empty() && T->Sort->isArraySort()) {
@@ -1182,6 +1199,11 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
+  // Decomposed tuple arrays select leaf-wise; the per-leaf selects below
+  // re-enter this wrapper, so observation/lazy instantiation happens per
+  // leaf.
+  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+    return mkCamadaTupleArraySelect(*this, Array, Index);
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
   SMTExprRef theExp = mkArraySelectImpl(Array, Index);
@@ -1197,6 +1219,10 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
                "Expected array index with matching sort");
   fatalErrorIf(Array->Sort->getElementSort() != Element->Sort,
                "Expected array element with matching sort");
+  // Decomposed tuple arrays store leaf-wise; the per-leaf stores re-enter
+  // this wrapper, so the lazy guards/tracking below apply per leaf.
+  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+    return mkCamadaTupleArrayStore(*this, Array, Index, Element);
   fatalErrorIf(!LazyConstArrayRoots.empty() && reachesLazyArray(Element),
                "Storing a lazily lowered constant array inside another array "
                "is not supported");
@@ -1418,6 +1444,29 @@ SMTExprRef SMTSolverImpl::mkTupleSelect(const SMTExprRef &Tuple,
   return theExp;
 }
 
+SMTExprRef SMTSolverImpl::mkTupleUpdate(const SMTExprRef &Tuple, unsigned Index,
+                                        const SMTExprRef &Value) {
+  fatalErrorIf(!Tuple->Sort->isTupleSort(), "Expected tuple expression");
+  fatalErrorIf(Index >= Tuple->Sort->getTupleElementSorts().size(),
+               "Tuple element index is out of bounds");
+  fatalErrorIf(Tuple->Sort->getTupleElementSorts()[Index] != Value->Sort,
+               "Expected tuple update value with the element's sort");
+  SMTExprRef theExp = mkTupleUpdateImpl(Tuple, Index, Value);
+  assert(theExp->Sort == Tuple->Sort);
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkTupleUpdateImpl(const SMTExprRef &Tuple,
+                                            unsigned Index,
+                                            const SMTExprRef &Value) {
+  const std::size_t ElementCount = Tuple->Sort->getTupleElementSorts().size();
+  std::vector<SMTExprRef> Elements;
+  Elements.reserve(ElementCount);
+  for (unsigned I = 0; I < ElementCount; ++I)
+    Elements.push_back(I == Index ? Value : mkTupleSelect(Tuple, I));
+  return mkTuple(Elements);
+}
+
 SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
                                   const std::vector<SMTExprRef> &Args) {
   fatalErrorIf(!Function->isFunctionSort(), "Expected function expression");
@@ -1451,9 +1500,10 @@ SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
   // then static_cast as one of its own expressions. Reject up front.
   if (!nativeTupleSupport())
     for (const auto &V : Vars)
-      fatalErrorIf(V->Sort->isTupleSort(),
-                   "Quantifiers over tuple-typed variables are not yet "
-                   "supported on this backend; see issue #17");
+      fatalErrorIf(sortContainsTuple(V->Sort),
+                   "Quantifiers over tuple-typed (or tuple-involving-array) "
+                   "variables are not yet supported on this backend; see "
+                   "issue #17");
   SMTExprRef theExp = mkForallImpl(Vars, Body);
   assert(theExp->isBoolSort());
   return theExp;
@@ -1469,9 +1519,10 @@ SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
   requireBoolSort(Body, "Expected boolean quantifier body");
   if (!nativeTupleSupport())
     for (const auto &V : Vars)
-      fatalErrorIf(V->Sort->isTupleSort(),
-                   "Quantifiers over tuple-typed variables are not yet "
-                   "supported on this backend; see issue #17");
+      fatalErrorIf(sortContainsTuple(V->Sort),
+                   "Quantifiers over tuple-typed (or tuple-involving-array) "
+                   "variables are not yet supported on this backend; see "
+                   "issue #17");
   SMTExprRef theExp = mkExistsImpl(Vars, Body);
   assert(theExp->isBoolSort());
   return theExp;
@@ -1560,6 +1611,10 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
+  // Decomposed tuple arrays read each leaf at Index and reassemble the
+  // per-leaf values into a tuple; the per-leaf reads re-enter this wrapper.
+  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+    return getCamadaTupleArrayElement(*this, Array, Index);
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
       return Resolved;
@@ -1579,6 +1634,10 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  // Decomposed tuple arrays zip the per-leaf sparse models into one
+  // tuple-valued model; the per-leaf queries re-enter this wrapper.
+  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+    return getCamadaTupleArrayValues(*this, Array);
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     return lazyArrayModel(Array);
   return getArrayValuesImpl(Array);
@@ -1782,6 +1841,12 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
     SymbolExprCache.emplace(Key, theExp);
     return theExp;
   }
+  if (!nativeTupleSupport() && Sort->isArraySort() &&
+      sortContainsTuple(Sort->getElementSort())) {
+    SMTExprRef theExp = mkCamadaTupleArraySymbol(*this, Name, Sort);
+    SymbolExprCache.emplace(Key, theExp);
+    return theExp;
+  }
 
   SMTExprRef theExp = mkSymbolImpl(Name, Sort);
   assert(theExp->Sort == Sort);
@@ -1889,12 +1954,20 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
 SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
                                        const SMTExprRef &InitValue,
                                        ConstArrayLowering Lowering) {
+  fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(IndexSort),
+               "Arrays whose index sort involves a tuple are not supported "
+               "on this backend; see issue #17");
   if (Lowering == ConstArrayLowering::Auto)
     Lowering = nativeConstArraySupport() ? ConstArrayLowering::Native
                                          : ConstArrayLowering::Lazy;
   fatalErrorIf(Lowering == ConstArrayLowering::Native &&
                    !nativeConstArraySupport(),
                "Native constant arrays are not supported by this backend");
+  // Tuple-involving initializers decompose into one constant array per
+  // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
+  // lowering (and its lazy machinery) applies per leaf.
+  if (!nativeTupleSupport() && sortContainsTuple(InitValue->Sort))
+    return mkCamadaTupleArrayConst(*this, IndexSort, InitValue, Lowering);
   SMTExprRef theExp = Lowering == ConstArrayLowering::Native
                           ? mkArrayConstImpl(IndexSort, InitValue)
                           : mkLazyConstArray(IndexSort, InitValue);
