@@ -26,22 +26,22 @@ set(CAMADA_DEPS_INSTALL_DIR
     CACHE PATH "Directory used to install downloaded solver dependencies")
 
 set(CAMADA_Z3_LINUX_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-x64-glibc-2.39.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-glibc-2.39.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux x86_64")
 set(CAMADA_Z3_LINUX_AARCH64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-arm64-glibc-2.34.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-glibc-2.38.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux aarch64")
 set(CAMADA_Z3_MACOS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-x64-osx-13.7.6.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-osx-15.7.3.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for macOS x86_64")
 set(CAMADA_Z3_MACOS_ARM64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-arm64-osx-13.7.6.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-osx-15.7.3.zip"
     CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.15.4/z3-4.15.4-x64-win.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-win.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Windows x86_64")
 set(CAMADA_CVC5_LINUX_X86_64_URL

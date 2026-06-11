@@ -37,13 +37,13 @@ jobs:
             schedtool
 
       - name: Cache deps
-        id: cache-deps-bench-v2
+        id: cache-deps-bench-v3
         uses: actions/cache@v4
         with:
           path: |
             build/deps
             build/_deps
-          key: ${{ runner.os }}-bench-deps-v2
+          key: ${{ runner.os }}-bench-deps-v3
 
       - name: Download latest master baseline
         id: download-master-baseline
