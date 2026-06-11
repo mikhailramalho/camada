@@ -495,6 +495,23 @@ SMTExprRef mkCamadaTupleArrayStore(SMTSolverImpl &Solver,
       std::move(StoredLeaves));
 }
 
+SMTExprRef mkCamadaTupleArrayConst(SMTSolverImpl &Solver,
+                                   const SMTSortRef &IndexSort,
+                                   const SMTExprRef &InitValue,
+                                   ConstArrayLowering Lowering) {
+  fatalErrorIf(!sortContainsTuple(InitValue->Sort),
+               "mkCamadaTupleArrayConst on a tuple-free initializer");
+  SMTSortRef Sort = Solver.mkArraySort(IndexSort, InitValue->Sort);
+  std::vector<SMTExprRef> InitLeaves;
+  collectLeafExprsOf(Solver, InitValue, InitLeaves);
+  std::vector<SMTExprRef> Leaves;
+  Leaves.reserve(InitLeaves.size());
+  for (const auto &Init : InitLeaves)
+    Leaves.push_back(Solver.mkArrayConst(IndexSort, Init, Lowering));
+  return Solver.makeExprRef<CamadaTupleArrayExpr>(
+      SMTExprKind::ArrayConst, Sort->getBackendKind(), Sort, std::move(Leaves));
+}
+
 SMTExprRef mkCamadaTupleArrayEqual(SMTSolverImpl &Solver, const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   const CamadaTupleArrayExpr *LE = toCamadaTupleArrayExpr(LHS);

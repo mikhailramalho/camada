@@ -50,3 +50,13 @@ TEST_CASE("Unsupported tuple-array UF/quantifier boundaries STP test",
     (void)stp->mkFunctionSort({tupArr}, bv4);
   });
 }
+
+TEST_CASE("Unsupported nested constant tuple arrays STP test", "[STP]") {
+  auto stp = camada::createSTPSolver();
+  require_abort([&]() {
+    auto bv4 = stp->mkBVSort(4);
+    auto init = stp->mkTuple({stp->mkBool(true), stp->mkBVFromDec(5, 8)});
+    auto innerConst = stp->mkArrayConst(bv4, init);
+    (void)stp->mkArrayConst(bv4, innerConst);
+  });
+}

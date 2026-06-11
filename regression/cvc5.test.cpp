@@ -162,3 +162,10 @@ TEST_CASE("Deep tuple/array nesting CVC5 test", "[CVC5]") {
   auto solver = camada::createCVC5Solver();
   tuple_array_deep_nesting(solver);
 }
+
+// Registered per backend: nested constant arrays require native constant
+// arrays (lazily lowered constant arrays cannot nest).
+TEST_CASE("Nested constant tuple arrays CVC5 test", "[CVC5]") {
+  auto solver = camada::createCVC5Solver();
+  tuple_array_const_nested(solver);
+}

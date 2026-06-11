@@ -1956,11 +1956,6 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
 SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
                                        const SMTExprRef &InitValue,
                                        ConstArrayLowering Lowering) {
-  // Tuple-involving initializers decompose into per-leaf constant arrays;
-  // tracked as the next tuple-plan phase.
-  fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(InitValue->Sort),
-               "Constant arrays of tuples are not yet supported on this "
-               "backend; see tuple-plan.md");
   fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
@@ -1970,6 +1965,11 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   fatalErrorIf(Lowering == ConstArrayLowering::Native &&
                    !nativeConstArraySupport(),
                "Native constant arrays are not supported by this backend");
+  // Tuple-involving initializers decompose into one constant array per
+  // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
+  // lowering (and its lazy machinery) applies per leaf.
+  if (!nativeTupleSupport() && sortContainsTuple(InitValue->Sort))
+    return mkCamadaTupleArrayConst(*this, IndexSort, InitValue, Lowering);
   SMTExprRef theExp = Lowering == ConstArrayLowering::Native
                           ? mkArrayConstImpl(IndexSort, InitValue)
                           : mkLazyConstArray(IndexSort, InitValue);
