@@ -115,9 +115,20 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   auto t = solver->mkSymbol("t", solver->mkBoolSort());
   REQUIRE(solver->checkSatAssuming({t}) == camada::checkResult::UNKNOWN);
 
-  // Clearing the limit restores normal solving.
-  solver->reset();
+  // Clearing the limit must work from the just-timed-out state.
   REQUIRE(solver->setTimeout(0));
+
+  // A timed-out check must leave the solver fully usable WITHOUT a reset:
+  // new constraints must take effect and incremental scopes must work. A
+  // backend whose interrupted context goes stale would drop the assert
+  // and answer instantly from the poisoned state instead of UNSAT.
+  solver->push();
+  solver->addConstraint(solver->mkBool(false));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  solver->pop();
+
+  // Normal solving works again after the limit is cleared.
+  solver->reset();
   auto y = solver->mkSymbol("y", solver->mkBVSort(8));
   solver->addConstraint(solver->mkEqual(y, solver->mkBVFromDec(9, 8)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
