@@ -69,7 +69,12 @@ class Z3Solver : public SMTSolverImpl {
 public:
   Z3Solver();
   explicit Z3Solver(z3::context C);
-  explicit Z3Solver(z3::context C, z3::solver S);
+  // There is deliberately no (context, solver) constructor: z3::solver
+  // holds a pointer to the context *object* it was built against, and
+  // z3::context is move-only, so any solver a caller could pass would
+  // reference the moved-from (nulled) context and crash on the first
+  // refcount operation. Subclass and call setSolver() against context()
+  // to install a custom solver (see the Override Z3 regression).
   ~Z3Solver() override;
 
 protected:
