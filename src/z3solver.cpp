@@ -891,7 +891,7 @@ SMTResult<ArrayModel> Z3Solver::getArrayValuesImpl(const SMTExprRef &Array) {
   const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
   const SMTSortRef &ElemSort = Array->Sort->getElementSort();
   const auto wrap = [&](const z3::expr &Value, const SMTSortRef &Sort) {
-    return makeExprRef<Z3Expr>(valueKindForSort(Sort), Context, Sort, Value);
+    return makeExprRef<Z3Expr>(valueKindForSort(Sort), &Context, Sort, Value);
   };
 
   z3::model Model = Solver.get_model();
@@ -909,7 +909,7 @@ SMTResult<ArrayModel> Z3Solver::getArrayValuesImpl(const SMTExprRef &Array) {
   if (Val.is_app() && Val.decl().decl_kind() == Z3_OP_AS_ARRAY) {
     // The model chose a function-graph representation: read the entries
     // and the else-branch off the function interpretation.
-    z3::func_decl Decl(*Context, Z3_get_as_array_func_decl(*Context, Val));
+    z3::func_decl Decl(Context, Z3_get_as_array_func_decl(Context, Val));
     z3::func_interp Interp = Model.get_func_interp(Decl);
     for (unsigned I = 0; I < Interp.num_entries(); ++I) {
       z3::func_entry Entry = Interp.entry(I);
@@ -1125,7 +1125,7 @@ bool Z3Solver::setTimeoutImpl(uint64_t Milliseconds) {
   constexpr uint64_t NoLimit = std::numeric_limits<unsigned>::max();
   const uint64_t Value =
       Milliseconds == 0 ? NoLimit : std::min(Milliseconds, NoLimit);
-  z3::params params(*Context);
+  z3::params params(Context);
   params.set("timeout", static_cast<unsigned>(Value));
   Solver.set(params);
   return true;
@@ -1138,11 +1138,11 @@ Z3Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   // smt solver tracks them regardless, so setting the parameter here is a
   // harmless no-op for it. Set per call because setSolver can swap the
   // solver instance at any time.
-  z3::params params(*Context);
+  z3::params params(Context);
   params.set("unsat_core", true);
   Solver.set(params);
 
-  z3::expr_vector assumptions(*Context);
+  z3::expr_vector assumptions(Context);
   for (const SMTExprRef &Assumption : Assumptions)
     assumptions.push_back(toZ3Expr(Assumption));
 
