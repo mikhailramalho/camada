@@ -83,6 +83,14 @@ set(CAMADA_BITWUZLA_MACOS_ARM64_URL
 set(CAMADA_MATHSAT_VERSION
     "5.6.17"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
+# The 5.6.17 macOS tarball is mispackaged: libmathsat.a is a plain ar archive
+# whose members are fat (universal) Mach-O objects, a layout Apple's ld rejects
+# ("archive member ... not a mach-o file"). 5.6.16 shipped the correct lipo
+# format (a fat file of two thin archives), so macOS stays pinned there until
+# upstream fixes the packaging.
+set(CAMADA_MATHSAT_MACOS_VERSION
+    "5.6.16"
+    CACHE STRING "MathSAT release version used for the macOS prebuilts")
 set(CAMADA_MATHSAT_LINUX_X86_64_URL
     "https://mathsat.fbk.eu/release/mathsat-5.6.17-linux-x86_64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux x86_64")
@@ -90,10 +98,10 @@ set(CAMADA_MATHSAT_LINUX_AARCH64_URL
     "https://mathsat.fbk.eu/release/mathsat-5.6.17-linux-aarch64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux aarch64")
 set(CAMADA_MATHSAT_MACOS_X86_64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.17-macos.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS x86_64")
 set(CAMADA_MATHSAT_MACOS_ARM64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.17-macos.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos.tar.gz"
     CACHE STRING "URL used to download MathSAT for macOS arm64")
 # No Windows prebuilt for MathSAT: mathsat.h pulls in <gmp.h> and Camada calls
 # mpq_*/mpz_* APIs directly, but Windows has no system GMP and the win64 vendor
@@ -459,10 +467,10 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
           "${CAMADA_MATHSAT_MACOS_X86_64_URL}"
           PARENT_SCOPE)
       set(${output_archive_var}
-          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-macos.tar.gz"
+          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos.tar.gz"
           PARENT_SCOPE)
       set(${output_source_dir_var}
-          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-macos"
+          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos"
           PARENT_SCOPE)
       return()
     endif()
@@ -471,10 +479,10 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
           "${CAMADA_MATHSAT_MACOS_ARM64_URL}"
           PARENT_SCOPE)
       set(${output_archive_var}
-          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-macos.tar.gz"
+          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos.tar.gz"
           PARENT_SCOPE)
       set(${output_source_dir_var}
-          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_VERSION}-macos"
+          "${CAMADA_DEPS_SRC_DIR}/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos"
           PARENT_SCOPE)
       return()
     endif()
