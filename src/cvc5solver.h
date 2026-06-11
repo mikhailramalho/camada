@@ -321,6 +321,8 @@ protected:
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 
+  SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array) override;
+
   SMTExprRef mkBoolImpl(const bool b) override;
   SMTExprRef mkIntImpl(int64_t v) override;
   SMTExprRef mkIntImpl(const std::string &v) override;
@@ -361,6 +363,8 @@ protected:
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
 
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
+
+  bool supportsImpl(SolverFeature Feature) const override;
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;

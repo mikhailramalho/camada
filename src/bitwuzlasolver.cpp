@@ -786,6 +786,34 @@ SMTExprRef BitwuzlaSolver::getArrayElementImpl(const SMTExprRef &Array,
       bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*select).Expr));
 }
 
+SMTResult<ArrayModel>
+BitwuzlaSolver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](BitwuzlaTerm Value, const SMTSortRef &Sort) {
+    return makeExprRef<BitwExpr>(valueKindForSort(Sort), Context, Sort, Value);
+  };
+
+  BitwuzlaTerm Val =
+      bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Array).Expr);
+  ArrayModel Result;
+  while (bitwuzla_term_get_kind(Val) == BITWUZLA_KIND_ARRAY_STORE) {
+    size_t Size = 0;
+    BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
+    fatalErrorIf(Size != 3, "Malformed bitwuzla array store in model");
+    Result.Entries.emplace_back(wrap(Children[1], IndexSort),
+                                wrap(Children[2], ElemSort));
+    Val = Children[0];
+  }
+  if (bitwuzla_term_get_kind(Val) == BITWUZLA_KIND_CONST_ARRAY) {
+    size_t Size = 0;
+    BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
+    fatalErrorIf(Size != 1, "Malformed bitwuzla constant array in model");
+    Result.Base = wrap(Children[0], ElemSort);
+  }
+  return Result;
+}
+
 SMTExprRef BitwuzlaSolver::mkBoolImpl(const bool b) {
   return makeExprRef<BitwExpr>(SMTExprKind::BoolConst, Context, mkBoolSort(),
                                b ? bitwuzla_mk_true(TermManager)
@@ -966,6 +994,24 @@ SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   const SMTExprRef &newSymbol = mkSymbolUnchecked(name, to);
   addConstraint(mkEqual(Exp, mkBVToIEEEFP(newSymbol, Exp->Sort)));
   return newSymbol;
+}
+
+bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::Quantifiers: // BV/FP quantifiers only
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::IntRealArithmetic:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
 }
 
 checkResult BitwuzlaSolver::checkImpl() {

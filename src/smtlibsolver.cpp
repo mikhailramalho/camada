@@ -2166,6 +2166,27 @@ SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
   return mkArraySelect(Array, Index);
 }
 
+bool SMTLIBSolver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  // These bits describe what the emitter can put on the wire; a given
+  // child solver may still reject a construct at runtime (yices-smt2 has
+  // no FP, bitwuzla no Int/Real, ...).
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+    return true;
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return false;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
+}
+
 checkResult SMTLIBSolver::checkImpl() {
   // (check-sat) is a query — it does NOT produce a `success` ack even when
   // :print-success is true. Bypass emitLine's resync logic; write the

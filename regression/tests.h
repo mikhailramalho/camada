@@ -68,6 +68,9 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(array_const_survives_push_pop, LazyArrays);
   RESETANDARGTEST(wide_index_const_array_semantics, LazyArrays);
   RESETANDARGTEST(const_array_select_survives_pop, LazyArrays);
+  RESETANDTEST(array_model_values);
+  RESETANDTEST(const_array_model_values);
+  RESETANDARGTEST(const_array_model_values, LazyArrays);
   RESETANDTEST(const_array_lowering_interop);
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_with_array_field);

@@ -1021,6 +1021,25 @@ SMTExprRef CVC5Solver::getArrayElementImpl(const SMTExprRef &Array,
       Context.getValue(toSolverExpr<CVC5Expr>(*sel).Expr));
 }
 
+SMTResult<ArrayModel> CVC5Solver::getArrayValuesImpl(const SMTExprRef &Array) {
+  const SMTSortRef &IndexSort = Array->Sort->getIndexSort();
+  const SMTSortRef &ElemSort = Array->Sort->getElementSort();
+  const auto wrap = [&](const cvc5::Term &Value, const SMTSortRef &Sort) {
+    return makeExprRef<CVC5Expr>(valueKindForSort(Sort), &Context, Sort, Value);
+  };
+
+  cvc5::Term Val = Context.getValue(toSolverExpr<CVC5Expr>(*Array).Expr);
+  ArrayModel Result;
+  while (Val.getKind() == cvc5::Kind::STORE) {
+    Result.Entries.emplace_back(wrap(Val[1], IndexSort),
+                                wrap(Val[2], ElemSort));
+    Val = Val[0];
+  }
+  if (Val.getKind() == cvc5::Kind::CONST_ARRAY)
+    Result.Base = wrap(Val.getConstArrayBase(), ElemSort);
+  return Result;
+}
+
 SMTExprRef CVC5Solver::mkBoolImpl(const bool b) {
   return makeExprRef<CVC5Expr>(SMTExprKind::BoolConst, &Context, mkBoolSort(),
                                Terms.mkBoolean(b));
@@ -1203,6 +1222,23 @@ SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
   return makeExprRef<CVC5Expr>(
       SMTExprKind::Exists, &Context, mkBoolSort(),
       Terms.mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body}));
+}
+
+bool CVC5Solver::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::UnsatAssumptions:
+  case SolverFeature::Timeouts:
+  case SolverFeature::ArrayModels:
+    return true;
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    break; // answered by the common layer's hooks
+  }
+  return false;
 }
 
 checkResult CVC5Solver::checkImpl() {

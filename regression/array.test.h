@@ -243,6 +243,75 @@ inline void const_array_select_survives_pop(
 
 // The lowerings interoperate: lazily and natively (or Auto-) lowered
 // constant arrays share array sorts and can appear in one formula.
+// Shared decoder for the array-model tests below: the model value at an
+// index is the first entry whose index matches, else the base, which must
+// then exist.
+inline int64_t array_model_value_at(const camada::SMTSolverRef &solver,
+                                    const camada::ArrayModel &Model,
+                                    int64_t Index) {
+  for (const auto &Entry : Model.Entries) {
+    auto IndexValue = solver->getBV(Entry.first);
+    REQUIRE(IndexValue);
+    if (IndexValue.value() == Index) {
+      auto ElemValue = solver->getBV(Entry.second);
+      REQUIRE(ElemValue);
+      return ElemValue.value();
+    }
+  }
+  REQUIRE(Model.Base);
+  auto BaseValue = solver->getBV(Model.Base);
+  REQUIRE(BaseValue);
+  return BaseValue.value();
+}
+
+inline void array_model_values(const camada::SMTSolverRef &solver) {
+  auto indexsort = solver->mkBVSort(8);
+  auto arr = solver->mkSymbol("arr", solver->mkArraySort(indexsort, indexsort));
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(arr, idx(1)), idx(10)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(arr, idx(2)), idx(20)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto Model = solver->getArrayValues(arr);
+  if (!Model) {
+    REQUIRE(Model.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+    return;
+  }
+  REQUIRE(array_model_value_at(solver, Model.value(), 1) == 10);
+  REQUIRE(array_model_value_at(solver, Model.value(), 2) == 20);
+}
+
+inline void const_array_model_values(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto indexsort = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  auto arr = solver->mkArrayConst(indexsort, idx(7), Lowering);
+  arr = solver->mkArrayStore(arr, idx(3), idx(9));
+  arr = solver->mkArrayStore(arr, idx(3), idx(11)); // shadows the store of 9
+  // Touch the array so every backend has it in the formula.
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(arr, idx(0)), idx(7)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  auto Model = solver->getArrayValues(arr);
+  if (!Model) {
+    REQUIRE(Model.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+    return;
+  }
+  // First matching entry wins: the outermost store shadows the inner one.
+  REQUIRE(array_model_value_at(solver, Model.value(), 3) == 11);
+  // Indexes never mentioned in the formula must read the initializer,
+  // through the base or an explicit entry.
+  REQUIRE(array_model_value_at(solver, Model.value(), 200) == 7);
+  // The sparse model must agree with the per-index query API.
+  auto Probe = solver->getBV(solver->getArrayElement(arr, idx(200)));
+  REQUIRE(Probe);
+  REQUIRE(Probe.value() == 7);
+}
+
 inline void const_array_lowering_interop(const camada::SMTSolverRef &solver) {
   auto idx = solver->mkBVSort(8);
   auto elem = solver->mkBVSort(8);

@@ -126,6 +126,8 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
                              symbol_cache_survives_push_pop(solver),
                              makeSMTLIBSolver)
 CAMADA_Z3_SMTLIB_SHARED_TEST("array", array(solver), makeSMTLIBSolver)
+CAMADA_Z3_SMTLIB_SHARED_TEST("array_model_values", array_model_values(solver),
+                             makeSMTLIBSolver)
 CAMADA_Z3_SMTLIB_SHARED_TEST("array_const_store_semantics",
                              array_const_store_semantics(solver),
                              makeSMTLIBSolver)
@@ -172,3 +174,17 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
 
 #undef CAMADA_Z3_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED
+
+TEST_CASE("Z3 feature capabilities", "[Z3]") {
+  auto solver = camada::createZ3Solver();
+  using camada::SolverFeature;
+  REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
+  REQUIRE(solver->supports(SolverFeature::Quantifiers));
+  REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
+  REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE(solver->supports(SolverFeature::NativeTuples));
+  REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
+  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  REQUIRE(solver->supports(SolverFeature::Timeouts));
+  REQUIRE(solver->supports(SolverFeature::ArrayModels));
+}
