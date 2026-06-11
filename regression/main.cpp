@@ -13,5 +13,5 @@ int main(int argc, char *argv[]) {
 // a quoting mistake there once shipped the literal macro names as the
 // version string, and nothing noticed.
 TEST_CASE("Camada version string", "[Camada]") {
-  REQUIRE(camada::getCamadaVersion() == "0.11");
+  REQUIRE(camada::getCamadaVersion() == "0.12");
 }
