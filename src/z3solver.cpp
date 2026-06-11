@@ -114,13 +114,6 @@ Z3Solver::Z3Solver(z3::context C) : Context(std::move(C)), Solver(Context) {
   initializeCommonSingletons();
 }
 
-Z3Solver::Z3Solver(z3::context C, z3::solver S)
-    : Context(std::move(C)), Solver(std::move(S)) {
-  // Needs to be set in order to convert NaN to bitvector
-  z3::set_param("rewriter.hi_fp_unspecified", true);
-  initializeCommonSingletons();
-}
-
 // Context (z3::context) and Solver (z3::solver) are RAII value members; their
 // destructors release the underlying Z3 resources after this body returns, so
 // only invalidateGeneratedObjects() is needed here to honor the SMTSolverImpl
