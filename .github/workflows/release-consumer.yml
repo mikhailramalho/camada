@@ -29,7 +29,7 @@ jobs:
         path: |
           .build-release/deps
           .build-release/_deps
-        key: ${{ runner.os }}-release-deps-v1
+        key: ${{ runner.os }}-release-deps-v2
 
     - name: Generate release
       run: python3 ./scripts/release.py
@@ -55,7 +55,7 @@ jobs:
         path: |
           .build-release/deps
           .build-release/_deps
-        key: ${{ runner.os }}-release-deps-v1
+        key: ${{ runner.os }}-release-deps-v2
 
     - name: Generate release
       shell: pwsh
@@ -95,7 +95,7 @@ jobs:
         path: |
           .build-release/deps
           .build-release/_deps
-        key: ${{ runner.os }}-release-deps-v1
+        key: ${{ runner.os }}-release-deps-v2
 
     - name: Generate release
       run: python3 ./scripts/release.py
