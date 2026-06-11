@@ -1831,7 +1831,7 @@ checkResult SMTSolverImpl::checkSatAssumingImpl(
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
   if (!UnsatAssumptionsValid)
-    return SMTError{SMTErrorCode::BackendError,
+    return SMTError{SMTErrorCode::InvalidUsage,
                     CachedBoolExprs[0]->getBackendKind(),
                     "getUnsatAssumptions is only valid right after a "
                     "checkSatAssuming call that returned UNSAT, before the "

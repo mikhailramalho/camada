@@ -263,7 +263,7 @@ private:
   // Per-check wall-clock deadline enforced through bitwuzla's termination
   // callback (registered in initializeContext, which passes this member's
   // address as the callback state). The epoch value means "no deadline";
-  // checkImpl arms it from TimeoutMs before each query.
+  // the check paths arm it from TimeoutMs before each query.
   std::chrono::steady_clock::time_point CheckDeadline{};
 };
 

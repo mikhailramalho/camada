@@ -167,6 +167,10 @@ enum class SMTErrorCode {
   BackendError,
   InvalidModelValue,
   UnsupportedOperation,
+  /// The call sequence violated an API contract (e.g. querying unsat
+  /// assumptions after the solver state changed), as opposed to a
+  /// backend-originated failure.
+  InvalidUsage,
 };
 
 /// Structured error payload carried by `SMTResult<T>` on failure.
@@ -533,7 +537,7 @@ public:
   /// Creates a floating-point isNaN operation
   virtual SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) = 0;
 
-  /// Creates a floating-point isNormal operation
+  /// Creates a floating-point isSubnormal operation
   virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) = 0;
 
   /// Creates a floating-point isNormal operation
@@ -809,18 +813,19 @@ public:
   virtual checkResult check() = 0;
 
   /// Set a wall-clock time limit, in milliseconds, applied to each
-  /// subsequent check() or checkSatAssuming() individually; 0 removes
-  /// the limit. A check that
-  /// hits the limit returns checkResult::UNKNOWN; reset() afterwards
-  /// restores the solver to a known-good state. The limit persists across
-  /// reset(). Returns false when the backend cannot enforce time limits
-  /// (STP; the SMT-LIB pipeline, where interrupting the child mid-query
-  /// would desynchronize the pipe protocol) — the limit is then ignored.
+  /// subsequent check() or checkSatAssuming() individually; 0 removes the
+  /// limit. A check that hits the limit returns checkResult::UNKNOWN and
+  /// leaves the solver usable. The limit persists across reset(). Returns
+  /// false when the backend cannot enforce time limits — the limit is
+  /// then ignored. Equivalently queryable up front as
+  /// supports(SolverFeature::Timeouts).
   virtual bool setTimeout(uint64_t Milliseconds) = 0;
 
   /// Check if the constraints conjoined with the given boolean assumptions
-  /// are satisfiable. The assumptions are only active for this query; they
-  /// are not asserted and do not persist into later checks.
+  /// are satisfiable. The assumptions are only active for this query: they
+  /// have no effect on the satisfiability of later checks. (Backends whose
+  /// native API only accepts literals lower compound assumptions through
+  /// fresh activation literals, which is observable in dump() output.)
   virtual checkResult
   checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) = 0;
 
@@ -828,8 +833,9 @@ public:
   /// unsatisfiability. Only valid right after a checkSatAssuming() call
   /// that returned UNSAT: any solver mutation (addConstraint, push, pop,
   /// reset) or later check invalidates the result, and querying it then is
-  /// an error. Backends without native unsat-assumption support (STP)
-  /// return an UnsupportedOperation error.
+  /// an error. Backends reporting
+  /// supports(SolverFeature::UnsatAssumptions) == false return an
+  /// UnsupportedOperation error.
   virtual SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() = 0;
 
   /// Reset the solver and remove all constraints.
