@@ -58,6 +58,43 @@ SMTExprRef mkCamadaTupleEqual(SMTSolverImpl &Solver, const SMTExprRef &LHS,
 SMTExprRef mkCamadaTupleIte(SMTSolverImpl &Solver, const SMTExprRef &Cond,
                             const SMTExprRef &T, const SMTExprRef &F);
 
+/// True when Sort is a tuple sort or an array sort whose element sort
+/// (recursively) involves a tuple. Drives the decomposed tuple-array
+/// dispatch: such sorts have no backend representation on backends
+/// without native datatype support.
+bool sortContainsTuple(const SMTSortRef &Sort);
+
+/// Camada-managed arrays of tuples: an `Array<Idx, T>` where T involves a
+/// tuple is represented as a bundle of per-leaf-field backend arrays —
+/// `Array<Idx, Tuple{BV32, Tuple{Bool}}>` becomes `{Array<Idx, BV32>,
+/// Array<Idx, Bool>}`. The tuple structure is dissolved at the Camada
+/// layer; all array reasoning stays in the backend's native theory.
+/// Operations recurse leaf-wise, so arbitrary tuple/array nesting
+/// flattens to native nested-arrays-of-scalars.
+
+SMTSortRef mkCamadaTupleArraySort(SMTSolverImpl &Solver,
+                                  const SMTSortRef &IndexSort,
+                                  const SMTSortRef &ElemSort);
+
+SMTExprRef mkCamadaTupleArraySymbol(SMTSolverImpl &Solver,
+                                    const std::string &Name,
+                                    const SMTSortRef &Sort);
+
+SMTExprRef mkCamadaTupleArraySelect(SMTSolverImpl &Solver,
+                                    const SMTExprRef &Array,
+                                    const SMTExprRef &Index);
+
+SMTExprRef mkCamadaTupleArrayStore(SMTSolverImpl &Solver,
+                                   const SMTExprRef &Array,
+                                   const SMTExprRef &Index,
+                                   const SMTExprRef &Element);
+
+SMTExprRef mkCamadaTupleArrayEqual(SMTSolverImpl &Solver, const SMTExprRef &LHS,
+                                   const SMTExprRef &RHS);
+
+SMTExprRef mkCamadaTupleArrayIte(SMTSolverImpl &Solver, const SMTExprRef &Cond,
+                                 const SMTExprRef &T, const SMTExprRef &F);
+
 } // namespace camada
 
 #endif
