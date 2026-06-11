@@ -312,6 +312,10 @@ limitations still matter in day-to-day use.
   - integers and reals are not supported.
   - quantifiers are available, but the strongest coverage in Camada is still in
     the quantifier-free fragments.
+  - constant arrays use Camada's lazy lowering: Bitwuzla 0.9.x answers
+    UNKNOWN for formulas that equate a native constant array with another
+    array (it warns "Equality over constant arrays not fully supported
+    yet"), which breaks the common `symbol = array_of(v)` pattern.
 - `CVC5` and `Z3`
   - these are currently the most complete backends for the public Camada API.
 
@@ -394,7 +398,7 @@ Camada also smooths over backend quirks where practical. For example:
 
 - MathSAT and STP now lower `Array<Idx, Bool>` through backend `Array<Idx, BV1>`
   representations internally
-- STP and Yices constant arrays use Camada's lazy lowering (a fresh array
+- STP, Yices, and Bitwuzla constant arrays use Camada's lazy lowering (a fresh array
   symbol whose default-value axiom is instantiated at each observed index);
   `ConstArrayLowering::Lazy` forces the same lowering on any backend
 - MathSAT native FP still falls back for unsupported operations such as

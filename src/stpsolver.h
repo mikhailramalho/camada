@@ -204,6 +204,11 @@ protected:
 
   bool nativeConstArraySupport() const override { return false; }
 
+  // STP's only array predicate is select; array equality is lowered by
+  // the common layer (mkEncodedArrayEqual), so mkEqualImpl never sees
+  // array-sorted operands.
+  bool nativeArrayExtensionality() const override { return false; }
+
   checkResult checkImpl() override;
 
   void resetImpl() override;

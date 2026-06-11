@@ -925,13 +925,9 @@ SMTExprRef BitwuzlaSolver::mkSymbolImpl(const std::string &Name,
                         Name.c_str()));
 }
 
-SMTExprRef BitwuzlaSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
-                                            const SMTExprRef &InitValue) {
-  const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
-  return makeExprRef<BitwExpr>(
-      SMTExprKind::ArrayConst, Context, sort,
-      bitwuzla_mk_const_array(TermManager, toSolverSort<BitwSort>(*sort).Sort,
-                              toSolverExpr<BitwExpr>(*InitValue).Expr));
+SMTExprRef BitwuzlaSolver::mkArrayConstImpl(const SMTSortRef &,
+                                            const SMTExprRef &) {
+  fatalError("Bitwuzla constant arrays are lowered lazily by the common layer");
 }
 
 SMTExprRef BitwuzlaSolver::mkForallImpl(const std::vector<SMTExprRef> &Vars,

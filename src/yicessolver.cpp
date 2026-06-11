@@ -123,7 +123,12 @@ static inline term_t yicesCheckTerm(term_t Term, const char *Message) {
 // per-element query loops a first-class path.
 class YicesModel {
 public:
-  explicit YicesModel(context_t *Ctx) : Model(yices_get_model(Ctx, 1)) {}
+  explicit YicesModel(context_t *Ctx) : Model(yices_get_model(Ctx, 1)) {
+    // yices_get_model returns NULL when the context is not in a SAT
+    // state; passing that to the yices_val_*/yices_get_* APIs segfaults.
+    fatalErrorIf(Model == nullptr,
+                 "Yices has no model available (last check was not SAT?)");
+  }
   ~YicesModel() {
     if (Model)
       yices_free_model(Model);

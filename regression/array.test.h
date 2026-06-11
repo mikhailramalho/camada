@@ -312,6 +312,151 @@ inline void const_array_model_values(
   REQUIRE(Probe.value() == 7);
 }
 
+// Plain array equality must be extensional in both polarities. The
+// asserted-positive direction is the regression: STP's old lowering
+// (select(A,w) == select(B,w) at one fresh index) only constrained one
+// cell, so `a == b` plus disagreeing selects was satisfiable.
+inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
+  auto mk = [&](const char *NameA, const char *NameB) {
+    auto indexsort = solver->mkBVSort(8);
+    auto arrsort = solver->mkArraySort(indexsort, indexsort);
+    return std::make_pair(solver->mkSymbol(NameA, arrsort),
+                          solver->mkSymbol(NameB, arrsort));
+  };
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+
+  // Positive direction: equality forces agreement at observed indexes.
+  auto [a, b] = mk("a", "b");
+  solver->addConstraint(solver->mkEqual(a, b));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(a, idx(0)), idx(1)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(b, idx(0)), idx(2)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Same, with the selects observed BEFORE the equality is built — pins
+  // the replay of already-observed indexes.
+  solver->reset();
+  auto [c, d] = mk("c", "d");
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(c, idx(0)), idx(1)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(d, idx(0)), idx(2)));
+  solver->addConstraint(solver->mkEqual(c, d));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Negative direction stays satisfiable: a difference can be exhibited.
+  solver->reset();
+  auto [e, f] = mk("e", "f");
+  solver->addConstraint(solver->mkNot(solver->mkEqual(e, f)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Agreeing constraints under asserted equality are satisfiable.
+  solver->reset();
+  auto [g, h] = mk("g", "h");
+  solver->addConstraint(solver->mkEqual(g, h));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(g, idx(0)), idx(5)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(h, idx(0)), idx(5)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Equality must be visible through store-derived terms: reading
+  // store(a, j, v) at i != j reads a at i.
+  solver->reset();
+  auto [p, q] = mk("p", "q");
+  solver->addConstraint(solver->mkEqual(p, q));
+  auto ps = solver->mkArrayStore(p, idx(1), idx(42));
+  auto qs = solver->mkArrayStore(q, idx(1), idx(42));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(
+      solver->mkArraySelect(ps, idx(0)), solver->mkArraySelect(qs, idx(0)))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // ... and through ite-derived terms.
+  solver->reset();
+  auto [r, s] = mk("r", "s");
+  auto cond = solver->mkSymbol("cond", solver->mkBoolSort());
+  solver->addConstraint(solver->mkEqual(r, s));
+  auto i1 = solver->mkIte(cond, r, s);
+  auto i2 = solver->mkIte(cond, s, r);
+  solver->addConstraint(solver->mkNot(
+      solver->mkEqual(solver->mkArraySelect(i1, solver->mkBVFromDec(0, 8)),
+                      solver->mkArraySelect(i2, solver->mkBVFromDec(0, 8)))));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Transitive chains close through observed-index congruence.
+  solver->reset();
+  auto [t, u] = mk("t", "u");
+  auto v = solver->mkSymbol("v", t->Sort);
+  solver->addConstraint(solver->mkEqual(t, u));
+  solver->addConstraint(solver->mkEqual(u, v));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(t, idx(0)), idx(1)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(v, idx(0)), idx(2)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Polarity safety: the equality literal used under boolean structure.
+  solver->reset();
+  auto [w, x] = mk("w", "x");
+  auto flag = solver->mkSymbol("flag", solver->mkBoolSort());
+  auto eq = solver->mkEqual(w, x);
+  solver->addConstraint(solver->mkIte(flag, eq, solver->mkNot(eq)));
+  solver->addConstraint(flag);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(w, idx(0)), idx(1)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(x, idx(0)), idx(2)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
+// Equality between an array symbol and a constant array — ESBMC's
+// `symbol = array_of(v)` pattern. Bitwuzla 0.9.x answers UNKNOWN on the
+// native ((as const ...)) form of this (with an "Equality over constant
+// arrays not fully supported yet" warning), which is why it lowers
+// constant arrays lazily; this fixture pins the pattern on every
+// backend and lowering.
+inline void const_array_equality_semantics(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto indexsort = solver->mkBVSort(8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  auto arrsort = solver->mkArraySort(indexsort, indexsort);
+
+  auto a = solver->mkSymbol("a", arrsort);
+  solver->addConstraint(
+      solver->mkEqual(a, solver->mkArrayConst(indexsort, idx(7), Lowering)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(a, idx(3)), idx(7)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // reset() invalidates every handle; rebuild the sorts for the
+  // contradiction direction.
+  solver->reset();
+  indexsort = solver->mkBVSort(8);
+  arrsort = solver->mkArraySort(indexsort, indexsort);
+  auto b = solver->mkSymbol("b", arrsort);
+  solver->addConstraint(
+      solver->mkEqual(b, solver->mkArrayConst(indexsort, idx(7), Lowering)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(b, idx(3)), idx(9)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+
+  // Derived-before-equality: a store built over the symbol BEFORE the
+  // constant-array equality exists must still see the default at indexes
+  // the store does not shadow.
+  solver->reset();
+  indexsort = solver->mkBVSort(8);
+  arrsort = solver->mkArraySort(indexsort, indexsort);
+  auto c = solver->mkSymbol("c", arrsort);
+  auto cs = solver->mkArrayStore(c, idx(1), idx(42));
+  solver->addConstraint(
+      solver->mkEqual(c, solver->mkArrayConst(indexsort, idx(7), Lowering)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(cs, idx(3)), idx(9)));
+  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+}
+
 inline void const_array_lowering_interop(const camada::SMTSolverRef &solver) {
   auto idx = solver->mkBVSort(8);
   auto elem = solver->mkBVSort(8);

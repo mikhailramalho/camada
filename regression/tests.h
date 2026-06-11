@@ -63,6 +63,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array_const_survives_push_pop);
   RESETANDTEST(wide_index_const_array_semantics);
   RESETANDTEST(const_array_select_survives_pop);
+  RESETANDTEST(array_equality_semantics);
+  RESETANDTEST(const_array_equality_semantics);
   constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
   RESETANDARGTEST(array, LazyArrays);
   RESETANDARGTEST(array_const_store_semantics, LazyArrays);
@@ -70,6 +72,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(array_const_survives_push_pop, LazyArrays);
   RESETANDARGTEST(wide_index_const_array_semantics, LazyArrays);
   RESETANDARGTEST(const_array_select_survives_pop, LazyArrays);
+  RESETANDARGTEST(const_array_equality_semantics, LazyArrays);
   RESETANDTEST(array_model_values);
   RESETANDTEST(const_array_model_values);
   RESETANDARGTEST(const_array_model_values, LazyArrays);

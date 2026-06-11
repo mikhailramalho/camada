@@ -366,17 +366,12 @@ SMTExprRef STPSolver::mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) {
 
 SMTExprRef STPSolver::mkEqualImpl(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
-  if (LHS->isArraySort()) {
-    // STP does not support array extensionality, so let's create a free
-    // variable
-    const std::string name =
-        "__CAMADA_index" + std::to_string(ConstArrayCounter++);
-    const SMTExprRef &index =
-        mkSymbolUnchecked(name, LHS->Sort->getIndexSort());
-
-    // and do select(A,i) == select(B,i)
-    return mkEqual(mkArraySelect(LHS, index), mkArraySelect(RHS, index));
-  }
+  // Array-sorted operands are lowered by the common layer
+  // (nativeArrayExtensionality() is false): the old single-witness
+  // select(A,i) == select(B,i) reduction here was only sound for asserted
+  // disequality.
+  fatalErrorIf(LHS->isArraySort(),
+               "STP array equality is lowered by the common layer");
 
   if (LHS->isBoolSort())
     return makeExprRef<STPExpr>(

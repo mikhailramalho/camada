@@ -155,6 +155,8 @@ protected:
     const SMTExpr *FalseArr;
   };
   std::unordered_map<const SMTExpr *, LazyConstArrayRoot> LazyConstArrayRoots;
+  std::unordered_map<const SMTSort *, std::vector<const SMTExpr *>>
+      LazyRootsByIndexSort;
   std::unordered_map<const SMTExpr *, std::vector<const SMTExpr *>>
       LazyConstArrayReach;
   std::unordered_map<const SMTExpr *, LazyArrayStoreStep> LazyArrayStores;
@@ -166,10 +168,56 @@ protected:
   std::set<std::pair<const SMTExpr *, const SMTExpr *>> LazyTouched;
   std::vector<std::vector<SMTExprRef>> LazyConstraintLevels{1};
   uint64_t LazyConstArrayCounter = 0;
+  // Every distinct index term ever selected with, grouped by index sort.
+  // Lazy default axioms and encoded-equality congruence are instantiated
+  // at EVERY observed index of the matching sort — not just indexes seen
+  // on the syntactic array operands — because reads can reach an array
+  // through store/ite-derived terms and through terms built before an
+  // equality existed. Sort-global instantiation is a superset of any
+  // equivalence-class walk, so it is unconditionally sound, and complete
+  // for quantifier-free formulas (only finitely many index terms exist).
+  std::unordered_map<const SMTSort *, std::vector<SMTExprRef>>
+      ObservedIndexesBySort;
+  std::set<std::pair<const SMTSort *, const SMTExpr *>> ObservedIndexSeen;
+  void observeArrayIndex(const SMTExprRef &Index);
+  // True while a model query (getArrayElement) is evaluating: selects
+  // built for evaluation must not instantiate default axioms or count as
+  // formula observations — asserting after check() invalidates the
+  // backend's model.
+  bool InLazyModelQuery = false;
 
   /// True when the backend can express `((as const ...) v)` natively.
   /// Backends without it get constant arrays through mkLazyConstArray().
   virtual bool nativeConstArraySupport() const { return true; }
+
+  /// True when the backend decides array equality natively (extensional
+  /// array theory). STP cannot: its only array predicate is select, so
+  /// the common layer lowers array equality through mkEncodedArrayEqual()
+  /// instead of mkEqualImpl().
+  virtual bool nativeArrayExtensionality() const { return true; }
+
+  // --- Encoded array equality (backends without native extensionality) ---
+  // Each lowered equality is a fresh boolean EqVar tied to its arrays by:
+  //   * the negative direction: EqVar \/ select(L,W) != select(R,W) for a
+  //     fresh witness index W (a difference must be exhibitable), and
+  //   * the positive direction: EqVar => select(L,i) = select(R,i) at
+  //     every index i either array is observed at — replayed for past
+  //     selects and hooked into mkArraySelect for future ones.
+  // Sound and complete for quantifier-free formulas: only finitely many
+  // index terms are ever observed.
+  struct ArrayEqualLink {
+    SMTExprRef EqVar;
+    SMTExprRef LHS;
+    SMTExprRef RHS;
+  };
+  std::vector<ArrayEqualLink> ArrayEqualLinks;
+  std::unordered_map<const SMTSort *, std::vector<std::size_t>>
+      ArrayEqualLinksByIndexSort;
+  std::set<std::pair<std::size_t, const SMTExpr *>> ArrayEqualCongruenceDone;
+  uint64_t ArrayEqualCounter = 0;
+
+  SMTExprRef mkEncodedArrayEqual(const SMTExprRef &LHS, const SMTExprRef &RHS);
+  void assertArrayEqualCongruence(std::size_t LinkId, const SMTExprRef &Index);
 
   /// Lower a constant array as a fresh backend array symbol whose
   /// "every element equals InitValue" semantics are enforced lazily: the
@@ -185,8 +233,8 @@ protected:
 
   std::vector<const SMTExpr *> lazyArrayRootsOf(const SMTExprRef &Exp) const;
   bool reachesLazyArray(const SMTExprRef &Exp) const;
-  void instantiateLazyDefaults(const SMTExprRef &Array,
-                               const SMTExprRef &Index);
+  void instantiateLazyDefaultAt(const SMTExpr *RootKey,
+                                const SMTExprRef &Index);
   SMTExprRef resolveLazyArrayElement(const SMTExprRef &Array,
                                      const SMTExprRef &Index);
 

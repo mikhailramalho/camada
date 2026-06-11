@@ -171,7 +171,7 @@ TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
-  REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
+  REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
