@@ -223,7 +223,6 @@ protected:
 
 private:
   STP::VC Context = nullptr;
-  unsigned int ConstArrayCounter = 0;
 }; // end class STPSolver
 
 } // namespace camada
