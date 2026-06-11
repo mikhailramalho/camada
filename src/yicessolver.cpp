@@ -117,6 +117,25 @@ static inline term_t yicesCheckTerm(term_t Term, const char *Message) {
   return NULL_TERM;
 }
 
+// yices_get_model allocates a fresh model that must be released with
+// yices_free_model; before this guard every model query leaked one
+// (~4 KB each), which compounded badly once getArrayValues made
+// per-element query loops a first-class path.
+class YicesModel {
+public:
+  explicit YicesModel(context_t *Ctx) : Model(yices_get_model(Ctx, 1)) {}
+  ~YicesModel() {
+    if (Model)
+      yices_free_model(Model);
+  }
+  YicesModel(const YicesModel &) = delete;
+  YicesModel &operator=(const YicesModel &) = delete;
+  operator model_t *() const { return Model; }
+
+private:
+  model_t *Model;
+};
+
 } // namespace
 
 unsigned YicesSort::getWidthFromSolver() const {
@@ -705,15 +724,17 @@ SMTExprRef YicesSolver::mkApplyImpl(const SMTExprRef &Function,
 
 SMTResult<bool> YicesSolver::getBoolImpl(const SMTExprRef &Exp) {
   int32_t val;
-  auto res = yices_get_bool_value(yices_get_model(Context, 1),
-                                  toSolverExpr<YicesExpr>(*Exp).Expr, &val);
+  const YicesModel Model(Context);
+  auto res =
+      yices_get_bool_value(Model, toSolverExpr<YicesExpr>(*Exp).Expr, &val);
   yicesCheckError(res, "Can't get boolean value from Yices");
   return val;
 }
 
 static inline void getYicesMPQValue(context_t *Context, term_t Expr,
                                     mpq_t Val) {
-  auto res = yices_get_mpq_value(yices_get_model(Context, 1), Expr, Val);
+  const YicesModel Model(Context);
+  auto res = yices_get_mpq_value(Model, Expr, Val);
   yicesCheckError(res, "Can't get rational value from Yices");
 }
 
@@ -721,9 +742,9 @@ SMTResult<std::string> YicesSolver::getBVInBinImpl(const SMTExprRef &Exp) {
   unsigned width = Exp->getWidth();
 
   std::vector<int32_t> data(width);
-  auto res =
-      yices_get_bv_value(yices_get_model(Context, 1),
-                         toSolverExpr<YicesExpr>(*Exp).Expr, data.data());
+  const YicesModel Model(Context);
+  auto res = yices_get_bv_value(Model, toSolverExpr<YicesExpr>(*Exp).Expr,
+                                data.data());
   if (res != 0)
     yicesCheckError(res, "Can't get bitvector value from Yices");
 
@@ -747,8 +768,9 @@ SMTResult<std::string> YicesSolver::getIntImpl(const SMTExprRef &Exp) {
   }
 
   int64_t val;
-  auto res = yices_get_int64_value(yices_get_model(Context, 1),
-                                   toSolverExpr<YicesExpr>(*Exp).Expr, &val);
+  const YicesModel Model(Context);
+  auto res =
+      yices_get_int64_value(Model, toSolverExpr<YicesExpr>(*Exp).Expr, &val);
   yicesCheckError(res, "Can't get integer value from Yices");
   return std::to_string(val);
 }
@@ -795,7 +817,7 @@ SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
 }
 
 SMTResult<ArrayModel> YicesSolver::getArrayValuesImpl(const SMTExprRef &Array) {
-  model_t *Model = yices_get_model(Context, 1);
+  const YicesModel Model(Context);
   yval_t Root;
   if (yices_get_value(Model, toSolverExpr<YicesExpr>(*Array).Expr, &Root) !=
           0 ||
@@ -1104,8 +1126,8 @@ void YicesSolver::dumpImpl(std::string &Out) {
 }
 
 void YicesSolver::dumpModelImpl(std::string &Out) {
-  char *model_str =
-      yices_model_to_string(yices_get_model(Context, 1), 160, 80, 0);
+  const YicesModel Model(Context);
+  char *model_str = yices_model_to_string(Model, 160, 80, 0);
   Out = model_str;
   Out += "\n";
   yices_free_string(model_str);
