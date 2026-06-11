@@ -30,9 +30,34 @@
 #include <mutex>
 #include <utility>
 #include <vector>
+
+#if !defined(_WIN32)
+#include <atomic>
+#include <csignal>
+#include <sys/time.h>
+#endif
 #include <yices.h>
 
 namespace camada {
+
+#if !defined(_WIN32)
+namespace {
+// Yices has no native time limit; the documented interruption mechanism is
+// calling yices_stop_search from a signal handler (the same pattern
+// smt-switch uses). The solver running the current check parks its context
+// here for the handler. The timer, handler slot, and this context are all
+// process-global, so at most one Yices check may run under a time limit at
+// a time process-wide: concurrent timed checks on Yices instances in
+// different threads would clobber each other's timer and deadline.
+std::atomic<context_t *> YicesSearchContext{nullptr};
+struct sigaction YicesOldAlarmAction = {};
+
+void yicesAlarmHandler(int) {
+  if (context_t *Ctx = YicesSearchContext.load())
+    yices_stop_search(Ctx);
+}
+} // namespace
+#endif
 
 namespace {
 
@@ -901,6 +926,59 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &,
   fatalError("Yices constant arrays are lowered lazily by the common layer");
 }
 
+void YicesSolver::armTimeout() {
+#if !defined(_WIN32)
+  if (TimeoutMs == 0)
+    return;
+  YicesSearchContext.store(Context);
+  struct sigaction Action = {};
+  Action.sa_handler = yicesAlarmHandler;
+  // yices_stop_search works through a flag the search loop polls, so the
+  // handler needs no syscall interruption: restart slow syscalls instead
+  // of surfacing spurious EINTRs to the rest of the process.
+  Action.sa_flags = SA_RESTART;
+  sigemptyset(&Action.sa_mask);
+  sigaction(SIGALRM, &Action, &YicesOldAlarmAction);
+  itimerval Timer{};
+  Timer.it_value.tv_sec = static_cast<time_t>(TimeoutMs / 1000);
+  Timer.it_value.tv_usec = static_cast<suseconds_t>((TimeoutMs % 1000) * 1000);
+  setitimer(ITIMER_REAL, &Timer, nullptr);
+#endif
+}
+
+void YicesSolver::disarmTimeout() {
+#if !defined(_WIN32)
+  if (TimeoutMs == 0)
+    return;
+  // A timer that expired between the check returning and the cancel below
+  // leaves SIGALRM pending; delivering it after the old disposition is
+  // restored could terminate the process (SIG_DFL). Block the signal,
+  // cancel the timer, discard any pending instance (POSIX guarantees
+  // setting SIG_IGN discards pending signals), then restore.
+  sigset_t AlarmSet, OldSet;
+  sigemptyset(&AlarmSet);
+  sigaddset(&AlarmSet, SIGALRM);
+  pthread_sigmask(SIG_BLOCK, &AlarmSet, &OldSet);
+  itimerval Off{};
+  setitimer(ITIMER_REAL, &Off, nullptr);
+  struct sigaction Ignore = {};
+  Ignore.sa_handler = SIG_IGN;
+  sigemptyset(&Ignore.sa_mask);
+  sigaction(SIGALRM, &Ignore, nullptr);
+  sigaction(SIGALRM, &YicesOldAlarmAction, nullptr);
+  YicesSearchContext.store(nullptr);
+  pthread_sigmask(SIG_SETMASK, &OldSet, nullptr);
+#endif
+}
+
+bool YicesSolver::setTimeoutImpl(uint64_t) {
+#if defined(_WIN32)
+  return false;
+#else
+  return true;
+#endif
+}
+
 bool YicesSolver::supportsImpl(SolverFeature Feature) const {
   switch (Feature) {
   case SolverFeature::IntRealArithmetic:
@@ -926,7 +1004,9 @@ bool YicesSolver::supportsImpl(SolverFeature Feature) const {
 }
 
 checkResult YicesSolver::checkImpl() {
+  armTimeout();
   smt_status_t res = yices_check_context(Context, nullptr);
+  disarmTimeout();
   if (res == YICES_STATUS_SAT)
     return checkResult::SAT;
 
@@ -943,9 +1023,11 @@ YicesSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   for (const SMTExprRef &Assumption : Assumptions)
     assumptions.push_back(toSolverExpr<YicesExpr>(*Assumption).Expr);
 
+  armTimeout();
   smt_status_t res = yices_check_context_with_assumptions(
       Context, nullptr, static_cast<uint32_t>(assumptions.size()),
       assumptions.data());
+  disarmTimeout();
   if (res == YICES_STATUS_SAT)
     return checkResult::SAT;
 

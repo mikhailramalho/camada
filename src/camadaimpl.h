@@ -190,6 +190,13 @@ protected:
   SMTExprRef resolveLazyArrayElement(const SMTExprRef &Array,
                                      const SMTExprRef &Index);
 
+  /// Wall-clock limit applied to each check, in milliseconds; 0 means no
+  /// limit. Stored here so reset() can re-apply it after resetImpl()
+  /// recreates backend state, and so backends that enforce the limit
+  /// through per-check deadlines (termination callbacks, SIGALRM) can
+  /// read the current value.
+  uint64_t TimeoutMs = 0;
+
   // --- Assumption-based solving ---
   // The assumptions of the most recent checkSatAssuming() call, kept so
   // backends can map the solver's native unsat core back to the caller's
@@ -454,6 +461,8 @@ public:
                           const SMTSortRef &To) override final;
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final;
   checkResult check() override final;
+  bool setTimeout(uint64_t Milliseconds) override final;
+
   checkResult
   checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) override final;
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() override final;
@@ -814,6 +823,13 @@ protected:
                            unsigned SWidth);
 
   virtual checkResult checkImpl() = 0;
+
+  /// Apply a per-check wall-clock limit (milliseconds; 0 disables) to the
+  /// backend. Returns false when the backend cannot enforce it — the
+  /// default for backends without a native limit or interrupt mechanism.
+  /// reset() re-applies the stored limit through this hook, so overrides
+  /// must be idempotent and callable right after resetImpl().
+  virtual bool setTimeoutImpl(uint64_t Milliseconds);
 
   /// Default fallback for backends without native assumption support:
   /// push a scope, assert each assumption, check, pop. Goes through the

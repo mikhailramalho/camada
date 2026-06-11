@@ -359,6 +359,8 @@ protected:
 
   checkResult checkImpl() override;
 
+  bool setTimeoutImpl(uint64_t Milliseconds) override;
+
   checkResult
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
 

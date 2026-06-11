@@ -39,6 +39,14 @@ namespace {
 
 void bitwuzlaErrorHandler(const char *msg) { fatalError(msg); }
 
+int32_t bitwuzlaTerminationCallback(void *State) {
+  const auto *Deadline =
+      static_cast<const std::chrono::steady_clock::time_point *>(State);
+  if (*Deadline == std::chrono::steady_clock::time_point{})
+    return 0;
+  return std::chrono::steady_clock::now() >= *Deadline ? 1 : 0;
+}
+
 static inline void bitwuzlaCheck(bool Ok, const char *Message) {
   if (Ok)
     return;
@@ -130,6 +138,8 @@ void BitwuzlaSolver::initializeContext() {
   bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
   Context = bitwuzla_new(TermManager, Options);
+  bitwuzla_set_termination_callback(Context, bitwuzlaTerminationCallback,
+                                    &CheckDeadline);
 }
 
 void BitwuzlaSolver::destroyContext() {
@@ -1014,7 +1024,14 @@ bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
   return false;
 }
 
+void BitwuzlaSolver::armCheckDeadline() {
+  CheckDeadline = TimeoutMs == 0 ? std::chrono::steady_clock::time_point{}
+                                 : std::chrono::steady_clock::now() +
+                                       std::chrono::milliseconds(TimeoutMs);
+}
+
 checkResult BitwuzlaSolver::checkImpl() {
+  armCheckDeadline();
   BitwuzlaResult res = bitwuzla_check_sat(Context);
   if (res == BITWUZLA_SAT)
     return checkResult::SAT;
@@ -1023,6 +1040,10 @@ checkResult BitwuzlaSolver::checkImpl() {
   return checkResult::UNKNOWN;
 }
 
+// The termination callback is always registered; arming the deadline per
+// check (above) is all that is needed.
+bool BitwuzlaSolver::setTimeoutImpl(uint64_t) { return true; }
+
 checkResult BitwuzlaSolver::checkSatAssumingImpl(
     const std::vector<SMTExprRef> &Assumptions) {
   std::vector<BitwuzlaTerm> assumptions;
@@ -1030,6 +1051,7 @@ checkResult BitwuzlaSolver::checkSatAssumingImpl(
   for (const SMTExprRef &Assumption : Assumptions)
     assumptions.push_back(toSolverExpr<BitwExpr>(*Assumption).Expr);
 
+  armCheckDeadline();
   BitwuzlaResult res = bitwuzla_check_sat_assuming(
       Context, static_cast<uint32_t>(assumptions.size()), assumptions.data());
   if (res == BITWUZLA_SAT)

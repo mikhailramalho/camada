@@ -1252,6 +1252,13 @@ checkResult CVC5Solver::checkImpl() {
   return checkResult::UNSAT;
 }
 
+bool CVC5Solver::setTimeoutImpl(uint64_t Milliseconds) {
+  // tlimit-per is cvc5's per-query wall-clock limit in milliseconds;
+  // 0 disables it. cvc5 allows (re)setting it at any point.
+  Context.setOption("tlimit-per", std::to_string(Milliseconds));
+  return true;
+}
+
 checkResult
 CVC5Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   std::vector<cvc5::Term> assumptions;

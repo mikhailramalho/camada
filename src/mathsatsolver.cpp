@@ -60,6 +60,14 @@ static inline void mathsatCheckError(int Res, const char *Message) {
   fatalError(Message);
 }
 
+int mathsatTerminationTest(void *State) {
+  const auto *Deadline =
+      static_cast<const std::chrono::steady_clock::time_point *>(State);
+  if (*Deadline == std::chrono::steady_clock::time_point{})
+    return 0;
+  return std::chrono::steady_clock::now() >= *Deadline ? 1 : 0;
+}
+
 } // namespace
 
 unsigned MathSATSort::getWidthFromSolver() const {
@@ -149,7 +157,12 @@ MathSATSolver::~MathSATSolver() {
   Config = msat_config{};
 }
 
-void MathSATSolver::initializeContext() { Context = msat_create_env(Config); }
+void MathSATSolver::initializeContext() {
+  Context = msat_create_env(Config);
+  mathsatCheckError(msat_set_termination_test(Context, mathsatTerminationTest,
+                                              &CheckDeadline),
+                    "Could not set MathSAT termination test");
+}
 
 void MathSATSolver::destroyContext() {
   if (!MSAT_ERROR_ENV(Context))
@@ -1132,7 +1145,14 @@ bool MathSATSolver::supportsImpl(SolverFeature Feature) const {
   return false;
 }
 
+void MathSATSolver::armCheckDeadline() {
+  CheckDeadline = TimeoutMs == 0 ? std::chrono::steady_clock::time_point{}
+                                 : std::chrono::steady_clock::now() +
+                                       std::chrono::milliseconds(TimeoutMs);
+}
+
 checkResult MathSATSolver::checkImpl() {
+  armCheckDeadline();
   msat_result res = msat_solve(Context);
   if (res == MSAT_SAT)
     return checkResult::SAT;
@@ -1142,6 +1162,10 @@ checkResult MathSATSolver::checkImpl() {
 
   return checkResult::UNKNOWN;
 }
+
+// The termination test is always registered; arming the deadline per
+// check (above) is all that is needed.
+bool MathSATSolver::setTimeoutImpl(uint64_t) { return true; }
 
 checkResult MathSATSolver::checkSatAssumingImpl(
     const std::vector<SMTExprRef> &Assumptions) {
@@ -1163,6 +1187,7 @@ checkResult MathSATSolver::checkSatAssumingImpl(
     LastAssumptionLits.emplace_back(msat_term_id(lits.back()), Assumption);
   }
 
+  armCheckDeadline();
   msat_result res =
       msat_solve_with_assumptions(Context, lits.data(), lits.size());
   if (res == MSAT_SAT)
