@@ -79,6 +79,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(const_array_lowering_interop);
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_with_array_field);
+  RESETANDTEST(tuple_update_semantics);
   RESETANDTEST(tuple_structural_equality);
   RESETANDTEST(empty_tuple_semantics);
   RESETANDTEST(dump_string_semantics);

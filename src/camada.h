@@ -648,6 +648,13 @@ public:
   /// Selects the element at Index from Tuple.
   virtual SMTExprRef mkTupleSelect(const SMTExprRef &Tuple, unsigned Index) = 0;
 
+  /// Returns a tuple equal to Tuple except that the element at Index is
+  /// replaced by Value; all other elements are unchanged. Index is a
+  /// concrete index — symbolic field selection is deliberately not part
+  /// of the API.
+  virtual SMTExprRef mkTupleUpdate(const SMTExprRef &Tuple, unsigned Index,
+                                   const SMTExprRef &Value) = 0;
+
   /// Applies a function symbol to arguments.
   virtual SMTExprRef mkApply(const SMTExprRef &Function,
                              const std::vector<SMTExprRef> &Args) = 0;
