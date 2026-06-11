@@ -233,8 +233,17 @@ protected:
                        const unsigned SigWidth) override;
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
+
+  // Bitwuzla 0.9.x answers UNKNOWN (with an "Equality over constant
+  // arrays not fully supported yet" warning) for any formula that
+  // equates a constant array with another array — including the common
+  // `symbol = ((as const ...) v)` pattern — so the common layer lowers
+  // constant arrays lazily instead (nativeConstArraySupport() below) and
+  // this override is unreachable.
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
+
+  bool nativeConstArraySupport() const override { return false; }
   SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                               const SMTSortRef &To) override;
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
