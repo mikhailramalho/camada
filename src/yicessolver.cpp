@@ -200,6 +200,15 @@ void YicesSolver::recreateContextWithConfig(const char *Logic,
   yices_default_config_for_logic(config, Logic);
   if (Configure)
     Configure(config);
+  // The context mode is owned by Camada, deliberately after the Configure
+  // callback: push()/pop() need at least push-pop mode, and "interactive"
+  // additionally restores the context automatically when a search is
+  // interrupted (yices_stop_search) — how setTimeout() is enforced here.
+  // Any weaker mode leaves an interrupted context in
+  // YICES_STATUS_INTERRUPTED permanently: later checks return STATUS_ERROR
+  // (mapped to instant UNKNOWN), asserts fail, and push aborts.
+  yicesCheckError(yices_set_config(config, "mode", "interactive"),
+                  "Could not configure Yices interactive mode");
 
   Context = yicesCheckContext(yices_new_context(config),
                               "Could not create Yices context");
@@ -208,7 +217,10 @@ void YicesSolver::recreateContextWithConfig(const char *Logic,
 
 void YicesSolver::addConstraintImpl(const SMTExprRef &Exp) {
   Assertions.push_back(Exp);
-  yices_assert_formula(Context, toSolverExpr<YicesExpr>(*Exp).Expr);
+  // Checked so a bad context state can never silently drop a constraint.
+  yicesCheckError(
+      yices_assert_formula(Context, toSolverExpr<YicesExpr>(*Exp).Expr),
+      "Could not assert formula in Yices context");
 }
 
 SMTExprRef YicesSolver::rewrapExprImpl(const SMTExpr &Exp,
