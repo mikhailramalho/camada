@@ -738,6 +738,10 @@ function(camada_setup_cryptominisat)
          "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a")
     file(COPY_FILE "${cms_cadical_lib}"
          "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
+    file(
+      APPEND "${cms_config}"
+      "\nset(CRYPTOMINISAT5_STATIC_LIBRARIES_DEPS \"${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a;${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a\")\n"
+    )
   endif()
 
   # CMS's install exports cadical/cadiback CMake packages whose archives are
