@@ -529,6 +529,9 @@ endfunction()
 function(camada_fetch_git_source package_name repository git_tag out_var)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
+  if(package_name STREQUAL "cryptominisat")
+    set(git_submodules_arg GIT_SUBMODULES)
+  endif()
   cpmaddpackage(
     NAME
     ${package_name}
@@ -538,6 +541,7 @@ function(camada_fetch_git_source package_name repository git_tag out_var)
     ${repository}
     GIT_TAG
     ${git_tag}
+    ${git_submodules_arg}
     GIT_PROGRESS
     TRUE)
   set(${out_var}
