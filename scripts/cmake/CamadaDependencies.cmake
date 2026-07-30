@@ -1010,6 +1010,9 @@ function(camada_setup_stp)
       -DMINISAT_INCLUDE_DIRS=${CAMADA_DEPS_INSTALL_DIR}/include
       -DMINISAT_LIBDIR=${CAMADA_DEPS_INSTALL_DIR}/lib
       -Dcryptominisat5_DIR=${cms_config_dir})
+  if(APPLE)
+    list(APPEND _camada_stp_cmake_args -DHAVE_UNISTD_H=ON)
+  endif()
   if(stp_bison_executable)
     list(APPEND _camada_stp_cmake_args
          -DBISON_EXECUTABLE=${stp_bison_executable})
