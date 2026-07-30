@@ -997,6 +997,16 @@ function(camada_setup_stp)
   camada_setup_minisat()
   camada_setup_cryptominisat()
   camada_fetch_git_source(stpsrc stp/stp 2.4.0 stp_source_dir)
+  if(APPLE)
+    file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
+    string(
+      REPLACE
+        "        set(CMAKE_EXE_LINKER_FLAGS \"\${CMAKE_EXE_LINKER_FLAGS} -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -static \")"
+        ""
+        stp_cmake_contents
+        "${stp_cmake_contents}")
+    file(WRITE "${stp_source_dir}/CMakeLists.txt" "${stp_cmake_contents}")
+  endif()
 
   set(stp_build_dir "${stp_source_dir}/build")
   set(cms_config_dir "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5")
