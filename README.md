@@ -109,11 +109,11 @@ When CMake downloads dependencies itself:
   Linux. macOS stays pinned to `5.6.16`: the `5.6.17` macOS tarball ships
   `libmathsat.a` as a plain `ar` archive of fat Mach-O objects, a layout
   Apple's `ld` rejects.
-- `STP` still falls back to a source build. The `2.3.4_cadical` GitHub release
-  only ships a standalone `stp` executable, not the headers and libraries that
-  Camada needs to link against the STP C++ API.
-- `CryptoMiniSat` and `Minisat` still build from source as part of the STP
-  dependency chain.
+- `STP` still falls back to a source build of `2.4.0`. The `2.4.0` GitHub
+  release only ships a standalone `stp` executable, not the headers and
+  libraries that Camada needs to link against the STP C++ API.
+- `CryptoMiniSat`, `Minisat`, and CryptoMiniSat's patched `CaDiCaL`/`CadiBack`
+  forks still build from source as part of the STP dependency chain.
 
 The `<build-dir>/deps/install` directory will contain the staged solver headers,
 libraries, and auxiliary artifacts, and Camada will use them from this
@@ -126,7 +126,7 @@ location during the build.
 | [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.1          | ✔️ |
 | [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️ |
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
-| [STP](https://stp.github.io/)              |  2.3.4          |   |
+| [STP](https://stp.github.io/)              |  2.4.0          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
 | [Z3](https://github.com/Z3Prover/z3)       |  4.16.0         | ✔️ |
 | SMT-LIB (any external solver) | n/a | depends on child |
