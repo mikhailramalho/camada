@@ -997,6 +997,7 @@ function(camada_setup_stp)
       -DONLY_SIMPLE=ON
       -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
       -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_CXX_FLAGS=-DABC_USE_STDINT_H=1
       # The stp binary doubles as an SMT-LIB pipeline child in the regression
       # suite.
       -DBUILD_EXECUTABLES=ON
