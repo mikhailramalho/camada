@@ -661,8 +661,16 @@ function(camada_setup_cryptominisat)
   endif()
 
   camada_ensure_deps_dirs()
-  file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/_deps/cryptominisat-src"
-       "${CMAKE_BINARY_DIR}/_deps/cryptominisat-subbuild")
+  file(
+    REMOVE_RECURSE
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadiback-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadiback-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cadical"
+    "${CMAKE_BINARY_DIR}/_deps/cadiback")
   # 5.11.22 is the version STP 2.4.0 bumped its CI to (stp/stp#493).
   camada_fetch_git_source(cryptominisat msoos/cryptominisat 5.11.22
                           cms_source_dir)
