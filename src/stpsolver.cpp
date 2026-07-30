@@ -190,6 +190,39 @@ SMTExprRef STPSolver::mkBVMulImpl(const SMTExprRef &LHS,
                          toSolverExpr<STPExpr>(*RHS).Expr));
 }
 
+SMTExprRef STPSolver::mkBVAddOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  STP::Expr L = toSolverExpr<STPExpr>(*LHS).Expr;
+  STP::Expr R = toSolverExpr<STPExpr>(*RHS).Expr;
+  return makeExprRef<STPExpr>(
+      SMTExprKind::BVAddOverflow, &Context, mkBoolSort(),
+      IsSigned ? STP::vc_bvSignedAddOverflowExpr(Context, L, R)
+               : STP::vc_bvUnsignedAddOverflowExpr(Context, L, R));
+}
+
+SMTExprRef STPSolver::mkBVSubOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  STP::Expr L = toSolverExpr<STPExpr>(*LHS).Expr;
+  STP::Expr R = toSolverExpr<STPExpr>(*RHS).Expr;
+  return makeExprRef<STPExpr>(
+      SMTExprKind::BVSubOverflow, &Context, mkBoolSort(),
+      IsSigned ? STP::vc_bvSignedSubOverflowExpr(Context, L, R)
+               : STP::vc_bvUnsignedSubOverflowExpr(Context, L, R));
+}
+
+SMTExprRef STPSolver::mkBVMulOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  STP::Expr L = toSolverExpr<STPExpr>(*LHS).Expr;
+  STP::Expr R = toSolverExpr<STPExpr>(*RHS).Expr;
+  return makeExprRef<STPExpr>(
+      SMTExprKind::BVMulOverflow, &Context, mkBoolSort(),
+      IsSigned ? STP::vc_bvSignedMulOverflowExpr(Context, L, R)
+               : STP::vc_bvUnsignedMulOverflowExpr(Context, L, R));
+}
+
 SMTExprRef STPSolver::mkBVSRemImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return makeExprRef<STPExpr>(

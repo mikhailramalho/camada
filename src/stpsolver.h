@@ -109,6 +109,18 @@ protected:
 
   SMTExprRef mkBVMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  // STP >= 2.4.0 exposes native SMT-LIB 2.7 overflow predicates through the
+  // C API; sdiv/neg overflow have no constructors there and stay on the
+  // common-layer encoding.
+  SMTExprRef mkBVAddOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVSubOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVMulOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
   SMTExprRef mkBVSRemImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
 
