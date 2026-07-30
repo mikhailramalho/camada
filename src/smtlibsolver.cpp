@@ -736,9 +736,18 @@ void SMTLIBSolver::emitPreamble() {
   // discarded on (pop). Camada's API lets a caller mkSymbol() inside a pushed
   // scope and use the returned expression after pop(); without this option,
   // the next (assert ...) or (get-value ...) referring to that symbol would
-  // hit "unknown constant" in the child solver. All solvers in the verified
-  // matrix accept this option.
-  emitLine("(set-option :global-declarations true)");
+  // hit "unknown constant" in the child solver. Like the option above, not
+  // every child implements it (stp answers `unsupported`); against such
+  // children a symbol declared inside a (push) dies with its scope, and the
+  // first command referring to it after (pop) aborts with the child's error.
+  const std::string GlobalDeclsOpt = "(set-option :global-declarations true)\n";
+  if (File)
+    File->emitRaw(GlobalDeclsOpt);
+  if (Proc) {
+    Proc->emitRaw(GlobalDeclsOpt);
+    Proc->flush();
+    (void)Proc->readResponse();
+  }
   emitLine("(set-info :status unknown)");
   // ALL covers BV/Bool/arrays/FP/Int/Real, which is the full Camada
   // surface. Children that don't support a particular sort will reject the
@@ -746,7 +755,36 @@ void SMTLIBSolver::emitPreamble() {
   // who want a portable script across heterogeneous solvers should pick
   // FPEncoding::BV at sort-construction time — that already routes every FP
   // op through the common-layer bit-blast path.
-  emitLine("(set-logic ALL)");
+  //
+  // Children that only accept concrete logic names get one fallback attempt
+  // with QF_AUFBV, the broadest quantifier-free fragment such children
+  // implement. The tee file records whichever logic the child accepted.
+  if (Proc) {
+    std::string Logic = "ALL";
+    Proc->emitRaw("(set-logic ALL)\n");
+    Proc->flush();
+    if (Proc->readResponse() != "success") {
+      // stp rejects ALL with a stray diagnostic line and then still answers
+      // `success` for the command; consume that stray ack or every later
+      // response is off by one. ponytail: this two-line pairing is
+      // stp-shaped — a child that emits only the error line would block
+      // here and needs echo-based resynchronization instead.
+      (void)Proc->readResponse();
+      Logic = "QF_AUFBV";
+      Proc->emitRaw("(set-logic QF_AUFBV)\n");
+      Proc->flush();
+      std::string Resp = Proc->readResponse();
+      fatalErrorIf(Resp != "success",
+                   ("SMTLIBSolver: child solver rejected both (set-logic ALL) "
+                    "and (set-logic QF_AUFBV): " +
+                    Resp)
+                       .c_str());
+    }
+    if (File)
+      File->emitRaw("(set-logic " + Logic + ")\n");
+  } else if (File) {
+    File->emitRaw("(set-logic ALL)\n");
+  }
 }
 
 void SMTLIBSolver::emitLine(const std::string &Text) const {
@@ -1512,7 +1550,8 @@ std::string extractValueFromGetValue(const std::string &Resp) {
   I = skipWS(Resp, I);
   if (I >= Resp.size() || Resp[I] != '(')
     return {};
-  ++I; // consume inner '(' opening the valuation pair
+  ++I;                 // consume inner '(' opening the valuation pair
+  I = skipWS(Resp, I); // stp emits `( |x|  #x0A )` with a leading space
   // Skip the <term>: walk until top-level whitespace, respecting `|...|`,
   // `"..."`, and nested parens.
   int Depth = 0;
@@ -2103,6 +2142,15 @@ SMTResult<bool> SMTLIBSolver::getBoolImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTLIBSolver::getBVInBinImpl(const SMTExprRef &Exp) {
+  // A BV literal is its own model value — decode it locally instead of
+  // round-tripping. Some children (stp) reject (get-value ...) on anything
+  // but a declared symbol.
+  const std::string Text = renderSMTLIBExpr(Exp);
+  if (!Text.empty() && Text[0] == '#') {
+    std::string Bits = bvValueToBinary(Text, Exp->getWidth());
+    if (!Bits.empty())
+      return Bits;
+  }
   std::string Resp;
   SMTResult<std::string> Value = sendGetValue(Exp, Resp);
   if (!Value)
@@ -2218,6 +2266,13 @@ checkResult SMTLIBSolver::checkImpl() {
 
 checkResult
 SMTLIBSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
+  // A child that rejected :produce-unsat-assumptions may not implement
+  // (check-sat-assuming ...) at all (stp answers `unsupported`), and without
+  // the option there is no unsat core to salvage from the native form
+  // anyway — use the common layer's equisatisfiable push/assert/check/pop
+  // fallback instead.
+  if (Proc && !UnsatAssumptionsSupported)
+    return SMTSolverImpl::checkSatAssumingImpl(Assumptions);
   // Activate each assumption through a fresh literal: assert
   // (=> lit assumption), then assume the literal. This is equisatisfiable
   // with assuming the term directly, stays inside the standard's

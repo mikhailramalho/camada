@@ -50,6 +50,11 @@ target_link_libraries(${REGRESSION_TARGET_NAME} PRIVATE ${PROJECT_NAME}
 # parameterized over every binary that's actually on disk, falling back to PATH
 # for missing ones. Each macro is defined only when the binary is present; the
 # test code uses #ifdef to discover them.
+if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/stp_simple")
+  target_compile_definitions(
+    ${REGRESSION_TARGET_NAME}
+    PRIVATE "CAMADA_TEST_STP_BIN=\"${CAMADA_DEPS_INSTALL_DIR}/bin/stp_simple\"")
+endif()
 if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/bin/z3")
   target_compile_definitions(
     ${REGRESSION_TARGET_NAME}

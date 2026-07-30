@@ -997,10 +997,17 @@ function(camada_setup_stp)
       -DONLY_SIMPLE=ON
       -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
       -DCMAKE_BUILD_TYPE=Release
-      -DBUILD_EXECUTABLES=OFF
+      # The stp binary doubles as an SMT-LIB pipeline child in the regression
+      # suite.
+      -DBUILD_EXECUTABLES=ON
       -DSTATICCOMPILE=ON
       -DBUILD_SHARED_LIBS=OFF
       -Dminisat_DIR=${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat
+      # STP's Findminisat.cmake module ignores minisat_DIR; without these hints
+      # it can resolve a system minisat whose headers and ABI differ from the
+      # staged one.
+      -DMINISAT_INCLUDE_DIRS=${CAMADA_DEPS_INSTALL_DIR}/include
+      -DMINISAT_LIBDIR=${CAMADA_DEPS_INSTALL_DIR}/lib
       -Dcryptominisat5_DIR=${cms_config_dir})
   if(stp_bison_executable)
     list(APPEND _camada_stp_cmake_args

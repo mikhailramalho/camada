@@ -170,6 +170,7 @@ shared fixtures from `tests.h`):
 | bitwuzla     | `{"bitwuzla"}`                                                  | speaks SMT-LIB on stdin without extra flags |
 | yices-smt2   | `{"yices-smt2", "--incremental"}`                               | `--incremental` is required for `(push)` / `(pop)`. No floating-point support — callers using native FP get an `unsupported` from the child. Use `FPEncoding::BV` to route every FP op through the common-layer bit-blast path, which works against yices. |
 | mathsat      | `{"mathsat"}`                                                   | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
+| stp          | `{"stp"}`                                                       | STP ≥ 2.4.0 only (older releases die on SMT-LIB2 commands they do not implement). BV/Bool/plain-array fragment: rejects `(set-logic ALL)` (Camada falls back to `QF_AUFBV`), answers `unsupported` to `:global-declarations` (symbols declared inside a `(push)` die with their scope), `:produce-unsat-assumptions`, and `(check-sat-assuming ...)` (Camada routes through the push/assert/check/pop fallback), rejects `((as const ...))`, and only supports `(get-value ...)` on declared symbols. Use `FPEncoding::BV` for FP. |
 
 The Camada preamble unconditionally sends `(set-option :print-success true)`,
 `(set-option :produce-models true)`,
@@ -177,9 +178,11 @@ The Camada preamble unconditionally sends `(set-option :print-success true)`,
 `unsupported` still solves normally; only `getUnsatAssumptions` degrades,
 and `supports(SolverFeature::UnsatAssumptions)` reflects the child's
 answer),
-`(set-option :global-declarations true)`, `(set-info :status unknown)`, and
-`(set-logic ALL)` at startup, so any solver that honors the SMT-LIB option
-contract should work. Other solvers should be
+`(set-option :global-declarations true)` (`unsupported` is tolerated, with
+the scope caveat above), `(set-info :status unknown)`, and
+`(set-logic ALL)` (with one fallback attempt at `QF_AUFBV` for children
+that only accept concrete logic names) at startup, so any solver that
+honors the SMT-LIB option contract should work. Other solvers should be
 straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
 
 Caveats:
