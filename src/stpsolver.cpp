@@ -25,8 +25,10 @@
 #include "camada.h"
 #include "camadacommon.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 
 namespace camada {
 
@@ -599,7 +601,18 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &, const SMTExprRef &) {
 
 checkResult STPSolver::checkImpl() {
   STP::Expr query = STP::vc_falseExpr(Context);
-  int res = STP::vc_query(Context, query);
+  // -1 disables the budget. The time budget is whole seconds for the
+  // entire query, so the millisecond deadline rounds up; the CryptoMiniSat
+  // backend abandons the search when it expires (return code 3).
+  int MaxTimeSecs = -1;
+  if (TimeoutMs) {
+    const uint64_t Secs = (TimeoutMs + 999) / 1000;
+    MaxTimeSecs = static_cast<int>(
+        std::min<uint64_t>(Secs, std::numeric_limits<int>::max()));
+  }
+  int res =
+      STP::vc_query_with_timeout(Context, query,
+                                 /*timeout_max_conflicts=*/-1, MaxTimeSecs);
   STP::vc_DeleteExpr(query);
   if (!res)
     return checkResult::SAT;
@@ -607,7 +620,20 @@ checkResult STPSolver::checkImpl() {
   if (res == 1)
     return checkResult::UNSAT;
 
+  // 2 is an error, 3 a timeout.
   return checkResult::UNKNOWN;
+}
+
+bool STPSolver::setTimeoutImpl(uint64_t) {
+  // Nothing to configure on the context; checkImpl() reads the current
+  // TimeoutMs on every query.
+  return true;
+}
+
+bool STPSolver::supportsImpl(SolverFeature Feature) const {
+  if (Feature == SolverFeature::Timeouts)
+    return true;
+  return SMTSolverImpl::supportsImpl(Feature);
 }
 
 void STPSolver::resetImpl() {

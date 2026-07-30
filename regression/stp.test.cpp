@@ -32,7 +32,7 @@ TEST_CASE("STP feature capabilities", "[STP]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
   REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
-  REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
+  REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
 }
 

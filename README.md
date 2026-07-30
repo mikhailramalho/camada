@@ -258,7 +258,7 @@ even if it lacks native floating-point support.
 | Quantifiers | ✔️ | ✔️ |   |   |   | ✔️ |
 | Overflow predicates | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Unsat assumptions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
-| Timeouts (`setTimeout`) | ✔️ | ✔️ | ✔️ |   | ✔️<sup>3</sup> | ✔️ |
+| Timeouts (`setTimeout`) | ✔️ | ✔️ | ✔️ | ✔️<sup>4</sup> | ✔️<sup>3</sup> | ✔️ |
 | Array models (`getArrayValues`) | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 
 <sup>1</sup> On `MathSAT`, `fp.fma` and `fp.rem` are lowered through the
@@ -270,6 +270,9 @@ datatypes; some gaps remain (e.g. arrays of tuples). Query
 
 <sup>3</sup> POSIX only, enforced through a process-global SIGALRM timer —
 at most one timed Yices check may run at a time process-wide.
+
+<sup>4</sup> STP's native time budget is whole seconds for the entire
+query; millisecond limits round up to the next second.
 
 The last four rows (and any platform splits) are queryable at runtime via
 `supports(SolverFeature)`; `checkSatAssuming` itself works on every
