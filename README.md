@@ -109,11 +109,11 @@ When CMake downloads dependencies itself:
   Linux. macOS stays pinned to `5.6.16`: the `5.6.17` macOS tarball ships
   `libmathsat.a` as a plain `ar` archive of fat Mach-O objects, a layout
   Apple's `ld` rejects.
-- `STP` still falls back to a source build. The `2.3.4_cadical` GitHub release
-  only ships a standalone `stp` executable, not the headers and libraries that
-  Camada needs to link against the STP C++ API.
-- `CryptoMiniSat` and `Minisat` still build from source as part of the STP
-  dependency chain.
+- `STP` still falls back to a source build of `2.4.0`. The `2.4.0` GitHub
+  release only ships a standalone `stp` executable, not the headers and
+  libraries that Camada needs to link against the STP C++ API.
+- `CryptoMiniSat`, `Minisat`, and CryptoMiniSat's patched `CaDiCaL`/`CadiBack`
+  forks still build from source as part of the STP dependency chain.
 
 The `<build-dir>/deps/install` directory will contain the staged solver headers,
 libraries, and auxiliary artifacts, and Camada will use them from this
@@ -126,7 +126,7 @@ location during the build.
 | [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.1          | ✔️ |
 | [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️ |
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
-| [STP](https://stp.github.io/)              |  2.3.4          |   |
+| [STP](https://stp.github.io/)              |  2.4.0          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
 | [Z3](https://github.com/Z3Prover/z3)       |  5.0.0          | ✔️ |
 | SMT-LIB (any external solver) | n/a | depends on child |
@@ -170,6 +170,7 @@ shared fixtures from `tests.h`):
 | bitwuzla     | `{"bitwuzla"}`                                                  | speaks SMT-LIB on stdin without extra flags |
 | yices-smt2   | `{"yices-smt2", "--incremental"}`                               | `--incremental` is required for `(push)` / `(pop)`. No floating-point support — callers using native FP get an `unsupported` from the child. Use `FPEncoding::BV` to route every FP op through the common-layer bit-blast path, which works against yices. |
 | mathsat      | `{"mathsat"}`                                                   | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
+| stp          | `{"stp"}`                                                       | STP ≥ 2.4.0 only (older releases die on SMT-LIB2 commands they do not implement). BV/Bool/plain-array fragment: rejects `(set-logic ALL)` (Camada falls back to `QF_AUFBV`), answers `unsupported` to `:global-declarations` (symbols declared inside a `(push)` die with their scope), `:produce-unsat-assumptions`, and `(check-sat-assuming ...)` (Camada routes through the push/assert/check/pop fallback), rejects `((as const ...))`, and only supports `(get-value ...)` on declared symbols. Use `FPEncoding::BV` for FP. |
 
 The Camada preamble unconditionally sends `(set-option :print-success true)`,
 `(set-option :produce-models true)`,
@@ -177,9 +178,11 @@ The Camada preamble unconditionally sends `(set-option :print-success true)`,
 `unsupported` still solves normally; only `getUnsatAssumptions` degrades,
 and `supports(SolverFeature::UnsatAssumptions)` reflects the child's
 answer),
-`(set-option :global-declarations true)`, `(set-info :status unknown)`, and
-`(set-logic ALL)` at startup, so any solver that honors the SMT-LIB option
-contract should work. Other solvers should be
+`(set-option :global-declarations true)` (`unsupported` is tolerated, with
+the scope caveat above), `(set-info :status unknown)`, and
+`(set-logic ALL)` (with one fallback attempt at `QF_AUFBV` for children
+that only accept concrete logic names) at startup, so any solver that
+honors the SMT-LIB option contract should work. Other solvers should be
 straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
 
 Caveats:
@@ -255,7 +258,7 @@ even if it lacks native floating-point support.
 | Quantifiers | ✔️ | ✔️ |   |   |   | ✔️ |
 | Overflow predicates | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Unsat assumptions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
-| Timeouts (`setTimeout`) | ✔️ | ✔️ | ✔️ |   | ✔️<sup>3</sup> | ✔️ |
+| Timeouts (`setTimeout`) | ✔️ | ✔️ | ✔️ | ✔️<sup>4</sup> | ✔️<sup>3</sup> | ✔️ |
 | Array models (`getArrayValues`) | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 
 <sup>1</sup> On `MathSAT`, `fp.fma` and `fp.rem` are lowered through the
@@ -267,6 +270,9 @@ datatypes; some gaps remain (e.g. arrays of tuples). Query
 
 <sup>3</sup> POSIX only, enforced through a process-global SIGALRM timer —
 at most one timed Yices check may run at a time process-wide.
+
+<sup>4</sup> STP's native time budget is whole seconds for the entire
+query; millisecond limits round up to the next second.
 
 The last four rows (and any platform splits) are queryable at runtime via
 `supports(SolverFeature)`; `checkSatAssuming` itself works on every

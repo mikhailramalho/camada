@@ -1,4 +1,7 @@
 
+#if SOLVER_SMTLIB_ENABLED
+#include "smtlib_pipeline.test.h"
+#endif
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -29,7 +32,7 @@ TEST_CASE("STP feature capabilities", "[STP]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
   REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
-  REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
+  REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
 }
 
@@ -60,3 +63,52 @@ TEST_CASE("Unsupported nested constant tuple arrays STP test", "[STP]") {
     (void)stp->mkArrayConst(bv4, innerConst);
   });
 }
+#if SOLVER_SMTLIB_ENABLED
+// ---------------------------------------------------------------------------
+// SMT-LIB pipeline tests against the stp binary (STP >= 2.4.0, which answers
+// the SMT-LIB2 commands it does not implement instead of dying). stp supports
+// BV, Bool, plain arrays, and FP-BV (via bit-blast). It rejects
+// (set-logic ALL) — the preamble falls back to QF_AUFBV — and answers
+// `unsupported` to :global-declarations, :produce-unsat-assumptions, and
+// (check-sat-assuming ...), so checkSatAssuming routes through the common
+// push/assert/check/pop fallback and symbols declared inside a (push) die
+// with their scope (symbol_cache_survives_push_pop is therefore absent).
+// Array fixtures are absent for the same reasons as yices-smt2: they all use
+// `mkArrayConst`, and stp additionally rejects `((as const ...))` syntax and
+// (get-value ...) on compound terms.
+// ---------------------------------------------------------------------------
+
+#define CAMADA_STP_SMTLIB_PIPELINE_TEST(NameStr, RunFn)                        \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [stp]", "[STP][SMTLIB][pipeline]") { \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::stpCommand(), "stp"); \
+    camada_smtlib_pipeline::RunFn(Cmd);                                        \
+  }
+
+CAMADA_STP_SMTLIB_PIPELINE_TEST("public factory works", runSMTLIBPublicFactory)
+CAMADA_STP_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
+                                runSMTLIBDualEmitter)
+
+#undef CAMADA_STP_SMTLIB_PIPELINE_TEST
+
+#define CAMADA_STP_SMTLIB_SHARED_TEST(NameStr, FixtureCall)                    \
+  TEST_CASE("SMTLIB pipeline: " NameStr " [stp]", "[STP][SMTLIB][pipeline]") { \
+    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::stpCommand(), "stp"); \
+    camada::SMTSolverRef solver =                                              \
+        camada_smtlib_pipeline::makeSMTLIBSolver(Cmd);                         \
+    FixtureCall;                                                               \
+  }
+
+CAMADA_STP_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver))
+CAMADA_STP_SMTLIB_SHARED_TEST("implies_semantics", implies_semantics(solver))
+CAMADA_STP_SMTLIB_SHARED_TEST("implies_true_implies_false",
+                              implies_true_implies_false(solver))
+CAMADA_STP_SMTLIB_SHARED_TEST("check_sat_assuming_semantics",
+                              check_sat_assuming_semantics(solver))
+CAMADA_STP_SMTLIB_SHARED_TEST("bv_lshr_semantics", bv_lshr_semantics(solver))
+CAMADA_STP_SMTLIB_SHARED_TEST("incremental_push_pop",
+                              incremental_push_pop(solver))
+CAMADA_STP_SMTLIB_SHARED_TEST("fp_equal BVFP",
+                              fp_equal(solver, camada::FPEncoding::BV))
+
+#undef CAMADA_STP_SMTLIB_SHARED_TEST
+#endif

@@ -113,6 +113,17 @@ inline std::vector<std::string> yicesSmt2Command() {
   return {Bin, "--incremental"};
 }
 
+// Staged binary only, no PATH fallback: the pipe contract (answering
+// unimplemented SMT-LIB2 commands instead of dying) is new in STP 2.4.0, so
+// an older `stp` from PATH would fail the tests rather than skip them.
+inline std::vector<std::string> stpCommand() {
+#ifdef CAMADA_TEST_STP_BIN
+  if (isExecutable(CAMADA_TEST_STP_BIN))
+    return {CAMADA_TEST_STP_BIN};
+#endif
+  return {};
+}
+
 inline std::vector<std::string> mathsatCommand() {
 #ifdef CAMADA_TEST_MATHSAT_BIN
   std::string Bin = findExecutable("mathsat", CAMADA_TEST_MATHSAT_BIN);

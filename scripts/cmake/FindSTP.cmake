@@ -48,10 +48,24 @@ function(_camada_normalize_stp_target)
 
   if(EXISTS "${_camada_stp_minisat_lib}" AND EXISTS
                                              "${_camada_stp_cryptominisat_lib}")
-    set_property(
-      TARGET stp
-      PROPERTY INTERFACE_LINK_LIBRARIES
-               "${_camada_stp_minisat_lib};${_camada_stp_cryptominisat_lib}")
+    set(_camada_stp_dep_libs "${_camada_stp_minisat_lib}"
+                             "${_camada_stp_cryptominisat_lib}")
+    # STP >= 2.4.0 builds ABC as a separate archive instead of folding it into
+    # libstp.a.
+    set(_camada_stp_abc_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libabc-pic.a")
+    if(EXISTS "${_camada_stp_abc_lib}")
+      list(APPEND _camada_stp_dep_libs "${_camada_stp_abc_lib}")
+    endif()
+    # On platforms where CMS's patched cadical/cadiback forks are not bundled
+    # into libcryptominisat5.a (macOS), they are staged separately; cadiback
+    # references cadical symbols, so it must come first.
+    set(_camada_stp_cadiback_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a")
+    if(EXISTS "${_camada_stp_cadiback_lib}")
+      list(APPEND _camada_stp_dep_libs "${_camada_stp_cadiback_lib}"
+           "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
+    endif()
+    set_property(TARGET stp PROPERTY INTERFACE_LINK_LIBRARIES
+                                     "${_camada_stp_dep_libs}")
   elseif(TARGET minisat AND TARGET libcryptominisat5)
     set_property(TARGET stp PROPERTY INTERFACE_LINK_LIBRARIES
                                      "minisat;libcryptominisat5")
