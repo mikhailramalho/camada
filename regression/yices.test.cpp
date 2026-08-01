@@ -232,6 +232,20 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 }
 
+// Registered per backend rather than in tests(): the depth-5 shape
+// flattens to nested-array leaves, which STP's array theory lacks.
+TEST_CASE("Deep tuple/array nesting Yices test", "[Yices]") {
+  auto solver = camada::createYicesSolver();
+  tuple_array_deep_nesting(solver);
+}
+
+// Registered per backend: nested constant arrays now lower lazily too,
+// so the per-leaf constant arrays of a tuple-array initializer can nest.
+TEST_CASE("Nested constant tuple arrays Yices test", "[Yices]") {
+  auto solver = camada::createYicesSolver();
+  tuple_array_const_nested(solver);
+}
+
 // Registered per backend, not in tests(): array_of(array_of(v)) needs a
 // nested array sort, which STP's BV-only array theory lacks.
 TEST_CASE("Nested constant arrays Yices test", "[Yices]") {

@@ -25,8 +25,10 @@
 #include "camada.h"
 #include "camadacommon.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 
 namespace camada {
 
@@ -131,6 +133,11 @@ SMTSortRef STPSolver::mkBVRMSortImpl() {
 
 SMTSortRef STPSolver::mkArraySortImpl(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
+  // STP's array theory is strictly BV-indexed, BV-valued (bools are
+  // adapted below); arrays of arrays do not exist in it, and passing one
+  // through would trip STP's own fatal handler with a cryptic message.
+  fatalErrorIf(IndexSort->isArraySort() || ElemSort->isArraySort(),
+               "Nested arrays are not supported by STP");
   const SMTSortRef &backend_elem_sort =
       ElemSort->isBoolSort() ? mkBVSort(1) : ElemSort;
   return makeSortRef<STPSort>(
@@ -183,6 +190,39 @@ SMTExprRef STPSolver::mkBVMulImpl(const SMTExprRef &LHS,
       STP::vc_bvMultExpr(Context, LHS->getWidth(),
                          toSolverExpr<STPExpr>(*LHS).Expr,
                          toSolverExpr<STPExpr>(*RHS).Expr));
+}
+
+SMTExprRef STPSolver::mkBVAddOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  STP::Expr L = toSolverExpr<STPExpr>(*LHS).Expr;
+  STP::Expr R = toSolverExpr<STPExpr>(*RHS).Expr;
+  return makeExprRef<STPExpr>(
+      SMTExprKind::BVAddOverflow, &Context, mkBoolSort(),
+      IsSigned ? STP::vc_bvSignedAddOverflowExpr(Context, L, R)
+               : STP::vc_bvUnsignedAddOverflowExpr(Context, L, R));
+}
+
+SMTExprRef STPSolver::mkBVSubOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  STP::Expr L = toSolverExpr<STPExpr>(*LHS).Expr;
+  STP::Expr R = toSolverExpr<STPExpr>(*RHS).Expr;
+  return makeExprRef<STPExpr>(
+      SMTExprKind::BVSubOverflow, &Context, mkBoolSort(),
+      IsSigned ? STP::vc_bvSignedSubOverflowExpr(Context, L, R)
+               : STP::vc_bvUnsignedSubOverflowExpr(Context, L, R));
+}
+
+SMTExprRef STPSolver::mkBVMulOverflowImpl(const SMTExprRef &LHS,
+                                          const SMTExprRef &RHS,
+                                          bool IsSigned) {
+  STP::Expr L = toSolverExpr<STPExpr>(*LHS).Expr;
+  STP::Expr R = toSolverExpr<STPExpr>(*RHS).Expr;
+  return makeExprRef<STPExpr>(
+      SMTExprKind::BVMulOverflow, &Context, mkBoolSort(),
+      IsSigned ? STP::vc_bvSignedMulOverflowExpr(Context, L, R)
+               : STP::vc_bvUnsignedMulOverflowExpr(Context, L, R));
 }
 
 SMTExprRef STPSolver::mkBVSRemImpl(const SMTExprRef &LHS,
@@ -561,7 +601,18 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &, const SMTExprRef &) {
 
 checkResult STPSolver::checkImpl() {
   STP::Expr query = STP::vc_falseExpr(Context);
-  int res = STP::vc_query(Context, query);
+  // -1 disables the budget. The time budget is whole seconds for the
+  // entire query, so the millisecond deadline rounds up; the CryptoMiniSat
+  // backend abandons the search when it expires (return code 3).
+  int MaxTimeSecs = -1;
+  if (TimeoutMs) {
+    const uint64_t Secs = (TimeoutMs + 999) / 1000;
+    MaxTimeSecs = static_cast<int>(
+        std::min<uint64_t>(Secs, std::numeric_limits<int>::max()));
+  }
+  int res =
+      STP::vc_query_with_timeout(Context, query,
+                                 /*timeout_max_conflicts=*/-1, MaxTimeSecs);
   STP::vc_DeleteExpr(query);
   if (!res)
     return checkResult::SAT;
@@ -569,7 +620,20 @@ checkResult STPSolver::checkImpl() {
   if (res == 1)
     return checkResult::UNSAT;
 
+  // 2 is an error, 3 a timeout.
   return checkResult::UNKNOWN;
+}
+
+bool STPSolver::setTimeoutImpl(uint64_t) {
+  // Nothing to configure on the context; checkImpl() reads the current
+  // TimeoutMs on every query.
+  return true;
+}
+
+bool STPSolver::supportsImpl(SolverFeature Feature) const {
+  if (Feature == SolverFeature::Timeouts)
+    return true;
+  return SMTSolverImpl::supportsImpl(Feature);
 }
 
 void STPSolver::resetImpl() {

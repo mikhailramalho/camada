@@ -26,22 +26,22 @@ set(CAMADA_DEPS_INSTALL_DIR
     CACHE PATH "Directory used to install downloaded solver dependencies")
 
 set(CAMADA_Z3_LINUX_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-glibc-2.39.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.0.0/z3-5.0.0-x64-glibc-2.39.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux x86_64")
 set(CAMADA_Z3_LINUX_AARCH64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-glibc-2.38.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.0.0/z3-5.0.0-arm64-glibc-2.38.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux aarch64")
 set(CAMADA_Z3_MACOS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-osx-15.7.3.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.0.0/z3-5.0.0-x64-osx-13.3.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for macOS x86_64")
 set(CAMADA_Z3_MACOS_ARM64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-osx-15.7.3.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.0.0/z3-5.0.0-arm64-osx-13.3.zip"
     CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-win.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.0.0/z3-5.0.0-x64-win.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Windows x86_64")
 set(CAMADA_CVC5_LINUX_X86_64_URL
@@ -529,6 +529,9 @@ endfunction()
 function(camada_fetch_git_source package_name repository git_tag out_var)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
+  if(package_name STREQUAL "cryptominisat")
+    set(git_submodules_arg GIT_SUBMODULES)
+  endif()
   cpmaddpackage(
     NAME
     ${package_name}
@@ -538,6 +541,7 @@ function(camada_fetch_git_source package_name repository git_tag out_var)
     ${repository}
     GIT_TAG
     ${git_tag}
+    ${git_submodules_arg}
     GIT_PROGRESS
     TRUE)
   set(${out_var}
@@ -566,14 +570,25 @@ function(camada_prepare_cryptominisat_dependency_layout dependency_dir
   endif()
 endfunction()
 
+# -fno-gnu-unique for the whole CMS stack (GCC/ELF only): the archives get
+# merged into one relocatable object whose non-CMSat symbols are localized, and
+# objcopy cannot demote STB_GNU_UNIQUE symbols.
+if(APPLE)
+  set(CAMADA_CMS_EXTRA_CXX_FLAGS "")
+else()
+  set(CAMADA_CMS_EXTRA_CXX_FLAGS "-fno-gnu-unique")
+endif()
+
+# CMS 5.11.x hard-requires meelgroup's patched cadical/cadiback forks and
+# expects them as sibling directories of the CMS source tree.
 function(camada_setup_cryptominisat_solver_deps cms_source_dir)
   get_filename_component(cms_parent_dir "${cms_source_dir}" DIRECTORY)
   set(cms_cadical_dir "${cms_parent_dir}/cadical")
+  set(cms_cadiback_dir "${cms_parent_dir}/cadiback")
 
-  if(NOT EXISTS "${cms_cadical_dir}/build/libcadical.a"
-     OR NOT EXISTS "${cms_cadical_dir}/src/cadical.hpp")
-    camada_fetch_git_source(cryptominisat_cadical arminbiere/cadical rel-1.4.0
-                            cms_cadical_source_dir)
+  if(NOT EXISTS "${cms_cadical_dir}/build/libcadical.a")
+    camada_fetch_git_source(cryptominisat_cadical meelgroup/cadical
+                            mate-only-libraries-1.8.0 cms_cadical_source_dir)
     camada_prepare_cryptominisat_dependency_layout("${cms_cadical_dir}"
                                                    "${cms_cadical_source_dir}")
     camada_run_checked(
@@ -582,6 +597,10 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
       MESSAGE
       "Configuring CryptoMiniSat CaDiCaL"
       COMMAND
+      ${CMAKE_COMMAND}
+      -E
+      env
+      "CXXFLAGS=${CAMADA_CMS_EXTRA_CXX_FLAGS}"
       ./configure
       -fPIC
       -O3)
@@ -595,20 +614,68 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
       -j
       libcadical.a)
   endif()
+
+  if(NOT EXISTS "${cms_cadiback_dir}/libcadiback.a")
+    # The 'mate' branch CMS 5.11.22 documents no longer exists; this is the last
+    # contemporary main commit whose CadiBack::doit() signature still matches
+    # CMS 5.11.22's backbone.cpp (2024-06-07).
+    camada_fetch_git_source(
+      cryptominisat_cadiback meelgroup/cadiback
+      69255f55e411207c4bdea02c6c2ab1ef29740ce1 cms_cadiback_source_dir)
+    camada_prepare_cryptominisat_dependency_layout("${cms_cadiback_dir}"
+                                                   "${cms_cadiback_source_dir}")
+    camada_run_checked(
+      WORKING_DIRECTORY
+      "${cms_cadiback_dir}"
+      MESSAGE
+      "Configuring CryptoMiniSat CadiBack"
+      COMMAND
+      ${CMAKE_COMMAND}
+      -E
+      env
+      "CXXFLAGS=-fPIC ${CAMADA_CMS_EXTRA_CXX_FLAGS}"
+      ./configure)
+    camada_run_checked(
+      WORKING_DIRECTORY
+      "${cms_cadiback_dir}"
+      MESSAGE
+      "Building CryptoMiniSat CadiBack"
+      COMMAND
+      make
+      -j
+      libcadiback.a)
+  endif()
 endfunction()
 
 function(camada_setup_cryptominisat)
   set(cms_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake"
   )
-  if(EXISTS "${cms_config}")
+  # Version stamp so a stale CMS (e.g. 5.6.3 from an older checkout) in an
+  # existing build directory is rebuilt instead of silently reused.
+  set(cms_stamp
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/camada-cms-5.11.22.stamp"
+  )
+  if(EXISTS "${cms_config}" AND EXISTS "${cms_stamp}")
     return()
   endif()
 
   camada_ensure_deps_dirs()
-  camada_fetch_git_source(cryptominisat msoos/cryptominisat 5.6.3
+  file(
+    REMOVE_RECURSE
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadiback-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadiback-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cadical"
+    "${CMAKE_BINARY_DIR}/_deps/cadiback")
+  # 5.11.22 is the version STP 2.4.0 bumped its CI to (stp/stp#493).
+  camada_fetch_git_source(cryptominisat msoos/cryptominisat 5.11.22
                           cms_source_dir)
   camada_setup_cryptominisat_solver_deps("${cms_source_dir}")
+  get_filename_component(cms_parent_dir "${cms_source_dir}" DIRECTORY)
 
   set(cms_build_dir "${cms_source_dir}/build")
   file(REMOVE_RECURSE "${cms_build_dir}")
@@ -623,12 +690,12 @@ function(camada_setup_cryptominisat)
     ${CMAKE_COMMAND}
     ..
     -GNinja
-    -DSTATICCOMPILE=ON
-    -DONLY_SIMPLE=ON
-    -DENABLE_PYTHON_INTERFACE=OFF
-    -DNOM4RI=ON
+    -DENABLE_ASSERTIONS=OFF
+    -DBUILD_SHARED_LIBS=OFF
+    -DNOZLIB=ON
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     -DCMAKE_BUILD_TYPE=Release
+    "-DCMAKE_CXX_FLAGS=${CAMADA_CMS_EXTRA_CXX_FLAGS}"
     -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR})
   camada_run_checked(WORKING_DIRECTORY "${cms_build_dir}" MESSAGE
                      "Building CryptoMiniSat" COMMAND ninja)
@@ -640,6 +707,60 @@ function(camada_setup_cryptominisat)
     COMMAND
     ninja
     install)
+
+  set(cms_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libcryptominisat5.a")
+  set(cms_cadical_lib "${cms_parent_dir}/cadical/build/libcadical.a")
+  set(cms_cadiback_lib "${cms_parent_dir}/cadiback/libcadiback.a")
+  if(NOT APPLE)
+    # Merge CMS with its patched cadical/cadiback into one relocatable object
+    # and localize everything but the CMSat:: API. bitwuzla's and cvc5's static
+    # archives carry their own (vanilla) cadical objects, so any global CaDiCaL
+    # symbol left here would be a duplicate-definition error in the final link.
+    camada_run_checked(
+      WORKING_DIRECTORY
+      "${cms_build_dir}"
+      MESSAGE
+      "Bundling CryptoMiniSat with cadical/cadiback"
+      COMMAND
+      bash
+      -c
+      "nm --defined-only -g '${cms_lib}' | awk 'NF==3{print \$3}' | grep 5CMSat | sort -u > camada-cms-keep.syms && \
+       ld -r --force-group-allocation -o camada-cms-bundle.o --whole-archive '${cms_lib}' '${cms_cadiback_lib}' '${cms_cadical_lib}' --no-whole-archive && \
+       objcopy --keep-global-symbols=camada-cms-keep.syms camada-cms-bundle.o && \
+       rm -f '${cms_lib}' && ar rcs '${cms_lib}' camada-cms-bundle.o")
+  else()
+    # ponytail: no objcopy on macOS; stage the fork archives and let
+    # FindSTP.cmake link them after libcryptominisat5.a. Collides if another
+    # enabled backend bundles a conflicting cadical — bundle+localize with
+    # Mach-O tools if that ever happens on the mac CI. Renamed so it cannot
+    # clobber cvc5's staged libcadical.a.
+    file(COPY_FILE "${cms_cadiback_lib}"
+         "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a")
+    file(COPY_FILE "${cms_cadical_lib}"
+         "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
+    file(
+      APPEND "${cms_config}"
+      "\nset(CRYPTOMINISAT5_STATIC_LIBRARIES_DEPS \"${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a;${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a\")\n"
+    )
+  endif()
+
+  # CMS's install exports cadical/cadiback CMake packages whose archives are
+  # never installed, and hardcodes their absolute paths (one of them into the
+  # build tree, one onto cvc5's staged libcadical.a) in the cryptominisat5
+  # export; STP's find_package trips over both. The bundle above already carries
+  # those objects (Linux) or FindSTP.cmake links the staged copies (macOS), so
+  # scrub the references.
+  file(REMOVE_RECURSE "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cadiback"
+       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cadical")
+  set(cms_targets_file
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Targets.cmake"
+  )
+  file(READ "${cms_targets_file}" cms_targets_contents)
+  string(REGEX REPLACE ";?[^;\"]*libcadi(back|cal)\\.a" "" cms_targets_contents
+                       "${cms_targets_contents}")
+  file(WRITE "${cms_targets_file}" "${cms_targets_contents}")
+
+  file(TOUCH "${cms_stamp}")
 endfunction()
 
 function(camada_setup_gmp)
@@ -864,18 +985,32 @@ endfunction()
 
 function(camada_setup_stp)
   set(stp_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/STP/STPConfig.cmake")
-  if(EXISTS "${stp_config}")
+  # libabc-pic.a is staged by this function for STP >= 2.4.0 only, so its
+  # presence also distinguishes a current install from a stale 2.3.x one left
+  # behind in an existing build directory.
+  if(EXISTS "${stp_config}" AND EXISTS
+                                "${CAMADA_DEPS_INSTALL_DIR}/lib/libabc-pic.a")
     return()
   endif()
 
   message(
     STATUS
-      "The STP 2.3.4_cadical GitHub release asset is a standalone solver binary, not a development package with headers and libraries. Falling back to a source build for Camada's STP API wrapper."
+      "The STP 2.4.0 GitHub release asset is a standalone solver binary, not a development package with headers and libraries. Falling back to a source build for Camada's STP API wrapper."
   )
 
   camada_setup_minisat()
   camada_setup_cryptominisat()
-  camada_fetch_git_source(stpsrc stp/stp 2.3.4 stp_source_dir)
+  camada_fetch_git_source(stpsrc stp/stp 2.4.0 stp_source_dir)
+  if(APPLE)
+    file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
+    string(
+      REPLACE
+        "        set(CMAKE_EXE_LINKER_FLAGS \"\${CMAKE_EXE_LINKER_FLAGS} -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -static \")"
+        ""
+        stp_cmake_contents
+        "${stp_cmake_contents}")
+    file(WRITE "${stp_source_dir}/CMakeLists.txt" "${stp_cmake_contents}")
+  endif()
 
   set(stp_build_dir "${stp_source_dir}/build")
   set(cms_config_dir "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5")
@@ -890,11 +1025,22 @@ function(camada_setup_stp)
       -DONLY_SIMPLE=ON
       -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
       -DCMAKE_BUILD_TYPE=Release
-      -DBUILD_EXECUTABLES=OFF
+      -DCMAKE_CXX_FLAGS=-DABC_USE_STDINT_H=1
+      # The stp binary doubles as an SMT-LIB pipeline child in the regression
+      # suite.
+      -DBUILD_EXECUTABLES=ON
       -DSTATICCOMPILE=ON
       -DBUILD_SHARED_LIBS=OFF
       -Dminisat_DIR=${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat
+      # STP's Findminisat.cmake module ignores minisat_DIR; without these hints
+      # it can resolve a system minisat whose headers and ABI differ from the
+      # staged one.
+      -DMINISAT_INCLUDE_DIRS=${CAMADA_DEPS_INSTALL_DIR}/include
+      -DMINISAT_LIBDIR=${CAMADA_DEPS_INSTALL_DIR}/lib
       -Dcryptominisat5_DIR=${cms_config_dir})
+  if(APPLE)
+    list(APPEND _camada_stp_cmake_args -DHAVE_UNISTD_H=ON)
+  endif()
   if(stp_bison_executable)
     list(APPEND _camada_stp_cmake_args
          -DBISON_EXECUTABLE=${stp_bison_executable})
@@ -920,6 +1066,12 @@ function(camada_setup_stp)
     COMMAND
     ninja
     install)
+
+  # STP >= 2.4.0 builds ABC as a separate static archive that its exported
+  # target references from the build tree but never installs; stage it next to
+  # libstp.a so FindSTP.cmake can link it.
+  file(COPY "${stp_build_dir}/lib/libabc-pic.a"
+       DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/lib")
 endfunction()
 
 function(camada_setup_yices)

@@ -218,7 +218,7 @@ set(RELEASE_MODE
 config_solver(Bitwuzla 0.9.1)
 config_solver(CVC5 1.0.8)
 config_solver(MathSAT 5.6.3)
-config_solver(STP 2.3.4)
+config_solver(STP 2.4.0)
 config_solver(Yices 2.6.1)
 config_solver(Z3 4.16.0)
 
