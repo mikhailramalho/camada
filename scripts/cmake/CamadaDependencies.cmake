@@ -995,12 +995,12 @@ function(camada_setup_stp)
 
   message(
     STATUS
-      "The STP 2.4.0 GitHub release asset is a standalone solver binary, not a development package with headers and libraries. Falling back to a source build for Camada's STP API wrapper."
+      "The STP 2.4.1 GitHub release asset is a standalone solver binary, not a development package with headers and libraries. Falling back to a source build for Camada's STP API wrapper."
   )
 
   camada_setup_minisat()
   camada_setup_cryptominisat()
-  camada_fetch_git_source(stpsrc stp/stp 2.4.0 stp_source_dir)
+  camada_fetch_git_source(stpsrc stp/stp 2.4.1 stp_source_dir)
   if(APPLE)
     file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
     string(

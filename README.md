@@ -109,7 +109,7 @@ When CMake downloads dependencies itself:
   Linux. macOS stays pinned to `5.6.16`: the `5.6.17` macOS tarball ships
   `libmathsat.a` as a plain `ar` archive of fat Mach-O objects, a layout
   Apple's `ld` rejects.
-- `STP` still falls back to a source build of `2.4.0`. The `2.4.0` GitHub
+- `STP` still falls back to a source build of `2.4.1`. The `2.4.1` GitHub
   release only ships a standalone `stp` executable, not the headers and
   libraries that Camada needs to link against the STP C++ API.
 - `CryptoMiniSat`, `Minisat`, and CryptoMiniSat's patched `CaDiCaL`/`CadiBack`
