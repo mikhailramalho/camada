@@ -201,6 +201,13 @@ SMTSortRef BitwuzlaSolver::mkBVFPSortImpl(const unsigned ExpWidth,
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
+SMTSortRef BitwuzlaSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                         bool IsSigned) {
+  return makeSortRef<BitwSort>(BitwSort(
+      SMTSortKind::FXP, Context, bitwuzla_mk_bv_sort(TermManager, Width),
+      SMTSort::FXPSortData{Width, FracBits, IsSigned}));
+}
+
 SMTSortRef BitwuzlaSolver::mkBVRMSortImpl() {
   return makeSortRef<BitwSort>(BitwSort(SMTSortKind::BVRM, Context,
                                         bitwuzla_mk_bv_sort(TermManager, 3),

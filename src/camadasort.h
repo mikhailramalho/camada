@@ -42,6 +42,7 @@ enum class SMTSortKind {
   RM,
   BVFP,
   BVRM,
+  FXP,
   Array,
   Function,
   Tuple
@@ -100,6 +101,18 @@ public:
     unsigned SigWidth = 0;
   };
 
+  /// Payload for fixed-point sorts (always Camada-encoded over BV).
+  ///
+  /// Width is the total encoded width; FracBits is the number of fractional
+  /// bits. For signed formats the sign bit is not a fraction bit
+  /// (FracBits < Width); unsigned formats allow FracBits == Width
+  /// (TR 18037 unsigned _Fract).
+  struct FXPSortData {
+    unsigned Width = 0;
+    unsigned FracBits = 0;
+    bool IsSigned = false;
+  };
+
   /// Payload for array sorts: index sort and element sort.
   struct ArraySortData {
     SMTSortRef IndexSort;
@@ -120,8 +133,9 @@ public:
     std::vector<SMTSortRef> ElementSorts;
   };
 
-  using SortData = std::variant<std::monostate, ScalarSortData, FPSortData,
-                                ArraySortData, FunctionSortData, TupleSortData>;
+  using SortData =
+      std::variant<std::monostate, ScalarSortData, FPSortData, FXPSortData,
+                   ArraySortData, FunctionSortData, TupleSortData>;
 
   explicit SMTSort(SMTSortKind K, SortData D = {})
       : Kind(K), Data(std::move(D)) {}
@@ -134,7 +148,7 @@ public:
   /// Returns true if the sort is a bitvector.
   bool isBVSort() const {
     return Kind == SMTSortKind::BV || Kind == SMTSortKind::BVFP ||
-           Kind == SMTSortKind::BVRM;
+           Kind == SMTSortKind::BVRM || Kind == SMTSortKind::FXP;
   }
 
   /// Returns true if the sort is a boolean.
@@ -165,6 +179,9 @@ public:
   /// Returns true if the sort is a Camada-encoded rounding mode.
   bool isBVRMSort() const { return Kind == SMTSortKind::BVRM; }
 
+  /// Returns true if the sort is a fixed-point (always Camada-encoded).
+  bool isFXPSort() const { return Kind == SMTSortKind::FXP; }
+
   /// Returns true if the sort is an array.
   bool isArraySort() const { return Kind == SMTSortKind::Array; }
 
@@ -187,6 +204,14 @@ public:
   /// Returns the floating-point exponent width, fails if the sort is not a
   /// floating-point.
   unsigned getFPExponentWidth() const;
+
+  /// Returns the fixed-point fractional bit count, fails if the sort is not
+  /// a fixed-point.
+  unsigned getFXPFracBits() const;
+
+  /// Returns whether the fixed-point format is signed, fails if the sort is
+  /// not a fixed-point.
+  bool isFXPSignedSort() const;
 
   /// Returns the array's index sort, fails if the sort is not an array.
   SMTSortRef getIndexSort() const;

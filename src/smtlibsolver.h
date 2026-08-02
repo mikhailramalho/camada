@@ -207,6 +207,8 @@ protected:
   SMTSortRef mkBoolSortImpl() override;
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
   SMTSortRef mkBVFPSortImpl(unsigned ExpWidth, unsigned SigWidth) override;
+  SMTSortRef mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                           bool IsSigned) override;
   SMTSortRef mkBVRMSortImpl() override;
   SMTSortRef mkFPSortImpl(unsigned ExpWidth, unsigned SigWidth) override;
   SMTSortRef mkRMSortImpl() override;

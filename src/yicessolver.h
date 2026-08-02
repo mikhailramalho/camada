@@ -94,6 +94,8 @@ protected:
 
   SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
                             const unsigned SigWidth) override;
+  SMTSortRef mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                           bool IsSigned) override;
 
   SMTSortRef mkBVRMSortImpl() override;
 

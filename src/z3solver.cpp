@@ -172,6 +172,13 @@ SMTSortRef Z3Solver::mkBVFPSortImpl(const unsigned ExpWidth,
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
+SMTSortRef Z3Solver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                   bool IsSigned) {
+  return makeSortRef<Z3Sort>(
+      Z3Sort(SMTSortKind::FXP, &Context, Context.bv_sort(Width),
+             SMTSort::FXPSortData{Width, FracBits, IsSigned}));
+}
+
 SMTSortRef Z3Solver::mkBVRMSortImpl() {
   return makeSortRef<Z3Sort>(Z3Sort(SMTSortKind::BVRM, &Context,
                                     Context.bv_sort(3),
