@@ -3,7 +3,7 @@
 // every native backend and on the SMT-LIB pipeline children.
 //
 // Verification strategy: an exact integer reference model (numerators are
-// raw*1, exact products/quotients computed in __int128) evaluates every
+// raw*1, exact products/quotients computed in int64_t) evaluates every
 // operation and predicate; the solver-side encoding is then pinned with a
 // single conjunction of constant equalities per operation and format, so a
 // SAT answer proves every enumerated case at once. The 4-bit exhaustive
@@ -19,6 +19,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cassert>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -50,7 +51,10 @@ inline int64_t refDecode(const RefFormat &F, uint64_t Raw) {
 }
 
 // Two's-complement wrap of a mathematically exact raw value to Width bits.
-inline uint64_t refWrap(const RefFormat &F, __int128 Value) {
+inline uint64_t refWrap(const RefFormat &F, int64_t Value) {
+  // int64_t arithmetic is exact only while formats stay narrow; the widest
+  // host-modeled format in these fixtures is 16 bits.
+  assert(F.Width <= 16);
   return uint64_t(uint64_t(Value) & ((uint64_t(1) << F.Width) - 1));
 }
 
@@ -64,8 +68,8 @@ inline std::string refBits(const RefFormat &F, uint64_t Raw) {
 
 // Floor division of exact integers (the value semantics of the truncating
 // right shifts in multiplication and fixed-to-fixed narrowing).
-inline __int128 refFloorDiv(__int128 Num, __int128 Den) {
-  __int128 Q = Num / Den;
+inline int64_t refFloorDiv(int64_t Num, int64_t Den) {
+  int64_t Q = Num / Den;
   if ((Num % Den) != 0 && ((Num < 0) != (Den < 0)))
     --Q;
   return Q;
@@ -78,28 +82,28 @@ struct RefResult {
 };
 
 inline RefResult refAdd(const RefFormat &F, int64_t A, int64_t B) {
-  __int128 Exact = __int128(A) + B;
+  int64_t Exact = int64_t(A) + B;
   return {refWrap(F, Exact), Exact < F.minRaw() || Exact > F.maxRaw(), false};
 }
 
 inline RefResult refSub(const RefFormat &F, int64_t A, int64_t B) {
-  __int128 Exact = __int128(A) - B;
+  int64_t Exact = int64_t(A) - B;
   return {refWrap(F, Exact), Exact < F.minRaw() || Exact > F.maxRaw(), false};
 }
 
 inline RefResult refNeg(const RefFormat &F, int64_t A) {
-  __int128 Exact = -__int128(A);
+  int64_t Exact = -int64_t(A);
   return {refWrap(F, Exact), Exact < F.minRaw() || Exact > F.maxRaw(), false};
 }
 
 inline RefResult refMul(const RefFormat &F, int64_t A, int64_t B) {
   // Exact product in raw scale is A*B/2^N; the encoding floors it. The
   // overflow predicate tests the pre-rounding exact value.
-  __int128 Prod = __int128(A) * B;
-  __int128 Scale = __int128(1) << F.FracBits;
+  int64_t Prod = int64_t(A) * B;
+  int64_t Scale = int64_t(1) << F.FracBits;
   RefResult R;
-  R.Overflow = Prod < __int128(F.minRaw()) * Scale ||
-               Prod > __int128(F.maxRaw()) * Scale;
+  R.Overflow =
+      Prod < int64_t(F.minRaw()) * Scale || Prod > int64_t(F.maxRaw()) * Scale;
   R.Raw = refWrap(F, refFloorDiv(Prod, Scale));
   return R;
 }
@@ -113,12 +117,12 @@ inline RefResult refDiv(const RefFormat &F, int64_t A, int64_t B) {
   // Exact quotient in raw scale is (A*2^N)/B; the encoding truncates toward
   // zero (bvsdiv). Overflow compares the exact rational against the bounds:
   // for B > 0, exact > max iff A*2^N > max*B (and flipped for B < 0).
-  __int128 Num = __int128(A) << F.FracBits;
-  __int128 MaxB = __int128(F.maxRaw()) * B;
-  __int128 MinB = __int128(F.minRaw()) * B;
+  int64_t Num = int64_t(A) << F.FracBits;
+  int64_t MaxB = int64_t(F.maxRaw()) * B;
+  int64_t MinB = int64_t(F.minRaw()) * B;
   R.Overflow =
       (B > 0) ? (Num > MaxB || Num < MinB) : (Num < MaxB || Num > MinB);
-  R.Raw = refWrap(F, Num / B); // __int128 '/' truncates toward zero
+  R.Raw = refWrap(F, Num / B); // int64_t '/' truncates toward zero
   return R;
 }
 
