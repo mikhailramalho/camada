@@ -105,8 +105,8 @@ void CVC5Expr::dump(std::string &Out) const {
 }
 
 CVC5Solver::CVC5Solver(UnsatAssumptionsMode Mode)
-    : Context(Terms),
-      ProduceUnsatAssumptions(Mode == UnsatAssumptionsMode::On) {
+    : ProduceUnsatAssumptions(Mode == UnsatAssumptionsMode::On),
+      Context(Terms) {
   Context.setOption("arrays-exp", "true");
   Context.setOption("produce-models", "true");
   Context.setOption("produce-assertions", "true");
