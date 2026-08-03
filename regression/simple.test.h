@@ -96,22 +96,30 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   // Factoring a 64-bit semiprime exactly (the 128-bit extension rules out
   // wrap-around shortcuts) is far beyond a 150ms budget on every backend,
   // so the limit must turn the query into UNKNOWN instead of a hang. The
-  // reset also pins that the limit itself survives reset().
-  solver->reset();
-  auto a = solver->mkSymbol("a", solver->mkBVSort(64));
-  auto b = solver->mkSymbol("b", solver->mkBVSort(64));
-  constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
-  auto prod =
-      solver->mkBVMul(solver->mkBVZeroExt(64, a), solver->mkBVZeroExt(64, b));
-  auto k = solver->mkBVZeroExt(
-      64, solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64));
-  solver->addConstraint(solver->mkEqual(prod, k));
-  auto one = solver->mkBVFromDec(1, 64);
-  solver->addConstraint(solver->mkBVUgt(a, one));
-  solver->addConstraint(solver->mkBVUgt(b, one));
+  // resets also pin that the limit itself survives reset().
+  auto assertSemiprimeFactoring = [&]() {
+    solver->reset();
+    auto a = solver->mkSymbol("a", solver->mkBVSort(64));
+    auto b = solver->mkSymbol("b", solver->mkBVSort(64));
+    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
+    auto prod =
+        solver->mkBVMul(solver->mkBVZeroExt(64, a), solver->mkBVZeroExt(64, b));
+    auto k = solver->mkBVZeroExt(
+        64, solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64));
+    solver->addConstraint(solver->mkEqual(prod, k));
+    auto one = solver->mkBVFromDec(1, 64);
+    solver->addConstraint(solver->mkBVUgt(a, one));
+    solver->addConstraint(solver->mkBVUgt(b, one));
+  };
+  assertSemiprimeFactoring();
   REQUIRE(solver->check() == camada::checkResult::UNKNOWN);
 
-  // The limit applies to assumption-based checks too.
+  // The limit applies to assumption-based checks too. Rebuild the problem
+  // from scratch first: an incremental solver resumes the interrupted
+  // search with everything it already learned, and the cumulative budget
+  // was occasionally enough to actually factor the semiprime (seen with
+  // bitwuzla), turning this deterministic UNKNOWN into a flaky SAT.
+  assertSemiprimeFactoring();
   auto t = solver->mkSymbol("t", solver->mkBoolSort());
   REQUIRE(solver->checkSatAssuming({t}) == camada::checkResult::UNKNOWN);
 

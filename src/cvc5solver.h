@@ -66,7 +66,7 @@ public:
 
 class CVC5Solver : public SMTSolverImpl {
 public:
-  CVC5Solver();
+  explicit CVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off);
   ~CVC5Solver() override;
 
 protected:
@@ -371,6 +371,11 @@ protected:
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
   bool supportsImpl(SolverFeature Feature) const override;
+
+  /// Whether the context was created with produce-unsat-assumptions
+  /// (opt-in: tracking assumption participation slows every check, and
+  /// cvc5 only honors the option when set before solving starts).
+  bool ProduceUnsatAssumptions = false;
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
