@@ -508,7 +508,12 @@ TEST_CASE("SMTLIB one-shot silent model solver is dropped, not hung",
   // camada blocked reading an ack the child would never send, before the
   // caller ever got control. It must instead be dropped at the first
   // bounded read, costing only counterexample support.
-  const unsigned SavedTimeout = camada::SMTLIBSolver::OneShotModelAckTimeoutMs;
+  // RAII restore: a failing REQUIRE below must not leave the shortened
+  // process-global timeout behind for later tests.
+  struct TimeoutGuard {
+    unsigned Saved = camada::SMTLIBSolver::OneShotModelAckTimeoutMs;
+    ~TimeoutGuard() { camada::SMTLIBSolver::OneShotModelAckTimeoutMs = Saved; }
+  } Guard;
   camada::SMTLIBSolver::OneShotModelAckTimeoutMs = 200;
 
   // Two shapes of silence: a child that never answers anything, and a
@@ -539,8 +544,6 @@ TEST_CASE("SMTLIB one-shot silent model solver is dropped, not hung",
     std::remove(Verdict.c_str());
     std::remove(Child.c_str());
   }
-
-  camada::SMTLIBSolver::OneShotModelAckTimeoutMs = SavedTimeout;
 }
 
 TEST_CASE("SMTLIB one-shot garbled model solver is dropped, not fatal",
