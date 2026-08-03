@@ -673,3 +673,108 @@ TEST_CASE("SMTLIB one-shot assumption checks and mid-negotiation death",
     std::remove(DyingModel.c_str());
   }
 }
+
+TEST_CASE("SMTLIB caller-chosen logic", "[SMTLIB][logic]") {
+  // Write-only: a non-empty Logic is emitted verbatim in place of ALL.
+  {
+    std::string Path = makeTempPath();
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        Path, camada::TupleEncoding::Native, "QF_BV");
+    solver->addConstraint(solver->mkBool(true));
+    (void)solver->check();
+    solver.reset();
+    std::string Written = readFile(Path);
+    REQUIRE(Written.find("(set-logic QF_BV)") != std::string::npos);
+    REQUIRE(Written.find("(set-logic ALL)") == std::string::npos);
+    std::remove(Path.c_str());
+  }
+  // Empty Logic keeps today's behaviour.
+  {
+    std::string Path = makeTempPath();
+    auto solver = std::make_unique<camada::SMTLIBSolver>(Path);
+    solver->addConstraint(solver->mkBool(true));
+    (void)solver->check();
+    solver.reset();
+    REQUIRE(readFile(Path).find("(set-logic ALL)") != std::string::npos);
+    std::remove(Path.c_str());
+  }
+  // One-shot: the formula file carries the caller's logic.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f",
+        std::vector<std::string>{}, camada::PgidCallback{},
+        camada::TupleEncoding::Native, "QF_BV");
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(readFile(Formula).find("(set-logic QF_BV)") != std::string::npos);
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+  // One-shot with an override AND a model child that dies right before the
+  // set-logic read: the override branch must drop the child and still write
+  // the caller's logic to the formula file, not abort.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\n");
+    // Ack the five preamble reads before set-logic, then exit.
+    std::string DyingModel = makeScript("echo success\n"
+                                        "echo success\n"
+                                        "echo success\n"
+                                        "echo success\n"
+                                        "echo success\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f",
+        std::vector<std::string>{DyingModel}, camada::PgidCallback{},
+        camada::TupleEncoding::Native, "QF_BV");
+    REQUIRE_FALSE(solver->oneShotModelSolverLive());
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(readFile(Formula).find("(set-logic QF_BV)") != std::string::npos);
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+    std::remove(DyingModel.c_str());
+  }
+}
+
+TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
+  auto ModelArgv = z3ModelArgv();
+  if (ModelArgv.empty())
+    SKIP("no staged z3 binary");
+
+  // An accepted explicit logic solves normally, and the tee file mirrors
+  // it — including after reset(), which re-runs the preamble from the
+  // stored member.
+  {
+    std::string Path = makeTempPath();
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBProcessTag{}, ModelArgv, Path,
+        camada::TupleEncoding::Native, "QF_AUFBV");
+    auto X = solver->mkSymbol("x", solver->mkBVSort(8));
+    solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(7, 8)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    solver->reset();
+    auto Y = solver->mkSymbol("y", solver->mkBVSort(8));
+    solver->addConstraint(solver->mkEqual(Y, solver->mkBVFromDec(9, 8)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    solver.reset();
+    std::string Written = readFile(Path);
+    REQUIRE(Written.find("(set-logic QF_AUFBV)") != std::string::npos);
+    REQUIRE(Written.find("(set-logic ALL)") == std::string::npos);
+    // Both preambles (construction and reset) carried the override.
+    auto First = Written.find("(set-logic QF_AUFBV)");
+    REQUIRE(Written.find("(set-logic QF_AUFBV)", First + 1) !=
+            std::string::npos);
+    std::remove(Path.c_str());
+  }
+  // A rejected explicit logic is a fatal error, not a silent downgrade.
+  requireAborts([&]() {
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBProcessTag{}, ModelArgv, camada::TupleEncoding::Native,
+        "NOT_A_LOGIC");
+    (void)solver->check();
+  });
+}

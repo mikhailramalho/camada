@@ -680,16 +680,18 @@ const std::string &textOf(const SMTSortRef &S) {
 } // namespace
 
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
-                           TupleEncoding TupleMode)
-    : File(std::make_unique<FileEmitter>(OutputPath)), TupleMode(TupleMode) {
+                           TupleEncoding TupleMode, const std::string &Logic)
+    : File(std::make_unique<FileEmitter>(OutputPath)), TupleMode(TupleMode),
+      LogicOverride(Logic) {
   emitPreamble();
   initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
-                           TupleEncoding TupleMode)
-    : Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode) {
+                           TupleEncoding TupleMode, const std::string &Logic)
+    : Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
+      LogicOverride(Logic) {
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -697,9 +699,10 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const std::string &OutputPath,
-                           TupleEncoding TupleMode)
+                           TupleEncoding TupleMode, const std::string &Logic)
     : File(std::make_unique<FileEmitter>(OutputPath)),
-      Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode) {
+      Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
+      LogicOverride(Logic) {
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -707,13 +710,14 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
 SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
                            const std::string &ShellCmd,
                            const std::vector<std::string> &ModelArgv,
-                           PgidCallback OnSpawn, TupleEncoding TupleMode)
+                           PgidCallback OnSpawn, TupleEncoding TupleMode,
+                           const std::string &Logic)
     : OneShotMode(true), OneShotFormulaPath(FormulaPath),
       OneShotShellCmd(ShellCmd), OneShotOnSpawn(std::move(OnSpawn)),
       File(std::make_unique<FileEmitter>(FormulaPath)),
       Proc(ModelArgv.empty() ? nullptr
                              : std::make_unique<ProcessEmitter>(ModelArgv)),
-      TupleMode(TupleMode) {
+      TupleMode(TupleMode), LogicOverride(Logic) {
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -944,7 +948,26 @@ void SMTLIBSolver::emitPreamble() {
   // Children that only accept concrete logic names get one fallback attempt
   // with QF_AUFBV, the broadest quantifier-free fragment such children
   // implement. The tee file records whichever logic the child accepted.
-  if (Proc) {
+  if (Proc && !LogicOverride.empty()) {
+    // Caller-chosen logic: emitted verbatim, no negotiation. The caller is
+    // asserting it knows what the child accepts, so a rejection is a fatal
+    // error rather than a silent downgrade (a one-shot model child that
+    // died gets the usual drop-and-continue treatment instead).
+    Proc->emitRaw("(set-logic " + LogicOverride + ")\n");
+    Proc->flush();
+    const std::string Resp = Proc->readResponse();
+    if (OneShotMode && Resp.empty()) {
+      Proc.reset();
+    } else {
+      fatalErrorIf(Resp != "success",
+                   ("SMTLIBSolver: child solver rejected the caller-chosen "
+                    "(set-logic " +
+                    LogicOverride + "): " + Resp)
+                       .c_str());
+    }
+    if (File)
+      File->emitRaw("(set-logic " + LogicOverride + ")\n");
+  } else if (Proc) {
     std::string Logic = "ALL";
     Proc->emitRaw("(set-logic ALL)\n");
     Proc->flush();
@@ -981,7 +1004,9 @@ void SMTLIBSolver::emitPreamble() {
     if (File)
       File->emitRaw("(set-logic " + Logic + ")\n");
   } else if (File) {
-    File->emitRaw("(set-logic ALL)\n");
+    File->emitRaw("(set-logic " +
+                  (LogicOverride.empty() ? std::string("ALL") : LogicOverride) +
+                  ")\n");
   }
 }
 
