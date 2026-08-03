@@ -501,6 +501,72 @@ TEST_CASE("SMTLIB one-shot sat with model solver", "[SMTLIB][oneshot]") {
   std::remove(Script.c_str());
 }
 
+TEST_CASE("SMTLIB one-shot silent model solver is dropped, not hung",
+          "[SMTLIB][oneshot]") {
+  // A model child that consumes input but never acks (it does not speak
+  // the :print-success protocol) used to deadlock the constructor:
+  // camada blocked reading an ack the child would never send, before the
+  // caller ever got control. It must instead be dropped at the first
+  // bounded read, costing only counterexample support.
+  const unsigned SavedTimeout = camada::SMTLIBSolver::OneShotModelAckTimeoutMs;
+  camada::SMTLIBSolver::OneShotModelAckTimeoutMs = 200;
+
+  // Two shapes of silence: a child that never answers anything, and a
+  // mono-style child that answers only (check-sat) and exits.
+  const std::string SilentBody = "while read line; do :; done\n";
+  const std::string MonoBody = "while read line; do\n"
+                               "  case \"$line\" in\n"
+                               "  '(check-sat)') echo sat; exit 0;;\n"
+                               "  esac\n"
+                               "done\n";
+  for (const std::string &Body : {SilentBody, MonoBody}) {
+    std::string Formula = makeTempPath();
+    std::string Verdict = makeScript("echo sat\n");
+    std::string Child = makeScript(Body);
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Verdict + " %f",
+        std::vector<std::string>{Child});
+    // Dropped during the preamble already.
+    REQUIRE_FALSE(solver->oneShotModelSolverLive());
+
+    auto X = solver->mkSymbol("x", solver->mkBVSort(8));
+    solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE_FALSE(solver->oneShotModelVerdict().has_value());
+
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Verdict.c_str());
+    std::remove(Child.c_str());
+  }
+
+  camada::SMTLIBSolver::OneShotModelAckTimeoutMs = SavedTimeout;
+}
+
+TEST_CASE("SMTLIB one-shot garbled model solver is dropped, not fatal",
+          "[SMTLIB][oneshot]") {
+  // A model child that answers unparseable lines used to hit fatalError
+  // (killing the host process) at the first non-`success` ack. An
+  // auxiliary child's garbage must cost only counterexample support.
+  std::string Formula = makeTempPath();
+  std::string Verdict = makeScript("echo sat\n");
+  std::string Garbled = makeScript("while read line; do echo banana; done\n");
+  auto solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBOneShotTag{}, Formula, Verdict + " %f",
+      std::vector<std::string>{Garbled});
+  REQUIRE_FALSE(solver->oneShotModelSolverLive());
+
+  auto X = solver->mkSymbol("x", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE_FALSE(solver->oneShotModelVerdict().has_value());
+
+  solver.reset();
+  std::remove(Formula.c_str());
+  std::remove(Verdict.c_str());
+  std::remove(Garbled.c_str());
+}
+
 TEST_CASE("SMTLIB one-shot verdict handling", "[SMTLIB][oneshot]") {
   // Last verdict wins, and SAT-competition style is accepted.
   {
