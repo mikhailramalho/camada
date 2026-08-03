@@ -125,6 +125,13 @@ SMTSortRef STPSolver::mkBVFPSortImpl(const unsigned ExpWidth,
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
+SMTSortRef STPSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                    bool IsSigned) {
+  return makeSortRef<STPSort>(
+      STPSort(SMTSortKind::FXP, &Context, STP::vc_bvType(Context, Width),
+              SMTSort::FXPSortData{Width, FracBits, IsSigned}));
+}
+
 SMTSortRef STPSolver::mkBVRMSortImpl() {
   return makeSortRef<STPSort>(STPSort(SMTSortKind::BVRM, &Context,
                                       STP::vc_bvType(Context, 3),

@@ -119,6 +119,8 @@ protected:
   std::array<std::unordered_map<FPSortCacheKey, SMTSortRef, FPSortCacheKeyHash>,
              2>
       FPSortCaches;
+  std::unordered_map<FXPSortCacheKey, SMTSortRef, FXPSortCacheKeyHash>
+      FXPSortCache;
   std::unordered_map<ArraySortCacheKey, SMTSortRef, ArraySortCacheKeyHash>
       ArraySortCache;
   std::unordered_map<SmallFunctionSortCacheKey, SMTSortRef,
@@ -289,6 +291,8 @@ public:
                       FPEncoding Encoding) override final;
   SMTSortRef mkFP32Sort(FPEncoding Encoding) override final;
   SMTSortRef mkFP64Sort(FPEncoding Encoding) override final;
+  SMTSortRef mkFXPSort(unsigned Width, unsigned FracBits,
+                       bool IsSigned) override final;
   SMTSortRef mkArraySort(const SMTSortRef &IndexSort,
                          const SMTSortRef &ElemSort) override final;
   SMTSortRef mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
@@ -449,6 +453,55 @@ public:
   SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) override final;
   SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
                             const SMTExprRef &R) override final;
+  // Fixed-point operations (all implemented once, in camadafxp.cpp, on top
+  // of the public BV surface — no backend hooks).
+  SMTExprRef mkFXPFromBin(const std::string &RawBits,
+                          const SMTSortRef &To) override final;
+  SMTExprRef mkFXPFromRawBV(const SMTExprRef &Exp,
+                            const SMTSortRef &To) override final;
+  SMTExprRef mkFXPToRawBV(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPAdd(const SMTExprRef &LHS,
+                      const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPSub(const SMTExprRef &LHS,
+                      const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPNeg(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPMul(const SMTExprRef &LHS,
+                      const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPDiv(const SMTExprRef &LHS,
+                      const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPShl(const SMTExprRef &Exp, unsigned Amount) override final;
+  SMTExprRef mkFXPShr(const SMTExprRef &Exp, unsigned Amount) override final;
+  SMTExprRef mkFXPLt(const SMTExprRef &LHS,
+                     const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPLe(const SMTExprRef &LHS,
+                     const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPGt(const SMTExprRef &LHS,
+                     const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPGe(const SMTExprRef &LHS,
+                     const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPEqual(const SMTExprRef &LHS,
+                        const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPAddOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPSubOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPMulOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPDivOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPDivByZero(const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPNegOverflow(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPShlOverflow(const SMTExprRef &Exp,
+                              unsigned Amount) override final;
+  SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
+                        const SMTSortRef &To) override final;
+  SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
+                                const SMTSortRef &To) override final;
+  SMTExprRef mkFXPFromBV(const SMTExprRef &Exp,
+                         const SMTSortRef &To) override final;
+  SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) override final;
+  SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp,
+                               unsigned ToWidth) override final;
   SMTExprRef mkArraySelect(const SMTExprRef &Array,
                            const SMTExprRef &Index) override final;
   SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
@@ -476,6 +529,7 @@ public:
   SMTResult<std::string> getFPInBin(const SMTExprRef &Exp) override final;
   SMTResult<float> getFP32(const SMTExprRef &Exp) override final;
   SMTResult<double> getFP64(const SMTExprRef &Exp) override final;
+  SMTResult<FXPValue> getFXP(const SMTExprRef &Exp) override final;
   SMTExprRef getArrayElement(const SMTExprRef &Array,
                              const SMTExprRef &Index) override final;
   SMTResult<ArrayModel> getArrayValues(const SMTExprRef &Array) override final;
@@ -929,6 +983,12 @@ protected:
                                     const unsigned SigWidth) = 0;
 
   virtual SMTSortRef mkBVRMSortImpl() = 0;
+
+  /// Constructs the backend-native BV sort of the given width tagged as a
+  /// fixed-point sort. Purely mechanical per backend, mirroring
+  /// mkBVFPSortImpl; all fixed-point semantics live in camadafxp.cpp.
+  virtual SMTSortRef mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                   bool IsSigned) = 0;
 };
 
 } // namespace camada

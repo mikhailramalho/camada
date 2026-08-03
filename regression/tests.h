@@ -1,6 +1,7 @@
 
 #include "array.test.h"
 #include "fp.test.h"
+#include "fxp.test.h"
 #include "simple.test.h"
 #include "tuple.test.h"
 
@@ -115,4 +116,13 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_non_standard_widths, BVFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, NativeFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
+
+  // Fixed-point: pure common-layer BV encoding, no backend gating needed.
+  RESETANDTEST(fxp_exhaustive_semantics);
+  RESETANDTEST(fxp_boundary_overflow_semantics);
+  RESETANDTEST(fxp_rounding_semantics);
+  RESETANDTEST(fxp_conversion_matrix);
+  RESETANDTEST(fxp_mixed_format_semantics);
+  RESETANDTEST(fxp_shift_semantics);
+  RESETANDTEST(fxp_model_and_constructs);
 }

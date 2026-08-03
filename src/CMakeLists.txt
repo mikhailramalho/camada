@@ -27,6 +27,7 @@ set(${LIBRARY_TARGET_NAME}_SRC
     camada.cpp
     camadaexpr.cpp
     camadafp.cpp
+    camadafxp.cpp
     camadaimpl.cpp
     camadasort.cpp
     camadatuple.cpp

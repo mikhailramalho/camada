@@ -110,5 +110,10 @@ CAMADA_STP_SMTLIB_SHARED_TEST("incremental_push_pop",
 CAMADA_STP_SMTLIB_SHARED_TEST("fp_equal BVFP",
                               fp_equal(solver, camada::FPEncoding::BV))
 
+CAMADA_STP_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
+                              fxp_rounding_semantics(solver))
+CAMADA_STP_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
+                              fxp_model_and_constructs(solver))
+
 #undef CAMADA_STP_SMTLIB_SHARED_TEST
 #endif

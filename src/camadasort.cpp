@@ -64,6 +64,9 @@ void SMTSort::dump(std::string &Out) const {
   case SMTSortKind::BVFP:
     Out = "kind: BV Floating-point\n";
     break;
+  case SMTSortKind::FXP:
+    Out = "kind: Fixed-point\n";
+    break;
   case SMTSortKind::Array:
     Out = "kind: Array\n";
     break;
@@ -88,6 +91,11 @@ void SMTSort::dump(std::string &Out) const {
                  ", solver: " + std::to_string(getWidthFromSolver()) +
                  " (exp: " + std::to_string(DataValue.ExpWidth) +
                  ", sig: " + std::to_string(DataValue.SigWidth) + ")\n";
+        } else if constexpr (std::is_same_v<T, FXPSortData>) {
+          Out += "width: " + std::to_string(DataValue.Width) +
+                 ", solver: " + std::to_string(getWidthFromSolver()) +
+                 " (frac: " + std::to_string(DataValue.FracBits) +
+                 (DataValue.IsSigned ? ", signed" : ", unsigned") + ")\n";
         } else if constexpr (std::is_same_v<T, ArraySortData>) {
           std::string Index;
           std::string Element;
@@ -124,6 +132,8 @@ unsigned SMTSort::getStoredWidth() const {
       "Width is not defined for array, function, tuple, or arithmetic sorts");
   if (isFPSort())
     return std::get<FPSortData>(Data).Width;
+  if (isFXPSort())
+    return std::get<FXPSortData>(Data).Width;
 
   return std::get<ScalarSortData>(Data).Width;
 }
@@ -150,6 +160,18 @@ unsigned SMTSort::getFPSignificandWidth() const {
 unsigned SMTSort::getFPExponentWidth() const {
   fatalErrorIf(!isFPSort(), "Exponent width is only defined for FP sorts");
   return std::get<FPSortData>(Data).ExpWidth;
+}
+
+unsigned SMTSort::getFXPFracBits() const {
+  fatalErrorIf(!isFXPSort(),
+               "Fractional bits are only defined for fixed-point sorts");
+  return std::get<FXPSortData>(Data).FracBits;
+}
+
+bool SMTSort::isFXPSignedSort() const {
+  fatalErrorIf(!isFXPSort(),
+               "Signedness is only defined for fixed-point sorts");
+  return std::get<FXPSortData>(Data).IsSigned;
 }
 
 SMTSortRef SMTSort::getIndexSort() const {
@@ -215,6 +237,11 @@ bool SMTSort::operator==(SMTSort const &Other) const {
           return ThisData.Width == OtherData.Width &&
                  ThisData.ExpWidth == OtherData.ExpWidth &&
                  ThisData.SigWidth == OtherData.SigWidth &&
+                 getWidth() == Other.getWidth();
+        } else if constexpr (std::is_same_v<T, FXPSortData>) {
+          return ThisData.Width == OtherData.Width &&
+                 ThisData.FracBits == OtherData.FracBits &&
+                 ThisData.IsSigned == OtherData.IsSigned &&
                  getWidth() == Other.getWidth();
         } else if constexpr (std::is_same_v<T, ArraySortData>) {
           return ThisData.IndexSort == OtherData.IndexSort &&

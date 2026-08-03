@@ -28,6 +28,9 @@ Current encoded/common-layer features:
 - bit-vector overflow predicates, assumption-based solving with unsat
   assumptions, per-check wall-clock timeouts, sparse array model
   extraction, and a queryable capability API (`supports(SolverFeature)`)
+- fixed-point arithmetic (TR 18037-shaped: values plus undefined-behavior
+  predicates for overflow and division by zero), encoded over bit-vectors
+  in the common layer, so it works on every backend
 
 ## What Camada Is
 
@@ -217,6 +220,10 @@ Camada currently provides public APIs for:
 - integers and reals
 - floating-point
 - rounding modes
+- fixed-point arithmetic (`mkFXP*`: TR 18037-shaped values, comparisons,
+  conversions, and undefined-behavior predicates for overflow and division
+  by zero; mixed formats compute in the common full-precision format;
+  always encoded over bit-vectors, so available on every backend)
 - arrays
 - uninterpreted functions
 - quantifiers on supporting backends
@@ -252,6 +259,7 @@ even if it lacks native floating-point support.
 | Integers / reals |   | ✔️ | ✔️ |   | ✔️ | ✔️ |
 | Native FP | ✔️ | ✔️ | ✔️<sup>1</sup> |   |   | ✔️ |
 | BV FP encoding | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Fixed-point (encoded) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Arrays | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Uninterpreted functions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 | Tuples | ✔️<sup>2</sup> | ✔️ | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️ |
