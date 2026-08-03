@@ -48,6 +48,15 @@ TEST_CASE("Ackermann arrays Z3 test", "[Z3]") {
   ack_array_tests(z3);
 }
 
+// The full shared fixture suite under the Ackermann encoding — the same
+// coverage the native-array mode gets, so every composition (const
+// arrays, tuples, FP, FXP, push/pop, models) is proven against the
+// encoding, not just the targeted ack_* fixtures.
+TEST_CASE("Ackermann full fixture suite Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+  tests(z3);
+}
+
 TEST_CASE("Ackermann arrays reject quantifiers Z3 test", "[Z3]") {
   auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
   require_abort([&]() {

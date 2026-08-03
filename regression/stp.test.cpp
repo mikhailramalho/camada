@@ -116,4 +116,21 @@ CAMADA_STP_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
                               fxp_model_and_constructs(solver))
 
 #undef CAMADA_STP_SMTLIB_SHARED_TEST
+
+// The Ackermann array encoding is aimed exactly at solvers like STP,
+// whose array support is its weakest theory: with it, the wire carries
+// no array sorts or select/store terms at all. checkSatAssuming inside
+// the fixture exercises the push/assert/check/pop fallback (the STP
+// child has no unsat-assumptions support), which replays the journaled
+// congruence axioms. Only the flat driver runs here: stp answers
+// `unsupported` to `:global-declarations true`, so fixtures that mint
+// read variables inside a (push) scope hit the documented
+// scoped-declaration limitation of such children.
+TEST_CASE("SMTLIB pipeline: ack_array_tests_flat [Ackermann] [stp]",
+          "[STP][SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::stpCommand(), "stp");
+  camada::SMTSolverRef solver =
+      camada_smtlib_pipeline::makeSMTLIBSolverAckermannArrays(Cmd);
+  ack_array_tests_flat(solver);
+}
 #endif

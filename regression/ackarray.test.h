@@ -245,28 +245,87 @@ inline void ack_array_model_values(const camada::SMTSolverRef &solver) {
   REQUIRE(baseval.value() == "00000101");
 }
 
-// Everything above, against one solver instance with resets in between —
-// the entry point backends instantiate.
-inline void ack_array_tests(const camada::SMTSolverRef &solver) {
+// FP-sorted elements compose: reads are ordinary FP variables and the
+// per-sort model getters evaluate them (BV-encoded FP works on every
+// backend, so that is what this exercises).
+inline void ack_fp_element_semantics(const camada::SMTSolverRef &solver) {
+  auto idxsort = solver->mkBVSort(8);
+  auto elemsort = solver->mkFP32Sort(camada::FPEncoding::BV);
+  auto a = solver->mkSymbol("a", solver->mkArraySort(idxsort, elemsort));
+  auto i = solver->mkBVFromDec(3, 8);
+  auto v = solver->mkFP32(1.5f, camada::FPEncoding::BV);
+
+  solver->addConstraint(solver->mkEqual(solver->mkArraySelect(a, i), v));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto at3 = solver->getArrayElement(a, solver->mkBVFromDec(3, 8));
+  auto fpval = solver->getFP32(at3);
+  REQUIRE(fpval);
+  REQUIRE(fpval.value() == 1.5f);
+  // Unconstrained index: the synthesized default must evaluate too.
+  auto at9 = solver->getArrayElement(a, solver->mkBVFromDec(9, 8));
+  REQUIRE(solver->getFP32(at9));
+}
+
+// checkSatAssuming over array constraints: congruence axioms are ordinary
+// journaled constraints, so they survive whichever mechanism the backend
+// uses (native assumptions or the push/assert/check/pop fallback).
+inline void ack_check_sat_assuming(const camada::SMTSolverRef &solver) {
+  auto idxsort = solver->mkBVSort(8);
+  auto elemsort = solver->mkBVSort(8);
+  auto a = solver->mkSymbol("a", solver->mkArraySort(idxsort, elemsort));
+  auto i = solver->mkSymbol("i", idxsort);
+  auto j = solver->mkSymbol("j", idxsort);
+
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(a, i), solver->mkBVFromDec(1, 8)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(a, j), solver->mkBVFromDec(2, 8)));
+  REQUIRE(solver->checkSatAssuming({solver->mkEqual(i, j)}) ==
+          camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->checkSatAssuming({solver->mkNot(solver->mkEqual(i, j))}) ==
+          camada::checkResult::SAT);
+}
+
+// The fixtures that never mint a read variable inside a (push) scope.
+// SMT-LIB children that answer `unsupported` to `:global-declarations
+// true` (stp) forget scoped declarations on (pop), so the journaled
+// congruence re-assert would reference an undeclared symbol — a
+// documented backend limitation (see emitPreamble in smtlibsolver.cpp),
+// not an encoding one. ack_distinct_index_reads and
+// ack_check_sat_assuming do push/pop but create all reads at the outer
+// level, which is safe.
+inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
   ack_read_congruence(solver);
   solver->reset();
   ack_distinct_index_reads(solver);
-  solver->reset();
-  ack_store_select_semantics(solver);
   solver->reset();
   ack_equality_before_reads(solver);
   solver->reset();
   ack_disequality_witness(solver);
   solver->reset();
-  ack_ite_array_semantics(solver);
-  solver->reset();
   ack_model_query_stability(solver);
   solver->reset();
   ack_internal_name_no_alias(solver);
   solver->reset();
-  ack_const_array_semantics(solver);
-  solver->reset();
   ack_array_model_values(solver);
+  solver->reset();
+  ack_fp_element_semantics(solver);
+  solver->reset();
+  ack_check_sat_assuming(solver);
+}
+
+// Everything, including fixtures that mint reads inside (push) scopes —
+// the entry point for native backends and children with global
+// declarations.
+inline void ack_array_tests(const camada::SMTSolverRef &solver) {
+  ack_array_tests_flat(solver);
+  solver->reset();
+  ack_store_select_semantics(solver);
+  solver->reset();
+  ack_ite_array_semantics(solver);
+  solver->reset();
+  ack_const_array_semantics(solver);
 }
 
 #endif
