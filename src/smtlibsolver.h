@@ -209,8 +209,15 @@ public:
   /// Pass "-" for stdout. check() returns UNKNOWN; get* queries error.
   /// `TupleMode` selects how tuples are lowered on the wire — see the
   /// docstring on TupleEncoding.
+  /// `Logic` (all four constructors) overrides the emitted
+  /// `(set-logic ...)`. Empty (the default) keeps the built-in behaviour:
+  /// `ALL`, with a one-shot `QF_AUFBV` retry for interactive children that
+  /// reject it. A non-empty value is emitted verbatim and no negotiation is
+  /// attempted — the caller is asserting it knows what the child accepts,
+  /// and a child that rejects it is a fatal error, not a retry.
   explicit SMTLIBSolver(const std::string &OutputPath,
-                        TupleEncoding TupleMode = TupleEncoding::Native);
+                        TupleEncoding TupleMode = TupleEncoding::Native,
+                        const std::string &Logic = "");
 
   /// Interactive constructor: spawn a child solver via
   /// `execvp(Argv[0], Argv)`. The solver must speak standard SMT-LIB on
@@ -219,14 +226,16 @@ public:
   /// verbatim, so spaces, quotes, and other metacharacters in any entry
   /// carry no special meaning.
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
-               TupleEncoding TupleMode = TupleEncoding::Native);
+               TupleEncoding TupleMode = TupleEncoding::Native,
+               const std::string &Logic = "");
 
   /// Combined constructor: spawn a child solver via execvp *and* log the
   /// script to a file. Useful when you want both an interactive answer
   /// and a reproducer to hand to another tool.
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
                const std::string &OutputPath,
-               TupleEncoding TupleMode = TupleEncoding::Native);
+               TupleEncoding TupleMode = TupleEncoding::Native,
+               const std::string &Logic = "");
 
   /// One-shot constructor: serialize the script (including `(check-sat)`)
   /// to FormulaPath, then run ShellCmd on it **via a shell** — every `%f`
@@ -255,7 +264,8 @@ public:
                const std::string &ShellCmd,
                const std::vector<std::string> &ModelArgv = {},
                PgidCallback OnSpawn = {},
-               TupleEncoding TupleMode = TupleEncoding::Native);
+               TupleEncoding TupleMode = TupleEncoding::Native,
+               const std::string &Logic = "");
 
   /// One-shot mode: the model solver's own answer to the shared query,
   /// read only after a sat verdict from the one-shot run. Unset when no
@@ -523,6 +533,12 @@ private:
   // wire; Camada decomposes tuples into per-field BV/Bool symbols before
   // anything reaches the wire. Default is Native.
   TupleEncoding TupleMode = TupleEncoding::Native;
+
+  // Caller-chosen (set-logic ...) override; empty selects the built-in
+  // ALL-with-QF_AUFBV-fallback behaviour. A member (not a constructor
+  // local) because resetImpl() re-runs emitPreamble() and must re-emit
+  // the same logic.
+  std::string LogicOverride;
 
   // Counter for fresh symbols introduced by mkIEEEFPToBVImpl. SMT-LIB has no
   // portable fp→bv same-encoding op, so we materialize a fresh BV symbol

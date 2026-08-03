@@ -211,7 +211,11 @@ answer),
 the scope caveat above), `(set-info :status unknown)`, and
 `(set-logic ALL)` (with one fallback attempt at `QF_AUFBV` for children
 that only accept concrete logic names) at startup, so any solver that
-honors the SMT-LIB option contract should work. Other solvers should be
+honors the SMT-LIB option contract should work. Every `SMTLIBSolver`
+constructor also accepts an optional `Logic` string: when non-empty it is
+emitted verbatim in place of `ALL`, with no negotiation — a child that
+rejects a caller-chosen logic is a fatal error rather than a silent
+downgrade. The choice survives `reset()`. Other solvers should be
 straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
 
 Caveats:
