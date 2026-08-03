@@ -1,4 +1,5 @@
 
+#include "ackarray.test.h"
 #include "array.test.h"
 #include "fp.test.h"
 #include "fxp.test.h"

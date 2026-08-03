@@ -125,6 +125,23 @@ enum class TupleEncoding { Native, Camada };
 /// and always support core extraction.
 enum class UnsatAssumptionsMode { Off, On };
 
+/// Selects how arrays are encoded, on the backends that accept it.
+///
+/// - Native (default): the backend's theory of arrays, unchanged.
+/// - Ackermann: arrays never reach the backend. Every select becomes a
+///   fresh element variable tied to the array's other reads by congruence
+///   axioms (`i = j => a[i] = a[j]`); stores and ites are lowered
+///   structurally, and array equality uses a witness-index encoding. The
+///   trade: array-theory work moves into the core solver as ground
+///   constraints, quadratic in the number of reads per array.
+///
+/// Restrictions in Ackermann mode: quantifier-free formulas only (any
+/// mkForall/mkExists call is rejected), no nested arrays, no array-sorted
+/// UF arguments/returns, and model queries need bool/BV index sorts. The
+/// mode forces the Camada tuple encoding — a native datatype cannot hold
+/// an array member that has no backend representation.
+enum class ArrayEncoding { Native, Ackermann };
+
 enum class RM {
   ROUND_TO_EVEN = 0,
   ROUND_TO_AWAY = 1,
@@ -1066,8 +1083,10 @@ public:
 /// Unique pointer for SMTSolvers.
 using SMTSolverRef = std::unique_ptr<SMTSolver>;
 
-/// Convenience method to create a Z3Solver object
-SMTSolverRef createZ3Solver();
+/// Convenience method to create a Z3Solver object. `ArrayMode` selects the
+/// array encoding (see ArrayEncoding); the default keeps Z3's native theory
+/// of arrays.
+SMTSolverRef createZ3Solver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
 /// Convenience method to create a MathSATSolver object
 SMTSolverRef createMathSATSolver();
@@ -1107,7 +1126,8 @@ SMTSolverRef createSTPSolver();
 /// honors that contract works.
 SMTSolverRef
 createSMTLIBSolver(const std::vector<std::string> &Argv,
-                   TupleEncoding TupleMode = TupleEncoding::Native);
+                   TupleEncoding TupleMode = TupleEncoding::Native,
+                   ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
 /// Same as `createSMTLIBSolver(Argv)` but also tees the emitted SMT-LIB
 /// script to OutputPath (or stdout if OutputPath is "-") for offline
@@ -1115,7 +1135,8 @@ createSMTLIBSolver(const std::vector<std::string> &Argv,
 SMTSolverRef
 createSMTLIBSolver(const std::vector<std::string> &Argv,
                    const std::string &OutputPath,
-                   TupleEncoding TupleMode = TupleEncoding::Native);
+                   TupleEncoding TupleMode = TupleEncoding::Native,
+                   ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
 } // namespace camada
 

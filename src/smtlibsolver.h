@@ -215,9 +215,13 @@ public:
   /// reject it. A non-empty value is emitted verbatim and no negotiation is
   /// attempted — the caller is asserting it knows what the child accepts,
   /// and a child that rejects it is a fatal error, not a retry.
+  /// `Arrays` (all four constructors) selects the array encoding — see the
+  /// docstring on ArrayEncoding. Ackermann mode keeps the theory of arrays
+  /// off the wire entirely and forces the Camada tuple encoding.
   explicit SMTLIBSolver(const std::string &OutputPath,
                         TupleEncoding TupleMode = TupleEncoding::Native,
-                        const std::string &Logic = "");
+                        const std::string &Logic = "",
+                        ArrayEncoding Arrays = ArrayEncoding::Native);
 
   /// Interactive constructor: spawn a child solver via
   /// `execvp(Argv[0], Argv)`. The solver must speak standard SMT-LIB on
@@ -227,7 +231,8 @@ public:
   /// carry no special meaning.
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
                TupleEncoding TupleMode = TupleEncoding::Native,
-               const std::string &Logic = "");
+               const std::string &Logic = "",
+               ArrayEncoding Arrays = ArrayEncoding::Native);
 
   /// Combined constructor: spawn a child solver via execvp *and* log the
   /// script to a file. Useful when you want both an interactive answer
@@ -235,7 +240,8 @@ public:
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
                const std::string &OutputPath,
                TupleEncoding TupleMode = TupleEncoding::Native,
-               const std::string &Logic = "");
+               const std::string &Logic = "",
+               ArrayEncoding Arrays = ArrayEncoding::Native);
 
   /// One-shot constructor: serialize the script (including `(check-sat)`)
   /// to FormulaPath, then run ShellCmd on it **via a shell** — every `%f`
@@ -265,7 +271,8 @@ public:
                const std::vector<std::string> &ModelArgv = {},
                PgidCallback OnSpawn = {},
                TupleEncoding TupleMode = TupleEncoding::Native,
-               const std::string &Logic = "");
+               const std::string &Logic = "",
+               ArrayEncoding Arrays = ArrayEncoding::Native);
 
   /// One-shot mode: the model solver's own answer to the shared query,
   /// read only after a sat verdict from the one-shot run. Unset when no
@@ -309,8 +316,11 @@ protected:
   SMTSortRef
   mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
 
+  // The Ackermann array mode forces the Camada tuple encoding: a native
+  // datatype cannot hold an array member that has no backend term.
   bool nativeTupleSupport() const override {
-    return TupleMode == TupleEncoding::Native;
+    return TupleMode == TupleEncoding::Native &&
+           ArrayMode != ArrayEncoding::Ackermann;
   }
 
   // --- expressions ---

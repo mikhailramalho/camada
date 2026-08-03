@@ -57,10 +57,11 @@ namespace camada {
 
 std::string getCamadaVersion() { return CAMADA_VERSION; }
 
-SMTSolverRef createZ3Solver() {
+SMTSolverRef createZ3Solver(ArrayEncoding ArrayMode) {
 #if SOLVER_Z3_ENABLED
-  return std::make_unique<Z3Solver>();
+  return std::make_unique<Z3Solver>(ArrayMode);
 #else
+  (void)ArrayMode;
   fatalError("Camada was not compiled with Z3 support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_Z3=ON");
 #endif
@@ -114,12 +115,15 @@ SMTSolverRef createSTPSolver() {
 }
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                TupleEncoding TupleMode) {
+                                TupleEncoding TupleMode,
+                                ArrayEncoding ArrayMode) {
 #if SOLVER_SMTLIB_ENABLED
-  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, TupleMode);
+  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, TupleMode, "",
+                                        ArrayMode);
 #else
   (void)Argv;
   (void)TupleMode;
+  (void)ArrayMode;
   fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
              "(unsupported on this platform)");
 #endif
@@ -127,14 +131,16 @@ SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
                                 const std::string &OutputPath,
-                                TupleEncoding TupleMode) {
+                                TupleEncoding TupleMode,
+                                ArrayEncoding ArrayMode) {
 #if SOLVER_SMTLIB_ENABLED
   return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, OutputPath,
-                                        TupleMode);
+                                        TupleMode, "", ArrayMode);
 #else
   (void)Argv;
   (void)OutputPath;
   (void)TupleMode;
+  (void)ArrayMode;
   fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
              "(unsupported on this platform)");
 #endif

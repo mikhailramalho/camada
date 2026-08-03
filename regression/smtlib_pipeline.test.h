@@ -151,6 +151,15 @@ makeSMTLIBSolverCamadaTuples(const std::vector<std::string> &Argv) {
   return camada::createSMTLIBSolver(Argv, camada::TupleEncoding::Camada);
 }
 
+// Same, but arrays use the Ackermann encoding: the wire carries no array
+// sorts or select/store terms at all, only the fresh read variables and
+// their congruence axioms.
+inline camada::SMTSolverRef
+makeSMTLIBSolverAckermannArrays(const std::vector<std::string> &Argv) {
+  return camada::createSMTLIBSolver(Argv, camada::TupleEncoding::Native,
+                                    camada::ArrayEncoding::Ackermann);
+}
+
 // Skip the test if the binary isn't reachable.
 #define CAMADA_SMTLIB_REQUIRE_BINARY(CmdExpr, Name)                            \
   std::vector<std::string> Cmd = (CmdExpr);                                    \
