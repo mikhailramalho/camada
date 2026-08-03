@@ -33,6 +33,8 @@ TEST_CASE("Arith CVC5 test", "[CVC5]") {
   cvc5->reset();
   arith_conversion_semantics(cvc5);
   cvc5->reset();
+  int_bv_conversion_semantics(cvc5);
+  cvc5->reset();
   arith_symbolic_shift_semantics(cvc5);
 }
 
@@ -138,6 +140,10 @@ CAMADA_CVC5_SMTLIB_SHARED_TEST("tuple_with_array_field [Camada]",
 CAMADA_CVC5_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                empty_tuple_semantics(solver),
                                makeSMTLIBSolverCamadaTuples)
+
+CAMADA_CVC5_SMTLIB_SHARED_TEST("int_bv_conversion_semantics",
+                               int_bv_conversion_semantics(solver),
+                               makeSMTLIBSolver)
 
 #undef CAMADA_CVC5_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED

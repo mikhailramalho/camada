@@ -75,6 +75,14 @@ TEST_CASE("Arith Yices test", "[YICES]") {
   }
 
   {
+    // The Int<->BV conversions mix theories, which yices only enables
+    // through a context configured for a combined logic.
+    camada::SMTSolverRef yices =
+        std::make_unique<myYicesArithSolver>("QF_UFBVLIA");
+    int_bv_conversion_semantics(yices);
+  }
+
+  {
     camada::SMTSolverRef yices =
         std::make_unique<myYicesArithSolver>("QF_UFLIRA");
     arith_conversion_semantics(yices);
@@ -210,6 +218,10 @@ CAMADA_YICES_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
 CAMADA_YICES_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                 empty_tuple_semantics(solver),
                                 makeSMTLIBSolverCamadaTuples)
+
+CAMADA_YICES_SMTLIB_SHARED_TEST("int_bv_conversion_semantics",
+                                int_bv_conversion_semantics(solver),
+                                makeSMTLIBSolver)
 
 #undef CAMADA_YICES_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED

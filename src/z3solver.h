@@ -225,6 +225,8 @@ protected:
   SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) override;
+  SMTExprRef mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) override;
 
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 

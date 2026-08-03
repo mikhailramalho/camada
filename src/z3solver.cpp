@@ -261,6 +261,16 @@ SMTExprRef Z3Solver::mkIsIntImpl(const SMTExprRef &Exp) {
                              z3::is_int(toZ3Expr(Exp)));
 }
 
+SMTExprRef Z3Solver::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+  return makeExprRef<Z3Expr>(SMTExprKind::Int2BV, &Context, mkBVSort(Width),
+                             z3::int2bv(Width, toZ3Expr(Exp)));
+}
+
+SMTExprRef Z3Solver::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
+  return makeExprRef<Z3Expr>(SMTExprKind::BV2Int, &Context, mkIntSort(),
+                             z3::bv2int(toZ3Expr(Exp), IsSigned));
+}
+
 SMTExprRef Z3Solver::mkFPAbsImpl(const SMTExprRef &Exp) {
   return makeExprRef<Z3Expr>(SMTExprKind::FPAbs, &Context, Exp->Sort,
                              z3::abs(toZ3Expr(Exp)));

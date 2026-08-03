@@ -217,6 +217,8 @@ void YicesSolver::recreateContext(const char *Logic) {
 
 void YicesSolver::recreateContextWithConfig(const char *Logic,
                                             void (*Configure)(ctx_config_t *)) {
+  ContextLogic = Logic;
+  ContextConfigure = Configure;
   destroyContext();
   yices_clear_error();
 
@@ -1098,7 +1100,10 @@ SMTResult<std::vector<SMTExprRef>> YicesSolver::getUnsatAssumptionsImpl() {
 void YicesSolver::resetImpl() {
   Assertions.clear();
   AssertionScopeSizes.clear();
-  recreateContext("QF_AUFBV");
+  // Recreate with the logic/config this context was created with — a
+  // custom-configured solver (e.g. a mixed Int/BV logic) must not revert
+  // to the default on reset().
+  recreateContextWithConfig(ContextLogic.c_str(), ContextConfigure);
 }
 
 void YicesSolver::pushImpl(unsigned nscopes) {

@@ -258,6 +258,21 @@ SMTExprRef CVC5Solver::mkIsIntImpl(const SMTExprRef &Exp) {
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
+SMTExprRef CVC5Solver::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::Int2BV, &Context, mkBVSort(Width),
+      Terms.mkTerm(Terms.mkOp(cvc5::Kind::INT_TO_BITVECTOR, {Width}),
+                   {toSolverExpr<CVC5Expr>(*Exp).Expr}));
+}
+
+SMTExprRef CVC5Solver::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BV2Int, &Context, mkIntSort(),
+      Terms.mkTerm(IsSigned ? cvc5::Kind::BITVECTOR_SBV_TO_INT
+                            : cvc5::Kind::BITVECTOR_UBV_TO_INT,
+                   {toSolverExpr<CVC5Expr>(*Exp).Expr}));
+}
+
 SMTExprRef CVC5Solver::mkBVAddImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   return makeExprRef<CVC5Expr>(

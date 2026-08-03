@@ -130,6 +130,8 @@ enum class SMTExprKind {
   Exists,
   BVToIEEEFP,
   IEEEFPToBV,
+  Int2BV,
+  BV2Int,
 };
 
 /// Diagnostic strings used by the shared handle base for expression handles.

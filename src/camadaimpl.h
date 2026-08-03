@@ -395,6 +395,8 @@ public:
   SMTExprRef mkInt2Real(const SMTExprRef &Exp) override final;
   SMTExprRef mkReal2Int(const SMTExprRef &Exp) override final;
   SMTExprRef mkIsInt(const SMTExprRef &Exp) override final;
+  SMTExprRef mkInt2BV(unsigned Width, const SMTExprRef &Exp) override final;
+  SMTExprRef mkBV2Int(const SMTExprRef &Exp, bool IsSigned) override final;
   SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                    const SMTExprRef &F) override final;
   SMTExprRef mkBVSignExt(unsigned i, const SMTExprRef &Exp) override final;
@@ -700,6 +702,18 @@ protected:
   virtual SMTExprRef mkReal2IntImpl(const SMTExprRef &);
 
   virtual SMTExprRef mkIsIntImpl(const SMTExprRef &);
+
+  /// Int -> BV conversion. The default lowers through a fresh BV symbol
+  /// constrained via mkBV2IntImpl (no portable SMT-LIB operator exists);
+  /// backends with a native conversion (Z3, cvc5, MathSAT) override.
+  virtual SMTExprRef mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp);
+
+  /// BV -> Int conversion. The default composes the value as a sum of
+  /// bit-tests, which works on any backend with both theories.
+  virtual SMTExprRef mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned);
+
+  /// Fresh-symbol counter for the mkInt2BVImpl fallback.
+  unsigned NextInt2BVId = 0;
 
   virtual SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                const SMTExprRef &F) = 0;

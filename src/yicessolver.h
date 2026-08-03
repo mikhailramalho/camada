@@ -81,6 +81,12 @@ protected:
                                  void (*Configure)(ctx_config_t *));
   void destroyContext();
 
+  /// The logic and extra configuration the current context was created
+  /// with, remembered so reset() recreates an equivalent context instead
+  /// of silently reverting a custom-configured solver to the default.
+  std::string ContextLogic = "QF_AUFBV";
+  void (*ContextConfigure)(ctx_config_t *) = nullptr;
+
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,

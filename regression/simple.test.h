@@ -562,6 +562,86 @@ inline void arith_model_queries(const camada::SMTSolverRef &solver) {
   REQUIRE(r_plus_half_res.value() == "2");
 }
 
+// Int <-> BV conversions (mkInt2BV / mkBV2Int): wrap semantics for
+// negatives and out-of-range values, signed/unsigned interpretation,
+// symbolic round trips, and the composition they exist for — bitwise
+// operations on integers via convert / mkBV* / convert back.
+inline void int_bv_conversion_semantics(const camada::SMTSolverRef &solver) {
+  // int2bv wraps modulo 2^w: 300 -> 44 at 8 bits, -1 -> 0xFF.
+  {
+    auto bv = solver->mkInt2BV(8, solver->mkInt(300));
+    solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(44, 8)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+  solver->reset();
+  {
+    auto bv = solver->mkInt2BV(8, solver->mkInt(-1));
+    solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(255, 8)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // bv2int on 0xFF: 255 unsigned, -1 signed.
+  solver->reset();
+  {
+    auto bv = solver->mkBVFromDec(255, 8);
+    solver->addConstraint(
+        solver->mkEqual(solver->mkBV2Int(bv, false), solver->mkInt(255)));
+    solver->addConstraint(
+        solver->mkEqual(solver->mkBV2Int(bv, true), solver->mkInt(-1)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Signed round trip is the identity on every in-range integer. The
+  // universal (UNSAT) proofs run at 4 bits: the property is width-generic,
+  // and on the fallback encoding (sum of bit-tests + Euclidean mod, used by
+  // Yices and every SMT-LIB child) wider proofs made some children grind
+  // for minutes.
+  solver->reset();
+  {
+    auto x = solver->mkSymbol("i2b_x", solver->mkIntSort());
+    solver->addConstraint(solver->mkArithGe(x, solver->mkInt(-8)));
+    solver->addConstraint(solver->mkArithLe(x, solver->mkInt(7)));
+    auto rt = solver->mkBV2Int(solver->mkInt2BV(4, x), true);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(rt, x)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+
+  // ... and the other way: int2bv(bv2int_u(y)) == y for every bit-vector.
+  solver->reset();
+  {
+    auto y = solver->mkSymbol("i2b_y", solver->mkBVSort(4));
+    auto rt = solver->mkInt2BV(4, solver->mkBV2Int(y, false));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(rt, y)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+
+  // The use case the bridge exists for: bitwise AND on integers
+  // (12 & 10 == 8), computed as bv2int(bvand(int2bv, int2bv)).
+  solver->reset();
+  {
+    auto r = solver->mkBV2Int(
+        solver->mkBVAnd(solver->mkInt2BV(8, solver->mkInt(12)),
+                        solver->mkInt2BV(8, solver->mkInt(10))),
+        true);
+    solver->addConstraint(solver->mkEqual(r, solver->mkInt(8)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Signed composition: ~x == -x-1 must hold for all in-range x when
+  // computed through the BV bridge.
+  solver->reset();
+  {
+    auto x = solver->mkSymbol("i2b_x", solver->mkIntSort());
+    solver->addConstraint(solver->mkArithGe(x, solver->mkInt(-8)));
+    solver->addConstraint(solver->mkArithLe(x, solver->mkInt(7)));
+    auto NotX = solver->mkBV2Int(solver->mkBVNot(solver->mkInt2BV(4, x)), true);
+    auto MinusXMinusOne =
+        solver->mkArithSub(solver->mkArithNeg(x), solver->mkInt(1));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(NotX, MinusXMinusOne)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
 inline void arith_conversion_semantics(const camada::SMTSolverRef &solver) {
   auto int_sort = solver->mkIntSort();
   auto real_sort = solver->mkRealSort();
