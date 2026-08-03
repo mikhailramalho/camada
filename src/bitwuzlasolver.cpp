@@ -121,7 +121,8 @@ void BitwExpr::dump(std::string &Out) const {
   Out = bitwuzla_term_to_string(Expr);
 }
 
-BitwuzlaSolver::BitwuzlaSolver() {
+BitwuzlaSolver::BitwuzlaSolver(UnsatAssumptionsMode Mode)
+    : ProduceUnsatAssumptions(Mode == UnsatAssumptionsMode::On) {
   initializeContext();
   initializeCommonSingletons();
 }
@@ -135,7 +136,11 @@ void BitwuzlaSolver::initializeContext() {
   TermManager = bitwuzla_term_manager_new();
   Options = bitwuzla_options_new();
   bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_MODELS, 1);
-  bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
+  // Tracking which assumptions participate in a refutation slows every
+  // check, so core production is opt-in (UnsatAssumptionsMode::On at
+  // construction) and the default context stays fast.
+  if (ProduceUnsatAssumptions)
+    bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
   Context = bitwuzla_new(TermManager, Options);
   bitwuzla_set_termination_callback(Context, bitwuzlaTerminationCallback,
@@ -1014,10 +1019,11 @@ bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
   case SolverFeature::Quantifiers: // BV/FP quantifiers only
   case SolverFeature::UninterpretedFunctions:
   case SolverFeature::NativeFloatingPoint:
-  case SolverFeature::UnsatAssumptions:
   case SolverFeature::Timeouts:
   case SolverFeature::ArrayModels:
     return true;
+  case SolverFeature::UnsatAssumptions:
+    return ProduceUnsatAssumptions;
   case SolverFeature::IntRealArithmetic:
     return false;
   case SolverFeature::NativeTuples:
@@ -1065,6 +1071,13 @@ checkResult BitwuzlaSolver::checkSatAssumingImpl(
 }
 
 SMTResult<std::vector<SMTExprRef>> BitwuzlaSolver::getUnsatAssumptionsImpl() {
+  // Guard: querying bitwuzla for a core it was not configured to produce
+  // trips its abort handler rather than returning an error.
+  if (!ProduceUnsatAssumptions)
+    return SMTError{SMTErrorCode::UnsupportedOperation,
+                    SMTBackendKind::Bitwuzla,
+                    "Unsat-assumption production is off; create the solver "
+                    "with UnsatAssumptionsMode::On to extract cores"};
   size_t size = 0;
   const BitwuzlaTerm *core = bitwuzla_get_unsat_assumptions(Context, &size);
   std::vector<SMTExprRef> Result;

@@ -163,9 +163,33 @@ TEST_CASE("CVC5 feature capabilities", "[CVC5]") {
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
   REQUIRE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
-  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  // Core extraction is opt-in at construction: producing unsat
+  // assumptions slows every check, so the default context leaves it off.
+  REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
+
+  auto withCores = camada::createCVC5Solver(camada::UnsatAssumptionsMode::On);
+  REQUIRE(withCores->supports(SolverFeature::UnsatAssumptions));
+}
+
+TEST_CASE("Unsat-assumption opt-in CVC5 test", "[CVC5]") {
+  // The default solver runs the shared fixture through its
+  // core-unsupported branch (inside tests()); the opted-in solver must
+  // produce real cores end to end.
+  auto solver = camada::createCVC5Solver(camada::UnsatAssumptionsMode::On);
+  check_sat_assuming_semantics(solver);
+  // The shared fixture tolerates core-less backends, so pin explicitly
+  // that this solver actually produces one — and that the opt-in survives
+  // reset() (cvc5 keeps its options through resetAssertions()).
+  solver->reset();
+  REQUIRE(solver->supports(camada::SolverFeature::UnsatAssumptions));
+  auto a = solver->mkSymbol("a", solver->mkBoolSort());
+  REQUIRE(solver->checkSatAssuming({a, solver->mkNot(a)}) ==
+          camada::checkResult::UNSAT);
+  auto core = solver->getUnsatAssumptions();
+  REQUIRE(core);
+  REQUIRE(!core.value().empty());
 }
 
 // Registered per backend rather than in tests(): the depth-5 shape

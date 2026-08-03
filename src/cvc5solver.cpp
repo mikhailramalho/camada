@@ -104,11 +104,17 @@ void CVC5Expr::dump(std::string &Out) const {
   Out += "\n";
 }
 
-CVC5Solver::CVC5Solver() : Context(Terms) {
+CVC5Solver::CVC5Solver(UnsatAssumptionsMode Mode)
+    : Context(Terms),
+      ProduceUnsatAssumptions(Mode == UnsatAssumptionsMode::On) {
   Context.setOption("arrays-exp", "true");
   Context.setOption("produce-models", "true");
   Context.setOption("produce-assertions", "true");
-  Context.setOption("produce-unsat-assumptions", "true");
+  // Tracking which assumptions participate in a refutation slows every
+  // check, so core production is opt-in (UnsatAssumptionsMode::On at
+  // construction) and the default context stays fast.
+  if (ProduceUnsatAssumptions)
+    Context.setOption("produce-unsat-assumptions", "true");
   initializeCommonSingletons();
 }
 
@@ -1252,10 +1258,11 @@ bool CVC5Solver::supportsImpl(SolverFeature Feature) const {
   case SolverFeature::Quantifiers:
   case SolverFeature::UninterpretedFunctions:
   case SolverFeature::NativeFloatingPoint:
-  case SolverFeature::UnsatAssumptions:
   case SolverFeature::Timeouts:
   case SolverFeature::ArrayModels:
     return true;
+  case SolverFeature::UnsatAssumptions:
+    return ProduceUnsatAssumptions;
   case SolverFeature::NativeTuples:
   case SolverFeature::NativeConstantArrays:
     break; // answered by the common layer's hooks
@@ -1299,6 +1306,12 @@ CVC5Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
 }
 
 SMTResult<std::vector<SMTExprRef>> CVC5Solver::getUnsatAssumptionsImpl() {
+  // Guard: cvc5 throws when queried for a core it was not configured to
+  // produce.
+  if (!ProduceUnsatAssumptions)
+    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::CVC5,
+                    "Unsat-assumption production is off; create the solver "
+                    "with UnsatAssumptionsMode::On to extract cores"};
   std::vector<cvc5::Term> core = Context.getUnsatAssumptions();
   std::vector<SMTExprRef> Result;
   for (const cvc5::Term &Term : core)

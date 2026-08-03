@@ -75,19 +75,21 @@ SMTSolverRef createMathSATSolver() {
 #endif
 }
 
-SMTSolverRef createCVC5Solver() {
+SMTSolverRef createCVC5Solver(UnsatAssumptionsMode Mode) {
 #if SOLVER_CVC5_ENABLED
-  return std::make_unique<CVC5Solver>();
+  return std::make_unique<CVC5Solver>(Mode);
 #else
+  (void)Mode;
   fatalError("Camada was not compiled with CVC5 support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_CVC5=ON");
 #endif
 }
 
-SMTSolverRef createBitwuzlaSolver() {
+SMTSolverRef createBitwuzlaSolver(UnsatAssumptionsMode Mode) {
 #if SOLVER_BITWUZLA_ENABLED
-  return std::make_unique<BitwuzlaSolver>();
+  return std::make_unique<BitwuzlaSolver>(Mode);
 #else
+  (void)Mode;
   fatalError("Camada was not compiled with Bitwuzla support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_BITWUZLA=ON");
 #endif

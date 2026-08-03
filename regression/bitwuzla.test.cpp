@@ -179,9 +179,34 @@ TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
-  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  // Core extraction is opt-in at construction: producing unsat
+  // assumptions slows every check, so the default context leaves it off.
+  REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
+
+  auto withCores =
+      camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::On);
+  REQUIRE(withCores->supports(SolverFeature::UnsatAssumptions));
+}
+
+TEST_CASE("Unsat-assumption opt-in Bitwuzla test", "[Bitwuzla]") {
+  // The default solver runs the shared fixture through its
+  // core-unsupported branch (inside tests()); the opted-in solver must
+  // produce real cores end to end.
+  auto solver = camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::On);
+  check_sat_assuming_semantics(solver);
+  // The shared fixture tolerates core-less backends, so pin explicitly
+  // that this solver actually produces one — and that the opt-in survives
+  // reset() (bitwuzla recreates its context there).
+  solver->reset();
+  REQUIRE(solver->supports(camada::SolverFeature::UnsatAssumptions));
+  auto a = solver->mkSymbol("a", solver->mkBoolSort());
+  REQUIRE(solver->checkSatAssuming({a, solver->mkNot(a)}) ==
+          camada::checkResult::UNSAT);
+  auto core = solver->getUnsatAssumptions();
+  REQUIRE(core);
+  REQUIRE(!core.value().empty());
 }
 
 // Registered per backend rather than in tests(): the depth-5 shape

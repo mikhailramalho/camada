@@ -108,6 +108,23 @@ enum class FPNegBehavior {
 ///   yices) already use.
 enum class TupleEncoding { Native, Camada };
 
+/// Selects whether a solver context is created with unsat-assumption
+/// production enabled. Producing the core is not free: backends whose SAT
+/// engine must track assumption participation (bitwuzla, cvc5) pay a
+/// solve-time cost on *every* check, and the setting is frozen at context
+/// creation — so it is opt-in.
+///
+/// - Off (default): fast contexts. checkSatAssuming() works unchanged;
+///   getUnsatAssumptions() reports UnsupportedOperation and
+///   supports(SolverFeature::UnsatAssumptions) answers false.
+/// - On: the backend tracks assumptions and getUnsatAssumptions() returns
+///   real cores after an UNSAT checkSatAssuming().
+///
+/// Backends that answer cores without a creation-time option (Z3 enables
+/// unsat_core per query, MathSAT and Yices track natively) ignore this
+/// and always support core extraction.
+enum class UnsatAssumptionsMode { Off, On };
+
 enum class RM {
   ROUND_TO_EVEN = 0,
   ROUND_TO_AWAY = 1,
@@ -1055,11 +1072,15 @@ SMTSolverRef createZ3Solver();
 /// Convenience method to create a MathSATSolver object
 SMTSolverRef createMathSATSolver();
 
-/// Convenience method to create a CVC5Solver object
-SMTSolverRef createCVC5Solver();
+/// Convenience method to create a CVC5Solver object. Core extraction via
+/// getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode).
+SMTSolverRef
+createCVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off);
 
-/// Convenience method to create a BitwuzlaSolver object
-SMTSolverRef createBitwuzlaSolver();
+/// Convenience method to create a BitwuzlaSolver object. Core extraction
+/// via getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode).
+SMTSolverRef
+createBitwuzlaSolver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off);
 
 /// Convenience method to create a YicesSolver object
 SMTSolverRef createYicesSolver();
