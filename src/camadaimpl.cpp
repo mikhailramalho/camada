@@ -203,6 +203,7 @@ void SMTSolverImpl::clearSortCaches() {
   BVSortCache.clear();
   for (auto &Cache : FPSortCaches)
     Cache.clear();
+  FXPSortCache.clear();
   ArraySortCache.clear();
   SmallFunctionSortCache.clear();
   FunctionSortCache.clear();

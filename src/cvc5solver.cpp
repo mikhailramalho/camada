@@ -173,6 +173,13 @@ SMTSortRef CVC5Solver::mkBVFPSortImpl(const unsigned ExpWidth,
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
+SMTSortRef CVC5Solver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                     bool IsSigned) {
+  return makeSortRef<CVC5Sort>(
+      CVC5Sort(SMTSortKind::FXP, &Context, Terms.mkBitVectorSort(Width),
+               SMTSort::FXPSortData{Width, FracBits, IsSigned}));
+}
+
 SMTSortRef CVC5Solver::mkBVRMSortImpl() {
   return makeSortRef<CVC5Sort>(CVC5Sort(SMTSortKind::BVRM, &Context,
                                         Terms.mkBitVectorSort(3),

@@ -646,6 +646,139 @@ public:
   virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
                                     const SMTExprRef &R) = 0;
 
+  // --- Fixed-point arithmetic (TR 18037-shaped, Camada-encoded over BV) ---
+  //
+  // No solver has a native fixed-point theory, so every operation below is
+  // encoded over bit-vectors in the common layer and works on all backends.
+  // A fixed-point value of width W with N fractional bits represents
+  // raw / 2^N, two's complement when signed.
+  //
+  // Operands of the binary operations may have different fixed-point
+  // formats: following TR 18037's usual arithmetic conversions, the
+  // operation is computed in the common full-precision format (max integer
+  // bits, max fractional bits, signed if either operand is signed) and the
+  // arithmetic result carries that format. Comparisons scale-align the same
+  // way and return Bool.
+  //
+  // Non-saturating overflow is undefined behavior in C; the mkFXP*Overflow
+  // and mkFXPDivByZero predicates report exactly the UB conditions, and the
+  // value produced by an operation is meaningful only under the negation of
+  // its predicate.
+
+  /// Creates a fixed-point sort. Width must be non-zero; FracBits <= Width
+  /// for unsigned formats and FracBits < Width for signed formats (the sign
+  /// bit is not a fraction bit).
+  virtual SMTSortRef mkFXPSort(unsigned Width, unsigned FracBits,
+                               bool IsSigned) = 0;
+
+  /// Creates a fixed-point constant from a two's-complement binary string
+  /// (exact at any width; the string length must equal the sort width).
+  virtual SMTExprRef mkFXPFromBin(const std::string &RawBits,
+                                  const SMTSortRef &To) = 0;
+
+  /// Reinterprets a bit-vector of matching width as a fixed-point value.
+  virtual SMTExprRef mkFXPFromRawBV(const SMTExprRef &Exp,
+                                    const SMTSortRef &To) = 0;
+
+  /// Reinterprets a fixed-point value as its underlying raw bit-vector.
+  virtual SMTExprRef mkFXPToRawBV(const SMTExprRef &Exp) = 0;
+
+  /// Creates a fixed-point addition.
+  virtual SMTExprRef mkFXPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point subtraction.
+  virtual SMTExprRef mkFXPSub(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point negation.
+  virtual SMTExprRef mkFXPNeg(const SMTExprRef &Exp) = 0;
+
+  /// Creates a fixed-point multiplication (truncating: the exact product's
+  /// low fractional bits are dropped).
+  virtual SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point division (truncating).
+  virtual SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point left shift by a concrete amount.
+  virtual SMTExprRef mkFXPShl(const SMTExprRef &Exp, unsigned Amount) = 0;
+
+  /// Creates a fixed-point right shift by a concrete amount (arithmetic for
+  /// signed formats, logical for unsigned).
+  virtual SMTExprRef mkFXPShr(const SMTExprRef &Exp, unsigned Amount) = 0;
+
+  /// Creates a fixed-point less-than comparison (scale-aligned).
+  virtual SMTExprRef mkFXPLt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point less-than-or-equal comparison (scale-aligned).
+  virtual SMTExprRef mkFXPLe(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point greater-than comparison (scale-aligned).
+  virtual SMTExprRef mkFXPGt(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point greater-than-or-equal comparison (scale-aligned).
+  virtual SMTExprRef mkFXPGe(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+
+  /// Creates a fixed-point equality (scale-aligned; use this instead of
+  /// mkEqual whenever the operand formats may differ).
+  virtual SMTExprRef mkFXPEqual(const SMTExprRef &LHS,
+                                const SMTExprRef &RHS) = 0;
+
+  /// True iff the exact sum overflows the common format of the operands.
+  virtual SMTExprRef mkFXPAddOverflow(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) = 0;
+
+  /// True iff the exact difference overflows the common format.
+  virtual SMTExprRef mkFXPSubOverflow(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) = 0;
+
+  /// True iff the exact product overflows the common format. Tested on the
+  /// pre-rounding product, so exact results just outside the representable
+  /// range are reported even when truncation would land on a boundary.
+  virtual SMTExprRef mkFXPMulOverflow(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) = 0;
+
+  /// True iff the exact quotient overflows the common format (pre-rounding,
+  /// as with mkFXPMulOverflow). Division by zero is reported separately by
+  /// mkFXPDivByZero, not here.
+  virtual SMTExprRef mkFXPDivOverflow(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) = 0;
+
+  /// True iff the divisor is zero (undefined behavior in C).
+  virtual SMTExprRef mkFXPDivByZero(const SMTExprRef &RHS) = 0;
+
+  /// True iff negation overflows: the minimum value for signed formats, any
+  /// non-zero value for unsigned formats.
+  virtual SMTExprRef mkFXPNegOverflow(const SMTExprRef &Exp) = 0;
+
+  /// True iff the left shift discards significant bits (or changes the sign
+  /// for signed formats).
+  virtual SMTExprRef mkFXPShlOverflow(const SMTExprRef &Exp,
+                                      unsigned Amount) = 0;
+
+  /// Converts between fixed-point formats (truncating on narrowing).
+  virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
+                                const SMTSortRef &To) = 0;
+
+  /// True iff the value does not fit the target format of a mkFXPToFXP
+  /// conversion.
+  virtual SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
+                                        const SMTSortRef &To) = 0;
+
+  /// Converts an integer bit-vector (signed per the target format) into a
+  /// fixed-point value.
+  virtual SMTExprRef mkFXPFromBV(const SMTExprRef &Exp,
+                                 const SMTSortRef &To) = 0;
+
+  /// Converts a fixed-point value to an integer bit-vector of the given
+  /// width, rounding toward zero (the direction TR 18037 specifies for
+  /// fixed-point to integer conversion).
+  virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) = 0;
+
+  /// True iff the integer part does not fit the target width of a
+  /// mkFXPToBV conversion.
+  virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp,
+                                       unsigned ToWidth) = 0;
+
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.
   virtual SMTExprRef mkArraySelect(const SMTExprRef &Array,
@@ -726,6 +859,19 @@ public:
   /// format: 1 bit for the sign + 11 bits for the exponent + 52 bits for the
   /// significand and 1 hidden bit in the significand
   virtual SMTResult<double> getFP64(const SMTExprRef &Exp) = 0;
+
+  /// Exact fixed-point model value: the raw two's-complement bits plus the
+  /// format needed to interpret them (value = raw / 2^FracBits). Kept as a
+  /// binary string so any width round-trips exactly.
+  struct FXPValue {
+    std::string RawBits;
+    unsigned FracBits = 0;
+    bool IsSigned = false;
+  };
+
+  /// If a model is available, returns the exact value of a given fixed-point
+  /// expression.
+  virtual SMTResult<FXPValue> getFXP(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the Expr in position Index of Array
   virtual SMTExprRef getArrayElement(const SMTExprRef &Array,

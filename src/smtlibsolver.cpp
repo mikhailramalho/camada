@@ -853,6 +853,13 @@ SMTSortRef SMTLIBSolver::mkBVFPSortImpl(unsigned ExpWidth, unsigned SigWidth) {
                  SMTSort::FPSortData{Width, ExpWidth, SigWidth + 1}));
 }
 
+SMTSortRef SMTLIBSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                       bool IsSigned) {
+  return makeSortRef<SMTLIBSort>(
+      SMTLIBSort(SMTSortKind::FXP, this, "(_ BitVec " + utoa(Width) + ")",
+                 SMTSort::FXPSortData{Width, FracBits, IsSigned}));
+}
+
 SMTSortRef SMTLIBSolver::mkBVRMSortImpl() {
   return makeSortRef<SMTLIBSort>(SMTLIBSort(
       SMTSortKind::BVRM, this, "(_ BitVec 3)", SMTSort::ScalarSortData{3}));

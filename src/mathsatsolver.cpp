@@ -259,6 +259,13 @@ SMTSortRef MathSATSolver::mkBVFPSortImpl(const unsigned ExpWidth,
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
+SMTSortRef MathSATSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                        bool IsSigned) {
+  return makeSortRef<MathSATSort>(
+      MathSATSort(SMTSortKind::FXP, &Context, msat_get_bv_type(Context, Width),
+                  SMTSort::FXPSortData{Width, FracBits, IsSigned}));
+}
+
 SMTSortRef MathSATSolver::mkBVRMSortImpl() {
   return makeSortRef<MathSATSort>(MathSATSort(SMTSortKind::BVRM, &Context,
                                               msat_get_bv_type(Context, 3),

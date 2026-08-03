@@ -175,6 +175,10 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
 CAMADA_Z3_SMTLIB_SHARED_TEST("int_bv_conversion_semantics",
                              int_bv_conversion_semantics(solver),
                              makeSMTLIBSolver)
+CAMADA_Z3_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
+                             fxp_rounding_semantics(solver), makeSMTLIBSolver)
+CAMADA_Z3_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
+                             fxp_model_and_constructs(solver), makeSMTLIBSolver)
 
 #undef CAMADA_Z3_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED

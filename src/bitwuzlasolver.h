@@ -94,6 +94,8 @@ protected:
                           const unsigned SigWidth) override;
   SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
                             const unsigned SigWidth) override;
+  SMTSortRef mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                           bool IsSigned) override;
   SMTSortRef mkBVRMSortImpl() override;
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;

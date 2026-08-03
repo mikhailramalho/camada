@@ -286,6 +286,13 @@ SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
       SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
 }
 
+SMTSortRef YicesSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
+                                      bool IsSigned) {
+  return makeSortRef<YicesSort>(
+      YicesSort(SMTSortKind::FXP, Context, yices_bv_type(Width),
+                SMTSort::FXPSortData{Width, FracBits, IsSigned}));
+}
+
 SMTSortRef YicesSolver::mkBVRMSortImpl() {
   return makeSortRef<YicesSort>(YicesSort(SMTSortKind::BVRM, Context,
                                           yices_bv_type(3),

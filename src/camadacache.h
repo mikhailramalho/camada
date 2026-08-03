@@ -48,6 +48,25 @@ struct FPSortCacheKeyHash {
   }
 };
 
+struct FXPSortCacheKey {
+  unsigned Width;
+  unsigned FracBits;
+  bool IsSigned;
+
+  bool operator==(const FXPSortCacheKey &Other) const {
+    return Width == Other.Width && FracBits == Other.FracBits &&
+           IsSigned == Other.IsSigned;
+  }
+};
+
+struct FXPSortCacheKeyHash {
+  std::size_t operator()(const FXPSortCacheKey &Key) const {
+    return (static_cast<std::size_t>(Key.Width) << 33) ^
+           (static_cast<std::size_t>(Key.FracBits) << 1) ^
+           static_cast<std::size_t>(Key.IsSigned);
+  }
+};
+
 struct ArraySortCacheKey {
   const SMTSort *IndexSort;
   const SMTSort *ElementSort;
