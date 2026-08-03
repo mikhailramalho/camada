@@ -7,6 +7,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <stpsolver.h>
 
+TEST_CASE("Ackermann arrays STP test", "[STP]") {
+  auto stp = camada::createSTPSolver(camada::ArrayEncoding::Ackermann);
+  ack_array_tests(stp);
+}
+
 TEST_CASE("Simple STP test", "[STP]") {
   // Create STP Solver
   auto stp = camada::createSTPSolver();

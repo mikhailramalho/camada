@@ -2070,8 +2070,12 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   if (Lowering == ConstArrayLowering::Auto)
     Lowering = nativeConstArraySupport() ? ConstArrayLowering::Native
                                          : ConstArrayLowering::Lazy;
+  // In Ackermann mode the lowering choice is moot (see below), so an
+  // explicit Native request is not an error on backends without native
+  // constant arrays.
   fatalErrorIf(Lowering == ConstArrayLowering::Native &&
-                   !nativeConstArraySupport(),
+                   !nativeConstArraySupport() &&
+                   ArrayMode != ArrayEncoding::Ackermann,
                "Native constant arrays are not supported by this backend");
   // Tuple-involving initializers decompose into one constant array per
   // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved

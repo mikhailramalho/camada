@@ -78,12 +78,15 @@ void STPExpr::dump(std::string &Out) const {
   free(s);
 }
 
-STPSolver::STPSolver() : Context(STP::vc_createValidityChecker()) {
+STPSolver::STPSolver(ArrayEncoding Arrays)
+    : Context(STP::vc_createValidityChecker()) {
+  ArrayMode = Arrays;
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }
 
-STPSolver::STPSolver(STP::VC C) : Context(C) {
+STPSolver::STPSolver(STP::VC C, ArrayEncoding Arrays) : Context(C) {
+  ArrayMode = Arrays;
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }

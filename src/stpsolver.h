@@ -74,8 +74,8 @@ public:
 
 class STPSolver : public SMTSolverImpl {
 public:
-  STPSolver();
-  explicit STPSolver(STP::VC C);
+  explicit STPSolver(ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit STPSolver(STP::VC C, ArrayEncoding Arrays = ArrayEncoding::Native);
   ~STPSolver() override;
 
 protected:

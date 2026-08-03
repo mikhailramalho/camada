@@ -69,7 +69,7 @@ public:
 
 class YicesSolver : public SMTSolverImpl {
 public:
-  YicesSolver();
+  explicit YicesSolver(ArrayEncoding Arrays = ArrayEncoding::Native);
   ~YicesSolver() override;
 
 protected:

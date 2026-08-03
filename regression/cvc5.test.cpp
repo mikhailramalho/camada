@@ -7,6 +7,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cvc5solver.h>
 
+TEST_CASE("Ackermann arrays CVC5 test", "[CVC5]") {
+  auto cvc5 = camada::createCVC5Solver(camada::UnsatAssumptionsMode::Off,
+                                       camada::ArrayEncoding::Ackermann);
+  ack_array_tests(cvc5);
+}
+
 TEST_CASE("Simple CVC5 test", "[CVC5]") {
   // Create CVC5 Solver
   auto cvc5 = camada::createCVC5Solver();

@@ -36,10 +36,14 @@ std::size_t readCurrentRSSKiB() {
   return (resident_pages * static_cast<std::size_t>(page_size)) / 1024;
 }
 
+// Array encoding applied to the chosen backend (--ack flag).
+camada::ArrayEncoding arrayMode = camada::ArrayEncoding::Native;
+
 camada::SMTSolverRef createSolver(const std::string &backend) {
   if (backend == "bitwuzla") {
 #if SOLVER_BITWUZLA_ENABLED
-    return camada::createBitwuzlaSolver();
+    return camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::Off,
+                                        arrayMode);
 #else
     throw std::runtime_error("Bitwuzla backend is not enabled");
 #endif
@@ -47,7 +51,8 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "cvc5") {
 #if SOLVER_CVC5_ENABLED
-    return camada::createCVC5Solver();
+    return camada::createCVC5Solver(camada::UnsatAssumptionsMode::Off,
+                                    arrayMode);
 #else
     throw std::runtime_error("CVC5 backend is not enabled");
 #endif
@@ -55,7 +60,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "mathsat") {
 #if SOLVER_MATHSAT_ENABLED
-    return camada::createMathSATSolver();
+    return camada::createMathSATSolver(arrayMode);
 #else
     throw std::runtime_error("MathSAT backend is not enabled");
 #endif
@@ -63,7 +68,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "stp") {
 #if SOLVER_STP_ENABLED
-    return camada::createSTPSolver();
+    return camada::createSTPSolver(arrayMode);
 #else
     throw std::runtime_error("STP backend is not enabled");
 #endif
@@ -71,7 +76,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "yices") {
 #if SOLVER_YICES_ENABLED
-    return camada::createYicesSolver();
+    return camada::createYicesSolver(arrayMode);
 #else
     throw std::runtime_error("Yices backend is not enabled");
 #endif
@@ -79,15 +84,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "z3") {
 #if SOLVER_Z3_ENABLED
-    return camada::createZ3Solver();
-#else
-    throw std::runtime_error("Z3 backend is not enabled");
-#endif
-  }
-
-  if (backend == "z3-ack") {
-#if SOLVER_Z3_ENABLED
-    return camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+    return camada::createZ3Solver(arrayMode);
 #else
     throw std::runtime_error("Z3 backend is not enabled");
 #endif
@@ -98,7 +95,8 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
     // Write-only mode to /dev/null: measures the text-emission layer without
     // a child solver. The bench cases are construction-only, so the UNKNOWN
     // check() result in this mode is irrelevant.
-    return std::make_unique<camada::SMTLIBSolver>("/dev/null");
+    return std::make_unique<camada::SMTLIBSolver>(
+        "/dev/null", camada::TupleEncoding::Native, "", arrayMode);
 #else
     throw std::runtime_error("SMTLIB backend is not enabled");
 #endif
@@ -510,8 +508,10 @@ void benchmarkResetCycleExprChain(camada::SMTSolver &solver,
 
 void printUsage(const char *argv0) {
   std::fprintf(stderr,
-               "Usage: %s [backend] [iterations] [case-substring]\n"
-               "Backends: bitwuzla cvc5 mathsat stp yices z3 z3-ack smtlib\n",
+               "Usage: %s [--ack] [backend] [iterations] [case-substring]\n"
+               "Backends: bitwuzla cvc5 mathsat stp yices z3 smtlib\n"
+               "  --ack  use the Ackermann array encoding "
+               "(ArrayEncoding::Ackermann)\n",
                argv0);
 }
 
@@ -519,16 +519,25 @@ void printUsage(const char *argv0) {
 
 int main(int argc, char **argv) {
   try {
-    std::string backend = argc > 1 ? argv[1] : defaultBackend();
+    std::vector<std::string> args;
+    for (int i = 1; i < argc; ++i) {
+      if (std::string(argv[i]) == "--ack")
+        arrayMode = camada::ArrayEncoding::Ackermann;
+      else
+        args.emplace_back(argv[i]);
+    }
+
+    std::string backend = !args.empty() ? args[0] : defaultBackend();
     std::size_t iterations =
-        argc > 2 ? static_cast<std::size_t>(std::strtoull(argv[2], nullptr, 10))
-                 : 1000;
+        args.size() > 1 ? static_cast<std::size_t>(
+                              std::strtoull(args[1].c_str(), nullptr, 10))
+                        : 1000;
 
     if (iterations == 0)
       throw std::runtime_error("iterations must be greater than zero");
 
-    if (argc > 3)
-      caseFilter = argv[3];
+    if (args.size() > 2)
+      caseFilter = args[2];
 
     runCase(backend, "bv_sort_same", iterations, benchmarkBVSort);
     runCase(backend, "bv_const_same", iterations, benchmarkBVConstSame);

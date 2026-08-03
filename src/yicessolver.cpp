@@ -186,7 +186,8 @@ void YicesExpr::dump(std::string &Out) const {
   yices_free_string(term_str);
 }
 
-YicesSolver::YicesSolver() {
+YicesSolver::YicesSolver(ArrayEncoding Arrays) {
+  ArrayMode = Arrays;
   acquireYicesLibrary();
   recreateContext("QF_AUFBV");
   initializeCommonSingletons();

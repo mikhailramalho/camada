@@ -104,9 +104,12 @@ void CVC5Expr::dump(std::string &Out) const {
   Out += "\n";
 }
 
-CVC5Solver::CVC5Solver(UnsatAssumptionsMode Mode)
+CVC5Solver::CVC5Solver(UnsatAssumptionsMode Mode, ArrayEncoding Arrays)
     : ProduceUnsatAssumptions(Mode == UnsatAssumptionsMode::On),
       Context(Terms) {
+  // Before the singletons: constant tracking (AckBVConstBits) must cover
+  // the cached small bit-vectors.
+  ArrayMode = Arrays;
   Context.setOption("arrays-exp", "true");
   Context.setOption("produce-models", "true");
   Context.setOption("produce-assertions", "true");

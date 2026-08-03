@@ -1088,24 +1088,33 @@ using SMTSolverRef = std::unique_ptr<SMTSolver>;
 /// of arrays.
 SMTSolverRef createZ3Solver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
-/// Convenience method to create a MathSATSolver object
-SMTSolverRef createMathSATSolver();
+/// Convenience method to create a MathSATSolver object. `ArrayMode`
+/// selects the array encoding (see ArrayEncoding).
+SMTSolverRef
+createMathSATSolver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
 /// Convenience method to create a CVC5Solver object. Core extraction via
-/// getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode).
+/// getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode); `ArrayMode`
+/// selects the array encoding (see ArrayEncoding).
 SMTSolverRef
-createCVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off);
+createCVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
+                 ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
 /// Convenience method to create a BitwuzlaSolver object. Core extraction
-/// via getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode).
+/// via getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode);
+/// `ArrayMode` selects the array encoding (see ArrayEncoding).
 SMTSolverRef
-createBitwuzlaSolver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off);
+createBitwuzlaSolver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
+                     ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
-/// Convenience method to create a YicesSolver object
-SMTSolverRef createYicesSolver();
+/// Convenience method to create a YicesSolver object. `ArrayMode` selects
+/// the array encoding (see ArrayEncoding).
+SMTSolverRef createYicesSolver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
-/// Convenience method to create a STPSolver object
-SMTSolverRef createSTPSolver();
+/// Convenience method to create a STPSolver object. `ArrayMode` selects
+/// the array encoding (see ArrayEncoding); Ackermann mode keeps arrays out
+/// of STP entirely, replacing its non-extensional array theory.
+SMTSolverRef createSTPSolver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
 
 /// Create an SMT-LIB-backed solver that drives an external solver process.
 ///

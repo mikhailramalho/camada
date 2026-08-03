@@ -121,8 +121,9 @@ void BitwExpr::dump(std::string &Out) const {
   Out = bitwuzla_term_to_string(Expr);
 }
 
-BitwuzlaSolver::BitwuzlaSolver(UnsatAssumptionsMode Mode)
+BitwuzlaSolver::BitwuzlaSolver(UnsatAssumptionsMode Mode, ArrayEncoding Arrays)
     : ProduceUnsatAssumptions(Mode == UnsatAssumptionsMode::On) {
+  ArrayMode = Arrays;
   initializeContext();
   initializeCommonSingletons();
 }

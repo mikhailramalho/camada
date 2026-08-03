@@ -31,8 +31,8 @@ Current encoded/common-layer features:
 - fixed-point arithmetic (TR 18037-shaped: values plus undefined-behavior
   predicates for overflow and division by zero), encoded over bit-vectors
   in the common layer, so it works on every backend
-- an opt-in Ackermann array encoding (`ArrayEncoding::Ackermann` on
-  `createZ3Solver` and `createSMTLIBSolver`): arrays never reach the
+- an opt-in Ackermann array encoding (`ArrayEncoding::Ackermann`, accepted
+  by every `create*Solver()` factory): arrays never reach the
   backend — every select becomes a fresh element variable tied by
   congruence axioms, stores/ites are lowered structurally, and equality
   uses a witness-index encoding. Quantifier-free formulas only; the mode
