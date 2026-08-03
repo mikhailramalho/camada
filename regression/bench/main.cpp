@@ -85,6 +85,14 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 #endif
   }
 
+  if (backend == "z3-ack") {
+#if SOLVER_Z3_ENABLED
+    return camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+#else
+    throw std::runtime_error("Z3 backend is not enabled");
+#endif
+  }
+
   if (backend == "smtlib") {
 #if SOLVER_SMTLIB_ENABLED
     // Write-only mode to /dev/null: measures the text-emission layer without
@@ -238,6 +246,37 @@ void benchmarkArrayStoreChain(camada::SMTSolver &solver,
   auto last_idx = solver.mkBVFromDec(
       static_cast<int64_t>((iterations - 1) & 0xff), idx_sort);
   volatile std::size_t sink = solver.mkArraySelect(array, last_idx)->getWidth();
+  (void)sink;
+}
+
+// Unlike the construction-only cases, this one calls check(): the array
+// encoding trade (native theory vs Ackermann ground constraints) only
+// shows up in solve time. Each cycle builds a small store chain, a few
+// symbolic reads with equalities, solves, and resets.
+void benchmarkArraySolve(camada::SMTSolver &solver, std::size_t iterations) {
+  volatile std::size_t sink = 0;
+
+  for (std::size_t cycle = 0; cycle < iterations; ++cycle) {
+    auto idx_sort = solver.mkBVSort(8);
+    auto elem_sort = solver.mkBVSort(32);
+    auto array =
+        solver.mkSymbol("solve_a", solver.mkArraySort(idx_sort, elem_sort));
+    for (std::size_t i = 0; i < 16; ++i)
+      array = solver.mkArrayStore(
+          array, solver.mkBVFromDec(static_cast<int64_t>(i), idx_sort),
+          solver.mkBVFromDec(static_cast<int64_t>(i * 3), elem_sort));
+
+    for (std::size_t r = 0; r < 4; ++r) {
+      auto k = solver.mkSymbol("solve_k" + std::to_string(r), idx_sort);
+      solver.addConstraint(solver.mkBVUlt(
+          solver.mkArraySelect(array, k),
+          solver.mkBVFromDec(static_cast<int64_t>(40 + r), elem_sort)));
+    }
+
+    sink += solver.check() == camada::checkResult::SAT;
+    solver.reset();
+  }
+
   (void)sink;
 }
 
@@ -472,7 +511,7 @@ void benchmarkResetCycleExprChain(camada::SMTSolver &solver,
 void printUsage(const char *argv0) {
   std::fprintf(stderr,
                "Usage: %s [backend] [iterations] [case-substring]\n"
-               "Backends: bitwuzla cvc5 mathsat stp yices z3 smtlib\n",
+               "Backends: bitwuzla cvc5 mathsat stp yices z3 z3-ack smtlib\n",
                argv0);
 }
 
@@ -498,6 +537,10 @@ int main(int argc, char **argv) {
     runCase(backend, "expr_construction_only", iterations,
             benchmarkExprConstructionOnly);
     runCase(backend, "array_store_chain", iterations, benchmarkArrayStoreChain);
+    // Write-only smtlib never solves; array_solve would just measure text
+    // emission there.
+    if (backend != "smtlib")
+      runCase(backend, "array_solve", iterations, benchmarkArraySolve);
     if (backendSupportsUF(backend))
       runCase(backend, "function_sort_cache_hit", iterations,
               benchmarkFunctionSortCacheHit);
