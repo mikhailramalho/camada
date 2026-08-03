@@ -24,7 +24,9 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -157,6 +159,37 @@ private:
 /// child solver process from the one that writes to a file.
 struct SMTLIBProcessTag {};
 
+/// Tag type for the one-shot constructor: serialize the whole script to a
+/// file and run a shell command on it once (see the constructor docs).
+struct SMTLIBOneShotTag {};
+
+/// Invoked in the parent immediately after the one-shot child is spawned
+/// and placed in its own process group, with the child's pgid. Lets the
+/// caller register the group for teardown on signal/timeout exit paths
+/// that skip destructors (a library destructor is not an equivalent
+/// fallback: _exit() runs neither destructors nor atexit handlers, and a
+/// one-shot solver may own a whole process subtree, e.g. an mpirun job).
+using PgidCallback = std::function<void(long Pgid)>;
+
+/// Strict verdict scanner for one-shot solver output, applied per line.
+/// Accepts exactly the bare SMT-LIB verdicts (`sat`, `unsat`, `unknown`)
+/// and the SAT-competition forms (`s SATISFIABLE`, `s UNSATISFIABLE`,
+/// `s UNKNOWN`), with surrounding whitespace tolerated; `unknown` maps to
+/// checkResult::UNKNOWN. Everything else is rejected — deliberately no
+/// substring matching, or a log line mentioning "unsat core" would become
+/// a verification verdict.
+std::optional<checkResult> parseOneShotVerdictLine(const std::string &Line);
+
+/// Facts about the last one-shot run, for the caller's diagnostics: the
+/// command after %f substitution, a decoded exit status ("exit code N" /
+/// "signal N"), and the last (up to) 20 lines of its stdout. Presentation
+/// is the caller's job — Camada reports, the host logs.
+struct OneShotDiagnostics {
+  std::string Command;
+  std::string ExitStatus;
+  std::string OutputTail;
+};
+
 /// Camada backend that emits SMT-LIB instead of calling a native solver.
 ///
 /// Two construction modes:
@@ -194,6 +227,51 @@ public:
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
                const std::string &OutputPath,
                TupleEncoding TupleMode = TupleEncoding::Native);
+
+  /// One-shot constructor: serialize the script (including `(check-sat)`)
+  /// to FormulaPath, then run ShellCmd on it **via a shell** — every `%f`
+  /// is replaced by the shell-quoted formula path, or the path is appended
+  /// when no `%f` is present — scanning its stdout for a verdict with
+  /// parseOneShotVerdictLine (each line trimmed, the last verdict wins).
+  /// The child runs in its own process group; OnSpawn, when set, receives
+  /// the pgid immediately after the spawn so the caller can register it
+  /// for teardown on exit paths that skip destructors.
+  ///
+  /// When ModelArgv is non-empty, the same script is also streamed to that
+  /// interactive solver (execvp, no shell), which starts solving in
+  /// parallel at check() and serves get-value queries after a sat verdict;
+  /// its own answer is available via oneShotModelVerdict() so the caller
+  /// can detect a diverging model solver. A model solver that dies is
+  /// dropped silently — the one-shot run remains the verdict source and
+  /// only counterexample support is lost.
+  ///
+  /// check() may be called once; a second call aborts. On no verdict the
+  /// result is UNKNOWN and oneShotDiagnostics() carries the evidence.
+  ///
+  /// SECURITY: unlike every other SMTLIBSolver mode, ShellCmd is executed
+  /// by `$SHELL -c` (or `sh -c`) and must not be built from untrusted
+  /// input. FormulaPath is shell-quoted; the template is not.
+  SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
+               const std::string &ShellCmd,
+               const std::vector<std::string> &ModelArgv = {},
+               PgidCallback OnSpawn = {},
+               TupleEncoding TupleMode = TupleEncoding::Native);
+
+  /// One-shot mode: the model solver's own answer to the shared query,
+  /// read only after a sat verdict from the one-shot run. Unset when no
+  /// model solver was configured, it died, or the verdict was not sat.
+  std::optional<checkResult> oneShotModelVerdict() const {
+    return OneShotModelVerdictValue;
+  }
+
+  /// One-shot mode: whether the interactive model solver is alive (it is
+  /// dropped when it dies, when the verdict is not sat, or when its own
+  /// answer was not sat).
+  bool oneShotModelSolverLive() const { return Proc != nullptr; }
+
+  /// One-shot mode: facts about the last run (command, exit status,
+  /// output tail) for the caller's diagnostics.
+  const OneShotDiagnostics &oneShotDiagnostics() const { return Diags; }
 
   ~SMTLIBSolver() override;
 
@@ -412,7 +490,7 @@ private:
                             bool OwnScope = false);
 
   // Emit a single line (newline appended) to the active emitter(s).
-  void emitLine(const std::string &Text) const;
+  void emitLine(const std::string &Text);
 
   // Emit a check command (a query: no `success` ack) and read the
   // sat/unsat/unknown verdict; UNKNOWN in write-only mode.
@@ -425,6 +503,18 @@ private:
 
   // Emit the standard preamble (set-option, set-logic, set-info).
   void emitPreamble();
+
+  // One-shot mode plumbing (see the SMTLIBOneShotTag constructor).
+  checkResult oneShotCheck();
+  checkResult runOneShotCommand();
+
+  bool OneShotMode = false;
+  bool OneShotCheckDone = false;
+  std::string OneShotFormulaPath;
+  std::string OneShotShellCmd;
+  PgidCallback OneShotOnSpawn;
+  std::optional<checkResult> OneShotModelVerdictValue;
+  OneShotDiagnostics Diags;
 
   std::unique_ptr<FileEmitter> File;
   std::unique_ptr<ProcessEmitter> Proc;
