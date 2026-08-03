@@ -155,6 +155,32 @@ auto result = solver->check();          // sat / unsat / unknown
 auto value = solver->getBV(symbol);     // round-trips through (get-value ...)
 ```
 
+A fourth, **one-shot** mode serves solvers that read a complete formula
+file and print a verdict instead of speaking interactive SMT-LIB
+(Mallob-style distributed solvers, ML-based solvers):
+
+```cpp
+auto solver = std::make_unique<camada::SMTLIBSolver>(
+    camada::SMTLIBOneShotTag{}, "/tmp/formula.smt2",
+    "mallob -mono=%f -mono-app=SMT",   // %f = shell-quoted formula path
+    {"z3", "-in"});                    // optional model solver for get-value
+```
+
+The script (including `(check-sat)`) is written to the formula file, the
+shell command runs on it once, and stdout is scanned with a strict
+per-line verdict parser (`sat`/`unsat`/`unknown` and the SAT-competition
+`s ...` forms; the last verdict wins; a verdict from a signal-killed
+command is discarded). Because the one-shot process cannot answer
+`(get-value)`, an optional interactive model solver receives the same
+script in parallel and serves models after a `sat` verdict — its own
+verdict is exposed via `oneShotModelVerdict()` so callers can detect a
+diverging model solver. The command runs in its own process group and a
+spawn-time callback hands out the pgid for the caller's signal/timeout
+teardown paths. One `check()` per solver; no-verdict runs return UNKNOWN
+with the command, exit status, and output tail retrievable via
+`oneShotDiagnostics()`. Unlike every other mode, the command template is
+executed **via a shell** — do not build it from untrusted input.
+
 A two-argument form also tees the emitted SMT-LIB script to a file, useful
 when you want both an interactive answer and a reproducer to share:
 

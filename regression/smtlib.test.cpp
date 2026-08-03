@@ -31,10 +31,14 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "camada.h"
@@ -378,4 +382,294 @@ TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
   solver.reset();
   camadaTuples.reset();
   std::remove(Path.c_str());
+}
+
+// ---------------------------------------------------------------------------
+// One-shot mode (SMTLIBOneShotTag): serialize to a file, run a shell command
+// on it, scan stdout for a verdict; an optional interactive model solver
+// serves get-value queries after a sat verdict.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Write an executable shell script and return its path.
+std::string makeScript(const std::string &Body) {
+  std::string Path = makeTempPath();
+  {
+    std::ofstream Out(Path);
+    REQUIRE(Out.good());
+    Out << "#!/bin/sh\n" << Body;
+  }
+  REQUIRE(::chmod(Path.c_str(), 0755) == 0);
+  return Path;
+}
+
+std::vector<std::string> z3ModelArgv() {
+#ifdef CAMADA_TEST_Z3_BIN
+  if (::access(CAMADA_TEST_Z3_BIN, X_OK) == 0)
+    return {CAMADA_TEST_Z3_BIN, "-in"};
+#endif
+  return {};
+}
+
+// Fork-and-expect-abort, local copy of the tests.h helper (this file does
+// not include the shared fixture headers).
+template <typename Fn> void requireAborts(Fn &&Body) {
+  ::pid_t Pid = ::fork();
+  REQUIRE(Pid >= 0);
+  if (Pid == 0) {
+    Body();
+    std::_Exit(0);
+  }
+  int Status = 0;
+  REQUIRE(::waitpid(Pid, &Status, 0) == Pid);
+  REQUIRE(WIFSIGNALED(Status));
+  REQUIRE(WTERMSIG(Status) == SIGABRT);
+}
+
+} // namespace
+
+TEST_CASE("SMTLIB one-shot verdict scanner contract", "[SMTLIB][oneshot]") {
+  using camada::checkResult;
+  using camada::parseOneShotVerdictLine;
+
+  // Bare SMT-LIB verdicts.
+  REQUIRE(parseOneShotVerdictLine("sat") == checkResult::SAT);
+  REQUIRE(parseOneShotVerdictLine("unsat") == checkResult::UNSAT);
+  REQUIRE(parseOneShotVerdictLine("unknown") == checkResult::UNKNOWN);
+
+  // SAT-competition style.
+  REQUIRE(parseOneShotVerdictLine("s SATISFIABLE") == checkResult::SAT);
+  REQUIRE(parseOneShotVerdictLine("s UNSATISFIABLE") == checkResult::UNSAT);
+  REQUIRE(parseOneShotVerdictLine("s UNKNOWN") == checkResult::UNKNOWN);
+
+  // Surrounding whitespace tolerated.
+  REQUIRE(parseOneShotVerdictLine("  sat") == checkResult::SAT);
+  REQUIRE(parseOneShotVerdictLine("unsat\r\n") == checkResult::UNSAT);
+  REQUIRE(parseOneShotVerdictLine("\t s SATISFIABLE \n") == checkResult::SAT);
+
+  // Everything else rejected — no substring matching.
+  REQUIRE_FALSE(parseOneShotVerdictLine("").has_value());
+  REQUIRE_FALSE(parseOneShotVerdictLine("   ").has_value());
+  REQUIRE_FALSE(parseOneShotVerdictLine("c solving /tmp/q.smt2").has_value());
+  REQUIRE_FALSE(
+      parseOneShotVerdictLine("[NeuroSym] loading model...").has_value());
+  REQUIRE_FALSE(parseOneShotVerdictLine("unsat core").has_value());
+  REQUIRE_FALSE(parseOneShotVerdictLine("presat").has_value());
+  REQUIRE_FALSE(parseOneShotVerdictLine("SATISFIABLE").has_value());
+  REQUIRE_FALSE(parseOneShotVerdictLine("s sat").has_value());
+}
+
+TEST_CASE("SMTLIB one-shot sat with model solver", "[SMTLIB][oneshot]") {
+  auto ModelArgv = z3ModelArgv();
+  if (ModelArgv.empty())
+    SKIP("no staged z3 binary for the model solver");
+
+  std::string Formula = makeTempPath();
+  // The stand-in checks it actually received the formula file, emits log
+  // noise a substring scanner would trip on, then the verdict.
+  std::string Script = makeScript("test -f \"$1\" || exit 9\n"
+                                  "echo '[fake-mallob] c unsat core noise'\n"
+                                  "echo sat\n");
+  long SeenPgid = 0;
+  auto solver = std::make_unique<camada::SMTLIBSolver>(
+      camada::SMTLIBOneShotTag{}, Formula, Script + " %f", ModelArgv,
+      [&SeenPgid](long Pgid) { SeenPgid = Pgid; });
+
+  auto X = solver->mkSymbol("x", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Pgid handed out at spawn; the formula file is complete.
+  REQUIRE(SeenPgid > 0);
+  std::string Written = readFile(Formula);
+  REQUIRE(Written.find("(check-sat)") != std::string::npos);
+  REQUIRE(Written.find("(assert") != std::string::npos);
+
+  // The parallel model solver agrees and serves the model.
+  REQUIRE(solver->oneShotModelVerdict() == camada::checkResult::SAT);
+  REQUIRE(solver->oneShotModelSolverLive());
+  auto Val = solver->getBV(X);
+  REQUIRE(Val);
+  REQUIRE(Val.value() == 5);
+
+  // Single-query restriction: a second check aborts.
+  requireAborts([&]() { (void)solver->check(); });
+
+  solver.reset();
+  std::remove(Formula.c_str());
+  std::remove(Script.c_str());
+}
+
+TEST_CASE("SMTLIB one-shot verdict handling", "[SMTLIB][oneshot]") {
+  // Last verdict wins, and SAT-competition style is accepted.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\necho 's UNSATISFIABLE'\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+  // No verdict: UNKNOWN, with the command, exit status, and output tail
+  // retrievable for the caller's diagnostics.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script =
+        makeScript("echo '[fake] warming up'\necho '[fake] done'\nexit 3\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::UNKNOWN);
+    const camada::OneShotDiagnostics &D = solver->oneShotDiagnostics();
+    REQUIRE(D.Command.find(Formula) != std::string::npos);
+    REQUIRE(D.ExitStatus == "exit code 3");
+    REQUIRE(D.OutputTail.find("[fake] warming up") != std::string::npos);
+    REQUIRE(D.OutputTail.find("[fake] done") != std::string::npos);
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+  // A verdict from a signal-killed solver is discarded: a truncated run
+  // must not become a verification verdict.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\nkill -9 $$\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::UNKNOWN);
+    REQUIRE(solver->oneShotDiagnostics().ExitStatus == "signal 9");
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+}
+
+TEST_CASE("SMTLIB one-shot %f substitution", "[SMTLIB][oneshot]") {
+  // Every %f is replaced with the same (quoted) path.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript(
+        "test -f \"$1\" && test \"$1\" = \"$2\" && echo sat || echo unsat\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f %f");
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+  // Without %f the quoted path is appended — even when it contains
+  // characters a shell would otherwise split or interpret.
+  {
+    char Dir[] = "/tmp/camada one-shot XXXXXX";
+    REQUIRE(::mkdtemp(Dir) != nullptr);
+    std::string Formula = std::string(Dir) + "/it's a formula.smt2";
+    std::string Script =
+        makeScript("test -f \"$1\" && echo sat || echo unsat\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script);
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    solver.reset();
+    std::remove(Formula.c_str());
+    ::rmdir(Dir);
+    std::remove(Script.c_str());
+  }
+}
+
+TEST_CASE("SMTLIB one-shot diverging and dying model solvers",
+          "[SMTLIB][oneshot]") {
+  // Diverging: the one-shot solver claims sat on an unsatisfiable formula;
+  // the model solver disagrees. Camada returns both verdicts and does NOT
+  // abort — the caller compares and decides how to report it.
+  {
+    auto ModelArgv = z3ModelArgv();
+    if (ModelArgv.empty())
+      SKIP("no staged z3 binary for the model solver");
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f", ModelArgv);
+    auto A = solver->mkSymbol("a", solver->mkBoolSort());
+    solver->addConstraint(A);
+    solver->addConstraint(solver->mkNot(A));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->oneShotModelVerdict() == camada::checkResult::UNSAT);
+    REQUIRE_FALSE(solver->oneShotModelSolverLive());
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+  // Dying: a model solver that exits immediately is dropped; the one-shot
+  // flow continues file-only without counterexample support.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f",
+        std::vector<std::string>{"false"});
+    auto X = solver->mkSymbol("x", solver->mkBVSort(8));
+    solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE_FALSE(solver->oneShotModelSolverLive());
+    REQUIRE_FALSE(solver->oneShotModelVerdict().has_value());
+    REQUIRE_FALSE(solver->getBV(X));
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+}
+
+TEST_CASE("SMTLIB one-shot assumption checks and mid-negotiation death",
+          "[SMTLIB][oneshot]") {
+  // checkSatAssuming must route through the one-shot flow (assumptions
+  // land in the formula file inside a scope), not silently query only the
+  // auxiliary model solver.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
+    auto A = solver->mkSymbol("a", solver->mkBoolSort());
+    REQUIRE(solver->checkSatAssuming({A}) == camada::checkResult::SAT);
+    std::string Written = readFile(Formula);
+    REQUIRE(Written.find("(check-sat)") != std::string::npos);
+    REQUIRE(Written.find("(push 1)") != std::string::npos);
+    // The single-query restriction holds through this entry point too.
+    requireAborts([&]() { (void)solver->check(); });
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+  }
+  // A model child that rejects (set-logic ALL) and then dies exercises the
+  // fallback branch of the preamble negotiation: it must degrade to
+  // file-only, not abort the host.
+  {
+    std::string Formula = makeTempPath();
+    std::string Script = makeScript("echo sat\n");
+    // Ack the five preamble reads before set-logic, reject ALL, then exit:
+    // print-success, produce-models, produce-unsat-assumptions,
+    // global-declarations, set-info.
+    std::string DyingModel = makeScript("echo success\n"
+                                        "echo success\n"
+                                        "echo success\n"
+                                        "echo success\n"
+                                        "echo success\n"
+                                        "echo '(error \"no ALL here\")'\n");
+    auto solver = std::make_unique<camada::SMTLIBSolver>(
+        camada::SMTLIBOneShotTag{}, Formula, Script + " %f",
+        std::vector<std::string>{DyingModel});
+    REQUIRE_FALSE(solver->oneShotModelSolverLive());
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+    solver.reset();
+    std::remove(Formula.c_str());
+    std::remove(Script.c_str());
+    std::remove(DyingModel.c_str());
+  }
 }

@@ -24,10 +24,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <climits>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <fcntl.h>
 #include <string>
 #include <sys/resource.h>
@@ -702,6 +704,189 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
   initializeCommonSingletons();
 }
 
+SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
+                           const std::string &ShellCmd,
+                           const std::vector<std::string> &ModelArgv,
+                           PgidCallback OnSpawn, TupleEncoding TupleMode)
+    : OneShotMode(true), OneShotFormulaPath(FormulaPath),
+      OneShotShellCmd(ShellCmd), OneShotOnSpawn(std::move(OnSpawn)),
+      File(std::make_unique<FileEmitter>(FormulaPath)),
+      Proc(ModelArgv.empty() ? nullptr
+                             : std::make_unique<ProcessEmitter>(ModelArgv)),
+      TupleMode(TupleMode) {
+  emitPreamble();
+  initializeCommonSingletons();
+}
+
+std::optional<checkResult> parseOneShotVerdictLine(const std::string &Raw) {
+  const std::size_t Start = Raw.find_first_not_of(" \t\r\n");
+  if (Start == std::string::npos)
+    return std::nullopt;
+  const std::size_t End = Raw.find_last_not_of(" \t\r\n");
+  const std::string Line = Raw.substr(Start, End - Start + 1);
+
+  if (Line == "sat" || Line == "s SATISFIABLE")
+    return checkResult::SAT;
+  if (Line == "unsat" || Line == "s UNSATISFIABLE")
+    return checkResult::UNSAT;
+  if (Line == "unknown" || Line == "s UNKNOWN")
+    return checkResult::UNKNOWN;
+  return std::nullopt;
+}
+
+namespace {
+
+// waitpid()-style status word -> human-readable, so diagnostics show
+// "exit code 10" rather than 2560.
+std::string describeExitStatus(int Status) {
+  if (WIFEXITED(Status))
+    return "exit code " + std::to_string(WEXITSTATUS(Status));
+  if (WIFSIGNALED(Status))
+    return "signal " + std::to_string(WTERMSIG(Status));
+  return "status " + std::to_string(Status);
+}
+
+// POSIX single-quote quoting; embedded quotes become '\''.
+std::string shellQuotePath(const std::string &Path) {
+  std::string Escaped = Path;
+  for (std::size_t Q = Escaped.find('\''); Q != std::string::npos;
+       Q = Escaped.find('\'', Q + 4))
+    Escaped.replace(Q, 1, "'\\''");
+  return "'" + Escaped + "'";
+}
+
+} // namespace
+
+checkResult SMTLIBSolver::runOneShotCommand() {
+  // Substitute the formula file for every %f, or append it, quoting the
+  // path for the shell the command runs under.
+  const std::string Quoted = shellQuotePath(OneShotFormulaPath);
+  std::string Cmd = OneShotShellCmd;
+  std::size_t Pos = Cmd.find("%f");
+  if (Pos == std::string::npos)
+    Cmd += " " + Quoted;
+  else
+    for (; Pos != std::string::npos; Pos = Cmd.find("%f", Pos)) {
+      Cmd.replace(Pos, 2, Quoted);
+      Pos += Quoted.size();
+    }
+  Diags = OneShotDiagnostics{};
+  Diags.Command = Cmd;
+
+  // Spawn the command in its own process group so the caller's
+  // signal/timeout exit paths can kill the whole subtree (a wrapper shell
+  // and any further children, e.g. an mpirun job) with one killpg.
+  int Fds[2];
+  fatalErrorIf(::pipe(Fds) != 0, "SMTLIBSolver: one-shot pipe() failed");
+  const ::pid_t Pid = ::fork();
+  fatalErrorIf(Pid < 0, "SMTLIBSolver: one-shot fork() failed");
+  if (Pid == 0) {
+    ::setpgid(0, 0); // become leader of a new group; pgid == pid
+    ::close(Fds[0]);
+    if (Fds[1] != STDOUT_FILENO) {
+      ::dup2(Fds[1], STDOUT_FILENO);
+      ::close(Fds[1]);
+    }
+    const char *Shell = ::getenv("SHELL");
+    if (!Shell || !*Shell)
+      Shell = "sh";
+    ::execlp(Shell, Shell, "-c", Cmd.c_str(), static_cast<char *>(nullptr));
+    ::_exit(127);
+  }
+  ::setpgid(Pid, Pid); // also from the parent, closing the fork/exec race
+  ::close(Fds[1]);
+  // Hand the pgid out immediately: a getter polled later would leave a
+  // window in which a caller timeout leaks the subtree.
+  if (OneShotOnSpawn)
+    OneShotOnSpawn(static_cast<long>(Pid));
+
+  std::FILE *ChildOut = ::fdopen(Fds[0], "r");
+  fatalErrorIf(ChildOut == nullptr, "SMTLIBSolver: one-shot fdopen() failed");
+
+  // Scan the output for verdict lines; the LAST one wins. Keep a tail of
+  // the output for the caller's diagnostics.
+  std::optional<checkResult> Verdict;
+  std::deque<std::string> Tail;
+  char Buf[4096];
+  while (std::fgets(Buf, sizeof(Buf), ChildOut)) {
+    std::string Line(Buf);
+    while (!Line.empty() &&
+           std::isspace(static_cast<unsigned char>(Line.back())))
+      Line.pop_back();
+    const std::size_t Start = Line.find_first_not_of(" \t");
+    if (Start != std::string::npos)
+      Line.erase(0, Start);
+
+    if (std::optional<checkResult> V = parseOneShotVerdictLine(Line))
+      Verdict = V;
+
+    Tail.push_back(std::move(Line));
+    if (Tail.size() > 20)
+      Tail.pop_front();
+  }
+  std::fclose(ChildOut);
+  int Status = 0;
+  ::waitpid(Pid, &Status, 0);
+
+  Diags.ExitStatus = describeExitStatus(Status);
+  for (const std::string &Line : Tail) {
+    Diags.OutputTail += Line;
+    Diags.OutputTail += '\n';
+  }
+
+  // A verdict from a solver that died on a signal (crash, OOM kill, a
+  // wrapper tearing the job down) cannot be trusted: a truncated run must
+  // not become a verification verdict. Non-zero *exit codes* stay
+  // accepted — SAT-competition-style solvers exit 10/20.
+  if (Verdict && WIFSIGNALED(Status))
+    return checkResult::UNKNOWN;
+  if (!Verdict)
+    return checkResult::UNKNOWN;
+  return *Verdict;
+}
+
+checkResult SMTLIBSolver::oneShotCheck() {
+  fatalErrorIf(OneShotCheckDone,
+               "SMTLIBSolver: one-shot mode supports a single (check-sat) "
+               "query per run; incremental strategies are not supported");
+  OneShotCheckDone = true;
+
+  // Complete the formula file first: the shell command reads it from disk.
+  if (File) {
+    File->emitRaw("(check-sat)\n");
+    File->flush();
+  }
+  // Start the model solver on the same query before the one-shot run so it
+  // solves in parallel; its answer is read only on a sat verdict.
+  if (Proc) {
+    Proc->emitRaw("(check-sat)\n");
+    Proc->flush();
+  }
+
+  const checkResult Verdict = runOneShotCommand();
+
+  if (Verdict == checkResult::SAT && Proc) {
+    const std::string Resp = Proc->readResponse();
+    if (Resp.empty()) {
+      // The model solver died mid-solve; continue without counterexample
+      // support. The caller sees oneShotModelSolverLive() == false.
+      Proc.reset();
+    } else {
+      OneShotModelVerdictValue = Resp == "sat"     ? checkResult::SAT
+                                 : Resp == "unsat" ? checkResult::UNSAT
+                                                   : checkResult::UNKNOWN;
+      // A disagreeing model solver has no model to serve; the caller
+      // compares the two verdicts and decides how to report it.
+      if (*OneShotModelVerdictValue != checkResult::SAT)
+        Proc.reset();
+    }
+  } else if (Proc) {
+    // Not sat (or no verdict): stop the parallel model solver unread.
+    Proc.reset();
+  }
+  return Verdict;
+}
+
 SMTLIBSolver::~SMTLIBSolver() { invalidateGeneratedObjects(); }
 
 void SMTLIBSolver::emitPreamble() {
@@ -763,7 +948,13 @@ void SMTLIBSolver::emitPreamble() {
     std::string Logic = "ALL";
     Proc->emitRaw("(set-logic ALL)\n");
     Proc->flush();
-    if (Proc->readResponse() != "success") {
+    const std::string FirstResp = Proc->readResponse();
+    if (OneShotMode && FirstResp.empty()) {
+      // The one-shot model solver died during startup; drop it and continue
+      // file-only (the emitLine death path, reachable here because this
+      // block reads responses by hand).
+      Proc.reset();
+    } else if (FirstResp != "success") {
       // stp rejects ALL with a stray diagnostic line and then still answers
       // `success` for the command; consume that stray ack or every later
       // response is off by one. ponytail: this two-line pairing is
@@ -774,11 +965,18 @@ void SMTLIBSolver::emitPreamble() {
       Proc->emitRaw("(set-logic QF_AUFBV)\n");
       Proc->flush();
       std::string Resp = Proc->readResponse();
-      fatalErrorIf(Resp != "success",
-                   ("SMTLIBSolver: child solver rejected both (set-logic ALL) "
-                    "and (set-logic QF_AUFBV): " +
-                    Resp)
-                       .c_str());
+      if (OneShotMode && Resp.empty()) {
+        // The one-shot model solver died mid-negotiation; drop it and
+        // continue file-only, same policy as everywhere else.
+        Proc.reset();
+      } else {
+        fatalErrorIf(
+            Resp != "success",
+            ("SMTLIBSolver: child solver rejected both (set-logic ALL) "
+             "and (set-logic QF_AUFBV): " +
+             Resp)
+                .c_str());
+      }
     }
     if (File)
       File->emitRaw("(set-logic " + Logic + ")\n");
@@ -787,7 +985,7 @@ void SMTLIBSolver::emitPreamble() {
   }
 }
 
-void SMTLIBSolver::emitLine(const std::string &Text) const {
+void SMTLIBSolver::emitLine(const std::string &Text) {
   const std::string Line = Text + "\n";
   if (File)
     File->emitRaw(Line);
@@ -798,9 +996,17 @@ void SMTLIBSolver::emitLine(const std::string &Text) const {
     // with the message — there's no recovery from a malformed command in this
     // simple synchronous protocol.
     std::string Resp = Proc->readResponse();
-    if (Resp != "success")
+    if (Resp != "success") {
+      // A one-shot model solver is auxiliary: on child death (EOF reads as
+      // an empty response), drop it and continue file-only — the one-shot
+      // run is the verdict source, only counterexample support is lost.
+      if (OneShotMode && Resp.empty()) {
+        Proc.reset();
+        return;
+      }
       fatalErrorIf(true,
                    ("SMTLIBSolver: child solver returned: " + Resp).c_str());
+    }
   }
 }
 
@@ -2268,6 +2474,8 @@ checkResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
 }
 
 checkResult SMTLIBSolver::checkImpl() {
+  if (OneShotMode)
+    return oneShotCheck();
   return emitCheckCommand("(check-sat)\n");
 }
 
@@ -2277,8 +2485,10 @@ SMTLIBSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   // (check-sat-assuming ...) at all (stp answers `unsupported`), and without
   // the option there is no unsat core to salvage from the native form
   // anyway — use the common layer's equisatisfiable push/assert/check/pop
-  // fallback instead.
-  if (Proc && !UnsatAssumptionsSupported)
+  // fallback instead. One-shot mode must take the fallback too: its checkImpl
+  // is the one-shot run itself, and emitting (check-sat-assuming ...) here
+  // would silently query only the auxiliary model solver.
+  if (OneShotMode || (Proc && !UnsatAssumptionsSupported))
     return SMTSolverImpl::checkSatAssumingImpl(Assumptions);
   // Activate each assumption through a fresh literal: assert
   // (=> lit assumption), then assume the literal. This is equisatisfiable
