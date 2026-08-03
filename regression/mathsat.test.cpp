@@ -27,6 +27,13 @@ TEST_CASE("Unsupported quantifiers MathSAT test", "[MathSAT]") {
   });
 }
 
+TEST_CASE("Int-BV conversion MathSAT test", "[MathSAT]") {
+  // The arith test's QF_UFLIRA config has no BV theory; the conversions
+  // mix Int and BV, so they run on the default environment.
+  auto mathsat = camada::createMathSATSolver();
+  int_bv_conversion_semantics(mathsat);
+}
+
 TEST_CASE("Arith MathSAT test", "[MathSAT]") {
   msat_config Config = msat_create_default_config("QF_UFLIRA");
   msat_set_option(Config, "model_generation", "true");
@@ -216,6 +223,10 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("tuple_with_array_field [Camada]",
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                                   empty_tuple_semantics(solver),
                                   makeSMTLIBSolverCamadaTuples)
+
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("int_bv_conversion_semantics",
+                                  int_bv_conversion_semantics(solver),
+                                  makeSMTLIBSolver)
 
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
                                   fxp_rounding_semantics(solver),

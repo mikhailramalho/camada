@@ -541,6 +541,19 @@ SMTExprRef MathSATSolver::mkIsIntImpl(const SMTExprRef &Exp) {
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::IsInt);
 }
 
+SMTExprRef MathSATSolver::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::Int2BV, &Context, mkBVSort(Width),
+      msat_make_int_to_bv(Context, Width, toMathSATTerm(Exp)));
+}
+
+SMTExprRef MathSATSolver::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
+  return makeExprRef<MathSATExpr>(
+      SMTExprKind::BV2Int, &Context, mkIntSort(),
+      IsSigned ? msat_make_int_from_sbv(Context, toMathSATTerm(Exp))
+               : msat_make_int_from_ubv(Context, toMathSATTerm(Exp)));
+}
+
 SMTExprRef MathSATSolver::mkEqualImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   return makeExprRef<MathSATExpr>(

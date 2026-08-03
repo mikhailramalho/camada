@@ -898,6 +898,22 @@ SMTExprRef SMTSolverImpl::mkIsInt(const SMTExprRef &Exp) {
   return theExp;
 }
 
+SMTExprRef SMTSolverImpl::mkInt2BV(unsigned Width, const SMTExprRef &Exp) {
+  fatalErrorIf(Width == 0, "Bit-vector width must be non-zero");
+  requireIntSort(Exp, "Expected integer expression");
+  SMTExprRef theExp = mkInt2BVImpl(Width, Exp);
+  assert(theExp->isBVSort());
+  assert(theExp->getWidth() == Width);
+  return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkBV2Int(const SMTExprRef &Exp, bool IsSigned) {
+  requireBVSort(Exp, "Expected bit-vector expression");
+  SMTExprRef theExp = mkBV2IntImpl(Exp, IsSigned);
+  assert(theExp->isIntSort());
+  return theExp;
+}
+
 SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                                 const SMTExprRef &F) {
   requireBoolSort(Cond, "Expected boolean condition");
@@ -2335,6 +2351,42 @@ SMTExprRef SMTSolverImpl::mkReal2IntImpl(const SMTExprRef &) {
 
 SMTExprRef SMTSolverImpl::mkIsIntImpl(const SMTExprRef &) {
   unsupportedFeature("Integer arithmetic");
+}
+
+SMTExprRef SMTSolverImpl::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
+  // No native conversion: compose the integer as a sum of bit-tests,
+  // Sum ite(bit_i = 1, 2^i, 0), minus 2^W when signed and the sign bit is
+  // set. Pure Int+BV+ite, so it works on any backend with both theories
+  // and over the SMT-LIB pipe.
+  const unsigned Width = Exp->getWidth();
+  SMTExprRef BitSet = mkBVFromDec(1, 1);
+  SMTExprRef Zero = mkInt(0);
+  SMTExprRef Sum = Zero;
+  for (unsigned I = 0; I < Width; ++I) {
+    SMTExprRef Bit = mkBVExtract(I, I, Exp);
+    Sum =
+        mkArithAdd(Sum, mkIte(mkEqual(Bit, BitSet), mkInt(power2Dec(I)), Zero));
+  }
+  if (IsSigned) {
+    SMTExprRef Sign = mkBVExtract(Width - 1, Width - 1, Exp);
+    Sum = mkArithSub(
+        Sum, mkIte(mkEqual(Sign, BitSet), mkInt(power2Dec(Width)), Zero));
+  }
+  return rewrapExprImpl(*Sum, Sum->Sort, SMTExprKind::BV2Int);
+}
+
+SMTExprRef SMTSolverImpl::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+  // No native conversion and no portable operator to compose one from: a
+  // bit-vector value tied to an integer can only be introduced through a
+  // fresh symbol constrained via the inverse direction (the mkIEEEFPToBV
+  // precedent). Euclidean mod puts the wrap in [0, 2^Width) for negative
+  // integers too. The constraint is asserted at the current push level
+  // and unwound by (pop), same caveat as mkIEEEFPToBV.
+  SMTExprRef Fresh = mkSymbolUnchecked(
+      "__CAMADA_int2bv_" + std::to_string(NextInt2BVId++), mkBVSort(Width));
+  SMTExprRef Wrapped = mkArithMod(Exp, mkInt(power2Dec(Width)));
+  addConstraint(mkEqual(mkBV2IntImpl(Fresh, /*IsSigned=*/false), Wrapped));
+  return rewrapExprImpl(*Fresh, Fresh->Sort, SMTExprKind::Int2BV);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {

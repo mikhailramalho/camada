@@ -33,6 +33,8 @@ TEST_CASE("Arith Z3 test", "[Z3]") {
   z3->reset();
   arith_conversion_semantics(z3);
   z3->reset();
+  int_bv_conversion_semantics(z3);
+  z3->reset();
   arith_symbolic_shift_semantics(z3);
 }
 
@@ -170,6 +172,9 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
                              empty_tuple_semantics(solver),
                              makeSMTLIBSolverCamadaTuples)
 
+CAMADA_Z3_SMTLIB_SHARED_TEST("int_bv_conversion_semantics",
+                             int_bv_conversion_semantics(solver),
+                             makeSMTLIBSolver)
 CAMADA_Z3_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
                              fxp_rounding_semantics(solver), makeSMTLIBSolver)
 CAMADA_Z3_SMTLIB_SHARED_TEST("fxp_model_and_constructs",

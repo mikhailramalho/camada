@@ -130,6 +130,8 @@ enum class SMTExprKind {
   Exists,
   BVToIEEEFP,
   IEEEFPToBV,
+  Int2BV,
+  BV2Int,
   FXPConst,
   FXPAdd,
   FXPSub,

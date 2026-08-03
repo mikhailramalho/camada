@@ -505,6 +505,21 @@ public:
   /// Returns true iff an arithmetic expression denotes an integer.
   virtual SMTExprRef mkIsInt(const SMTExprRef &Exp) = 0;
 
+  /// Converts an integer to a Width-bit bit-vector; the value is taken
+  /// modulo 2^Width, so negative integers wrap to their two's-complement
+  /// representation. Native on Z3, cvc5, and MathSAT; on backends without
+  /// a native conversion (Yices, the SMT-LIB pipe) the result is a fresh
+  /// bit-vector symbol constrained through the inverse direction, and —
+  /// like mkIEEEFPToBV — that constraint lives at the current (push)/(pop)
+  /// level.
+  virtual SMTExprRef mkInt2BV(unsigned Width, const SMTExprRef &Exp) = 0;
+
+  /// Converts a bit-vector to the integer it denotes: two's complement
+  /// when IsSigned, the unsigned value in [0, 2^N) otherwise. Together
+  /// with mkInt2BV this is the bridge for bitwise operations on integers
+  /// (convert, apply the mkBV* operation, convert back).
+  virtual SMTExprRef mkBV2Int(const SMTExprRef &Exp, bool IsSigned) = 0;
+
   /// Creates a boolean ite operation
   virtual SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                            const SMTExprRef &F) = 0;
