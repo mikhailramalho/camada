@@ -211,3 +211,16 @@ TEST_CASE("Nested constant tuple arrays CVC5 test", "[CVC5]") {
   auto solver = camada::createCVC5Solver();
   tuple_array_const_nested(solver);
 }
+
+// Registered per backend, not in tests(): array_of(array_of(v)) needs a
+// nested array sort, which STP's BV-only array theory lacks.
+TEST_CASE("Nested constant arrays CVC5 test", "[CVC5]") {
+  auto solver = camada::createCVC5Solver();
+  nested_const_array_semantics(solver);
+  solver->reset();
+  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
+  solver->reset();
+  nested_const_array_survives_pop(solver);
+  solver->reset();
+  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
+}

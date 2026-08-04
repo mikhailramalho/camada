@@ -222,16 +222,22 @@ TEST_CASE("Deep tuple/array nesting Bitwuzla test", "[Bitwuzla]") {
   tuple_array_deep_nesting(solver);
 }
 
-// Nested constant tuple arrays need every per-leaf constant array to
-// nest, and lazily lowered constant arrays cannot — pin the abort.
-TEST_CASE("Unsupported nested constant tuple arrays Bitwuzla test",
-          "[Bitwuzla]") {
+// Registered per backend: nested constant arrays now lower lazily too,
+// so the per-leaf constant arrays of a tuple-array initializer can nest.
+TEST_CASE("Nested constant tuple arrays Bitwuzla test", "[Bitwuzla]") {
   auto solver = camada::createBitwuzlaSolver();
-  require_abort([&]() {
-    auto bv4 = solver->mkBVSort(4);
-    auto init =
-        solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(5, 8)});
-    auto innerConst = solver->mkArrayConst(bv4, init);
-    (void)solver->mkArrayConst(bv4, innerConst);
-  });
+  tuple_array_const_nested(solver);
+}
+
+// Registered per backend, not in tests(): array_of(array_of(v)) needs a
+// nested array sort, which STP's BV-only array theory lacks.
+TEST_CASE("Nested constant arrays Bitwuzla test", "[Bitwuzla]") {
+  auto solver = camada::createBitwuzlaSolver();
+  nested_const_array_semantics(solver);
+  solver->reset();
+  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
+  solver->reset();
+  nested_const_array_survives_pop(solver);
+  solver->reset();
+  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }
