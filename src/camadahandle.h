@@ -126,18 +126,23 @@ protected:
   /// can decide which solver internals are allowed to create valid handles.
   /// The state/generation arguments are accepted (and ignored) in unchecked
   /// mode so construction sites compile identically under both layouts.
-SMTRefBase(const T *ThePtr, const SMTHandleState *TheState,
-           uint64_t TheGeneration)
+  /// Each branch is a complete declaration — clang-format mis-parses a
+  /// preprocessor conditional inside a member-initializer list.
 #if CAMADA_CHECKED_HANDLES
-    : Ptr(ThePtr), State(TheState), Generation(TheGeneration){}
+  SMTRefBase(const T *ThePtr, const SMTHandleState *TheState,
+             uint64_t TheGeneration)
+      : Ptr(ThePtr), State(TheState), Generation(TheGeneration) {}
 #else
+  SMTRefBase(const T *ThePtr, const SMTHandleState *TheState,
+             uint64_t TheGeneration)
       : Ptr(ThePtr) {
     (void)TheState;
     (void)TheGeneration;
   }
 #endif
 
-      private : CAMADA_ALWAYS_INLINE void validate() const {
+private:
+  CAMADA_ALWAYS_INLINE void validate() const {
 #if CAMADA_CHECKED_HANDLES
     if (Ptr && State &&
         State->Generation.load(std::memory_order_relaxed) == Generation)
