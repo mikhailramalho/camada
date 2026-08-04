@@ -117,3 +117,8 @@ CAMADA_STP_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
 
 #undef CAMADA_STP_SMTLIB_SHARED_TEST
 #endif
+
+TEST_CASE("Unsupported nested constant arrays STP test", "[STP]") {
+  auto stp = camada::createSTPSolver();
+  require_abort([&]() { nested_const_array_semantics(stp); });
+}
