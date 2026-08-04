@@ -598,6 +598,23 @@ std::string ProcessEmitter::readResponse() const {
   return readOneSmtlibResponse(In);
 }
 
+std::optional<std::string>
+ProcessEmitter::readResponseWithin(unsigned TimeoutMs) const {
+  if (!In)
+    return std::string(); // no read side: same as EOF
+  int Fd = ::fileno(In);
+  fd_set ReadFds;
+  FD_ZERO(&ReadFds);
+  FD_SET(Fd, &ReadFds);
+  struct timeval Timeout;
+  Timeout.tv_sec = TimeoutMs / 1000;
+  Timeout.tv_usec = (TimeoutMs % 1000) * 1000;
+  int Ready = ::select(Fd + 1, &ReadFds, nullptr, nullptr, &Timeout);
+  if (Ready <= 0)
+    return std::nullopt; // silent child (or select error): caller drops it
+  return readOneSmtlibResponse(In);
+}
+
 unsigned ProcessEmitter::drainResponses(unsigned TimeoutMs) const {
   if (!In)
     return 0;
@@ -893,6 +910,21 @@ checkResult SMTLIBSolver::oneShotCheck() {
 
 SMTLIBSolver::~SMTLIBSolver() { invalidateGeneratedObjects(); }
 
+unsigned SMTLIBSolver::OneShotModelAckTimeoutMs = 5000;
+
+std::optional<std::string> SMTLIBSolver::oneShotModelReply() {
+  std::optional<std::string> Resp =
+      Proc->readResponseWithin(OneShotModelAckTimeoutMs);
+  if (!Resp || Resp->empty()) {
+    // Timeout (the child does not speak the ack protocol) or EOF (it
+    // died): drop it and continue file-only — the one-shot run is the
+    // verdict source, only counterexample support is lost.
+    Proc.reset();
+    return std::nullopt;
+  }
+  return Resp;
+}
+
 void SMTLIBSolver::emitPreamble() {
   // Interactive mode: the very first emitted command is
   // `(set-option :print-success true)`. Standard-conforming SMT-LIB solvers
@@ -919,7 +951,14 @@ void SMTLIBSolver::emitPreamble() {
   if (Proc) {
     Proc->emitRaw(UnsatAssumptionsOpt);
     Proc->flush();
-    UnsatAssumptionsSupported = Proc->readResponse() == "success";
+    if (OneShotMode) {
+      // Bounded read for the auxiliary model child; `unsupported` is a
+      // legitimate answer, so anything readable just records the bit.
+      std::optional<std::string> Resp = oneShotModelReply();
+      UnsatAssumptionsSupported = Resp && *Resp == "success";
+    } else {
+      UnsatAssumptionsSupported = Proc->readResponse() == "success";
+    }
   }
   // Without :global-declarations true, declarations made inside a (push) are
   // discarded on (pop). Camada's API lets a caller mkSymbol() inside a pushed
@@ -935,7 +974,10 @@ void SMTLIBSolver::emitPreamble() {
   if (Proc) {
     Proc->emitRaw(GlobalDeclsOpt);
     Proc->flush();
-    (void)Proc->readResponse();
+    if (OneShotMode)
+      (void)oneShotModelReply();
+    else
+      (void)Proc->readResponse();
   }
   emitLine("(set-info :status unknown)");
   // ALL covers BV/Bool/arrays/FP/Int/Real, which is the full Camada
@@ -955,10 +997,15 @@ void SMTLIBSolver::emitPreamble() {
     // died gets the usual drop-and-continue treatment instead).
     Proc->emitRaw("(set-logic " + LogicOverride + ")\n");
     Proc->flush();
-    const std::string Resp = Proc->readResponse();
-    if (OneShotMode && Resp.empty()) {
-      Proc.reset();
+    if (OneShotMode) {
+      // Auxiliary model child: a rejection (or any unusable reply) drops
+      // it instead of aborting — the caller's logic claim is only fatal
+      // when the child is the verdict source.
+      std::optional<std::string> Resp = oneShotModelReply();
+      if (Resp && *Resp != "success")
+        Proc.reset();
     } else {
+      const std::string Resp = Proc->readResponse();
       fatalErrorIf(Resp != "success",
                    ("SMTLIBSolver: child solver rejected the caller-chosen "
                     "(set-logic " +
@@ -971,13 +1018,25 @@ void SMTLIBSolver::emitPreamble() {
     std::string Logic = "ALL";
     Proc->emitRaw("(set-logic ALL)\n");
     Proc->flush();
-    const std::string FirstResp = Proc->readResponse();
-    if (OneShotMode && FirstResp.empty()) {
-      // The one-shot model solver died during startup; drop it and continue
-      // file-only (the emitLine death path, reachable here because this
-      // block reads responses by hand).
-      Proc.reset();
-    } else if (FirstResp != "success") {
+    if (OneShotMode) {
+      // Auxiliary model child: every read is bounded, and any unusable
+      // reply at the end of the negotiation drops the child. The tee file
+      // keeps the last logic actually offered.
+      std::optional<std::string> FirstResp = oneShotModelReply();
+      if (FirstResp && *FirstResp != "success") {
+        // stp-shaped two-line rejection (see the interactive branch
+        // below): consume the stray ack, then retry with QF_AUFBV.
+        if (oneShotModelReply()) {
+          Logic = "QF_AUFBV";
+          Proc->emitRaw("(set-logic QF_AUFBV)\n");
+          Proc->flush();
+          std::optional<std::string> Resp = oneShotModelReply();
+          if (Resp && *Resp != "success")
+            Proc.reset();
+        }
+      }
+    } else if (const std::string FirstResp = Proc->readResponse();
+               FirstResp != "success") {
       // stp rejects ALL with a stray diagnostic line and then still answers
       // `success` for the command; consume that stray ack or every later
       // response is off by one. ponytail: this two-line pairing is
@@ -988,18 +1047,11 @@ void SMTLIBSolver::emitPreamble() {
       Proc->emitRaw("(set-logic QF_AUFBV)\n");
       Proc->flush();
       std::string Resp = Proc->readResponse();
-      if (OneShotMode && Resp.empty()) {
-        // The one-shot model solver died mid-negotiation; drop it and
-        // continue file-only, same policy as everywhere else.
-        Proc.reset();
-      } else {
-        fatalErrorIf(
-            Resp != "success",
-            ("SMTLIBSolver: child solver rejected both (set-logic ALL) "
-             "and (set-logic QF_AUFBV): " +
-             Resp)
-                .c_str());
-      }
+      fatalErrorIf(Resp != "success",
+                   ("SMTLIBSolver: child solver rejected both (set-logic ALL) "
+                    "and (set-logic QF_AUFBV): " +
+                    Resp)
+                       .c_str());
     }
     if (File)
       File->emitRaw("(set-logic " + Logic + ")\n");
@@ -1017,21 +1069,22 @@ void SMTLIBSolver::emitLine(const std::string &Text) {
   if (Proc) {
     Proc->emitRaw(Line);
     Proc->flush();
-    // Discard the `success` ack. If the child returned `(error "...")`, abort
-    // with the message — there's no recovery from a malformed command in this
+    // A one-shot model solver is auxiliary: any unusable ack — timeout,
+    // EOF, garbage — drops it and continues file-only. The one-shot run
+    // is the verdict source, only counterexample support is lost.
+    if (OneShotMode) {
+      std::optional<std::string> Resp = oneShotModelReply();
+      if (Resp && *Resp != "success")
+        Proc.reset();
+      return;
+    }
+    // Interactive mode: the child IS the verdict source. Discard the
+    // `success` ack; if it returned `(error "...")`, abort with the
+    // message — there's no recovery from a malformed command in this
     // simple synchronous protocol.
     std::string Resp = Proc->readResponse();
-    if (Resp != "success") {
-      // A one-shot model solver is auxiliary: on child death (EOF reads as
-      // an empty response), drop it and continue file-only — the one-shot
-      // run is the verdict source, only counterexample support is lost.
-      if (OneShotMode && Resp.empty()) {
-        Proc.reset();
-        return;
-      }
-      fatalErrorIf(true,
-                   ("SMTLIBSolver: child solver returned: " + Resp).c_str());
-    }
+    fatalErrorIf(Resp != "success",
+                 ("SMTLIBSolver: child solver returned: " + Resp).c_str());
   }
 }
 

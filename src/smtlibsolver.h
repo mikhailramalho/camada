@@ -140,6 +140,20 @@ public:
   ///   - error: `(error "...")`
   std::string readResponse() const;
 
+  /// Like readResponse(), but waits at most `TimeoutMs` for the child to
+  /// start answering (select on the pipe, same technique as
+  /// drainResponses). Returns nullopt when nothing arrived in time and an
+  /// empty string on EOF. Used for protocol acks from the auxiliary
+  /// one-shot model solver, which must never block camada indefinitely.
+  ///
+  /// The select-vs-stdio-buffer caveat from drainResponses does not bite
+  /// here: a conforming child answers exactly one response per command, so
+  /// the stdio buffer is empty whenever this is called. Only a
+  /// nonconforming child can batch responses ahead, and for those the
+  /// resulting spurious timeout drops the child — exactly the intended
+  /// outcome.
+  std::optional<std::string> readResponseWithin(unsigned TimeoutMs) const;
+
   /// Best-effort non-blocking drain: read responses until none are pending
   /// within `TimeoutMs`. Used by resetImpl() to absorb solver-specific stray
   /// `success` lines emitted alongside the standard reset/option acks (e.g.
@@ -250,9 +264,11 @@ public:
   /// interactive solver (execvp, no shell), which starts solving in
   /// parallel at check() and serves get-value queries after a sat verdict;
   /// its own answer is available via oneShotModelVerdict() so the caller
-  /// can detect a diverging model solver. A model solver that dies is
-  /// dropped silently — the one-shot run remains the verdict source and
-  /// only counterexample support is lost.
+  /// can detect a diverging model solver. A model solver that misbehaves
+  /// in any way — dies, hangs, answers garbage, does not speak the
+  /// `:print-success` ack protocol — is dropped silently (acks are read
+  /// with a deadline, see OneShotModelAckTimeoutMs): the one-shot run
+  /// remains the verdict source and only counterexample support is lost.
   ///
   /// check() may be called once; a second call aborts. On no verdict the
   /// result is UNKNOWN and oneShotDiagnostics() carries the evidence.
@@ -282,6 +298,16 @@ public:
   /// One-shot mode: facts about the last run (command, exit status,
   /// output tail) for the caller's diagnostics.
   const OneShotDiagnostics &oneShotDiagnostics() const { return Diags; }
+
+  /// One-shot mode: deadline for each protocol ack from the auxiliary
+  /// model solver. Acks are instantaneous for any conforming child; a
+  /// child that does not answer within the deadline does not speak the
+  /// `:print-success` protocol and is dropped (only counterexample
+  /// support is lost). Does NOT apply to the read of the model solver's
+  /// own verdict after a sat one-shot run — that read can legitimately
+  /// take as long as the solve and stays blocking. Process-global;
+  /// tunable mainly so tests do not have to wait out the default.
+  static unsigned OneShotModelAckTimeoutMs;
 
   ~SMTLIBSolver() override;
 
@@ -501,6 +527,14 @@ private:
 
   // Emit a single line (newline appended) to the active emitter(s).
   void emitLine(const std::string &Text);
+
+  /// One-shot mode only: read one protocol ack from the auxiliary model
+  /// solver, bounded by OneShotModelAckTimeoutMs. On timeout or EOF the
+  /// child is dropped (Proc reset) and nullopt is returned; otherwise the
+  /// reply is returned for the caller to judge. Callers that require
+  /// `success` drop the child on anything else — an auxiliary child that
+  /// misbehaves in any way costs counterexample support, never the run.
+  std::optional<std::string> oneShotModelReply();
 
   // Emit a check command (a query: no `success` ack) and read the
   // sat/unsat/unknown verdict; UNKNOWN in write-only mode.
