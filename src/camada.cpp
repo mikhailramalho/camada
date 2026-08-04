@@ -57,69 +57,80 @@ namespace camada {
 
 std::string getCamadaVersion() { return CAMADA_VERSION; }
 
-SMTSolverRef createZ3Solver() {
+SMTSolverRef createZ3Solver(ArrayEncoding ArrayMode) {
 #if SOLVER_Z3_ENABLED
-  return std::make_unique<Z3Solver>();
+  return std::make_unique<Z3Solver>(ArrayMode);
 #else
+  (void)ArrayMode;
   fatalError("Camada was not compiled with Z3 support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_Z3=ON");
 #endif
 }
 
-SMTSolverRef createMathSATSolver() {
+SMTSolverRef createMathSATSolver(ArrayEncoding ArrayMode) {
 #if SOLVER_MATHSAT_ENABLED
-  return std::make_unique<MathSATSolver>();
+  return std::make_unique<MathSATSolver>(ArrayMode);
 #else
+  (void)ArrayMode;
   fatalError("Camada was not compiled with MathSAT support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_MATHSAT=ON");
 #endif
 }
 
-SMTSolverRef createCVC5Solver(UnsatAssumptionsMode Mode) {
+SMTSolverRef createCVC5Solver(UnsatAssumptionsMode Mode,
+                              ArrayEncoding ArrayMode) {
 #if SOLVER_CVC5_ENABLED
-  return std::make_unique<CVC5Solver>(Mode);
+  return std::make_unique<CVC5Solver>(Mode, ArrayMode);
 #else
   (void)Mode;
+  (void)ArrayMode;
   fatalError("Camada was not compiled with CVC5 support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_CVC5=ON");
 #endif
 }
 
-SMTSolverRef createBitwuzlaSolver(UnsatAssumptionsMode Mode) {
+SMTSolverRef createBitwuzlaSolver(UnsatAssumptionsMode Mode,
+                                  ArrayEncoding ArrayMode) {
 #if SOLVER_BITWUZLA_ENABLED
-  return std::make_unique<BitwuzlaSolver>(Mode);
+  return std::make_unique<BitwuzlaSolver>(Mode, ArrayMode);
 #else
   (void)Mode;
+  (void)ArrayMode;
   fatalError("Camada was not compiled with Bitwuzla support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_BITWUZLA=ON");
 #endif
 }
 
-SMTSolverRef createYicesSolver() {
+SMTSolverRef createYicesSolver(ArrayEncoding ArrayMode) {
 #if SOLVER_YICES_ENABLED
-  return std::make_unique<YicesSolver>();
+  return std::make_unique<YicesSolver>(ArrayMode);
 #else
+  (void)ArrayMode;
   fatalError("Camada was not compiled with YICES support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_YICES=ON");
 #endif
 }
 
-SMTSolverRef createSTPSolver() {
+SMTSolverRef createSTPSolver(ArrayEncoding ArrayMode) {
 #if SOLVER_STP_ENABLED
-  return std::make_unique<STPSolver>();
+  return std::make_unique<STPSolver>(ArrayMode);
 #else
+  (void)ArrayMode;
   fatalError("Camada was not compiled with STP support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_STP=ON");
 #endif
 }
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                TupleEncoding TupleMode) {
+                                TupleEncoding TupleMode,
+                                ArrayEncoding ArrayMode) {
 #if SOLVER_SMTLIB_ENABLED
-  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, TupleMode);
+  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, TupleMode, "",
+                                        ArrayMode);
 #else
   (void)Argv;
   (void)TupleMode;
+  (void)ArrayMode;
   fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
              "(unsupported on this platform)");
 #endif
@@ -127,14 +138,16 @@ SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
                                 const std::string &OutputPath,
-                                TupleEncoding TupleMode) {
+                                TupleEncoding TupleMode,
+                                ArrayEncoding ArrayMode) {
 #if SOLVER_SMTLIB_ENABLED
   return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, OutputPath,
-                                        TupleMode);
+                                        TupleMode, "", ArrayMode);
 #else
   (void)Argv;
   (void)OutputPath;
   (void)TupleMode;
+  (void)ArrayMode;
   fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
              "(unsupported on this platform)");
 #endif

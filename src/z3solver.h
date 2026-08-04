@@ -67,8 +67,9 @@ public:
 
 class Z3Solver : public SMTSolverImpl {
 public:
-  Z3Solver();
-  explicit Z3Solver(z3::context C);
+  explicit Z3Solver(ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit Z3Solver(z3::context C,
+                    ArrayEncoding Arrays = ArrayEncoding::Native);
   // There is deliberately no (context, solver) constructor: z3::solver
   // holds a pointer to the context *object* it was built against, and
   // z3::context is move-only, so any solver a caller could pass would
@@ -116,7 +117,12 @@ protected:
   SMTSortRef
   mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
 
-  bool nativeTupleSupport() const override { return true; }
+  // Native datatypes cannot hold an Ackermann-encoded array member (it
+  // has no backend term), so the Ackermann array mode forces the Camada
+  // tuple encoding.
+  bool nativeTupleSupport() const override {
+    return ArrayMode != ArrayEncoding::Ackermann;
+  }
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 

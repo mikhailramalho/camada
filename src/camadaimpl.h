@@ -25,6 +25,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -39,6 +40,10 @@
 #include "camadasort.h"
 
 namespace camada {
+
+// Model-walk scratch state for the Ackermann array encoding; defined in
+// camadaarray.cpp.
+struct AckClassWalk;
 
 class SMTSolverImpl : public SMTSolver {
 public:
@@ -220,6 +225,65 @@ protected:
 
   SMTExprRef mkEncodedArrayEqual(const SMTExprRef &LHS, const SMTExprRef &RHS);
   void assertArrayEqualCongruence(std::size_t LinkId, const SMTExprRef &Index);
+
+  // --- Ackermann array encoding (opt-in, see ArrayEncoding) ---
+  // Array terms are Camada-owned nodes with no backend representation
+  // (see camadaarray.cpp); selects on symbol roots become fresh element
+  // variables ("reads") tied by pairwise congruence axioms, so the theory
+  // of arrays never reaches the backend. Array equality reuses the
+  // encoded-equality machinery above; the congruence axioms are journaled
+  // in LazyConstraintLevels like every other scope-independent fact.
+  // Sound and complete for quantifier-free formulas only; the mode also
+  // forces the Camada tuple encoding (native tuples cannot hold a
+  // no-backend-term array member).
+  ArrayEncoding ArrayMode = ArrayEncoding::Native;
+  struct AckArrayRead {
+    SMTExprRef Index;
+    SMTExprRef Value;
+    // BV-constant index with bits known at build time (see
+    // AckBVConstBits): canonicalized by value so equal constants share a
+    // read and distinct constants skip the congruence axiom.
+    bool IndexIsConst;
+    std::string ConstBits;
+  };
+  struct AckArrayRootState {
+    // Ordered: each new read emits congruence against all prior ones, so
+    // every unordered pair is related exactly once.
+    std::vector<AckArrayRead> Reads;
+    std::unordered_map<const SMTExpr *, std::size_t> ReadsByIndex;
+    std::unordered_map<std::string, std::size_t> ReadsByConstBits;
+  };
+  std::unordered_map<const SMTExpr *, AckArrayRootState> AckArrayRoots;
+  // Bits of BV constants built through mkBVFromBin/mkBVFromDec, tracked
+  // only in Ackermann mode (general expressions are not hash-consed, so
+  // the value is otherwise unrecoverable at build time).
+  std::unordered_map<const SMTExpr *, std::string> AckBVConstBits;
+  uint64_t AckArrayCounter = 0;
+  // Default values handed out for unconstrained (root, index value) model
+  // queries, so repeated queries agree; cleared with the model (see
+  // invalidateUnsatAssumptions).
+  std::map<std::pair<const SMTExpr *, std::string>, SMTExprRef>
+      AckModelDefaults;
+
+  SMTSortRef mkAckArraySort(const SMTSortRef &IndexSort,
+                            const SMTSortRef &ElemSort);
+  SMTExprRef mkAckArraySymbol(const std::string &Name, const SMTSortRef &Sort);
+  SMTExprRef mkAckArraySelect(const SMTExprRef &Array, const SMTExprRef &Index);
+  SMTExprRef mkAckArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
+                             const SMTExprRef &Element);
+  SMTExprRef mkAckArrayIte(const SMTExprRef &Cond, const SMTExprRef &T,
+                           const SMTExprRef &F);
+  SMTExprRef mkAckArrayConst(const SMTSortRef &IndexSort,
+                             const SMTExprRef &InitValue);
+  void ackWalkChain(const SMTExpr *Node, const std::string &QueryBits,
+                    AckClassWalk &Walk);
+  void ackExpandEqualityClass(const SMTSortRef &ArraySort,
+                              const std::string &QueryBits, AckClassWalk &Walk);
+  SMTExprRef ackDefaultElementValue(const SMTSortRef &Sort);
+  SMTExprRef resolveAckArrayElement(const SMTExprRef &Array,
+                                    const SMTExprRef &Index);
+  SMTResult<ArrayModel> ackArrayModel(const SMTExprRef &Array);
+  void noteAckBVConstBits(const SMTExprRef &Exp, const std::string &Bits);
 
   /// Lower a constant array as a fresh backend array symbol whose
   /// "every element equals InitValue" semantics are enforced lazily: the

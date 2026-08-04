@@ -9,6 +9,12 @@
 #include <cstring>
 #include <random>
 
+TEST_CASE("Ackermann arrays Bitwuzla test", "[Bitwuzla]") {
+  auto bzla = camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::Off,
+                                           camada::ArrayEncoding::Ackermann);
+  ack_array_tests(bzla);
+}
+
 TEST_CASE("Simple Bitwuzla test", "[Bitwuzla]") {
   auto bitwuzla = camada::createBitwuzlaSolver();
   tests(bitwuzla);

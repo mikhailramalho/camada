@@ -31,6 +31,14 @@ Current encoded/common-layer features:
 - fixed-point arithmetic (TR 18037-shaped: values plus undefined-behavior
   predicates for overflow and division by zero), encoded over bit-vectors
   in the common layer, so it works on every backend
+- an opt-in Ackermann array encoding (`ArrayEncoding::Ackermann`, accepted
+  by every `create*Solver()` factory): arrays never reach the
+  backend — every select becomes a fresh element variable tied by
+  congruence axioms, stores/ites are lowered structurally, and equality
+  uses a witness-index encoding. Quantifier-free formulas only; the mode
+  forces the Camada tuple encoding, and rejects nested arrays and
+  array-sorted UF signatures. Useful where a backend's array decision
+  procedure is the bottleneck
 
 ## What Camada Is
 

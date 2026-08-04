@@ -697,18 +697,24 @@ const std::string &textOf(const SMTSortRef &S) {
 } // namespace
 
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
-                           TupleEncoding TupleMode, const std::string &Logic)
+                           TupleEncoding TupleMode, const std::string &Logic,
+                           ArrayEncoding Arrays)
     : File(std::make_unique<FileEmitter>(OutputPath)), TupleMode(TupleMode),
       LogicOverride(Logic) {
+  // Before the singletons: constant tracking (AckBVConstBits) must cover
+  // the cached small bit-vectors.
+  ArrayMode = Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
-                           TupleEncoding TupleMode, const std::string &Logic)
+                           TupleEncoding TupleMode, const std::string &Logic,
+                           ArrayEncoding Arrays)
     : Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
       LogicOverride(Logic) {
+  ArrayMode = Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -716,10 +722,12 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const std::string &OutputPath,
-                           TupleEncoding TupleMode, const std::string &Logic)
+                           TupleEncoding TupleMode, const std::string &Logic,
+                           ArrayEncoding Arrays)
     : File(std::make_unique<FileEmitter>(OutputPath)),
       Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
       LogicOverride(Logic) {
+  ArrayMode = Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -728,13 +736,14 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
                            const std::string &ShellCmd,
                            const std::vector<std::string> &ModelArgv,
                            PgidCallback OnSpawn, TupleEncoding TupleMode,
-                           const std::string &Logic)
+                           const std::string &Logic, ArrayEncoding Arrays)
     : OneShotMode(true), OneShotFormulaPath(FormulaPath),
       OneShotShellCmd(ShellCmd), OneShotOnSpawn(std::move(OnSpawn)),
       File(std::make_unique<FileEmitter>(FormulaPath)),
       Proc(ModelArgv.empty() ? nullptr
                              : std::make_unique<ProcessEmitter>(ModelArgv)),
       TupleMode(TupleMode), LogicOverride(Logic) {
+  ArrayMode = Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }

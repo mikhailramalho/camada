@@ -43,6 +43,28 @@ TEST_CASE("Tuple-with-Int Z3 test", "[Z3]") {
   tuple_semantics_with_int(z3);
 }
 
+TEST_CASE("Ackermann arrays Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+  ack_array_tests(z3);
+}
+
+// The full shared fixture suite under the Ackermann encoding — the same
+// coverage the native-array mode gets, so every composition (const
+// arrays, tuples, FP, FXP, push/pop, models) is proven against the
+// encoding, not just the targeted ack_* fixtures.
+TEST_CASE("Ackermann full fixture suite Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+  tests(z3);
+}
+
+TEST_CASE("Ackermann arrays reject quantifiers Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+  require_abort([&]() {
+    auto x = z3->mkSymbol("x", z3->mkBVSort(4));
+    (void)z3->mkForall({x}, z3->mkEqual(x, x));
+  });
+}
+
 TEST_CASE("Override Z3 Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
@@ -179,6 +201,12 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
                              fxp_rounding_semantics(solver), makeSMTLIBSolver)
 CAMADA_Z3_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
                              fxp_model_and_constructs(solver), makeSMTLIBSolver)
+
+// Ackermann array encoding over the pipe: the wire carries no array
+// theory at all — only the read variables and their congruence axioms.
+CAMADA_Z3_SMTLIB_SHARED_TEST("ack_array_tests [Ackermann]",
+                             ack_array_tests(solver),
+                             makeSMTLIBSolverAckermannArrays)
 
 #undef CAMADA_Z3_SMTLIB_SHARED_TEST
 #endif // SOLVER_SMTLIB_ENABLED
