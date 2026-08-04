@@ -1,5 +1,14 @@
 /* Generated backend feature macros for Camada. */
 
+/* Runtime stale-handle detection. When 1 (the default), SMTExprRef and
+   SMTSortRef carry a generation tag (24 bytes) and dereferencing a handle
+   after the owning solver was reset or destroyed aborts with a clear
+   message. When 0, handles are a single raw pointer (8 bytes) and stale
+   use is undefined behavior. Baked in at library configure time
+   (-DCAMADA_CHECKED_HANDLES=OFF); the library and its consumers must
+   agree, which including this generated header guarantees. */
+#cmakedefine01 CAMADA_CHECKED_HANDLES
+
 #cmakedefine01 CAMADA_HAVE_BITWUZLA
 #cmakedefine01 CAMADA_HAVE_CVC5
 #cmakedefine01 CAMADA_HAVE_MATHSAT

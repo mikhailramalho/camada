@@ -400,6 +400,12 @@ inline void symbol_cache_survives_push_pop(const camada::SMTSolverRef &solver) {
 
 inline void
 handle_invalidation_after_reset(const camada::SMTSolverRef &solver) {
+#if !CAMADA_CHECKED_HANDLES
+  // Unchecked handles are a raw pointer: reset cannot be detected and
+  // stale use is undefined behavior by contract.
+  (void)solver;
+  SKIP("stale-handle detection is compiled out (CAMADA_CHECKED_HANDLES=OFF)");
+#else
   auto sort = solver->mkBVSort(8);
   auto expr = solver->mkSymbol("stale", sort);
 
@@ -415,7 +421,15 @@ handle_invalidation_after_reset(const camada::SMTSolverRef &solver) {
   auto fresh_expr = solver->mkSymbol("fresh", fresh_sort);
   REQUIRE(fresh_sort.isValid());
   REQUIRE(fresh_expr.isValid());
+#endif
 }
+
+// Pin the size contract ESBMC cares about: checked handles are pointer +
+// state + generation; unchecked handles are exactly one pointer.
+static_assert(sizeof(camada::SMTExprRef) == (CAMADA_CHECKED_HANDLES ? 24 : 8),
+              "SMTExprRef size drifted from the documented layout");
+static_assert(sizeof(camada::SMTSortRef) == (CAMADA_CHECKED_HANDLES ? 24 : 8),
+              "SMTSortRef size drifted from the documented layout");
 
 inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   auto x = solver->mkSymbol("x", solver->mkBVSort(4));

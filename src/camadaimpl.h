@@ -26,7 +26,6 @@
 #include <cassert>
 #include <cstdint>
 #include <map>
-#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -333,8 +332,9 @@ protected:
   /// were never instantiated).
   SMTResult<ArrayModel> lazyArrayModel(const SMTExprRef &Array);
 
-  std::shared_ptr<SMTHandleState> HandleState =
-      std::make_shared<SMTHandleState>();
+  /// Process-lifetime (see makeProcessLifetimeHandleState): handles keep a
+  /// raw pointer to it, so it must stay readable after this solver dies.
+  SMTHandleState *HandleState = makeProcessLifetimeHandleState();
 
 public:
   SMTExprRef getBVZero1Expr() const;

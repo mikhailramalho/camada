@@ -159,6 +159,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Build test related commands
 option(CAMADA_ENABLE_REGRESSION "Enable regression testing" OFF)
+
+option(
+  CAMADA_CHECKED_HANDLES
+  "Runtime stale-handle detection: SMTExprRef/SMTSortRef carry a generation \
+tag (24 bytes) and abort on use after solver reset/destruction. OFF makes \
+handles a single raw pointer (8 bytes); stale use becomes undefined \
+behavior. Baked into the installed camadafeatures.h — the library and its \
+consumers must be built with the same value."
+  ON)
 if(CAMADA_ENABLE_REGRESSION)
   include(CTest)
   find_package(Catch2 3 QUIET)
