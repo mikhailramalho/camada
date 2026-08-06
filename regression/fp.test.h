@@ -308,6 +308,79 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver,
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Regression for the ESBMC fp.to_ieee_bv round-trip report: bit-exact
+// fp<->bv correspondence wherever camada can prove the bits.
+inline void fp_ieee_bv_bitexact_roundtrip(const camada::SMTSolverRef &solver,
+                                          camada::FPEncoding Encoding) {
+  auto fp32 = [&]() { return solver->mkFP32Sort(Encoding); };
+  auto bv32 = [&]() { return solver->mkBVSort(32); };
+
+  // 1. Direct round-trip is exact for EVERY pattern, NaN payloads
+  // included: bits(to_fp(b)) == b universally. fp.to_ieee_bv alone cannot
+  // provide this (it is underspecified at NaN); the provenance shadow
+  // makes it a term-level identity.
+  {
+    auto b = solver->mkSymbol("rt_b", bv32());
+    auto f = solver->mkBVToIEEEFP(b, fp32());
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(f), b)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 2. ESBMC's byte-write laundering chain: an uninitialized float
+  // written byte-by-byte (0x40490FDB, little-endian), each step
+  // round-tripping the partial state through the FP sort via a fresh SSA
+  // symbol tied by an asserted equality. Before the shadow, any
+  // partial-write state encoding NaN let the solver discard the bytes
+  // already written; the final byte read must nevertheless be exact.
+  {
+    auto byteAt = [&](const camada::SMTExprRef &bits, unsigned lo) {
+      return solver->mkBVExtract(lo + 7, lo, bits);
+    };
+    const uint64_t Bytes[4] = {0xDB, 0x0F, 0x49, 0x40};
+    auto f = solver->mkSymbol("lc_f0", fp32());
+    for (unsigned i = 0; i < 4; ++i) {
+      auto bits = solver->mkIEEEFPToBV(f);
+      auto wr = solver->mkBVFromDec(static_cast<int64_t>(Bytes[i]), 8);
+      // Rebuild the 32-bit pattern with byte i replaced.
+      camada::SMTExprRef nbits;
+      if (i == 0)
+        nbits = solver->mkBVConcat(solver->mkBVExtract(31, 8, bits), wr);
+      else if (i == 3)
+        nbits = solver->mkBVConcat(wr, solver->mkBVExtract(23, 0, bits));
+      else
+        nbits = solver->mkBVConcat(
+            solver->mkBVConcat(solver->mkBVExtract(31, 8 * (i + 1), bits), wr),
+            solver->mkBVExtract(8 * i - 1, 0, bits));
+      auto next = solver->mkSymbol("lc_f" + std::to_string(i + 1), fp32());
+      solver->addConstraint(
+          solver->mkEqual(solver->mkBVToIEEEFP(nbits, fp32()), next));
+      f = next;
+    }
+    auto finalBits = solver->mkIEEEFPToBV(f);
+    solver->addConstraint(solver->mkNot(
+        solver->mkEqual(byteAt(finalBits, 0), solver->mkBVFromDec(0xDB, 8))));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 3. Assert-derived provenance dies with its push scope: after the
+  // tying equality is popped, the bits are unconstrained again, so a
+  // divergent pattern must be satisfiable.
+  {
+    auto g = solver->mkSymbol("sc_g", fp32());
+    auto pat = solver->mkBVFromDec(0x40490FDB, 32);
+    solver->push();
+    solver->addConstraint(
+        solver->mkEqual(g, solver->mkBVToIEEEFP(pat, fp32())));
+    solver->pop();
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(g), pat)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+}
+
 // Regression: mkIEEEFPToBV must return a PLAIN BV sort, not BVFP. The
 // native backends used to tag the bit pattern with the BVFP sort, which
 // leaked into caller sort comparisons — ESBMC's float→int bitcast
