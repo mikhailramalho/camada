@@ -492,6 +492,20 @@ inline void dump_string_semantics(const camada::SMTSolverRef &solver) {
   solver->dumpModel(model_dump);
   REQUIRE(!model_dump.empty());
   REQUIRE(model_dump != "seed");
+
+  // Regression: dumpModel with Camada-owned symbols in the symbol cache
+  // (encoded tuples on backends without native datatypes carry no backend
+  // term). Bitwuzla's model dump used to cast every cache entry to its
+  // native expression type and SIGSEGV on the tuple node.
+  solver->reset();
+  auto tup = solver->mkSymbol(
+      "dmt", solver->mkTupleSort({solver->mkBVSort(8), solver->mkBoolSort()}));
+  solver->addConstraint(solver->mkEqual(solver->mkTupleSelect(tup, 0),
+                                        solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  std::string tuple_model_dump = "seed";
+  solver->dumpModel(tuple_model_dump);
+  REQUIRE(tuple_model_dump != "seed");
 }
 
 inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
