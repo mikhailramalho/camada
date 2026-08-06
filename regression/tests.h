@@ -111,6 +111,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_bv_conversions, BVFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, NativeFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, BVFP);
+  RESETANDARGTEST(fp_ieee_bv_bitexact_roundtrip, NativeFP);
+  RESETANDARGTEST(fp_ieee_bv_bitexact_roundtrip, BVFP);
   RESETANDARGTEST(fp_to_signed_bv_multiple_widths, BVFP);
   RESETANDARGTEST(fp_denormal_round_to_integral, NativeFP);
   RESETANDARGTEST(fp_denormal_round_to_integral, BVFP);

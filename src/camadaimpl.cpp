@@ -279,6 +279,9 @@ void SMTSolverImpl::clearExprCaches() {
   ArrayEqualCongruenceDone.clear();
   AckArrayRoots.clear();
   AckBVConstBits.clear();
+  IEEEBVShadow.clear();
+  PendingShadowLinks.clear();
+  ShadowScopeLevels.assign(1, {});
   invalidateUnsatAssumptions();
 }
 
@@ -563,7 +566,18 @@ SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
   requireBoolSort(Exp, "Expected boolean constraint");
   invalidateUnsatAssumptions();
+  commitShadowLink(Exp);
   return addConstraintImpl(Exp);
+}
+
+void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
+  auto It = PendingShadowLinks.find(&*Constraint);
+  if (It == PendingShadowLinks.end())
+    return;
+  // Keep the first (outermost) entry on collision so a pop cannot erase a
+  // fact established in an outer scope; only journal what was inserted.
+  if (IEEEBVShadow.emplace(It->second.Target, It->second.Bits).second)
+    ShadowScopeLevels.back().push_back(It->second.Target);
 }
 
 #define CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(ReturnType, Name, SortAssert,      \
@@ -794,6 +808,19 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
   assert(theExp->isBoolSort());
+  // Native-FP equality with exactly one shadowed side: if this equality
+  // gets asserted top-level, the other side provably carries the same
+  // bits (see IEEEBVShadow; commit happens in addConstraint).
+  if (LHS->isFPSort() && !usesBVFPEncoding(LHS)) {
+    auto L = IEEEBVShadow.find(&*LHS);
+    auto R = IEEEBVShadow.find(&*RHS);
+    const bool HasL = L != IEEEBVShadow.end();
+    const bool HasR = R != IEEEBVShadow.end();
+    if (HasL != HasR)
+      PendingShadowLinks.emplace(
+          &*theExp, PendingShadowLink{HasL ? &*RHS : &*LHS,
+                                      HasL ? L->second : R->second});
+  }
   return theExp;
 }
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkImplies,
@@ -2029,6 +2056,12 @@ SMTExprRef SMTSolverImpl::mkFPFromBin(const std::string &FP, unsigned EWidth,
                           : mkFPFromBinImpl(FP, EWidth);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == FP.length());
+  // The bits of a native-FP constant are known here and nowhere else;
+  // remember them so mkIEEEFPToBV round-trips exactly, NaN payloads
+  // included (see IEEEBVShadow).
+  if (!usesBVFPEncoding(Sort))
+    IEEEBVShadow.emplace(&*theExp,
+                         mkBVFromBin(FP, static_cast<unsigned>(FP.length())));
   FPConstExprCache.emplace(std::move(Key), theExp);
   return theExp;
 }
@@ -2154,11 +2187,26 @@ SMTExprRef SMTSolverImpl::mkBVToIEEEFP(const SMTExprRef &Exp,
                           : mkBVToIEEEFPImpl(Exp, To);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == Exp->getWidth());
+  // Remember the bits this native-FP term was built from, so a later
+  // mkIEEEFPToBV round-trips exactly (see IEEEBVShadow). BV-encoded FP is
+  // already exact (the base mkIEEEFPToBVImpl retags the same term), and
+  // only a plain-BV source can be handed back by mkIEEEFPToBV.
+  if (!usesBVFPEncoding(To) && Exp->Sort->getSortKind() == SMTSortKind::BV)
+    IEEEBVShadow.emplace(&*theExp, Exp);
   return theExp;
 }
 
 SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   requireFPSort(Exp, "Expected floating-point expression");
+  // Bit-exact where provenance is known: if this term was built from bits
+  // (or an asserted equality ties it to one that was), hand the original
+  // bits back instead of asking the backend — fp.to_ieee_bv is
+  // underspecified at NaN and a backend may otherwise answer with any NaN
+  // pattern. See IEEEBVShadow. Terms with no provable provenance fall
+  // back to the underspecified operation SILENTLY; callers that need
+  // unconditional bit-exactness must use FPEncoding::BV.
+  if (auto It = IEEEBVShadow.find(&*Exp); It != IEEEBVShadow.end())
+    return It->second;
   SMTExprRef theExp = usesBVFPEncoding(Exp)
                           ? SMTSolverImpl::mkIEEEFPToBVImpl(Exp)
                           : mkIEEEFPToBVImpl(Exp);
@@ -2270,6 +2318,7 @@ void SMTSolverImpl::reset() {
 void SMTSolverImpl::push(unsigned nscopes) {
   invalidateUnsatAssumptions();
   LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
+  ShadowScopeLevels.resize(ShadowScopeLevels.size() + nscopes);
   pushImpl(nscopes);
 }
 
@@ -2285,6 +2334,14 @@ void SMTSolverImpl::pop(unsigned nscopes) {
     Reassert.insert(Reassert.end(), std::make_move_iterator(Level.begin()),
                     std::make_move_iterator(Level.end()));
     LazyConstraintLevels.pop_back();
+  }
+  // Assert-derived bit-pattern shadows die with their scope: the tying
+  // equality is retracted by the pop, and keeping the bits without it
+  // would let mkIEEEFPToBV claim facts no longer asserted.
+  for (unsigned I = 0; I < nscopes && ShadowScopeLevels.size() > 1; ++I) {
+    for (const SMTExpr *Key : ShadowScopeLevels.back())
+      IEEEBVShadow.erase(Key);
+    ShadowScopeLevels.pop_back();
   }
   popImpl(nscopes);
   for (SMTExprRef &Constraint : Reassert) {

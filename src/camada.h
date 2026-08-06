@@ -1017,13 +1017,33 @@ public:
 
   /// Reinterpret a floating-point as a bitvector, using the IEEE format.
   ///
+  /// NaN caveat: the underlying operation (fp.to_ieee_bv) is
+  /// underspecified for NaN inputs — the FP sort has a single NaN value
+  /// while the bit-vector encoding has many NaN patterns, so no function
+  /// out of the sort can recover which pattern produced a NaN, and a
+  /// backend may answer with any of them. Camada compensates where it can
+  /// PROVE the bits: when Exp was built by mkBVToIEEEFP or an FP-constant
+  /// constructor, or a top-level asserted equality ties it to such a
+  /// term, the original bit pattern is returned exactly (a term-level
+  /// rewrite, uniform across backends, exact for round-trips like
+  /// byte-level memory models). The trade: with that rewrite the result
+  /// is a function of the TERM's provenance, not only of the FP value —
+  /// two value-equal NaN terms may report different patterns, which is
+  /// C's memory semantics rather than SMT-LIB's functional one.
+  ///
+  /// IMPORTANT: a term whose provenance camada cannot prove falls back to
+  /// the underspecified backend operation SILENTLY — there is no
+  /// diagnostic. Callers that need unconditional bit-exactness must use
+  /// FPEncoding::BV, where FP values ARE their bit patterns.
+  ///
   /// Scope caveat: bitwuzla, cvc5, and the SMT-LIB pipeline backend implement
-  /// this by materializing a fresh BV symbol and binding it to the FP value
-  /// through an asserted equality. That equality is tied to the current
+  /// the fallback by materializing a fresh BV symbol and binding it to the FP
+  /// value through an asserted equality. That equality is tied to the current
   /// (push) level, so the returned bitvector is only meaningful at the
   /// nesting level where this method was called — using it after a (pop)
   /// that crosses the call site leaves the result effectively unconstrained.
-  /// Z3's native backend uses fp.to_ieee_bv directly and is not affected.
+  /// (Provenance-derived results are immune: nothing is asserted for them.
+  /// Assert-derived provenance itself dies with its scope on pop.)
   virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) = 0;
 
   /// Check if the constraints are satisfiable

@@ -284,6 +284,37 @@ protected:
   SMTResult<ArrayModel> ackArrayModel(const SMTExprRef &Array);
   void noteAckBVConstBits(const SMTExprRef &Exp, const std::string &Bits);
 
+  // --- IEEE bit-pattern shadow for mkIEEEFPToBV ---
+  // fp.to_ieee_bv is underspecified at NaN: the FP sort has one NaN value
+  // while the encoding has millions of NaN patterns, so no function out
+  // of the sort can recover which pattern produced a NaN, and a backend
+  // may answer with any of them. That is unsound for callers that need
+  // bit-exact fp<->bv round-trips (byte-level memory models). Where
+  // camada can PROVE the bits — the FP term was built by mkBVToIEEEFP or
+  // mkFPFromBin, or a top-level asserted equality ties it to such a term
+  // — mkIEEEFPToBV returns the original bits instead of asking the
+  // backend. This is a term-level rewrite, not a constraint: nothing is
+  // asserted, so it composes with push/pop and every backend uniformly.
+  //
+  // Provenance entries (terms camada itself built from bits) are
+  // scope-independent identity facts. Entries derived from asserted
+  // equalities die with their push scope: the tying constraint is
+  // retracted by pop(), and keeping the bits without it could conjure
+  // contradictions out of thin air.
+  std::unordered_map<const SMTExpr *, SMTExprRef> IEEEBVShadow;
+  // mkEqual results pairing a native-FP term with a shadowed counterpart;
+  // the shadow commits only if the equality is actually asserted
+  // top-level (a negated or embedded equality proves nothing).
+  struct PendingShadowLink {
+    const SMTExpr *Target;
+    SMTExprRef Bits;
+  };
+  std::unordered_map<const SMTExpr *, PendingShadowLink> PendingShadowLinks;
+  // Scope journal for assert-derived entries: pop() erases them — the
+  // opposite of LazyConstraintLevels' re-assert, deliberately.
+  std::vector<std::vector<const SMTExpr *>> ShadowScopeLevels{1};
+  void commitShadowLink(const SMTExprRef &Constraint);
+
   /// Lower a constant array as a fresh backend array symbol whose
   /// "every element equals InitValue" semantics are enforced lazily: the
   /// default axiom is instantiated at each index term the formula observes
