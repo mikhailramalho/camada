@@ -1193,10 +1193,11 @@ SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   // to bv, so we create a new symbol
   const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
 
-  const SMTSortRef &to =
-      mkFPSort(Exp->Sort->getFPExponentWidth(),
-               Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
-  const SMTExprRef &newSymbol = mkSymbolUnchecked(name, to);
+  // Plain BV, not BVFP: the contract is "give me the bit pattern", and a
+  // BVFP-sorted result leaks into caller sort comparisons (a float→int
+  // bitcast would carry a BVFP sort where the caller's type says BV).
+  const SMTExprRef &newSymbol =
+      mkSymbolUnchecked(name, mkBVSort(Exp->getWidth()));
 
   // and constraint it to be the conversion of the fp, since
   // (fp_matches_bv f bv) <-> (= f ((_ to_fp E S) bv))

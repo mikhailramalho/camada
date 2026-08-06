@@ -2162,7 +2162,9 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   SMTExprRef theExp = usesBVFPEncoding(Exp)
                           ? SMTSolverImpl::mkIEEEFPToBVImpl(Exp)
                           : mkIEEEFPToBVImpl(Exp);
-  assert(theExp->isBVSort());
+  // Exactly a plain BV sort: isBVSort() also answers true for BVFP, and a
+  // BVFP-sorted result would leak into caller sort comparisons.
+  assert(theExp->Sort->getSortKind() == SMTSortKind::BV);
   assert(theExp->getWidth() == Exp->getWidth());
   return theExp;
 }

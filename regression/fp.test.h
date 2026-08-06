@@ -308,6 +308,31 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver,
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Regression: mkIEEEFPToBV must return a PLAIN BV sort, not BVFP. The
+// native backends used to tag the bit pattern with the BVFP sort, which
+// leaked into caller sort comparisons — ESBMC's float→int bitcast
+// produced a term whose sort disagreed with its own BV type, aborting on
+// the first mkEqual against an ordinary bit-vector.
+inline void fp_ieee_bv_sort_identity(const camada::SMTSolverRef &solver,
+                                     camada::FPEncoding Encoding) {
+  auto fp = solver->mkSymbol("ibv_f", solver->mkFP32Sort(Encoding));
+  auto bits = solver->mkIEEEFPToBV(fp);
+
+  // Exactly the sort mkBVSort(32) hands out — this is what callers compare
+  // against, and BVFP would fail requireSameSort below.
+  REQUIRE(bits->Sort == solver->mkBVSort(32));
+
+  // ESBMC's bitcast pattern: equate the bit pattern with a plain BV
+  // symbol, then pin the round-trip semantics.
+  auto ibv = solver->mkSymbol("ibv_i", solver->mkBVSort(32));
+  solver->addConstraint(solver->mkEqual(bits, ibv));
+  solver->addConstraint(solver->mkEqual(fp, solver->mkFP32(1.5f, Encoding)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+  auto v = solver->getBVInBin(ibv);
+  REQUIRE(v);
+  REQUIRE(v.value() == "00111111110000000000000000000000"); // 1.5f
+}
+
 inline void fp_to_signed_bv_multiple_widths(const camada::SMTSolverRef &solver,
                                             camada::FPEncoding Encoding) {
   auto fp = solver->mkFP32(42.0f, Encoding);

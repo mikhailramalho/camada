@@ -1071,10 +1071,12 @@ SMTExprRef Z3Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef Z3Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  const SMTSortRef &to =
-      mkFPSort(Exp->Sort->getFPExponentWidth(),
-               Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
-  return makeExprRef<Z3Expr>(SMTExprKind::IEEEFPToBV, &Context, to,
+  // Plain BV, not BVFP: z3's mk_to_ieee_bv already returns a bit-vector
+  // term, and a BVFP-sorted wrapper leaks into caller sort comparisons (a
+  // float→int bitcast would carry a BVFP sort where the caller's type
+  // says BV).
+  return makeExprRef<Z3Expr>(SMTExprKind::IEEEFPToBV, &Context,
+                             mkBVSort(Exp->getWidth()),
                              toZ3Expr(Exp).mk_to_ieee_bv());
 }
 
