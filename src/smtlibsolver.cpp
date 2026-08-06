@@ -697,24 +697,24 @@ const std::string &textOf(const SMTSortRef &S) {
 } // namespace
 
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
-                           TupleEncoding TupleMode, const std::string &Logic,
-                           ArrayEncoding Arrays)
-    : File(std::make_unique<FileEmitter>(OutputPath)), TupleMode(TupleMode),
-      LogicOverride(Logic) {
+                           const SolverConfig &Config)
+    : File(std::make_unique<FileEmitter>(OutputPath)), TupleMode(Config.Tuples),
+      LogicOverride(Config.Logic),
+      OneShotAckTimeoutMs(Config.OneShotModelAckTimeoutMs) {
   // Before the singletons: constant tracking (AckBVConstBits) must cover
   // the cached small bit-vectors.
-  ArrayMode = Arrays;
+  ArrayMode = Config.Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
-                           TupleEncoding TupleMode, const std::string &Logic,
-                           ArrayEncoding Arrays)
-    : Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
-      LogicOverride(Logic) {
-  ArrayMode = Arrays;
+                           const SolverConfig &Config)
+    : Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(Config.Tuples),
+      LogicOverride(Config.Logic),
+      OneShotAckTimeoutMs(Config.OneShotModelAckTimeoutMs) {
+  ArrayMode = Config.Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -722,12 +722,12 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const std::string &OutputPath,
-                           TupleEncoding TupleMode, const std::string &Logic,
-                           ArrayEncoding Arrays)
+                           const SolverConfig &Config)
     : File(std::make_unique<FileEmitter>(OutputPath)),
-      Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
-      LogicOverride(Logic) {
-  ArrayMode = Arrays;
+      Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(Config.Tuples),
+      LogicOverride(Config.Logic),
+      OneShotAckTimeoutMs(Config.OneShotModelAckTimeoutMs) {
+  ArrayMode = Config.Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -735,15 +735,15 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
 SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
                            const std::string &ShellCmd,
                            const std::vector<std::string> &ModelArgv,
-                           PgidCallback OnSpawn, TupleEncoding TupleMode,
-                           const std::string &Logic, ArrayEncoding Arrays)
+                           PgidCallback OnSpawn, const SolverConfig &Config)
     : OneShotMode(true), OneShotFormulaPath(FormulaPath),
       OneShotShellCmd(ShellCmd), OneShotOnSpawn(std::move(OnSpawn)),
       File(std::make_unique<FileEmitter>(FormulaPath)),
       Proc(ModelArgv.empty() ? nullptr
                              : std::make_unique<ProcessEmitter>(ModelArgv)),
-      TupleMode(TupleMode), LogicOverride(Logic) {
-  ArrayMode = Arrays;
+      TupleMode(Config.Tuples), LogicOverride(Config.Logic),
+      OneShotAckTimeoutMs(Config.OneShotModelAckTimeoutMs) {
+  ArrayMode = Config.Arrays;
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -919,11 +919,9 @@ checkResult SMTLIBSolver::oneShotCheck() {
 
 SMTLIBSolver::~SMTLIBSolver() { invalidateGeneratedObjects(); }
 
-unsigned SMTLIBSolver::OneShotModelAckTimeoutMs = 5000;
-
 std::optional<std::string> SMTLIBSolver::oneShotModelReply() {
   std::optional<std::string> Resp =
-      Proc->readResponseWithin(OneShotModelAckTimeoutMs);
+      Proc->readResponseWithin(OneShotAckTimeoutMs);
   if (!Resp || Resp->empty()) {
     // Timeout (the child does not speak the ack protocol) or EOF (it
     // died): drop it and continue file-only — the one-shot run is the

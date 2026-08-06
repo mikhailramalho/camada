@@ -7,8 +7,40 @@
 #include <catch2/catch_test_macros.hpp>
 #include <yicessolver.h>
 
+// SolverConfig::Logic drives the Yices context logic; it must survive
+// reset(), which recreates the context.
+TEST_CASE("Config logic Yices test", "[YICES]") {
+  camada::SolverConfig Cfg;
+  Cfg.Logic = "QF_BV";
+  auto yices = camada::createYicesSolver(Cfg);
+  auto x = yices->mkSymbol("x", yices->mkBVSort(8));
+  yices->addConstraint(yices->mkEqual(x, yices->mkBVFromDec(7, 8)));
+  REQUIRE(yices->check() == camada::checkResult::SAT);
+  yices->reset();
+  auto y = yices->mkSymbol("y", yices->mkBVSort(8));
+  yices->addConstraint(yices->mkEqual(y, yices->mkBVFromDec(9, 8)));
+  REQUIRE(yices->check() == camada::checkResult::SAT);
+
+  // Pin that the logic actually reached the context: a QF_BV context has
+  // no array solver, so asserting an array constraint aborts — under the
+  // default QF_AUFBV it would work. Fails if the Logic plumbing is ever
+  // dropped.
+  require_abort([&]() {
+    camada::SolverConfig BVOnly;
+    BVOnly.Logic = "QF_BV";
+    auto s = camada::createYicesSolver(BVOnly);
+    auto bv8 = s->mkBVSort(8);
+    auto a = s->mkSymbol("a", s->mkArraySort(bv8, bv8));
+    s->addConstraint(s->mkEqual(s->mkArraySelect(a, s->mkBVFromDec(1, 8)),
+                                s->mkBVFromDec(2, 8)));
+    (void)s->check();
+  });
+}
+
 TEST_CASE("Ackermann arrays Yices test", "[YICES]") {
-  auto yices = camada::createYicesSolver(camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto yices = camada::createYicesSolver(Cfg);
   ack_array_tests(yices);
 }
 

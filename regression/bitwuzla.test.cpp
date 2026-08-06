@@ -9,9 +9,20 @@
 #include <cstring>
 #include <random>
 
+namespace {
+// C++17: no designated initializers, so a tiny builder for the one field
+// these tests flip.
+inline camada::SolverConfig withUnsatAssumptions() {
+  camada::SolverConfig Cfg;
+  Cfg.UnsatAssumptions = camada::UnsatAssumptionsMode::On;
+  return Cfg;
+}
+} // namespace
+
 TEST_CASE("Ackermann arrays Bitwuzla test", "[Bitwuzla]") {
-  auto bzla = camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::Off,
-                                           camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto bzla = camada::createBitwuzlaSolver(Cfg);
   ack_array_tests(bzla);
 }
 
@@ -191,8 +202,7 @@ TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 
-  auto withCores =
-      camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::On);
+  auto withCores = camada::createBitwuzlaSolver(withUnsatAssumptions());
   REQUIRE(withCores->supports(SolverFeature::UnsatAssumptions));
 }
 
@@ -200,7 +210,7 @@ TEST_CASE("Unsat-assumption opt-in Bitwuzla test", "[Bitwuzla]") {
   // The default solver runs the shared fixture through its
   // core-unsupported branch (inside tests()); the opted-in solver must
   // produce real cores end to end.
-  auto solver = camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::On);
+  auto solver = camada::createBitwuzlaSolver(withUnsatAssumptions());
   check_sat_assuming_semantics(solver);
   // The shared fixture tolerates core-less backends, so pin explicitly
   // that this solver actually produces one — and that the opt-in survives

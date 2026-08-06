@@ -90,11 +90,13 @@ public:
 
 class MathSATSolver : public SMTSolverImpl {
 public:
-  explicit MathSATSolver(ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit MathSATSolver(const SolverConfig &SolverCfg = {});
 
   /// Take ownership of a MathSAT configuration and reuse it across resets.
+  /// Caller-built msat_config: SolverCfg.Logic is ignored — the logic is
+  /// whatever the given configuration was created with.
   explicit MathSATSolver(msat_config Config,
-                         ArrayEncoding Arrays = ArrayEncoding::Native);
+                         const SolverConfig &SolverCfg = {});
   ~MathSATSolver() override;
 
 protected:

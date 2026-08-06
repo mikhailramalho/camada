@@ -31,8 +31,13 @@ Current encoded/common-layer features:
 - fixed-point arithmetic (TR 18037-shaped: values plus undefined-behavior
   predicates for overflow and division by zero), encoded over bit-vectors
   in the common layer, so it works on every backend
-- an opt-in Ackermann array encoding (`ArrayEncoding::Ackermann`, accepted
-  by every `create*Solver()` factory): arrays never reach the
+- a `SolverConfig` object on every `create*Solver()` factory holding the
+  construction-frozen options: the array encoding, the tuple lowering
+  (Camada per-field lowering can be forced even on native-datatype
+  backends), unsat-assumption production, a caller-chosen logic (SMT-LIB,
+  Yices, MathSAT), and the SMT-LIB one-shot ack deadline
+- an opt-in Ackermann array encoding (`SolverConfig::Arrays =
+  ArrayEncoding::Ackermann`): arrays never reach the
   backend — every select becomes a fresh element variable tied by
   congruence axioms, stores/ites are lowered structurally, and equality
   uses a witness-index encoding. Quantifier-free formulas only; the mode
@@ -323,8 +328,8 @@ query; millisecond limits round up to the next second.
 <sup>5</sup> Opt-in at solver creation: producing unsat assumptions slows
 every check on these backends and the option is frozen at context
 creation, so `createBitwuzlaSolver`/`createCVC5Solver` default it off —
-pass `UnsatAssumptionsMode::On` to extract cores. `checkSatAssuming`
-itself works regardless.
+set `SolverConfig::UnsatAssumptions = UnsatAssumptionsMode::On` to
+extract cores. `checkSatAssuming` itself works regardless.
 
 The last four rows (and any platform splits) are queryable at runtime via
 `supports(SolverFeature)`; `checkSatAssuming` itself works on every

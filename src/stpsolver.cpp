@@ -78,15 +78,15 @@ void STPExpr::dump(std::string &Out) const {
   free(s);
 }
 
-STPSolver::STPSolver(ArrayEncoding Arrays)
+STPSolver::STPSolver(const SolverConfig &Config)
     : Context(STP::vc_createValidityChecker()) {
-  ArrayMode = Arrays;
+  ArrayMode = Config.Arrays;
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }
 
-STPSolver::STPSolver(STP::VC C, ArrayEncoding Arrays) : Context(C) {
-  ArrayMode = Arrays;
+STPSolver::STPSolver(STP::VC C, const SolverConfig &Config) : Context(C) {
+  ArrayMode = Config.Arrays;
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }

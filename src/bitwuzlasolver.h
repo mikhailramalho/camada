@@ -66,8 +66,7 @@ public:
 
 class BitwuzlaSolver : public SMTSolverImpl {
 public:
-  explicit BitwuzlaSolver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
-                          ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit BitwuzlaSolver(const SolverConfig &Config = {});
   ~BitwuzlaSolver() override;
 
 protected:

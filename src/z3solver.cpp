@@ -103,18 +103,20 @@ void Z3Expr::dump(std::string &Out) const {
   Out += "\n";
 }
 
-Z3Solver::Z3Solver(ArrayEncoding Arrays) : Solver(Context) {
-  // The mode must be set before the singletons are built so constant
+Z3Solver::Z3Solver(const SolverConfig &Config) : Solver(Context) {
+  // The modes must be set before the singletons are built so constant
   // tracking (AckBVConstBits) covers the cached small bit-vectors.
-  ArrayMode = Arrays;
+  ArrayMode = Config.Arrays;
+  TupleMode = Config.Tuples;
   // Needs to be set in order to convert NaN to bitvector
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
 }
 
-Z3Solver::Z3Solver(z3::context C, ArrayEncoding Arrays)
+Z3Solver::Z3Solver(z3::context C, const SolverConfig &Config)
     : Context(std::move(C)), Solver(Context) {
-  ArrayMode = Arrays;
+  ArrayMode = Config.Arrays;
+  TupleMode = Config.Tuples;
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();
 }
