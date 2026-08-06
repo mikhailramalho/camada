@@ -1129,9 +1129,22 @@ void BitwuzlaSolver::dumpImpl(std::string &Out) {
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {
   Out.clear();
   for (const auto &entry : SymbolExprCache) {
-    const BitwuzlaTerm term = toSolverExpr<BitwExpr>(*entry.second).Expr;
+    // The symbol cache also holds Camada-owned nodes (encoded tuples,
+    // tuple-array bundles, Ackermann arrays) that carry no bitwuzla term
+    // at all — casting one yields a garbage term and a SIGSEGV inside
+    // bitwuzla. Skip them: their backing per-field/per-read backend
+    // symbols are separate cache entries and print on their own.
+    const auto *BE = dynamic_cast<const BitwExpr *>(entry.second.get());
+    if (BE == nullptr)
+      continue;
+    const BitwuzlaTerm term = BE->Expr;
+    // A term without a symbol has nothing to name in a define-fun (and
+    // appending a null char* to std::string is undefined behavior).
+    const char *Symbol = bitwuzla_term_get_symbol(term);
+    if (Symbol == nullptr)
+      continue;
     Out += "(define-fun ";
-    Out += bitwuzla_term_get_symbol(term);
+    Out += Symbol;
     Out += " () ";
     Out += bitwuzla_sort_to_string(bitwuzla_term_get_sort(term));
     Out += " ";
