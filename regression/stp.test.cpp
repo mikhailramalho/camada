@@ -139,3 +139,8 @@ TEST_CASE("SMTLIB pipeline: ack_array_tests_flat [Ackermann] [stp]",
   ack_array_tests_flat(solver);
 }
 #endif
+
+TEST_CASE("Unsupported nested constant arrays STP test", "[STP]") {
+  auto stp = camada::createSTPSolver();
+  require_abort([&]() { nested_const_array_semantics(stp); });
+}

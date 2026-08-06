@@ -1355,9 +1355,16 @@ bool SMTSolverImpl::reachesLazyArray(const SMTExprRef &Exp) const {
 
 SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
                                            const SMTExprRef &InitValue) {
-  fatalErrorIf(InitValue->isArraySort() && reachesLazyArray(InitValue),
-               "Lazily lowered constant arrays cannot be nested inside one "
-               "another");
+  // Nesting (array_of(array_of(v))) is supported: the outer default axiom
+  // `select(Root, i) = Init` is an ASSERTED-TRUE array equality, which
+  // instantiateLazyDefaultAt lowers without an extensionality witness —
+  // known-true polarity has no negative direction to protect, and not
+  // minting a witness per default is exactly what makes nesting terminate
+  // (a witness would be observed, firing this same root's default at a
+  // fresh index, forever). Reads of the nested value observe the inner
+  // index, firing the inner root's default there, and the asserted
+  // equality propagates it. Model extraction returns the inner lazy array
+  // as the base; the consumer re-queries it via getArrayElement.
   SMTSortRef ArraySort = mkArraySort(IndexSort, InitValue->Sort);
   SMTExprRef Root = mkSymbolUnchecked(
       "__CAMADA_lazyarr" + std::to_string(LazyConstArrayCounter++), ArraySort);
@@ -1385,7 +1392,26 @@ void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
     return;
   // Copy: the maps may rehash while the constraint is built.
   const LazyConstArrayRoot Root = LazyConstArrayRoots.at(RootKey);
-  SMTExprRef Constraint = mkEqual(mkArraySelect(Root.Root, Index), Root.Init);
+  SMTExprRef Sel = mkArraySelect(Root.Root, Index);
+  SMTExprRef Constraint;
+  if (Root.Init->isArraySort()) {
+    // Nested lazy const array: the default is an ASSERTED-TRUE array
+    // equality, so it needs no extensionality witness — there is no
+    // negative direction a model could fake. Going through the public
+    // mkEqual would mint one, whose observation re-fires this same
+    // root's default at the fresh witness, unboundedly; the direct
+    // native equality is both sound (the backend enforces it
+    // extensionally, and Init's own defaults fire at every observed
+    // inner index) and what makes nesting terminate. STP cannot build
+    // nested array sorts at all, so the non-extensional case is
+    // unreachable here.
+    fatalErrorIf(!nativeArrayExtensionality(),
+                 "Nested lazy constant arrays require native array "
+                 "extensionality");
+    Constraint = mkEqualImpl(Sel, Root.Init);
+  } else {
+    Constraint = mkEqual(Sel, Root.Init);
+  }
   addConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
