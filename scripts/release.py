@@ -95,6 +95,12 @@ if __name__ == '__main__':
         "-DCMAKE_BUILD_TYPE=Release",
         "-DCMAKE_INSTALL_PREFIX=../release/",
         "-DRELEASE_MODE=ON",
+        # Release artifacts ship lean 8-byte handles (raw pointers, old
+        # ESBMC semantics: stale use is UB). The flag is baked into the
+        # installed camadafeatures.h, so consumers of these tarballs get
+        # the matching layout automatically. Debug/CI builds keep the
+        # default checked 24-byte handles with stale-use detection.
+        "-DCAMADA_CHECKED_HANDLES=OFF",
     ]
 
     if is_windows:

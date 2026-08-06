@@ -26,8 +26,24 @@
 #include <algorithm>
 #include <cstdio>
 #include <limits>
+#include <memory>
+#include <mutex>
 
 namespace camada {
+
+SMTHandleState *makeProcessLifetimeHandleState() {
+  // The registry itself is a deliberately immortal heap allocation: states
+  // must stay readable for the whole process (a handle can outlive its
+  // solver, and even static-storage solvers bump their state's generation
+  // during exit teardown, after any static registry would already be
+  // destroyed). It stays reachable through this static pointer, so leak
+  // checkers classify it as still-reachable rather than lost.
+  static std::mutex RegistryMutex;
+  static auto *Registry = new std::vector<std::unique_ptr<SMTHandleState>>();
+  std::lock_guard<std::mutex> Lock(RegistryMutex);
+  Registry->push_back(std::make_unique<SMTHandleState>());
+  return Registry->back().get();
+}
 
 namespace {
 
