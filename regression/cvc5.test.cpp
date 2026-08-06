@@ -7,9 +7,36 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cvc5solver.h>
 
+namespace {
+// C++17: no designated initializers, so a tiny builder for the one field
+// these tests flip.
+inline camada::SolverConfig withUnsatAssumptions() {
+  camada::SolverConfig Cfg;
+  Cfg.UnsatAssumptions = camada::UnsatAssumptionsMode::On;
+  return Cfg;
+}
+} // namespace
+
+// SolverConfig::Tuples = Camada forces the per-field lowering even though
+// cvc5 has native datatypes.
+TEST_CASE("Camada tuples via config CVC5 test", "[CVC5]") {
+  camada::SolverConfig Cfg;
+  Cfg.Tuples = camada::TupleEncoding::Camada;
+  auto cvc5 = camada::createCVC5Solver(Cfg);
+  REQUIRE_FALSE(cvc5->supports(camada::SolverFeature::NativeTuples));
+  tuple_semantics(cvc5);
+  cvc5->reset();
+  tuple_with_array_field(cvc5);
+  cvc5->reset();
+  tuple_array_semantics(cvc5);
+  cvc5->reset();
+  tuple_update_semantics(cvc5);
+}
+
 TEST_CASE("Ackermann arrays CVC5 test", "[CVC5]") {
-  auto cvc5 = camada::createCVC5Solver(camada::UnsatAssumptionsMode::Off,
-                                       camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto cvc5 = camada::createCVC5Solver(Cfg);
   ack_array_tests(cvc5);
 }
 
@@ -175,7 +202,7 @@ TEST_CASE("CVC5 feature capabilities", "[CVC5]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 
-  auto withCores = camada::createCVC5Solver(camada::UnsatAssumptionsMode::On);
+  auto withCores = camada::createCVC5Solver(withUnsatAssumptions());
   REQUIRE(withCores->supports(SolverFeature::UnsatAssumptions));
 }
 
@@ -183,7 +210,7 @@ TEST_CASE("Unsat-assumption opt-in CVC5 test", "[CVC5]") {
   // The default solver runs the shared fixture through its
   // core-unsupported branch (inside tests()); the opted-in solver must
   // produce real cores end to end.
-  auto solver = camada::createCVC5Solver(camada::UnsatAssumptionsMode::On);
+  auto solver = camada::createCVC5Solver(withUnsatAssumptions());
   check_sat_assuming_semantics(solver);
   // The shared fixture tolerates core-less backends, so pin explicitly
   // that this solver actually produces one — and that the opt-in survives

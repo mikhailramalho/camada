@@ -221,21 +221,23 @@ class SMTLIBSolver : public SMTSolverImpl {
 public:
   /// Write-only constructor: write the emitted SMT-LIB script to OutputPath.
   /// Pass "-" for stdout. check() returns UNKNOWN; get* queries error.
-  /// `TupleMode` selects how tuples are lowered on the wire — see the
-  /// docstring on TupleEncoding.
-  /// `Logic` (all four constructors) overrides the emitted
-  /// `(set-logic ...)`. Empty (the default) keeps the built-in behaviour:
-  /// `ALL`, with a one-shot `QF_AUFBV` retry for interactive children that
-  /// reject it. A non-empty value is emitted verbatim and no negotiation is
-  /// attempted — the caller is asserting it knows what the child accepts,
-  /// and a child that rejects it is a fatal error, not a retry.
-  /// `Arrays` (all four constructors) selects the array encoding — see the
-  /// docstring on ArrayEncoding. Ackermann mode keeps the theory of arrays
-  /// off the wire entirely and forces the Camada tuple encoding.
+  ///
+  /// `Config` (all four constructors) carries the construction-frozen
+  /// options — see SolverConfig. This backend consumes:
+  ///   - Tuples: how tuples are lowered on the wire (TupleEncoding);
+  ///   - Logic: overrides the emitted `(set-logic ...)`. Empty (the
+  ///     default) keeps the built-in behaviour: `ALL`, with a one-shot
+  ///     `QF_AUFBV` retry for interactive children that reject it. A
+  ///     non-empty value is emitted verbatim and no negotiation is
+  ///     attempted — the caller is asserting it knows what the child
+  ///     accepts, and a child that rejects it is a fatal error, not a
+  ///     retry (a one-shot model child is dropped instead);
+  ///   - Arrays: the array encoding (ArrayEncoding). Ackermann mode keeps
+  ///     the theory of arrays off the wire entirely and forces the Camada
+  ///     tuple encoding;
+  ///   - OneShotModelAckTimeoutMs: one-shot mode only, see below.
   explicit SMTLIBSolver(const std::string &OutputPath,
-                        TupleEncoding TupleMode = TupleEncoding::Native,
-                        const std::string &Logic = "",
-                        ArrayEncoding Arrays = ArrayEncoding::Native);
+                        const SolverConfig &Config = {});
 
   /// Interactive constructor: spawn a child solver via
   /// `execvp(Argv[0], Argv)`. The solver must speak standard SMT-LIB on
@@ -244,18 +246,13 @@ public:
   /// verbatim, so spaces, quotes, and other metacharacters in any entry
   /// carry no special meaning.
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
-               TupleEncoding TupleMode = TupleEncoding::Native,
-               const std::string &Logic = "",
-               ArrayEncoding Arrays = ArrayEncoding::Native);
+               const SolverConfig &Config = {});
 
   /// Combined constructor: spawn a child solver via execvp *and* log the
   /// script to a file. Useful when you want both an interactive answer
   /// and a reproducer to hand to another tool.
   SMTLIBSolver(SMTLIBProcessTag, const std::vector<std::string> &Argv,
-               const std::string &OutputPath,
-               TupleEncoding TupleMode = TupleEncoding::Native,
-               const std::string &Logic = "",
-               ArrayEncoding Arrays = ArrayEncoding::Native);
+               const std::string &OutputPath, const SolverConfig &Config = {});
 
   /// One-shot constructor: serialize the script (including `(check-sat)`)
   /// to FormulaPath, then run ShellCmd on it **via a shell** — every `%f`
@@ -285,10 +282,7 @@ public:
   SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
                const std::string &ShellCmd,
                const std::vector<std::string> &ModelArgv = {},
-               PgidCallback OnSpawn = {},
-               TupleEncoding TupleMode = TupleEncoding::Native,
-               const std::string &Logic = "",
-               ArrayEncoding Arrays = ArrayEncoding::Native);
+               PgidCallback OnSpawn = {}, const SolverConfig &Config = {});
 
   /// One-shot mode: the model solver's own answer to the shared query,
   /// read only after a sat verdict from the one-shot run. Unset when no
@@ -305,16 +299,6 @@ public:
   /// One-shot mode: facts about the last run (command, exit status,
   /// output tail) for the caller's diagnostics.
   const OneShotDiagnostics &oneShotDiagnostics() const { return Diags; }
-
-  /// One-shot mode: deadline for each protocol ack from the auxiliary
-  /// model solver. Acks are instantaneous for any conforming child; a
-  /// child that does not answer within the deadline does not speak the
-  /// `:print-success` protocol and is dropped (only counterexample
-  /// support is lost). Does NOT apply to the read of the model solver's
-  /// own verdict after a sat one-shot run — that read can legitimately
-  /// take as long as the solve and stays blocking. Process-global;
-  /// tunable mainly so tests do not have to wait out the default.
-  static unsigned OneShotModelAckTimeoutMs;
 
   ~SMTLIBSolver() override;
 
@@ -583,6 +567,16 @@ private:
   // local) because resetImpl() re-runs emitPreamble() and must re-emit
   // the same logic.
   std::string LogicOverride;
+
+  // One-shot mode: deadline in milliseconds for each protocol ack from
+  // the auxiliary model solver (SolverConfig::OneShotModelAckTimeoutMs).
+  // Acks are instantaneous for any conforming child; one that stays
+  // silent past the deadline does not speak the `:print-success` protocol
+  // and is dropped, costing only counterexample support. Does NOT apply
+  // to the read of the model solver's own verdict after a sat one-shot
+  // run — that read can legitimately take as long as the solve and stays
+  // blocking.
+  unsigned OneShotAckTimeoutMs = 5000;
 
   // Counter for fresh symbols introduced by mkIEEEFPToBVImpl. SMT-LIB has no
   // portable fp→bv same-encoding op, so we materialize a fresh BV symbol
