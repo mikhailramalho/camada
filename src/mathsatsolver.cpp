@@ -713,7 +713,7 @@ SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
   // We can call the conversion API directly here because the arguments were
   // already checked
   const SMTExprRef &rem =
-      SMTSolverImpl::mkFPRemImpl(mkIEEEFPToBVImpl(LHS), mkIEEEFPToBVImpl(RHS));
+      SMTSolverImpl::mkFPRemImpl(bvfpView(LHS), bvfpView(RHS));
 
   // And convert it back the right type
   SMTExprRef result = mkBVToIEEEFP(rem, LHS->Sort);
@@ -769,9 +769,8 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
   // We can call the conversion API directly here because the arguments were
   // already checked
-  const SMTExprRef &fma =
-      SMTSolverImpl::mkFPFMAImpl(mkIEEEFPToBVImpl(X), mkIEEEFPToBVImpl(Y),
-                                 mkIEEEFPToBVImpl(Z), roundingMode);
+  const SMTExprRef &fma = SMTSolverImpl::mkFPFMAImpl(bvfpView(X), bvfpView(Y),
+                                                     bvfpView(Z), roundingMode);
 
   // And convert it back the right type
   SMTExprRef result = mkBVToIEEEFP(fma, X->Sort);
@@ -1136,13 +1135,22 @@ SMTExprRef MathSATSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                                toMathSATTerm(Exp)));
 }
 
-SMTExprRef MathSATSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
+SMTExprRef MathSATSolver::bvfpView(const SMTExprRef &Exp) {
   const SMTSortRef &to =
       mkFPSort(Exp->Sort->getFPExponentWidth(),
                Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
   return makeExprRef<MathSATExpr>(
       SMTExprKind::IEEEFPToBV, &Context, to,
       msat_make_fp_as_ieeebv(Context, toMathSATTerm(Exp)));
+}
+
+SMTExprRef MathSATSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
+  // Plain BV, not BVFP: msat_make_fp_as_ieeebv already returns a
+  // bit-vector term, and a BVFP-sorted wrapper leaks into caller sort
+  // comparisons (a float→int bitcast would carry a BVFP sort where the
+  // caller's type says BV).
+  return rewrapExprImpl(*bvfpView(Exp), mkBVSort(Exp->getWidth()),
+                        SMTExprKind::IEEEFPToBV);
 }
 
 SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,

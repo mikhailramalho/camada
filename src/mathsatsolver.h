@@ -332,6 +332,12 @@ protected:
 
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
+  /// View a native FP term as a Camada BVFP-encoded expression: the raw
+  /// IEEE bits carrying the BVFP sort, which is what the common-layer FP
+  /// bit-blasts (mkFPRemImpl, mkFPFMAImpl) operate on. Distinct from
+  /// mkIEEEFPToBVImpl, whose public contract is a PLAIN BV bit pattern.
+  SMTExprRef bvfpView(const SMTExprRef &Exp);
+
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 

@@ -1007,10 +1007,11 @@ SMTExprRef BitwuzlaSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 
 SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
-  const SMTSortRef &to =
-      mkFPSort(Exp->Sort->getFPExponentWidth(),
-               Exp->Sort->getFPSignificandWidth(), FPEncoding::BV);
-  const SMTExprRef &newSymbol = mkSymbolUnchecked(name, to);
+  // Plain BV, not BVFP: the contract is "give me the bit pattern", and a
+  // BVFP-sorted result leaks into caller sort comparisons (a float→int
+  // bitcast would carry a BVFP sort where the caller's type says BV).
+  const SMTExprRef &newSymbol =
+      mkSymbolUnchecked(name, mkBVSort(Exp->getWidth()));
   addConstraint(mkEqual(Exp, mkBVToIEEEFP(newSymbol, Exp->Sort)));
   return newSymbol;
 }
