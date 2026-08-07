@@ -584,14 +584,6 @@ private:
   // the same logic.
   std::string LogicOverride;
 
-  // Counter for fresh symbols introduced by mkIEEEFPToBVImpl. SMT-LIB has no
-  // portable fp→bv same-encoding op, so we materialize a fresh BV symbol
-  // and constrain it via the inverse fp.from-IEEE-bv direction. The
-  // constraint is scoped to the current push level — same trade-off the
-  // bitwuzla and cvc5 native backends make. See the docstring on
-  // SMTSolver::mkIEEEFPToBV for the user-facing implication.
-  uint64_t NextIEEEBVId = 0;
-
   // Counter for fresh tuple-sort names. mkTupleSortImpl declares a fresh
   // datatype per distinct tuple shape (Camada caches sort identity, so the
   // declaration runs at most once per shape).

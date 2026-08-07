@@ -396,7 +396,6 @@ protected:
 private:
   cvc5::TermManager Terms;
   cvc5::Solver Context;
-  unsigned int ToBVCounter = 0;
 
 }; // end class CVC5Solver
 

@@ -1189,22 +1189,9 @@ SMTExprRef CVC5Solver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  // CVC5 does not provide a direct way to convert from fp
-  // to bv, so we create a new symbol
-  const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
-
-  // Plain BV, not BVFP: the contract is "give me the bit pattern", and a
-  // BVFP-sorted result leaks into caller sort comparisons (a float→int
-  // bitcast would carry a BVFP sort where the caller's type says BV).
-  const SMTExprRef &newSymbol =
-      mkSymbolUnchecked(name, mkBVSort(Exp->getWidth()));
-
-  // and constraint it to be the conversion of the fp, since
-  // (fp_matches_bv f bv) <-> (= f ((_ to_fp E S) bv))
-  addConstraint(mkEqual(Exp, mkBVToIEEEFP(newSymbol, Exp->Sort)));
-
-  // NewSymbol is the resulting bitvector
-  return newSymbol;
+  // No native fp->bv primitive: emulate it as an uninterpreted function
+  // so equal FP values report equal bits (see mkIEEEFPToBVViaUF).
+  return mkIEEEFPToBVViaUF(Exp);
 }
 
 SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,

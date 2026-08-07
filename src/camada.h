@@ -1036,14 +1036,14 @@ public:
   /// diagnostic. Callers that need unconditional bit-exactness must use
   /// FPEncoding::BV, where FP values ARE their bit patterns.
   ///
-  /// Scope caveat: bitwuzla, cvc5, and the SMT-LIB pipeline backend implement
-  /// the fallback by materializing a fresh BV symbol and binding it to the FP
-  /// value through an asserted equality. That equality is tied to the current
-  /// (push) level, so the returned bitvector is only meaningful at the
-  /// nesting level where this method was called — using it after a (pop)
-  /// that crosses the call site leaves the result effectively unconstrained.
-  /// (Provenance-derived results are immune: nothing is asserted for them.
-  /// Assert-derived provenance itself dies with its scope on pop.)
+  /// The fallback is nevertheless FUNCTIONALLY CONSISTENT on every
+  /// backend: value-equal FP terms report equal bits. Z3 and MathSAT get
+  /// this from their native fp->bv primitives; backends without one
+  /// (bitwuzla, cvc5, the SMT-LIB pipeline) emulate the primitive as a
+  /// per-sort uninterpreted function tied per-term by `to_fp(fn(x)) == x`,
+  /// so functional congruence provides the same guarantee. The tie is a
+  /// definitional fact re-asserted across (pop), so the result stays
+  /// meaningful at any nesting level.
   virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) = 0;
 
   /// Check if the constraints are satisfiable
