@@ -315,6 +315,21 @@ protected:
   std::vector<std::vector<const SMTExpr *>> ShadowScopeLevels{1};
   void commitShadowLink(const SMTExprRef &Constraint);
 
+  // --- IEEE bits function for backends without a native fp->bv ---
+  // The old emulation minted a fresh constant per call, so two FP terms
+  // asserted equal could report different bit patterns (the equality may
+  // arrive before either side has shadow provenance, and to_fp is
+  // many-to-one at NaN, so the inverse ties constrain nothing). Emulate
+  // the FUNCTION instead: one uninterpreted function per FP sort, applied
+  // to the term, tied per-term by `to_fp(fn(x)) == x`. Functional
+  // congruence then makes value-equal terms agree by construction — the
+  // same guarantee z3's native primitive has. The tie is a definitional,
+  // scope-independent fact, journaled in LazyConstraintLevels so pop()
+  // re-asserts it; applications are memoized per term.
+  std::unordered_map<const SMTSort *, SMTExprRef> IEEEBVFnCache;
+  std::unordered_map<const SMTExpr *, SMTExprRef> IEEEBVAppCache;
+  SMTExprRef mkIEEEFPToBVViaUF(const SMTExprRef &Exp);
+
   /// Lower a constant array as a fresh backend array symbol whose
   /// "every element equals InitValue" semantics are enforced lazily: the
   /// default axiom is instantiated at each index term the formula observes

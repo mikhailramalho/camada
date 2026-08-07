@@ -1590,15 +1590,10 @@ SMTExprRef SMTLIBSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTLIBSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  // Same trick as the cvc5 backend: SMT-LIB has no direct fp→bv that
-  // preserves the IEEE bit pattern, so introduce a fresh BV symbol and tie it
-  // back via the inverse direction.
-  const std::string Name = "__CAMADA_ieeebv" + std::to_string(NextIEEEBVId++);
-  SMTSortRef BVSort = mkBVSort(Exp->Sort->getFPExponentWidth() +
-                               Exp->Sort->getFPSignificandWidth() + 1);
-  SMTExprRef NewSymbol = mkSymbolUnchecked(Name, BVSort);
-  addConstraint(mkEqual(Exp, mkBVToIEEEFP(NewSymbol, Exp->Sort)));
-  return NewSymbol;
+  // SMT-LIB has no portable fp->bv that preserves the IEEE bit pattern:
+  // emulate it as an uninterpreted function so equal FP values report
+  // equal bits (see mkIEEEFPToBVViaUF).
+  return mkIEEEFPToBVViaUF(Exp);
 }
 
 // --- Int / Real literals + arithmetic ---

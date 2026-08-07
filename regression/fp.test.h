@@ -381,6 +381,52 @@ inline void fp_ieee_bv_bitexact_roundtrip(const camada::SMTSolverRef &solver,
   }
 }
 
+// Regression for the second ESBMC fp.to_ieee_bv report
+// (github_3719_4-nondet): mkIEEEFPToBV must be functionally consistent —
+// value-equal FP terms report equal bits, matching z3's native
+// primitive. The fresh-symbol emulation minted unrelated constants per
+// call, so an equality asserted BEFORE either side had provenance left
+// the two symbols free to diverge at NaN.
+inline void fp_ieee_bv_consistency(const camada::SMTSolverRef &solver,
+                                   camada::FPEncoding Encoding) {
+  auto fp32 = [&]() { return solver->mkFP32Sort(Encoding); };
+
+  // 1. Equality-before-provenance: two plain FP symbols asserted equal
+  // before any fp->bv conversion exists must report equal bits, NaN
+  // included.
+  {
+    auto y = solver->mkSymbol("cy", fp32());
+    auto z = solver->mkSymbol("cz", fp32());
+    solver->addConstraint(solver->mkEqual(y, z));
+    auto by = solver->mkIEEEFPToBV(y);
+    auto bz = solver->mkIEEEFPToBV(z);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(by, bz)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 2. Repeated reads of one term cannot diverge.
+  {
+    auto f = solver->mkSymbol("cf", fp32());
+    auto b1 = solver->mkIEEEFPToBV(f);
+    auto b2 = solver->mkIEEEFPToBV(f);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(b1, b2)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 3. Exactness where the encoding is injective: a non-NaN value's bits
+  // are fully determined.
+  {
+    auto f = solver->mkSymbol("cg", fp32());
+    solver->addConstraint(solver->mkEqual(f, solver->mkFP32(1.5f, Encoding)));
+    auto bits = solver->mkIEEEFPToBV(f);
+    solver->addConstraint(solver->mkNot(
+        solver->mkEqual(bits, solver->mkBVFromDec(0x3FC00000, 32))));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
 // Regression: mkIEEEFPToBV must return a PLAIN BV sort, not BVFP. The
 // native backends used to tag the bit pattern with the BVFP sort, which
 // leaked into caller sort comparisons — ESBMC's float→int bitcast

@@ -282,6 +282,8 @@ void SMTSolverImpl::clearExprCaches() {
   IEEEBVShadow.clear();
   PendingShadowLinks.clear();
   ShadowScopeLevels.assign(1, {});
+  IEEEBVFnCache.clear();
+  IEEEBVAppCache.clear();
   invalidateUnsatAssumptions();
 }
 
@@ -2194,6 +2196,30 @@ SMTExprRef SMTSolverImpl::mkBVToIEEEFP(const SMTExprRef &Exp,
   if (!usesBVFPEncoding(To) && Exp->Sort->getSortKind() == SMTSortKind::BV)
     IEEEBVShadow.emplace(&*theExp, Exp);
   return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
+  // Emulate the fp->bv primitive as a per-sort uninterpreted FUNCTION,
+  // not a per-call constant: functional congruence then forces
+  // value-equal terms to report equal bits, the same guarantee z3's
+  // native fp.to_ieee_bv provides. The per-term tie `to_fp(fn(x)) == x`
+  // pins the exact bits wherever the encoding is injective (everything
+  // but NaN); at NaN the payload is unspecified but consistent. The tie
+  // is a definitional, scope-independent fact — journal it so pop()
+  // re-asserts it, keeping the application memo valid across scopes.
+  if (auto It = IEEEBVAppCache.find(&*Exp); It != IEEEBVAppCache.end())
+    return It->second;
+  auto [FnIt, Inserted] = IEEEBVFnCache.try_emplace(&*Exp->Sort);
+  if (Inserted)
+    FnIt->second = mkSymbolUnchecked(
+        "__CAMADA_ieeebv_fn" + std::to_string(IEEEBVFnCache.size() - 1),
+        mkFunctionSort({Exp->Sort}, mkBVSort(Exp->getWidth())));
+  SMTExprRef Bits = mkApply(FnIt->second, {Exp});
+  IEEEBVAppCache.emplace(&*Exp, Bits);
+  SMTExprRef Tie = mkEqual(mkBVToIEEEFP(Bits, Exp->Sort), Exp);
+  addConstraint(Tie);
+  LazyConstraintLevels.back().push_back(std::move(Tie));
+  return Bits;
 }
 
 SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {

@@ -74,7 +74,6 @@ protected:
   BitwuzlaContextRef context() const { return Context; }
   BitwuzlaOptions *options() const { return Options; }
   BitwuzlaTermManager *termManager() const { return TermManager; }
-  uint64_t ToBVCounter = 0;
 
   void initializeContext();
   void destroyContext();
