@@ -5,6 +5,7 @@
 #include "smtlibsolver.h"
 #endif
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -450,6 +451,97 @@ void benchmarkFPRemOnly(camada::SMTSolver &solver, std::size_t iterations) {
   (void)sink;
 }
 
+// Solve-time FP case: proving add commutativity UNSAT drags the solver
+// through the whole bit-blasted adder -- unpack, alignment, rounding and
+// the renormalization leading-zero count -- on two symbolic operands.
+// Encoding-structure changes (e.g. chain vs tree lzc) only show up in
+// solve time, never in the construction-only fp cases above.
+void benchmarkFPSolveAdd(camada::SMTSolver &solver, std::size_t iterations) {
+  volatile std::size_t sink = 0;
+
+  for (std::size_t cycle = 0; cycle < iterations; ++cycle) {
+    // A toy 8-bit format: the same circuit structure as fp32, but the
+    // proof stays in the milliseconds range (fp32 takes seconds per
+    // check, fp16 still ~2s).
+    auto fp8 = solver.mkFPSort(4, 3, camada::FPEncoding::BV);
+    auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+    auto x = solver.mkSymbol("fp_solve_x", fp8);
+    auto y = solver.mkSymbol("fp_solve_y", fp8);
+    auto lhs = solver.mkFPAdd(x, y, rm);
+    auto rhs = solver.mkFPAdd(y, x, rm);
+    solver.addConstraint(solver.mkNot(solver.mkEqual(lhs, rhs)));
+    sink += solver.check() == camada::checkResult::UNSAT;
+    solver.reset();
+  }
+
+  (void)sink;
+}
+
+// fma(x,y,z) == fma(y,x,z): the product is commutative, so proving the
+// negation UNSAT forces both FMA circuits (alignment, sticky handling,
+// renormalization) end to end.
+void benchmarkFPSolveFMA(camada::SMTSolver &solver, std::size_t iterations) {
+  volatile std::size_t sink = 0;
+
+  for (std::size_t cycle = 0; cycle < iterations; ++cycle) {
+    auto fp8 = solver.mkFPSort(4, 3, camada::FPEncoding::BV);
+    auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+    auto x = solver.mkSymbol("fp_solve_x", fp8);
+    auto y = solver.mkSymbol("fp_solve_y", fp8);
+    auto z = solver.mkSymbol("fp_solve_z", fp8);
+    auto lhs = solver.mkFPFMA(x, y, z, rm);
+    auto rhs = solver.mkFPFMA(y, x, z, rm);
+    solver.addConstraint(solver.mkNot(solver.mkEqual(lhs, rhs)));
+    sink += solver.check() == camada::checkResult::UNSAT;
+    solver.reset();
+  }
+
+  (void)sink;
+}
+
+// Correctly rounded sqrt is weakly monotone: 0 <= x <= y implies
+// sqrt(x) <= sqrt(y). Proving the negation UNSAT forces two sqrt
+// digit-recurrence circuits plus the comparison logic.
+void benchmarkFPSolveSqrt(camada::SMTSolver &solver, std::size_t iterations) {
+  volatile std::size_t sink = 0;
+
+  for (std::size_t cycle = 0; cycle < iterations; ++cycle) {
+    auto fp8 = solver.mkFPSort(4, 3, camada::FPEncoding::BV);
+    auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+    auto x = solver.mkSymbol("fp_solve_x", fp8);
+    auto y = solver.mkSymbol("fp_solve_y", fp8);
+    auto zero =
+        solver.mkFPFromBin(std::string(8, '0'), 4, camada::FPEncoding::BV);
+    solver.addConstraint(solver.mkFPLe(zero, x));
+    solver.addConstraint(solver.mkFPLe(x, y));
+    solver.addConstraint(solver.mkNot(
+        solver.mkFPLe(solver.mkFPSqrt(x, rm), solver.mkFPSqrt(y, rm))));
+    sink += solver.check() == camada::checkResult::UNSAT;
+    solver.reset();
+  }
+
+  (void)sink;
+}
+
+// IEEE remainder ignores the divisor's sign: rem(x, y) == rem(x, -y).
+// Proving the negation UNSAT forces two remainder circuits end to end.
+void benchmarkFPSolveRem(camada::SMTSolver &solver, std::size_t iterations) {
+  volatile std::size_t sink = 0;
+
+  for (std::size_t cycle = 0; cycle < iterations; ++cycle) {
+    auto fp8 = solver.mkFPSort(4, 3, camada::FPEncoding::BV);
+    auto x = solver.mkSymbol("fp_solve_x", fp8);
+    auto y = solver.mkSymbol("fp_solve_y", fp8);
+    auto lhs = solver.mkFPRem(x, y);
+    auto rhs = solver.mkFPRem(x, solver.mkFPNeg(y));
+    solver.addConstraint(solver.mkNot(solver.mkEqual(lhs, rhs)));
+    sink += solver.check() == camada::checkResult::UNSAT;
+    solver.reset();
+  }
+
+  (void)sink;
+}
+
 void benchmarkResetCycleMemory(camada::SMTSolver &solver,
                                std::size_t iterations) {
   volatile std::size_t sink = 0;
@@ -565,6 +657,16 @@ int main(int argc, char **argv) {
     runCase(backend, "fp_fma_only", iterations, benchmarkFPFMAOnly);
     runCase(backend, "fp_rem_only", iterations, benchmarkFPRemOnly);
     runCase(backend, "fp_construct", iterations, benchmarkFPConstruct);
+    // One check() per iteration and each is a real UNSAT proof, so this
+    // case runs at 1/100th of the requested iterations to keep the
+    // default run's wall clock sane.
+    if (backend != "smtlib") {
+      const std::size_t solveIters = std::max<std::size_t>(1, iterations / 100);
+      runCase(backend, "fp_solve_add", solveIters, benchmarkFPSolveAdd);
+      runCase(backend, "fp_solve_fma", solveIters, benchmarkFPSolveFMA);
+      runCase(backend, "fp_solve_sqrt", solveIters, benchmarkFPSolveSqrt);
+      runCase(backend, "fp_solve_rem", solveIters, benchmarkFPSolveRem);
+    }
     runCase(backend, "reset_cycle_memory", iterations,
             benchmarkResetCycleMemory);
     runCase(backend, "reset_cycle_expr_chain", iterations,
