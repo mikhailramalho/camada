@@ -265,40 +265,35 @@ static inline SMTExprRef mkUnbias(SMTSolver &S, const SMTExprRef &Src) {
   return S.mkBVSub(Src, bias);
 }
 
-static inline SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
-                                        unsigned int MaxBits) {
+/* Recurses into BOTH halves and selects with one ite per level, so every
+ * zero-test examines a static slice of the original input. The obvious
+ * alternative -- a narrowing loop that keeps muxing a "current" half -- emits
+ * fewer nodes, but each step's condition then tests the previous step's mux
+ * output; that sequential dependence defeats the solvers' rewriting and
+ * measurably slows bit-blasted FP formulas. The tree form rewrites toward a
+ * priority encoder instead. */
+static SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
+                                 unsigned int MaxBits) {
   std::size_t bv_sz = Src->getWidth();
   if (bv_sz == 0)
     return S.mkBVFromDec(0, MaxBits);
 
-  std::size_t padded_sz = 1;
-  while (padded_sz < bv_sz)
-    padded_sz <<= 1;
-
-  SMTExprRef current =
-      padded_sz == bv_sz ? Src : S.mkBVZeroExt(padded_sz - bv_sz, Src);
-  SMTExprRef count = S.mkBVFromDec(0, MaxBits);
-
-  std::size_t current_sz = padded_sz;
-  while (current_sz > 1) {
-    std::size_t half = current_sz / 2;
-    SMTExprRef upper = S.mkBVExtract(current_sz - 1, half, current);
-    SMTExprRef lower = S.mkBVExtract(half - 1, 0, current);
-    SMTExprRef upper_is_zero = S.mkEqual(upper, S.mkBVFromDec(0, half));
-    SMTExprRef next_count = S.mkBVAdd(count, S.mkBVFromDec(half, MaxBits));
-    count = S.mkIte(upper_is_zero, next_count, count);
-    current = S.mkIte(upper_is_zero, lower, upper);
-    current_sz = half;
+  if (bv_sz == 1) {
+    SMTExprRef eq = S.mkEqual(Src, mkBVZero1(S));
+    return S.mkIte(eq, S.mkBVFromDec(1, MaxBits), S.mkBVFromDec(0, MaxBits));
   }
 
-  SMTExprRef total =
-      S.mkIte(S.mkEqual(current, mkBVZero1(S)),
-              S.mkBVAdd(count, S.mkBVFromDec(1, MaxBits)), count);
+  SMTExprRef H = S.mkBVExtract(bv_sz - 1, bv_sz / 2, Src);
+  SMTExprRef L = S.mkBVExtract(bv_sz / 2 - 1, 0, Src);
 
-  if (padded_sz != bv_sz)
-    total = S.mkBVSub(total, S.mkBVFromDec(padded_sz - bv_sz, MaxBits));
+  const unsigned H_size = H->getWidth();
 
-  return total;
+  SMTExprRef lzH = mkLeadingZeros(S, H, MaxBits);
+  SMTExprRef lzL = mkLeadingZeros(S, L, MaxBits);
+
+  SMTExprRef H_is_zero = S.mkEqual(H, S.mkBVFromDec(0, H_size));
+  SMTExprRef sum = S.mkBVAdd(S.mkBVFromDec(H_size, MaxBits), lzL);
+  return S.mkIte(H_is_zero, sum, lzH);
 }
 
 static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
