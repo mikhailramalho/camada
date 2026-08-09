@@ -274,6 +274,34 @@ void benchmarkArraySelectFanout(camada::SMTSolver &solver,
   (void)sink;
 }
 
+// Select constant indexes from a constant-index store chain. Every level
+// is decidable at build time, so a host-side fold in the Ackermann chain
+// walk answers hits and skips misses without emitting a single term;
+// without it each select emits a 24-deep ite cascade of constant
+// comparisons for the backend rewriter to chew through.
+void benchmarkArraySelectConstChain(camada::SMTSolver &solver,
+                                    std::size_t iterations) {
+  auto idx_sort = solver.mkBVSort(32);
+  auto elem_sort = solver.mkBVSort(32);
+  auto arr = solver.mkSymbol("cc_a", solver.mkArraySort(idx_sort, elem_sort));
+
+  for (int i = 0; i < 24; ++i)
+    arr = solver.mkArrayStore(
+        arr, solver.mkBVFromDec(i, idx_sort),
+        solver.mkBVFromDec(static_cast<int64_t>(i * 3), elem_sort));
+
+  volatile std::size_t sink = 0;
+  // 24 of every 32 iterations hit a store; the rest fall through to the
+  // symbol root and mint (memoized) reads.
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver
+                .mkArraySelect(arr, solver.mkBVFromDec(
+                                        static_cast<int64_t>(i % 32), idx_sort))
+                ->getWidth();
+
+  (void)sink;
+}
+
 // Unlike the construction-only cases, this one calls check(): the array
 // encoding trade (native theory vs Ackermann ground constraints) only
 // shows up in solve time. Each cycle builds a small store chain, a few
@@ -666,6 +694,8 @@ int main(int argc, char **argv) {
     runCase(backend, "array_store_chain", iterations, benchmarkArrayStoreChain);
     runCase(backend, "array_select_fanout", iterations,
             benchmarkArraySelectFanout);
+    runCase(backend, "array_select_const_chain", iterations,
+            benchmarkArraySelectConstChain);
     // Write-only smtlib never solves; array_solve would just measure text
     // emission there.
     if (backend != "smtlib")
