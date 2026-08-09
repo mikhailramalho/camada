@@ -730,7 +730,9 @@ public:
   /// low fractional bits are dropped).
   virtual SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
-  /// Creates a fixed-point division (truncating).
+  /// Creates a fixed-point division. The quotient rounds toward negative
+  /// infinity (floor), matching Clang's -ffixed-point behavior as pinned
+  /// by the execution oracle.
   virtual SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a fixed-point left shift by a concrete amount.
@@ -859,9 +861,12 @@ public:
   virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
                                    const SMTSortRef &To) = 0;
 
-  /// Converts an integer bit-vector (signed per the target format) into a
-  /// fixed-point value.
-  virtual SMTExprRef mkFXPFromBV(const SMTExprRef &Exp,
+  /// Converts an integer bit-vector into a fixed-point value. SrcSigned is
+  /// the signedness of the SOURCE integer type: it governs the value (C's
+  /// int-to-fixed conversion converts the source value, so int8 0xFF is -1
+  /// while uint8 0xFF is 255), independent of the target format's
+  /// signedness, which only governs the representation.
+  virtual SMTExprRef mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
                                  const SMTSortRef &To) = 0;
 
   /// Converts a fixed-point value to an integer bit-vector of the given

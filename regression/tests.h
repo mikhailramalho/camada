@@ -3,6 +3,7 @@
 #include "array.test.h"
 #include "fp.test.h"
 #include "fxp.test.h"
+#include "fxporacle.test.h"
 #include "simple.test.h"
 #include "tuple.test.h"
 
@@ -155,4 +156,6 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_sat_shift_semantics);
   RESETANDTEST(fxp_sat_conversion_semantics);
   RESETANDTEST(fxp_symbolic_shift_semantics);
+  RESETANDTEST(fxp_oracle_semantics);
+  RESETANDTEST(fxp_oracle_mixed_semantics);
 }
