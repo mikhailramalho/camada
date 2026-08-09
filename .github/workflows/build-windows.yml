@@ -31,6 +31,13 @@ jobs:
           build/deps
           build/_deps
         key: ${{ runner.os }}-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
+        # Prefix fallback: a key change (solver version bump) restores the
+        # newest previous deps tree and only rebuilds what changed. Caveat:
+        # on a *downgrade*, the restored tree still holds the newer solver,
+        # which satisfies the minimum-version find and skips the download —
+        # delete the stale caches (gh cache delete) when downgrading.
+        restore-keys: |
+          ${{ runner.os }}-deps-
 
     - name: Configure Camada
       shell: pwsh

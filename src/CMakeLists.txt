@@ -117,7 +117,17 @@ if(${CAMADA_SOLVER_CVC5_ENABLE})
   target_link_directories(
     ${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
     ${CAMADA_DEPS_INSTALL_DIR}/lib64)
-  list(APPEND _camada_backend_link_libs cvc5::cvc5)
+  # CVC5_LINK_LIBRARIES is the resolved archive path when FindCVC5 could read
+  # the imported location, falling back to the cvc5::cvc5 target otherwise —
+  # same self-contained-export rationale as the STP block.
+  list(APPEND _camada_backend_link_libs ${CVC5_LINK_LIBRARIES})
+  # SYSTEM, because that is how the cvc5::cvc5 imported target propagated this
+  # directory: bitwuzla and cvc5 both define an ENUM macro, and only
+  # system-header status keeps clang's -Wmacro-redefined quiet under -Werror.
+  if(CVC5_INCLUDE_DIRS)
+    target_include_directories(${LIBRARY_TARGET_NAME} SYSTEM
+                               PUBLIC "$<BUILD_INTERFACE:${CVC5_INCLUDE_DIRS}>")
+  endif()
   if(CAMADA_CVC5_EXTRA_LIBS)
     list(APPEND _camada_backend_link_libs ${CAMADA_CVC5_EXTRA_LIBS})
   endif()
@@ -134,7 +144,12 @@ if(${CAMADA_SOLVER_MATHSAT_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_STP_ENABLE})
-  list(APPEND _camada_backend_link_libs stp)
+  # STP_LINK_LIBRARIES is absolute archive paths when FindSTP resolved the
+  # imported location (deps-tree installs), or the bare `stp` target for system
+  # installs. Paths keep the installed camada export self-contained — an
+  # exported imported-target *name* would force every consumer through
+  # find_package(STP).
+  list(APPEND _camada_backend_link_libs ${STP_LINK_LIBRARIES})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PUBLIC "$<BUILD_INTERFACE:${STP_INCLUDE_DIRS}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
