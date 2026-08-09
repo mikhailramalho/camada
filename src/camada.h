@@ -789,6 +789,62 @@ public:
   virtual SMTExprRef mkFXPShlOverflow(const SMTExprRef &Exp,
                                       unsigned Amount) = 0;
 
+  // Saturating variants (TR 18037 `_Sat` types / the FX pragmas in SAT
+  // state). Saturation is an operation property, not a sort property: a
+  // `_Sat` type shares its representation with the plain type, so the
+  // frontend picks the sat variant by expression type, mirroring LLVM's
+  // fixed-point intrinsics. Saturating overflow is defined behavior —
+  // results clamp to the format's min/max and there is no paired
+  // predicate — but division by zero remains UB even for `_Sat` types, so
+  // mkFXPDivSat still pairs with mkFXPDivByZero.
+
+  /// Saturating fixed-point addition.
+  virtual SMTExprRef mkFXPAddSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point subtraction.
+  virtual SMTExprRef mkFXPSubSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point negation (unsigned formats clamp to zero for
+  /// any non-zero operand; signed formats clamp the minimum to the max).
+  virtual SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) = 0;
+
+  /// Saturating fixed-point multiplication.
+  virtual SMTExprRef mkFXPMulSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point division. The value is meaningful only under
+  /// the negation of mkFXPDivByZero.
+  virtual SMTExprRef mkFXPDivSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point left shift.
+  virtual SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) = 0;
+
+  // Runtime-amount shift variants: C allows `x << n` with a runtime n, so
+  // each shift takes an Amount expression (a bit-vector of the operand's
+  // width). The value is meaningful under Amount < Width — C's own shift
+  // constraint, which the consumer's UB check guards; at or beyond the
+  // width the SMT shift semantics (zero) apply.
+
+  /// Left shift by a runtime amount.
+  virtual SMTExprRef mkFXPShlExpr(const SMTExprRef &Exp,
+                                  const SMTExprRef &Amount) = 0;
+
+  /// Right shift by a runtime amount (arithmetic for signed formats).
+  virtual SMTExprRef mkFXPShrExpr(const SMTExprRef &Exp,
+                                  const SMTExprRef &Amount) = 0;
+
+  /// True iff the runtime-amount left shift discards significant bits
+  /// (or changes the sign for signed formats).
+  virtual SMTExprRef mkFXPShlOverflowExpr(const SMTExprRef &Exp,
+                                          const SMTExprRef &Amount) = 0;
+
+  /// Saturating left shift by a runtime amount.
+  virtual SMTExprRef mkFXPShlSatExpr(const SMTExprRef &Exp,
+                                     const SMTExprRef &Amount) = 0;
+
   /// Converts between fixed-point formats (truncating on narrowing).
   virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
                                 const SMTSortRef &To) = 0;
@@ -797,6 +853,11 @@ public:
   /// conversion.
   virtual SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
                                         const SMTSortRef &To) = 0;
+
+  /// Saturating fixed-point format conversion: out-of-range values clamp
+  /// to the target format's min/max instead of being undefined.
+  virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
+                                   const SMTSortRef &To) = 0;
 
   /// Converts an integer bit-vector (signed per the target format) into a
   /// fixed-point value.
@@ -808,10 +869,20 @@ public:
   /// fixed-point to integer conversion).
   virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) = 0;
 
-  /// True iff the integer part does not fit the target width of a
-  /// mkFXPToBV conversion.
-  virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp,
-                                       unsigned ToWidth) = 0;
+  /// True iff the toward-zero integer part does not fit the target
+  /// integer type's range: [0, 2^w-1] for an unsigned target,
+  /// two's-complement bounds for a signed one. The plain mkFXPToBV needs
+  /// no signedness parameter — its value bits are the integral part mod
+  /// 2^w either way; only this range report and mkFXPToBVSat's clamp
+  /// depend on the target's signedness.
+  virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,
+                                       bool ToSigned) = 0;
+
+  /// Saturating fixed-point to integer conversion (round toward zero,
+  /// then clamp to the TARGET integer type's range — a negative source
+  /// clamps to zero for an unsigned target.
+  virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
+                                  bool ToSigned) = 0;
 
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.
