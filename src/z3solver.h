@@ -68,14 +68,15 @@ public:
 class Z3Solver : public SMTSolverImpl {
 public:
   explicit Z3Solver(ArrayEncoding Arrays = ArrayEncoding::Native);
-  explicit Z3Solver(z3::context C,
+  // z3::context is neither copyable nor movable in Z3 4.13.x, so a
+  // caller-configured context cannot cross this API; the configuration
+  // does instead, and the context is built in place from it. For the
+  // same reason there is no (context, solver) constructor: any solver a
+  // caller could pass would reference a context object outside this
+  // class. Subclass and call setSolver() against context() to install a
+  // custom solver (see the Override Z3 regression).
+  explicit Z3Solver(z3::config &Config,
                     ArrayEncoding Arrays = ArrayEncoding::Native);
-  // There is deliberately no (context, solver) constructor: z3::solver
-  // holds a pointer to the context *object* it was built against, and
-  // z3::context is move-only, so any solver a caller could pass would
-  // reference the moved-from (nulled) context and crash on the first
-  // refcount operation. Subclass and call setSolver() against context()
-  // to install a custom solver (see the Override Z3 regression).
   ~Z3Solver() override;
 
 protected:

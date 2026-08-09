@@ -111,7 +111,7 @@ Downloaded sources and locally installed solver artifacts are stored under
 
 When CMake downloads dependencies itself:
 - `Bitwuzla` uses the prebuilt static release archive from `0.9.1`.
-- `Z3` uses the prebuilt release archive from `z3-5.0.0`.
+- `Z3` uses the prebuilt release archive from `z3-4.13.3`.
 - `CVC5` uses the prebuilt static release archive from `cvc5-1.3.4`.
 - `Yices` uses a source build.
 - `GMP` uses a source build when it is needed by downloaded dependencies and no
@@ -139,7 +139,7 @@ location during the build.
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
 | [STP](https://stp.github.io/)              |  2.4.0          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
-| [Z3](https://github.com/Z3Prover/z3)       |  5.0.0          | ✔️ |
+| [Z3](https://github.com/Z3Prover/z3)       |  4.13.3         | ✔️ |
 | SMT-LIB (any external solver) | n/a | depends on child |
 
 <sup>1</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
