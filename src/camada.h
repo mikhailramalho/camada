@@ -889,6 +889,37 @@ public:
   virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
                                   bool ToSigned) = 0;
 
+  /// Converts a fixed-point value to a floating-point value of the given
+  /// sort, rounding once per R. C's fixed-to-float conversion rounds to
+  /// nearest even: pass RM::ROUND_TO_EVEN (Clang's direction, pinned by
+  /// the execution oracle). Always defined — every fixed-point range is
+  /// tiny next to any floating-point range. R is the enum, not a
+  /// rounding-mode expression: the encoding routes through an exact wide
+  /// intermediate whose encoding it chooses internally (falling back to
+  /// the BV encoder when the backend's native formats cannot hold the
+  /// intermediate), so it mints the rounding-mode term itself.
+  virtual SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
+                               RM R) = 0;
+
+  /// Converts a floating-point value to a fixed-point value, rounding
+  /// toward zero — C's float-to-fixed direction, which differs from
+  /// fixed-to-fixed narrowing (floor); both pinned by the execution
+  /// oracle. The value is meaningful only under the negation of
+  /// mkFPToFXPOverflow (out-of-range, infinity, and NaN stay UB in C).
+  virtual SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To) = 0;
+
+  /// True iff the float-to-fixed conversion is undefined: NaN, +-infinity,
+  /// or the toward-zero result lies outside the target format's range.
+  virtual SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
+                                       const SMTSortRef &To) = 0;
+
+  /// Saturating float-to-fixed conversion, defined for every input:
+  /// out-of-range values and +-infinity clamp to the format's rails, NaN
+  /// converts to 0 (Clang's choice for _Sat targets; the TR leaves it
+  /// undefined).
+  virtual SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp,
+                                  const SMTSortRef &To) = 0;
+
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.
   virtual SMTExprRef mkArraySelect(const SMTExprRef &Array,

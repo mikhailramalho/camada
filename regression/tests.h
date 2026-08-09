@@ -158,4 +158,6 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_symbolic_shift_semantics);
   RESETANDTEST(fxp_oracle_semantics);
   RESETANDTEST(fxp_oracle_mixed_semantics);
+  RESETANDARGTEST(fxp_fp_conversion_semantics, NativeFP);
+  RESETANDARGTEST(fxp_fp_conversion_semantics, BVFP);
 }

@@ -19,10 +19,13 @@ Usage: fxp_oracle_gen.py --clang /path/to/clang [--out FILE]
 """
 
 import argparse
+import math
 import random
+import struct
 import subprocess
 import sys
 import tempfile
+from fractions import Fraction
 from pathlib import Path
 
 # The x86_64-unknown-linux default ladder (Clang TargetInfo), padding off.
@@ -85,6 +88,19 @@ BINARY_OPS = ["add", "sub", "mul", "div"]
 UNARY_OPS = ["neg"]
 SHIFT_OPS = ["shl", "shr"]
 SAT_SUFFIX = "_sat"
+
+
+def fp_bits(val, fp_w):
+    """Round-to-nearest encoding of a Python float as IEEE bits."""
+    if fp_w == 32:
+        return struct.unpack("<I", struct.pack("<f", val))[0]
+    return struct.unpack("<Q", struct.pack("<d", val))[0]
+
+
+def fp_val(bits, fp_w):
+    if fp_w == 32:
+        return struct.unpack("<f", struct.pack("<I", bits))[0]
+    return struct.unpack("<d", struct.pack("<Q", bits))[0]
 
 
 def min_raw(w, s):
@@ -240,6 +256,48 @@ def emit_conv_fn(idx, from_fmt, to_fmt, vectors):
   }}
 }}"""
     return body
+
+
+def emit_tofp_fn(idx, from_fmt, fp_w, vectors):
+    """fixed -> float/double: always defined; Clang rounds RNE."""
+    (fc, fw, fn, fs) = from_fmt
+    fit = int_type(fw)
+    fpt = "float" if fp_w == 32 else "double"
+    rows = ",".join(f"{a}ull" for a in vectors)
+    return f"""static void case_{idx}(void) {{
+  static const uint64_t v[] = {{{rows}}};
+  for (unsigned i = 0; i < {len(vectors)}u; ++i) {{
+    {fit} ra = ({fit})v[i]; uint{fp_w}_t rr;
+    {fc} a;
+    memcpy(&a, &ra, sizeof a);
+    {fpt} r = ({fpt})a;
+    memcpy(&rr, &r, sizeof r);
+    printf("tofp,{fw},{fn},{int(fs)},{fp_w},%llu,%llu\\n",
+           (unsigned long long)ra, (unsigned long long)rr);
+  }}
+}}"""
+
+
+def emit_fromfp_fn(idx, fp_w, to_fmt, sat, vectors):
+    """float/double -> fixed: rows are FP bit patterns. Plain vectors were
+    UB-filtered (out-of-range/NaN/inf); _Sat is defined for everything."""
+    (tc, tw, tn, ts) = to_fmt
+    tit = int_type(tw)
+    fpt = "float" if fp_w == 32 else "double"
+    qual = f"_Sat {tc}" if sat else tc
+    rows = ",".join(f"{a}ull" for a in vectors)
+    return f"""static void case_{idx}(void) {{
+  static const uint64_t v[] = {{{rows}}};
+  for (unsigned i = 0; i < {len(vectors)}u; ++i) {{
+    uint{fp_w}_t rf = (uint{fp_w}_t)v[i]; {tit} rr;
+    {fpt} a;
+    memcpy(&a, &rf, sizeof a);
+    {qual} r = ({qual})a;
+    memcpy(&rr, &r, sizeof r);
+    printf("fromfp{'_sat' if sat else ''},{fp_w},{tw},{tn},{int(ts)},%llu,%llu\\n",
+           (unsigned long long)rf, (unsigned long long)rr);
+  }}
+}}"""
 
 
 def emit_tobv_fn(idx, from_fmt, to_w, to_signed, vectors):
@@ -417,6 +475,86 @@ def main():
                         emit_tobv_fn(idx, from_fmt, to_w, to_signed, inrange))
                     idx += 1
 
+    # Fixed <-> floating point (REPORT-fxp-api-gaps.md section 1).
+    # fixed -> float/double is defined for every input (fixed ranges are
+    # tiny next to FP ranges); Clang rounds RNE. Crafted inputs exercise
+    # both tie directions and the all-ones carry-out at the 24- and
+    # 53-bit significand boundaries; the ESBMC report's exact vectors
+    # are seeded so the tables subsume that evidence under our pin.
+    ESBMC_TOFP = {
+        (32, 31, True): [0x2AAAAAAB, 0x40000040, 0x400000C0, 0x40000140,
+                         0x7FFFFFC0],
+        (64, 31, True): [0x4000000000000180],
+    }
+    # Each FP-conversion vector costs milliseconds of solver time in the
+    # BV encoding (the FP circuits dominate the regression suite), so the
+    # random pool is a quarter of the arithmetic sections'. The rounding
+    # rules do not vary with format, and the cases that discriminate them
+    # (ties, carry-out, rails, NaN) are all seeded explicitly.
+    fp_randoms = max(args.randoms // 4, 1)
+    for from_fmt in FORMATS:
+        (fc, fw, fn_, fs) = from_fmt
+        singles = boundary_values(fw, fn_, fs) + \
+            [rng.getrandbits(fw) for _ in range(fp_randoms)]
+        singles += ESBMC_TOFP.get((fw, fn_, fs), [])
+        for sig in (24, 53):
+            if fw > sig + 1:
+                top = fw - 2  # stays positive when signed
+                half = 1 << (top - sig)
+                singles += [1 << top | half,           # tie, keep even
+                            1 << top | half << 1 | half,  # tie, keep odd
+                            1 << top | half >> 1,      # tail below half
+                            1 << top | half | 1,       # tail above half
+                            wrap(max_raw(fw, fs) & ~(half - 1), fw)]  # carry-out
+        singles = sorted({wrap(x, fw) for x in singles})
+        for fp_w in (32, 64):
+            fns.append(emit_tofp_fn(idx, from_fmt, fp_w, singles))
+            idx += 1
+
+    # float/double -> fixed: the plain conversion of NaN/inf/out-of-range
+    # is UB, filtered with exact Fraction arithmetic. Clang lowers the
+    # plain conversion as fmul-by-2^n + fptosi, and fptosi is defined iff
+    # the TOWARD-ZERO result fits, so the defined range is the open
+    # interval (minRaw-1, maxRaw+1) at scale — one-ulp-past-the-rail
+    # values still truncate into range. The _Sat conversion is total, so
+    # every pattern stays, NaN/inf included.
+    ESBMC_FROMFP = [0x406ccccd, 0xc06ccccd, 0x80000001, 0xb7800000,
+                    0x40200000, 0xc0200000, 0x7f800000, 0xff800000,
+                    0x7fc00000, 0x7f800001, 0x3f000000, 0xbf000000]
+    for fp_w in (32, 64):
+        patterns = {0, 1 << (fp_w - 1),          # +-0.0
+                    1, (1 << (fp_w - 1)) | 1}    # +-min subnormal
+        if fp_w == 32:
+            patterns |= set(ESBMC_FROMFP)
+        for v in (0.5, 1.0, 1.5, 2.5, 3.7, 2.0 ** -16, 2.0 ** 40):
+            patterns |= {fp_bits(v, fp_w), fp_bits(-v, fp_w)}
+        # Random IEEE patterns mostly land far out of range (uniform
+        # exponents), so they mainly re-exercise the rails; the crafted
+        # and rail-neighborhood inputs carry the discriminating cases.
+        patterns |= {rng.getrandbits(fp_w) for _ in range(fp_randoms)}
+        for to_fmt in FORMATS:
+            (tc, tw, tn, ts) = to_fmt
+            # Rail neighborhoods: patterns within 2 ulps of the format's
+            # min/max values, where clamping and UB switch on.
+            rails = set()
+            for bound in (min_raw(tw, ts), max_raw(tw, ts)):
+                enc = fp_bits(bound / (2.0 ** tn), fp_w)
+                rails |= {wrap(enc + d, fp_w) for d in (-1, 0, 1)}
+            plain, satv = [], []
+            for bits in sorted(patterns | rails):
+                satv.append(bits)
+                val = fp_val(bits, fp_w)
+                if math.isnan(val) or math.isinf(val):
+                    continue
+                scaled = Fraction(val) * (1 << tn)
+                if min_raw(tw, ts) - 1 < scaled < max_raw(tw, ts) + 1:
+                    plain.append(bits)
+            if plain:
+                fns.append(emit_fromfp_fn(idx, fp_w, to_fmt, False, plain))
+                idx += 1
+            fns.append(emit_fromfp_fn(idx, fp_w, to_fmt, True, satv))
+            idx += 1
+
     calls = "\n".join(f"  case_{i}();" for i in range(idx))
     prog = f"""#include <stdint.h>
 #include <stdio.h>
@@ -442,7 +580,7 @@ int main(void) {{
         out = subprocess.run([str(exe)], capture_output=True, text=True,
                              check=True).stdout
 
-    arith, convs, tobvs, mixed = [], [], [], []
+    arith, convs, tobvs, mixed, tofps, fromfps = [], [], [], [], [], []
     for line in out.splitlines():
         f = line.split(",")
         if f[0].startswith("mix"):
@@ -457,6 +595,11 @@ int main(void) {{
         elif f[0] == "tobv":
             tw, ts = f[5].split(".")
             tobvs.append((f[1], f[2], f[3], f[4], tw, ts, f[6]))
+        elif f[0] == "tofp":
+            tofps.append((f[1], f[2], f[3], f[4], f[5], f[6]))
+        elif f[0].startswith("fromfp"):
+            sat = "1" if f[0].endswith("_sat") else "0"
+            fromfps.append((f[1], f[2], f[3], f[4], sat, f[5], f[6]))
         else:
             arith.append((f[0], f[1], f[2], f[3], f[4], f[5], f[6]))
 
@@ -515,11 +658,28 @@ int main(void) {{
                    f"{fb[0]},{fb[1]},{fb[2]},{fr[0]},{fr[1]},{fr[2]},"
                    f"{a}ull,{b}ull,{r}ull}},")
     hdr.append("};")
+    hdr.append("// Fixed <-> floating point. kToFP: fixed source, IEEE")
+    hdr.append("// result bits (fpw 32 or 64), Clang rounds RNE. kFromFP:")
+    hdr.append("// IEEE source bits, raw fixed result; sat==0 rows were")
+    hdr.append("// UB-filtered to in-range finite inputs, sat==1 rows")
+    hdr.append("// include NaN (-> 0), +-inf and out-of-range (-> rails).")
+    hdr.append("struct OrToFP { uint8_t fw, fn, fs, fpw; uint64_t a, r; };")
+    hdr.append("inline const OrToFP kToFP[] = {")
+    for (fw, fn_, fs, fpw, a, r) in tofps:
+        hdr.append(f"  {{{fw},{fn_},{fs},{fpw},{a}ull,{r}ull}},")
+    hdr.append("};")
+    hdr.append("struct OrFromFP { uint8_t fpw, tw, tn, ts, sat;")
+    hdr.append("  uint64_t a, r; };")
+    hdr.append("inline const OrFromFP kFromFP[] = {")
+    for (fpw, tw, tn, ts, sat, a, r) in fromfps:
+        hdr.append(f"  {{{fpw},{tw},{tn},{ts},{sat},{a}ull,{r}ull}},")
+    hdr.append("};")
     hdr.append("} // namespace camada_fxp_oracle")
     hdr.append("#endif")
     Path(args.out).write_text("\n".join(hdr) + "\n")
     print(f"{len(arith)} arith + {len(convs)} conv + {len(tobvs)} tobv "
-          f"+ {len(mixed)} mixed vectors -> {args.out}")
+          f"+ {len(mixed)} mixed + {len(tofps)} tofp + {len(fromfps)} "
+          f"fromfp vectors -> {args.out}")
     print(f"oracle: {version}")
 
 

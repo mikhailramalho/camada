@@ -166,6 +166,9 @@ enum class SMTExprKind {
   FXPToBVSat,
   BVToFXP,
   FXPToRawBV,
+  FXPToFP,
+  FPToFXP,
+  FPToFXPSat,
 };
 
 /// Diagnostic strings used by the shared handle base for expression handles.

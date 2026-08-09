@@ -644,6 +644,14 @@ public:
                            const SMTSortRef &To) override;
   SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
                           bool ToSigned) override;
+  SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
+                       RM R) override final;
+  SMTExprRef mkFPToFXP(const SMTExprRef &Exp,
+                       const SMTSortRef &To) override final;
+  SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
+                               const SMTSortRef &To) override final;
+  SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp,
+                          const SMTSortRef &To) override final;
   SMTExprRef mkArraySelect(const SMTExprRef &Array,
                            const SMTExprRef &Index) override final;
   SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
