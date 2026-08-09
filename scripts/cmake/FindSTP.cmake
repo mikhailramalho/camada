@@ -32,6 +32,31 @@ function(_camada_validate_stp)
   unset(STP_INCLUDE_DIRS PARENT_SCOPE)
 endfunction()
 
+# STP 2.4.0's exported interface references the libabc-pic *target*, which
+# STPTargets.cmake never defines (STP builds the archive but does not export the
+# target); every consumer that loads the file fails at generate time evaluating
+# $<TARGET_FILE:libabc-pic>. Repair our staged copy in place, pointing the
+# reference at the staged archive. Only the file under the camada deps tree is
+# touched.
+function(_camada_repair_stp_targets_file)
+  set(_camada_stp_targets_file
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/STP/STPTargets.cmake")
+  set(_camada_stp_abc_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libabc-pic.a")
+  if(NOT EXISTS "${_camada_stp_targets_file}" OR NOT EXISTS
+                                                 "${_camada_stp_abc_lib}")
+    return()
+  endif()
+  file(READ "${_camada_stp_targets_file}" _camada_stp_targets_content)
+  string(FIND "${_camada_stp_targets_content}" "\\$<TARGET_FILE:libabc-pic>"
+              _camada_stp_abc_ref)
+  if(_camada_stp_abc_ref EQUAL -1)
+    return()
+  endif()
+  string(REPLACE "\\$<TARGET_FILE:libabc-pic>" "${_camada_stp_abc_lib}"
+                 _camada_stp_targets_content "${_camada_stp_targets_content}")
+  file(WRITE "${_camada_stp_targets_file}" "${_camada_stp_targets_content}")
+endfunction()
+
 function(_camada_normalize_stp_target)
   if(NOT TARGET stp)
     return()
@@ -40,6 +65,17 @@ function(_camada_normalize_stp_target)
   if(STP_INCLUDE_DIRS)
     set_property(TARGET stp PROPERTY INTERFACE_INCLUDE_DIRECTORIES
                                      "${STP_INCLUDE_DIRS}")
+  endif()
+
+  # Resolve the imported archive so camada's link line — and therefore its
+  # installed export — carries absolute paths instead of the imported target
+  # name. install(EXPORT) can only record the *name* of an imported target,
+  # which forces consumers through find_package(STP) to reconstruct it; paths
+  # make the camada package self-contained, matching how every other backend is
+  # exported.
+  get_target_property(_camada_stp_lib stp IMPORTED_LOCATION)
+  if(NOT _camada_stp_lib)
+    get_target_property(_camada_stp_lib stp IMPORTED_LOCATION_RELEASE)
   endif()
 
   set(_camada_stp_minisat_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libminisat.a")
@@ -66,12 +102,24 @@ function(_camada_normalize_stp_target)
     endif()
     set_property(TARGET stp PROPERTY INTERFACE_LINK_LIBRARIES
                                      "${_camada_stp_dep_libs}")
+    if(_camada_stp_lib)
+      set(STP_LINK_LIBRARIES
+          "${_camada_stp_lib};${_camada_stp_dep_libs}"
+          PARENT_SCOPE)
+      return()
+    endif()
   elseif(TARGET minisat AND TARGET libcryptominisat5)
     set_property(TARGET stp PROPERTY INTERFACE_LINK_LIBRARIES
                                      "minisat;libcryptominisat5")
   elseif(TARGET minisat)
     set_property(TARGET stp PROPERTY INTERFACE_LINK_LIBRARIES "minisat")
   endif()
+
+  # System installs (or an unresolvable archive) keep the target-based link;
+  # their exported packages are expected to be reconstructable by consumers.
+  set(STP_LINK_LIBRARIES
+      stp
+      PARENT_SCOPE)
 endfunction()
 
 set(_camada_stp_find_args CONFIG QUIET HINTS ${_camada_stp_hints})
@@ -86,6 +134,7 @@ endif()
 
 find_package(cryptominisat5 CONFIG QUIET HINTS ${_camada_stp_hints})
 find_package(minisat CONFIG QUIET HINTS ${_camada_stp_hints})
+_camada_repair_stp_targets_file()
 find_package(STP ${_camada_stp_find_args})
 _camada_normalize_stp_target()
 _camada_validate_stp()
@@ -94,6 +143,7 @@ if(NOT STP_FOUND AND _camada_download_stp)
   camada_setup_stp()
   find_package(cryptominisat5 CONFIG QUIET HINTS ${_camada_stp_hints})
   find_package(minisat CONFIG QUIET HINTS ${_camada_stp_hints})
+  _camada_repair_stp_targets_file()
   find_package(
     STP
     CONFIG

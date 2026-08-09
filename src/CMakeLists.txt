@@ -134,7 +134,12 @@ if(${CAMADA_SOLVER_MATHSAT_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_STP_ENABLE})
-  list(APPEND _camada_backend_link_libs stp)
+  # STP_LINK_LIBRARIES is absolute archive paths when FindSTP resolved the
+  # imported location (deps-tree installs), or the bare `stp` target for system
+  # installs. Paths keep the installed camada export self-contained — an
+  # exported imported-target *name* would force every consumer through
+  # find_package(STP).
+  list(APPEND _camada_backend_link_libs ${STP_LINK_LIBRARIES})
   target_include_directories(${LIBRARY_TARGET_NAME}
                              PUBLIC "$<BUILD_INTERFACE:${STP_INCLUDE_DIRS}>")
   target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE SOLVER_STP_ENABLED)
