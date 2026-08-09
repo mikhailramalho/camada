@@ -248,6 +248,32 @@ void benchmarkArrayStoreChain(camada::SMTSolver &solver,
   (void)sink;
 }
 
+// Re-select a fixed store chain with recurring index terms. Under the
+// Ackermann encoding every select lowers the whole chain to an ite
+// cascade, so repeated selects measure the re-lowering cost that a
+// select memo would remove; under native encodings this is just cheap
+// term construction either way.
+void benchmarkArraySelectFanout(camada::SMTSolver &solver,
+                                std::size_t iterations) {
+  auto idx_sort = solver.mkBVSort(32);
+  auto elem_sort = solver.mkBVSort(32);
+  auto arr = solver.mkSymbol("fan_a", solver.mkArraySort(idx_sort, elem_sort));
+
+  std::vector<camada::SMTExprRef> idxs;
+  for (int i = 0; i < 24; ++i) {
+    auto k = solver.mkSymbol("fan_i" + std::to_string(i), idx_sort);
+    idxs.push_back(k);
+    arr = solver.mkArrayStore(
+        arr, k, solver.mkBVFromDec(static_cast<int64_t>(i), elem_sort));
+  }
+
+  volatile std::size_t sink = 0;
+  for (std::size_t i = 0; i < iterations; ++i)
+    sink += solver.mkArraySelect(arr, idxs[i % idxs.size()])->getWidth();
+
+  (void)sink;
+}
+
 // Unlike the construction-only cases, this one calls check(): the array
 // encoding trade (native theory vs Ackermann ground constraints) only
 // shows up in solve time. Each cycle builds a small store chain, a few
@@ -638,6 +664,8 @@ int main(int argc, char **argv) {
     runCase(backend, "expr_construction_only", iterations,
             benchmarkExprConstructionOnly);
     runCase(backend, "array_store_chain", iterations, benchmarkArrayStoreChain);
+    runCase(backend, "array_select_fanout", iterations,
+            benchmarkArraySelectFanout);
     // Write-only smtlib never solves; array_solve would just measure text
     // emission there.
     if (backend != "smtlib")
