@@ -278,6 +278,7 @@ void SMTSolverImpl::clearExprCaches() {
   ArrayEqualLinksByIndexSort.clear();
   ArrayEqualCongruenceDone.clear();
   AckArrayRoots.clear();
+  AckSelectMemo.clear();
   AckBVConstBits.clear();
   IEEEBVShadow.clear();
   PendingShadowLinks.clear();
