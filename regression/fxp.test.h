@@ -114,15 +114,15 @@ inline RefResult refDiv(const RefFormat &F, int64_t A, int64_t B) {
     R.DivByZero = true;
     return R;
   }
-  // Exact quotient in raw scale is (A*2^N)/B; the encoding truncates toward
-  // zero (bvsdiv). Overflow compares the exact rational against the bounds:
+  // Exact quotient in raw scale is (A*2^N)/B; the encoding floors it (the
+  // oracle-pinned direction). Overflow compares the exact rational bounds:
   // for B > 0, exact > max iff A*2^N > max*B (and flipped for B < 0).
   int64_t Num = int64_t(A) << F.FracBits;
   int64_t MaxB = int64_t(F.maxRaw()) * B;
   int64_t MinB = int64_t(F.minRaw()) * B;
   R.Overflow =
       (B > 0) ? (Num > MaxB || Num < MinB) : (Num < MaxB || Num > MinB);
-  R.Raw = refWrap(F, Num / B); // int64_t '/' truncates toward zero
+  R.Raw = refWrap(F, refFloorDiv(Num, B)); // floor (Clang sdiv.fix)
   return R;
 }
 
@@ -176,7 +176,7 @@ inline uint64_t refDivSat(const RefFormat &F, int64_t A, int64_t B) {
     return refWrap(F, F.maxRaw());
   if (BelowMin)
     return refWrap(F, F.minRaw());
-  return refWrap(F, Num / B); // toward zero, matching bvsdiv
+  return refWrap(F, refFloorDiv(Num, B)); // floor (Clang sdiv.fix)
 }
 
 inline uint64_t refShlSat(const RefFormat &F, int64_t A, unsigned Amount) {
@@ -331,19 +331,21 @@ fxp_boundary_overflow_semantics(const camada::SMTSolverRef &solver) {
   }
 }
 
-// Sign-sensitive rounding vectors: division truncates toward zero,
-// multiplication floors, fixed-to-integer truncates toward zero,
-// fixed-to-fixed narrowing floors.
+// Sign-sensitive rounding vectors: division and multiplication floor
+// (the oracle-pinned Clang direction — see scripts/fxp_oracle_gen.py),
+// fixed-to-integer truncates toward zero (the one direction TR 18037
+// specifies), fixed-to-fixed narrowing floors.
 inline void fxp_rounding_semantics(const camada::SMTSolverRef &solver) {
   RefFormat F{8, 4, true};
   auto C = [&](int64_t Raw) {
     return mkConst(solver, F, uint64_t(Raw) & 0xFF);
   };
   std::vector<camada::SMTExprRef> Conjuncts;
-  // (-3/16) / 2.0: exact raw quotient -1.5, not representable; toward zero
-  // gives raw -1 (a floor would give -2).
+  // (-3/16) / 2.0: exact raw quotient -1.5, not representable; floor
+  // gives raw -2 (toward zero would give -1 — Clang floors, per the
+  // execution oracle).
   Conjuncts.push_back(
-      solver->mkFXPEqual(solver->mkFXPDiv(C(-3), C(32)), C(-1)));
+      solver->mkFXPEqual(solver->mkFXPDiv(C(-3), C(32)), C(-2)));
   // (3/16) / 2.0: exact raw quotient 1.5 -> raw 1.
   Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPDiv(C(3), C(32)), C(1)));
   // (-1/16) * (8/16): exact -0.5 raw; floor -> -1 raw (not 0).

@@ -32,7 +32,9 @@
 // result just outside the representable range must be reported even when
 // truncation would land it back on a boundary. Fixed-point to integer
 // conversion rounds toward zero (the one direction TR 18037 specifies);
-// everything else truncates low bits (floor).
+// everything else — multiplication, division, and narrowing — rounds down
+// (floor), matching Clang's implementation-defined choices as pinned by
+// the execution oracle (scripts/fxp_oracle_gen.py).
 //
 // Mixed-format operands follow TR 18037's usual arithmetic conversions: the
 // operation is computed in the common full-precision format (max integer
@@ -181,6 +183,20 @@ SMTExprRef clampRaw(SMTSolverImpl &S, const SMTExprRef &Wide, unsigned W,
   return Res;
 }
 
+// Adjusts a toward-zero signed quotient to floor: subtract one when the
+// remainder is nonzero and the operand signs differ. Fixed-point division
+// rounds down on inexact results (Clang/LLVM sdiv.fix, pinned by the
+// execution oracle); bvsdiv rounds toward zero.
+SMTExprRef floorAdjustQuotient(SMTSolverImpl &S, const SMTExprRef &Quot,
+                               const SMTExprRef &L, const SMTExprRef &R,
+                               unsigned W) {
+  SMTExprRef RemNZ = S.mkNot(S.mkEqual(S.mkBVSRem(L, R), S.mkBVFromDec(0, W)));
+  SMTExprRef SignsDiffer = S.mkNot(S.mkEqual(S.mkBVExtract(W - 1, W - 1, L),
+                                             S.mkBVExtract(W - 1, W - 1, R)));
+  return S.mkIte(S.mkAnd(RemNZ, SignsDiffer),
+                 S.mkBVSub(Quot, S.mkBVFromDec(1, W)), Quot);
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -279,13 +295,18 @@ SMTExprRef SMTSolverImpl::mkFXPDiv(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
   AlignedPair P = alignPair(*this, LHS, RHS);
   // (lhs * 2^N) / rhs at double width: extend first, then scale the
-  // dividend — the shift cannot overflow 2W since N <= W. bvsdiv truncates
-  // toward zero, matching C division.
+  // dividend — the shift cannot overflow 2W since N <= W. Inexact
+  // quotients round DOWN (floor), not toward zero: TR 18037 leaves the
+  // direction implementation-defined and Clang floors (LLVM sdiv.fix),
+  // pinned by the execution oracle (scripts/fxp_oracle_gen.py) — the
+  // C-integer-division analogy does not govern fixed-point.
   SMTExprRef L = extendRaw(*this, P.LHS, P.Fmt.IsSigned, P.Fmt.Width);
   SMTExprRef R = extendRaw(*this, P.RHS, P.Fmt.IsSigned, P.Fmt.Width);
   if (P.Fmt.FracBits != 0)
     L = mkBVShl(L, mkBVFromDec(P.Fmt.FracBits, 2 * P.Fmt.Width));
   SMTExprRef Quot = P.Fmt.IsSigned ? mkBVSDiv(L, R) : mkBVUDiv(L, R);
+  if (P.Fmt.IsSigned)
+    Quot = floorAdjustQuotient(*this, Quot, L, R, 2 * P.Fmt.Width);
   return rewrapExprImpl(*mkBVExtract(P.Fmt.Width - 1, 0, Quot),
                         mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
                         SMTExprKind::FXPDiv);
@@ -382,7 +403,7 @@ SMTExprRef SMTSolverImpl::mkFXPMulSat(const SMTExprRef &LHS,
 SMTExprRef SMTSolverImpl::mkFXPDivSat(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   AlignedPair P = alignPair(*this, LHS, RHS);
-  // Same 2W scaled dividend and toward-zero quotient as mkFXPDiv; clamp
+  // Same 2W scaled dividend and floored quotient as mkFXPDiv; clamp
   // instead of truncating. The signed min/-1 case lands above max at 2W
   // and clamps there. The value is meaningful only under !mkFXPDivByZero.
   SMTExprRef L = extendRaw(*this, P.LHS, P.Fmt.IsSigned, P.Fmt.Width);
@@ -390,6 +411,8 @@ SMTExprRef SMTSolverImpl::mkFXPDivSat(const SMTExprRef &LHS,
   if (P.Fmt.FracBits != 0)
     L = mkBVShl(L, mkBVFromDec(P.Fmt.FracBits, 2 * P.Fmt.Width));
   SMTExprRef Quot = P.Fmt.IsSigned ? mkBVSDiv(L, R) : mkBVUDiv(L, R);
+  if (P.Fmt.IsSigned)
+    Quot = floorAdjustQuotient(*this, Quot, L, R, 2 * P.Fmt.Width);
   return rewrapExprImpl(
       *clampRaw(*this, Quot, 2 * P.Fmt.Width, P.Fmt, P.Fmt.IsSigned),
       mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
