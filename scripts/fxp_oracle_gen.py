@@ -63,6 +63,24 @@ _Static_assert(sizeof(short _Fract) == 1 && sizeof(_Fract) == 2 &&
                sizeof(_Accum) == 4 && sizeof(long _Accum) == 8, "sizes");
 """
 
+# _Generic type codes so the ORACLE reports which result type Clang's
+# rank rules picked for a mixed-format operation (fw.fn.fs encoding).
+TYPE_CODE = """
+#define TYCODE(x) _Generic((x), \\
+  short _Fract: "8.7.1", _Fract: "16.15.1", long _Fract: "32.31.1", \\
+  short _Accum: "16.7.1", _Accum: "32.15.1", long _Accum: "64.31.1", \\
+  unsigned short _Fract: "8.8.0", unsigned _Fract: "16.16.0", \\
+  unsigned long _Fract: "32.32.0", unsigned short _Accum: "16.8.0", \\
+  unsigned _Accum: "32.16.0", unsigned long _Accum: "64.32.0", \\
+  _Sat short _Fract: "8.7.1", _Sat _Fract: "16.15.1", \\
+  _Sat long _Fract: "32.31.1", _Sat short _Accum: "16.7.1", \\
+  _Sat _Accum: "32.15.1", _Sat long _Accum: "64.31.1", \\
+  _Sat unsigned short _Fract: "8.8.0", _Sat unsigned _Fract: "16.16.0", \\
+  _Sat unsigned long _Fract: "32.32.0", \\
+  _Sat unsigned short _Accum: "16.8.0", _Sat unsigned _Accum: "32.16.0", \\
+  _Sat unsigned long _Accum: "64.32.0")
+"""
+
 BINARY_OPS = ["add", "sub", "mul", "div"]
 UNARY_OPS = ["neg"]
 SHIFT_OPS = ["shl", "shr"]
@@ -177,6 +195,33 @@ def emit_case_fn(idx, ctype, w, n, s, op, sat, vectors):
     return "\n".join(lines)
 
 
+def emit_mixed_fn(idx, fmt_a, fmt_b, op, sat, vectors):
+    """Mixed-format binary op: operands keep their own types; the result
+    type is whatever Clang's rank rules produce, reported via TYCODE."""
+    (ca, wa, na, sa) = fmt_a
+    (cb, wb, nb, sb) = fmt_b
+    qa = f"_Sat {ca}" if sat else ca
+    qb = f"_Sat {cb}" if sat else cb
+    ita, itb = int_type(wa), int_type(wb)
+    sym = {"add": "+", "sub": "-", "mul": "*", "div": "/"}[op]
+    rows = ",".join(f"{{{a}ull,{b}ull}}" for a, b in vectors)
+    opname = ("mix" + op) + (SAT_SUFFIX if sat else "")
+    return f"""static void case_{idx}(void) {{
+  static const struct {{ uint64_t a, b; }} v[] = {{{rows}}};
+  for (unsigned i = 0; i < {len(vectors)}u; ++i) {{
+    {ita} ra = ({ita})v[i].a; {itb} rb = ({itb})v[i].b;
+    {qa} a; {qb} b;
+    memcpy(&a, &ra, sizeof a); memcpy(&b, &rb, sizeof b);
+    __auto_type r = a {sym} b;
+    uint64_t rr = 0;
+    memcpy(&rr, &r, sizeof r);
+    printf("{opname},{wa}.{na}.{int(sa)},{wb}.{nb}.{int(sb)},%s,%llu,%llu,%llu\\n",
+           TYCODE(r), (unsigned long long)ra, (unsigned long long)rb,
+           (unsigned long long)rr);
+  }}
+}}"""
+
+
 def emit_conv_fn(idx, from_fmt, to_fmt, vectors):
     (fc, fw, fn, fs) = from_fmt
     (tc, tw, tn, ts) = to_fmt
@@ -272,6 +317,80 @@ def main():
                 fns.append(emit_case_fn(idx, ctype, w, n, s, op, True, svec))
                 idx += 1
 
+    # Mixed-format operations: the TR's rank rules type the result (all
+    # accums outrank all fracts; signed/unsigned mixes go signed), the
+    # value is the full-precision result converted to that type. Python
+    # replicates the rule only to FILTER UB (plain ops whose exact result
+    # leaves the result type's range); the ORACLE reports Clang's actual
+    # result type via _Generic, and the generator asserts the two agree.
+    RANK = {(8, 7, True): 0, (16, 15, True): 1, (32, 31, True): 2,
+            (16, 7, True): 3, (32, 15, True): 4, (64, 31, True): 5,
+            (8, 8, False): 0, (16, 16, False): 1, (32, 32, False): 2,
+            (16, 8, False): 3, (32, 16, False): 4, (64, 32, False): 5}
+    SIGNED_OF_RANK = {0: (8, 7, True), 1: (16, 15, True), 2: (32, 31, True),
+                      3: (16, 7, True), 4: (32, 15, True), 5: (64, 31, True)}
+
+    def result_format(a_fmt, b_fmt):
+        (_, wa, na, sa) = a_fmt
+        (_, wb, nb, sb) = b_fmt
+        ra_, rb_ = RANK[(wa, na, sa)], RANK[(wb, nb, sb)]
+        hi = max(ra_, rb_)
+        if sa != sb:
+            return SIGNED_OF_RANK[hi]
+        src = a_fmt if ra_ >= rb_ else b_fmt
+        return (src[1], src[2], src[3])
+
+    MIXED_FMTS = [f for f in FORMATS
+                  if (f[1], f[2], f[3]) in ((8, 7, True), (16, 15, True),
+                                            (16, 7, True), (8, 8, False),
+                                            (16, 8, False))]
+    for fmt_a in MIXED_FMTS:
+        for fmt_b in MIXED_FMTS:
+            if fmt_a == fmt_b:
+                continue  # same-format is the kArith section's job
+            (_, wa, na, sa) = fmt_a
+            (_, wb, nb, sb) = fmt_b
+            (rw, rn, rs) = result_format(fmt_a, fmt_b)
+            pairs = [(a, b)
+                     for a in boundary_values(wa, na, sa)[:6]
+                     for b in boundary_values(wb, nb, sb)[:6]]
+            pairs += [(rng.getrandbits(wa), rng.getrandbits(wb))
+                      for _ in range(args.randoms)]
+            for op in BINARY_OPS:
+                plain, satv = [], []
+                for (a, b) in pairs:
+                    av, bv = decode(a, wa, sa), decode(b, wb, sb)
+                    if op == "div" and bv == 0:
+                        continue
+                    satv.append((a, b))
+                    # Exact result as a rational at the common scale;
+                    # UB iff outside the RESULT type's range.
+                    scale = max(na, nb)
+                    A = av << (scale - na)
+                    B = bv << (scale - nb)
+                    lo = min_raw(rw, rs) << (scale - rn)
+                    hi_ = max_raw(rw, rs) << (scale - rn)
+                    if op == "add":
+                        ok = lo <= A + B <= hi_
+                    elif op == "sub":
+                        ok = lo <= A - B <= hi_
+                    elif op == "mul":
+                        ok = lo * (1 << scale) <= A * B <= hi_ * (1 << scale)
+                    else:
+                        num = A << scale
+                        ok = (min(lo * B, hi_ * B) <= num <=
+                              max(lo * B, hi_ * B))
+                    if ok:
+                        plain.append((a, b))
+                if plain:
+                    fns.append(emit_mixed_fn(idx, fmt_a, fmt_b, op, False,
+                                             plain))
+                    idx += 1
+                if satv:
+                    fns.append(emit_mixed_fn(idx, fmt_a, fmt_b, op, True,
+                                             satv))
+                    idx += 1
+
     # Conversions: every format pair through a _Sat target (defined for all
     # inputs, so no filtering), and fixed->int casts (toward zero, clamped
     # only by our Sat variant -- the plain C cast of an out-of-range value
@@ -303,6 +422,7 @@ def main():
 #include <stdio.h>
 #include <string.h>
 {LAYOUT_ASSERTS}
+{TYPE_CODE}
 {chr(10).join(fns)}
 int main(void) {{
 {calls}
@@ -322,9 +442,15 @@ int main(void) {{
         out = subprocess.run([str(exe)], capture_output=True, text=True,
                              check=True).stdout
 
-    arith, convs, tobvs = [], [], []
+    arith, convs, tobvs, mixed = [], [], [], []
     for line in out.splitlines():
         f = line.split(",")
+        if f[0].startswith("mix"):
+            fa = f[1].split(".")
+            fb = f[2].split(".")
+            fr = f[3].split(".")
+            mixed.append((f[0], fa, fb, fr, f[4], f[5], f[6]))
+            continue
         if f[0] == "cvt_sat":
             tw, tn, ts = f[5].split(".")
             convs.append((f[1], f[2], f[3], f[4], tw, tn, ts, f[6]))
@@ -372,11 +498,28 @@ int main(void) {{
     for (fw, fn_, fs, a, tw, ts, r) in tobvs:
         hdr.append(f"  {{{fw},{fn_},{fs},{tw},{ts},{a}ull,{r}ull}},")
     hdr.append("};")
+    hdr.append("// Mixed-format ops: Clang's own result type (rank rules,")
+    hdr.append("// reported by _Generic at execution) plus the result bits.")
+    hdr.append("enum class OrMixOp : uint8_t { Add, Sub, Mul, Div,")
+    hdr.append("  AddSat, SubSat, MulSat, DivSat };")
+    hdr.append("struct OrMixed { OrMixOp op;")
+    hdr.append("  uint8_t aw, an, as_, bw, bn, bs, rw, rn, rs;")
+    hdr.append("  uint64_t a, b, r; };")
+    mixmap = {"mixadd": "Add", "mixsub": "Sub", "mixmul": "Mul",
+              "mixdiv": "Div", "mixadd_sat": "AddSat",
+              "mixsub_sat": "SubSat", "mixmul_sat": "MulSat",
+              "mixdiv_sat": "DivSat"}
+    hdr.append("inline const OrMixed kMixed[] = {")
+    for (op, fa, fb, fr, a, b, r) in mixed:
+        hdr.append(f"  {{OrMixOp::{mixmap[op]},{fa[0]},{fa[1]},{fa[2]},"
+                   f"{fb[0]},{fb[1]},{fb[2]},{fr[0]},{fr[1]},{fr[2]},"
+                   f"{a}ull,{b}ull,{r}ull}},")
+    hdr.append("};")
     hdr.append("} // namespace camada_fxp_oracle")
     hdr.append("#endif")
     Path(args.out).write_text("\n".join(hdr) + "\n")
     print(f"{len(arith)} arith + {len(convs)} conv + {len(tobvs)} tobv "
-          f"vectors -> {args.out}")
+          f"+ {len(mixed)} mixed vectors -> {args.out}")
     print(f"oracle: {version}")
 
 

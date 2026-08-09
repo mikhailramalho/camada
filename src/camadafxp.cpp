@@ -36,10 +36,19 @@
 // (floor), matching Clang's implementation-defined choices as pinned by
 // the execution oracle (scripts/fxp_oracle_gen.py).
 //
-// Mixed-format operands follow TR 18037's usual arithmetic conversions: the
-// operation is computed in the common full-precision format (max integer
-// bits, max fractional bits, signed if either operand is signed) and the
-// result carries that format.
+// Mixed-format operands: TR 18037 states the usual arithmetic conversions
+// do NOT apply between fixed-point operands — the operation is computed
+// "with the full precision of both operands" and only the RESULT is
+// converted, to the higher-ranked operand type (6.3.1.8 as amended; all
+// accums outrank all fracts, signed wins sign mixes — verified against
+// Clang across 8781 oracle vectors). Camada implements the full-precision
+// half: mixed operands compute exactly in the common containing format
+// (max integer bits, max fractional bits, signed if either side is) and
+// the result CARRIES that common format, not C's ranked result type.
+// Consumers implementing C semantics convert explicitly:
+//   mkFXPToFXP[Sat](mixed-op result, C-result-sort)
+// which is exact (floor composes across nested scales; clamps compose
+// monotonically) — pinned end-to-end by the kMixed oracle fixtures.
 //
 // No solver has a native fixed-point theory, so unlike camadafp.cpp there is
 // no native-vs-encoded split here: everything below is built once from the

@@ -125,8 +125,58 @@ inline void fxp_oracle_semantics(const camada::SMTSolverRef &solver) {
   });
 }
 
+// Mixed-format composition: camada computes mixed ops in the exact
+// common format; C types the result by rank and converts. The oracle
+// rows carry Clang's own result type, so this pins the composition
+// mkFXPToFXP[Sat](mixed-op, result-sort) to the executed bits.
+inline void fxp_oracle_mixed_semantics(const camada::SMTSolverRef &solver) {
+  const std::size_t NMixed = sizeof(kMixed) / sizeof(kMixed[0]);
+  checkVectorsChunked(solver, NMixed, [&](std::size_t I) {
+    const OrMixed &V = kMixed[I];
+    camada::SMTExprRef A = mkFXP(solver, V.a, V.aw, V.an, V.as_ != 0);
+    camada::SMTExprRef B = mkFXP(solver, V.b, V.bw, V.bn, V.bs != 0);
+    camada::SMTSortRef To = solver->mkFXPSort(V.rw, V.rn, V.rs != 0);
+    camada::SMTExprRef R;
+    bool Sat = false;
+    switch (V.op) {
+    case OrMixOp::Add:
+      R = solver->mkFXPAdd(A, B);
+      break;
+    case OrMixOp::Sub:
+      R = solver->mkFXPSub(A, B);
+      break;
+    case OrMixOp::Mul:
+      R = solver->mkFXPMul(A, B);
+      break;
+    case OrMixOp::Div:
+      R = solver->mkFXPDiv(A, B);
+      break;
+    case OrMixOp::AddSat:
+      R = solver->mkFXPAddSat(A, B);
+      Sat = true;
+      break;
+    case OrMixOp::SubSat:
+      R = solver->mkFXPSubSat(A, B);
+      Sat = true;
+      break;
+    case OrMixOp::MulSat:
+      R = solver->mkFXPMulSat(A, B);
+      Sat = true;
+      break;
+    case OrMixOp::DivSat:
+      R = solver->mkFXPDivSat(A, B);
+      Sat = true;
+      break;
+    }
+    camada::SMTExprRef C =
+        Sat ? solver->mkFXPToFXPSat(R, To) : solver->mkFXPToFXP(R, To);
+    return solver->mkFXPEqual(C, mkFXP(solver, V.r, V.rw, V.rn, V.rs != 0));
+  });
+}
+
 } // namespace camada_fxp_oracle
 
+using camada_fxp_oracle::fxp_oracle_mixed_semantics;
 using camada_fxp_oracle::fxp_oracle_semantics;
 
 #endif // CAMADA_REGRESSION_FXPORACLE_TEST_H_
