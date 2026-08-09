@@ -112,8 +112,8 @@ Z3Solver::Z3Solver(ArrayEncoding Arrays) : Solver(Context) {
   initializeCommonSingletons();
 }
 
-Z3Solver::Z3Solver(z3::context C, ArrayEncoding Arrays)
-    : Context(std::move(C)), Solver(Context) {
+Z3Solver::Z3Solver(z3::config &Config, ArrayEncoding Arrays)
+    : Context(Config), Solver(Context) {
   ArrayMode = Arrays;
   z3::set_param("rewriter.hi_fp_unspecified", true);
   initializeCommonSingletons();

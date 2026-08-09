@@ -69,7 +69,7 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
-    explicit myZ3Solver(z3::context C) : camada::Z3Solver(std::move(C)) {
+    explicit myZ3Solver(z3::config &Cfg) : camada::Z3Solver(Cfg) {
       setSolver(makeSolver(context()));
     }
 
@@ -81,8 +81,10 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
     }
   };
 
-  // Create Z3 Solver
-  camada::SMTSolverRef z3 = std::make_unique<myZ3Solver>(z3::context{});
+  // Create Z3 Solver from a caller-owned configuration; the context is
+  // built inside the solver (z3::context cannot be moved in Z3 4.13.x).
+  z3::config Cfg;
+  camada::SMTSolverRef z3 = std::make_unique<myZ3Solver>(Cfg);
 
   tests(z3);
 }
