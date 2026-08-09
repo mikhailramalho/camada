@@ -158,6 +158,29 @@ AlignedPair alignPair(SMTSolverImpl &S, const SMTExprRef &LHS,
   return AlignedPair{C, alignRaw(S, LHS, C), alignRaw(S, RHS, C)};
 }
 
+// Clamps a wide exact raw value to the format's range and narrows to the
+// format width: the saturating counterpart of the truncating extracts in
+// the non-saturating ops. Comparisons run at the wide width. SignedCmp
+// selects signed comparisons (and enables the min-bound clamp); it must
+// be true exactly when the wide view is sign-correct — signed operands,
+// or unsigned values carried with a slack bit so no top bit is set.
+// Unsigned views whose top bit can be set (the 2W product/quotient of
+// unsigned operands) use unsigned comparisons, where only the max bound
+// exists.
+SMTExprRef clampRaw(SMTSolverImpl &S, const SMTExprRef &Wide, unsigned W,
+                    const FXPFormat &F, bool SignedCmp) {
+  SMTExprRef MaxW = S.mkBVFromBin(maxRawBits(F, W), W);
+  SMTExprRef Over = SignedCmp ? S.mkBVSgt(Wide, MaxW) : S.mkBVUgt(Wide, MaxW);
+  SMTExprRef Res = S.mkIte(Over, S.mkBVFromBin(maxRawBits(F, F.Width), F.Width),
+                           S.mkBVExtract(F.Width - 1, 0, Wide));
+  if (SignedCmp) {
+    SMTExprRef MinW = S.mkBVFromBin(minRawBits(F, W), W);
+    Res = S.mkIte(S.mkBVSlt(Wide, MinW),
+                  S.mkBVFromBin(minRawBits(F, F.Width), F.Width), Res);
+  }
+  return Res;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -286,6 +309,114 @@ SMTExprRef SMTSolverImpl::mkFXPShr(const SMTExprRef &Exp, unsigned Amount) {
   SMTExprRef Shifted = Exp->Sort->isFXPSignedSort() ? mkBVAshr(Raw, AmountExp)
                                                     : mkBVLshr(Raw, AmountExp);
   return rewrapExprImpl(*Shifted, Exp->Sort, SMTExprKind::FXPShr);
+}
+
+// ---------------------------------------------------------------------------
+// Saturating arithmetic (TR 18037 `_Sat`)
+//
+// Each variant computes the exact result in a wide intermediate and clamps
+// with clampRaw. Clamping the post-truncation value is output-equivalent to
+// clamping the exact result: on the max side the two differ only when the
+// exact value lies in (max, max+1ulp), where truncation already lands on
+// max; the min side is identical (floor/toward-zero cannot cross min from
+// above). Saturating overflow is defined behavior, so there are no paired
+// predicates; mkFXPDivSat still pairs with mkFXPDivByZero.
+// ---------------------------------------------------------------------------
+
+SMTExprRef SMTSolverImpl::mkFXPAddSat(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  AlignedPair P = alignPair(*this, LHS, RHS);
+  // Two extra bits hold the exact sum sign-correctly for both
+  // signednesses: one for the carry, one so the unsigned sum's top bit
+  // never lands in the sign position.
+  SMTExprRef Sum = mkBVAdd(extendRaw(*this, P.LHS, P.Fmt.IsSigned, 2),
+                           extendRaw(*this, P.RHS, P.Fmt.IsSigned, 2));
+  return rewrapExprImpl(*clampRaw(*this, Sum, P.Fmt.Width + 2, P.Fmt,
+                                  /*SignedCmp=*/true),
+                        mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
+                        SMTExprKind::FXPAddSat);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPSubSat(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  AlignedPair P = alignPair(*this, LHS, RHS);
+  // Two extra bits keep the exact difference sign-correct for both
+  // signednesses; an unsigned underflow then clamps against min = 0.
+  SMTExprRef Diff = mkBVSub(extendRaw(*this, P.LHS, P.Fmt.IsSigned, 2),
+                            extendRaw(*this, P.RHS, P.Fmt.IsSigned, 2));
+  return rewrapExprImpl(*clampRaw(*this, Diff, P.Fmt.Width + 2, P.Fmt,
+                                  /*SignedCmp=*/true),
+                        mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
+                        SMTExprKind::FXPSubSat);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPNegSat(const SMTExprRef &Exp) {
+  requireFXP(Exp);
+  FXPFormat F = formatOf(Exp->Sort);
+  SMTExprRef Neg = mkBVNeg(extendRaw(*this, mkFXPToRawBV(Exp), F.IsSigned, 2));
+  return rewrapExprImpl(*clampRaw(*this, Neg, F.Width + 2, F,
+                                  /*SignedCmp=*/true),
+                        Exp->Sort, SMTExprKind::FXPNegSat);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPMulSat(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  AlignedPair P = alignPair(*this, LHS, RHS);
+  // Same 2W exact product and floor shift as mkFXPMul; clamp instead of
+  // truncating. Unsigned products can set the top bit at 2W, so the
+  // comparisons follow the format signedness (mirroring the overflow
+  // predicate).
+  SMTExprRef L = extendRaw(*this, P.LHS, P.Fmt.IsSigned, P.Fmt.Width);
+  SMTExprRef R = extendRaw(*this, P.RHS, P.Fmt.IsSigned, P.Fmt.Width);
+  SMTExprRef Prod = mkBVMul(L, R);
+  if (P.Fmt.FracBits != 0) {
+    SMTExprRef Amount = mkBVFromDec(P.Fmt.FracBits, 2 * P.Fmt.Width);
+    Prod = P.Fmt.IsSigned ? mkBVAshr(Prod, Amount) : mkBVLshr(Prod, Amount);
+  }
+  return rewrapExprImpl(
+      *clampRaw(*this, Prod, 2 * P.Fmt.Width, P.Fmt, P.Fmt.IsSigned),
+      mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
+      SMTExprKind::FXPMulSat);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPDivSat(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) {
+  AlignedPair P = alignPair(*this, LHS, RHS);
+  // Same 2W scaled dividend and toward-zero quotient as mkFXPDiv; clamp
+  // instead of truncating. The signed min/-1 case lands above max at 2W
+  // and clamps there. The value is meaningful only under !mkFXPDivByZero.
+  SMTExprRef L = extendRaw(*this, P.LHS, P.Fmt.IsSigned, P.Fmt.Width);
+  SMTExprRef R = extendRaw(*this, P.RHS, P.Fmt.IsSigned, P.Fmt.Width);
+  if (P.Fmt.FracBits != 0)
+    L = mkBVShl(L, mkBVFromDec(P.Fmt.FracBits, 2 * P.Fmt.Width));
+  SMTExprRef Quot = P.Fmt.IsSigned ? mkBVSDiv(L, R) : mkBVUDiv(L, R);
+  return rewrapExprImpl(
+      *clampRaw(*this, Quot, 2 * P.Fmt.Width, P.Fmt, P.Fmt.IsSigned),
+      mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
+      SMTExprKind::FXPDivSat);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) {
+  requireFXP(Exp);
+  unsigned W = Exp->getWidth();
+  fatalErrorIf(Amount >= W,
+               "Fixed-point shift amount must be smaller than the width");
+  FXPFormat F = formatOf(Exp->Sort);
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  SMTExprRef Shifted = mkBVShl(Raw, mkBVFromDec(Amount, W));
+  SMTExprRef Ovf = mkFXPShlOverflow(Exp, Amount);
+  SMTExprRef Max = mkBVFromBin(maxRawBits(F, F.Width), F.Width);
+  SMTExprRef Clamped;
+  if (!F.IsSigned) {
+    Clamped = mkIte(Ovf, Max, Shifted);
+  } else {
+    // The clamp direction follows the operand's sign: a negative value
+    // that overflows saturates to min, a positive one to max.
+    SMTExprRef Neg = mkEqual(mkBVExtract(W - 1, W - 1, Raw), mkBVFromDec(1, 1));
+    SMTExprRef Min = mkBVFromBin(minRawBits(F, F.Width), F.Width);
+    Clamped = mkIte(Ovf, mkIte(Neg, Min, Max), Shifted);
+  }
+  return rewrapExprImpl(*Clamped, Exp->Sort, SMTExprKind::FXPShlSat);
 }
 
 // ---------------------------------------------------------------------------
@@ -493,6 +624,28 @@ SMTExprRef SMTSolverImpl::mkFXPToFXPOverflow(const SMTExprRef &Exp,
   return mkOr(mkBVSgt(Raw, Max), mkBVSlt(Raw, Min));
 }
 
+SMTExprRef SMTSolverImpl::mkFXPToFXPSat(const SMTExprRef &Exp,
+                                        const SMTSortRef &To) {
+  requireFXP(Exp);
+  requireFXPSort(To);
+  FXPFormat From = formatOf(Exp->Sort);
+  FXPFormat Target = formatOf(To);
+  // Same wide intermediate and fraction shifts as mkFXPToFXP (floor on
+  // narrowing), clamped instead of truncated. Wide's slack bit keeps the
+  // view sign-correct for both source signednesses, so the comparisons
+  // are signed (the overflow predicate's argument).
+  auto [Raw, Wide] = wideForConversion(*this, Exp, Target);
+  if (Target.FracBits > From.FracBits) {
+    Raw = mkBVShl(Raw, mkBVFromDec(Target.FracBits - From.FracBits, Wide));
+  } else if (From.FracBits > Target.FracBits) {
+    SMTExprRef Amount = mkBVFromDec(From.FracBits - Target.FracBits, Wide);
+    Raw = From.IsSigned ? mkBVAshr(Raw, Amount) : mkBVLshr(Raw, Amount);
+  }
+  return rewrapExprImpl(*clampRaw(*this, Raw, Wide, Target,
+                                  /*SignedCmp=*/true),
+                        To, SMTExprKind::FXPToFXPSat);
+}
+
 SMTExprRef SMTSolverImpl::mkFXPFromBV(const SMTExprRef &Exp,
                                       const SMTSortRef &To) {
   fatalErrorIf(!Exp->Sort->isBVSort(), "Expected bit-vector expression");
@@ -547,6 +700,29 @@ SMTExprRef SMTSolverImpl::mkFXPToBVOverflow(const SMTExprRef &Exp,
   SMTExprRef Max = mkBVFromBin(maxRawBits(IntTarget, Wide), Wide);
   SMTExprRef Min = mkBVFromBin(minRawBits(IntTarget, Wide), Wide);
   return mkOr(mkBVSgt(Raw, Max), mkBVSlt(Raw, Min));
+}
+
+SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp,
+                                       unsigned ToWidth) {
+  requireFXP(Exp);
+  fatalErrorIf(ToWidth == 0, "Target width must be non-zero");
+  FXPFormat From = formatOf(Exp->Sort);
+  // Same toward-zero rounding as mkFXPToBV (signed division by 2^N),
+  // clamped to the integer target's range instead of truncated. Wide's
+  // slack bit keeps the comparisons sign-correct for both signednesses.
+  unsigned Wide = std::max(From.Width, ToWidth + From.FracBits) + 1;
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  Raw = extendRaw(*this, Raw, From.IsSigned, Wide - From.Width);
+  if (From.FracBits != 0) {
+    std::string PowBits(Wide, '0');
+    PowBits[Wide - 1 - From.FracBits] = '1';
+    SMTExprRef Pow = mkBVFromBin(PowBits, Wide);
+    Raw = From.IsSigned ? mkBVSDiv(Raw, Pow) : mkBVUDiv(Raw, Pow);
+  }
+  FXPFormat IntTarget{ToWidth, 0, From.IsSigned};
+  return rewrapExprImpl(*clampRaw(*this, Raw, Wide, IntTarget,
+                                  /*SignedCmp=*/true),
+                        mkBVSort(ToWidth), SMTExprKind::FXPToBVSat);
 }
 
 // ---------------------------------------------------------------------------

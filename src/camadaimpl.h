@@ -626,6 +626,15 @@ public:
   SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) override final;
   SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp,
                                unsigned ToWidth) override final;
+  SMTExprRef mkFXPAddSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPSubSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) override;
+  SMTExprRef mkFXPMulSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPDivSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) override;
+  SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
+                           const SMTSortRef &To) override;
+  SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth) override;
   SMTExprRef mkArraySelect(const SMTExprRef &Array,
                            const SMTExprRef &Index) override final;
   SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,

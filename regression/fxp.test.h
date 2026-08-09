@@ -127,6 +127,63 @@ inline RefResult refDiv(const RefFormat &F, int64_t A, int64_t B) {
 }
 
 // ---------------------------------------------------------------------------
+// Saturating reference model (TR 18037 `_Sat`): the exact rational result
+// clamps to the format bounds; only in-range results round (floor for
+// multiplication and narrowing, toward zero for division and to-integer).
+// Deliberately written from the TR semantics — clamp-the-exact-value —
+// rather than mirroring the encoding's clamp-the-rounded-value shape, so
+// the fixtures also pin the output equivalence of the two.
+// ---------------------------------------------------------------------------
+
+inline int64_t refClamp(const RefFormat &F, int64_t Exact) {
+  if (Exact < F.minRaw())
+    return F.minRaw();
+  if (Exact > F.maxRaw())
+    return F.maxRaw();
+  return Exact;
+}
+
+inline uint64_t refAddSat(const RefFormat &F, int64_t A, int64_t B) {
+  return refWrap(F, refClamp(F, A + B));
+}
+
+inline uint64_t refSubSat(const RefFormat &F, int64_t A, int64_t B) {
+  return refWrap(F, refClamp(F, A - B));
+}
+
+inline uint64_t refNegSat(const RefFormat &F, int64_t A) {
+  return refWrap(F, refClamp(F, -A));
+}
+
+inline uint64_t refMulSat(const RefFormat &F, int64_t A, int64_t B) {
+  int64_t Prod = A * B;
+  int64_t Scale = int64_t(1) << F.FracBits;
+  if (Prod < F.minRaw() * Scale)
+    return refWrap(F, F.minRaw());
+  if (Prod > F.maxRaw() * Scale)
+    return refWrap(F, F.maxRaw());
+  return refWrap(F, refFloorDiv(Prod, Scale));
+}
+
+// Precondition: B != 0 (division by zero stays UB for _Sat types).
+inline uint64_t refDivSat(const RefFormat &F, int64_t A, int64_t B) {
+  int64_t Num = A << F.FracBits;
+  int64_t MaxB = F.maxRaw() * B;
+  int64_t MinB = F.minRaw() * B;
+  bool AboveMax = (B > 0) ? Num > MaxB : Num < MaxB;
+  bool BelowMin = (B > 0) ? Num < MinB : Num > MinB;
+  if (AboveMax)
+    return refWrap(F, F.maxRaw());
+  if (BelowMin)
+    return refWrap(F, F.minRaw());
+  return refWrap(F, Num / B); // toward zero, matching bvsdiv
+}
+
+inline uint64_t refShlSat(const RefFormat &F, int64_t A, unsigned Amount) {
+  return refWrap(F, refClamp(F, A * (int64_t(1) << Amount)));
+}
+
+// ---------------------------------------------------------------------------
 // Solver-side helpers
 // ---------------------------------------------------------------------------
 
@@ -504,6 +561,137 @@ inline void fxp_model_and_constructs(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Exhaustive 4-bit sweep of the saturating variants against the exact
+// reference. Division-by-zero pairs are skipped for DivSat (the value is
+// meaningful only under !mkFXPDivByZero, same as the plain division).
+inline void fxp_sat_exhaustive_semantics(const camada::SMTSolverRef &solver) {
+  enum class Op { Add, Sub, Mul, Div, Neg };
+  for (const RefFormat &F : sweepFormats()) {
+    for (Op O : {Op::Add, Op::Sub, Op::Mul, Op::Div, Op::Neg}) {
+      solver->reset();
+      std::vector<camada::SMTExprRef> Conjuncts;
+      const uint64_t Count = uint64_t(1) << F.Width;
+      for (uint64_t RA = 0; RA < Count; ++RA) {
+        for (uint64_t RB = 0; RB < (O == Op::Neg ? 1 : Count); ++RB) {
+          int64_t A = refDecode(F, RA);
+          int64_t B = refDecode(F, RB);
+          camada::SMTExprRef EA = mkConst(solver, F, RA);
+          camada::SMTExprRef EB = mkConst(solver, F, RB);
+
+          uint64_t Ref = 0;
+          camada::SMTExprRef Value;
+          switch (O) {
+          case Op::Add:
+            Ref = refAddSat(F, A, B);
+            Value = solver->mkFXPAddSat(EA, EB);
+            break;
+          case Op::Sub:
+            Ref = refSubSat(F, A, B);
+            Value = solver->mkFXPSubSat(EA, EB);
+            break;
+          case Op::Mul:
+            Ref = refMulSat(F, A, B);
+            Value = solver->mkFXPMulSat(EA, EB);
+            break;
+          case Op::Div:
+            if (B == 0)
+              continue;
+            Ref = refDivSat(F, A, B);
+            Value = solver->mkFXPDivSat(EA, EB);
+            break;
+          case Op::Neg:
+            Ref = refNegSat(F, A);
+            Value = solver->mkFXPNegSat(EA);
+            break;
+          }
+          Conjuncts.push_back(
+              solver->mkFXPEqual(Value, mkConst(solver, F, Ref)));
+        }
+      }
+      requireAllHold(solver, Conjuncts);
+    }
+  }
+}
+
+// Exhaustive saturating shifts over every amount below the width.
+inline void fxp_sat_shift_semantics(const camada::SMTSolverRef &solver) {
+  for (const RefFormat &F : sweepFormats()) {
+    solver->reset();
+    std::vector<camada::SMTExprRef> Conjuncts;
+    const uint64_t Count = uint64_t(1) << F.Width;
+    for (unsigned Amount = 0; Amount < F.Width; ++Amount) {
+      for (uint64_t RA = 0; RA < Count; ++RA) {
+        int64_t A = refDecode(F, RA);
+        camada::SMTExprRef EA = mkConst(solver, F, RA);
+        Conjuncts.push_back(
+            solver->mkFXPEqual(solver->mkFXPShlSat(EA, Amount),
+                               mkConst(solver, F, refShlSat(F, A, Amount))));
+      }
+    }
+    requireAllHold(solver, Conjuncts);
+  }
+}
+
+// Saturating conversions: every sweep-format pair (fixed-to-fixed) and
+// every source against 2/4/8-bit integer targets, exhaustively.
+inline void fxp_sat_conversion_semantics(const camada::SMTSolverRef &solver) {
+  // Exact rational compare across formats: bring value and target bounds
+  // to the larger fraction scale, clamp, floor only when in range.
+  auto toFXPSatRef = [](const RefFormat &From, const RefFormat &To,
+                        int64_t A) -> uint64_t {
+    unsigned Scale = std::max(From.FracBits, To.FracBits);
+    int64_t V = A << (Scale - From.FracBits);
+    int64_t Max = To.maxRaw() << (Scale - To.FracBits);
+    int64_t Min = To.minRaw() << (Scale - To.FracBits);
+    if (V > Max)
+      return uint64_t(To.maxRaw()) & ((uint64_t(1) << To.Width) - 1);
+    if (V < Min)
+      return uint64_t(To.minRaw()) & ((uint64_t(1) << To.Width) - 1);
+    int64_t R = refFloorDiv(V, int64_t(1) << (Scale - To.FracBits));
+    return uint64_t(R) & ((uint64_t(1) << To.Width) - 1);
+  };
+  auto toBVSatRef = [](const RefFormat &From, unsigned ToWidth,
+                       int64_t A) -> uint64_t {
+    RefFormat IntTarget{ToWidth, 0, From.IsSigned};
+    int64_t Trunc = A / (int64_t(1) << From.FracBits); // toward zero
+    if (Trunc < IntTarget.minRaw())
+      Trunc = IntTarget.minRaw();
+    if (Trunc > IntTarget.maxRaw())
+      Trunc = IntTarget.maxRaw();
+    return uint64_t(Trunc) & ((uint64_t(1) << ToWidth) - 1);
+  };
+
+  for (const RefFormat &From : sweepFormats()) {
+    const uint64_t Count = uint64_t(1) << From.Width;
+    for (const RefFormat &To : sweepFormats()) {
+      solver->reset();
+      std::vector<camada::SMTExprRef> Conjuncts;
+      for (uint64_t RA = 0; RA < Count; ++RA) {
+        int64_t A = refDecode(From, RA);
+        camada::SMTExprRef EA = mkConst(solver, From, RA);
+        Conjuncts.push_back(
+            solver->mkFXPEqual(solver->mkFXPToFXPSat(EA, mkSort(solver, To)),
+                               mkConst(solver, To, toFXPSatRef(From, To, A))));
+      }
+      requireAllHold(solver, Conjuncts);
+    }
+    for (unsigned ToWidth : {2u, 4u, 8u}) {
+      solver->reset();
+      std::vector<camada::SMTExprRef> Conjuncts;
+      for (uint64_t RA = 0; RA < Count; ++RA) {
+        int64_t A = refDecode(From, RA);
+        camada::SMTExprRef EA = mkConst(solver, From, RA);
+        RefFormat IntF{ToWidth, 0, From.IsSigned};
+        std::string Bits = refBits(IntF, toBVSatRef(From, ToWidth, A));
+        Conjuncts.push_back(
+            solver->mkEqual(solver->mkFXPToBVSat(EA, ToWidth),
+                            solver->mkBVFromBin(Bits, ToWidth)));
+      }
+      requireAllHold(solver, Conjuncts);
+    }
+  }
+}
+
 } // namespace camada_fxp_test
 
 // The fixtures are referenced unqualified from tests.h and the per-backend
@@ -514,6 +702,9 @@ using camada_fxp_test::fxp_exhaustive_semantics;
 using camada_fxp_test::fxp_mixed_format_semantics;
 using camada_fxp_test::fxp_model_and_constructs;
 using camada_fxp_test::fxp_rounding_semantics;
+using camada_fxp_test::fxp_sat_conversion_semantics;
+using camada_fxp_test::fxp_sat_exhaustive_semantics;
+using camada_fxp_test::fxp_sat_shift_semantics;
 using camada_fxp_test::fxp_shift_semantics;
 
 #endif // CAMADA_REGRESSION_FXP_TEST_H_

@@ -789,6 +789,39 @@ public:
   virtual SMTExprRef mkFXPShlOverflow(const SMTExprRef &Exp,
                                       unsigned Amount) = 0;
 
+  // Saturating variants (TR 18037 `_Sat` types / the FX pragmas in SAT
+  // state). Saturation is an operation property, not a sort property: a
+  // `_Sat` type shares its representation with the plain type, so the
+  // frontend picks the sat variant by expression type, mirroring LLVM's
+  // fixed-point intrinsics. Saturating overflow is defined behavior —
+  // results clamp to the format's min/max and there is no paired
+  // predicate — but division by zero remains UB even for `_Sat` types, so
+  // mkFXPDivSat still pairs with mkFXPDivByZero.
+
+  /// Saturating fixed-point addition.
+  virtual SMTExprRef mkFXPAddSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point subtraction.
+  virtual SMTExprRef mkFXPSubSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point negation (unsigned formats clamp to zero for
+  /// any non-zero operand; signed formats clamp the minimum to the max).
+  virtual SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) = 0;
+
+  /// Saturating fixed-point multiplication.
+  virtual SMTExprRef mkFXPMulSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point division. The value is meaningful only under
+  /// the negation of mkFXPDivByZero.
+  virtual SMTExprRef mkFXPDivSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point left shift.
+  virtual SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) = 0;
+
   /// Converts between fixed-point formats (truncating on narrowing).
   virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
                                 const SMTSortRef &To) = 0;
@@ -797,6 +830,11 @@ public:
   /// conversion.
   virtual SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
                                         const SMTSortRef &To) = 0;
+
+  /// Saturating fixed-point format conversion: out-of-range values clamp
+  /// to the target format's min/max instead of being undefined.
+  virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
+                                   const SMTSortRef &To) = 0;
 
   /// Converts an integer bit-vector (signed per the target format) into a
   /// fixed-point value.
@@ -812,6 +850,11 @@ public:
   /// mkFXPToBV conversion.
   virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp,
                                        unsigned ToWidth) = 0;
+
+  /// Saturating fixed-point to integer conversion (round toward zero,
+  /// then clamp to the integer range; signedness follows the source
+  /// format).
+  virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth) = 0;
 
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.
