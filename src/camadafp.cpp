@@ -1311,7 +1311,6 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
   // else comes the fused multiplication.
   SMTExprRef one_1 = mkBVOne1(*this);
-  SMTExprRef zero_1 = mkBVZero1(*this);
 
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
@@ -1394,13 +1393,16 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   assert(e_sig->getWidth() == 2 * sbits + 5);
   assert(shifted_f_sig->getWidth() == 2 * sbits + 5);
 
+  /* Jam the alignment sticky into the aligned operand before the one
+   * add/sub. e_sig is always even (mul_sig and c_sig_ext both carry
+   * trailing zeros), so the sum/difference LSB equals shifted_f_sig's LSB
+   * and this is exactly equivalent to the conditional post-add/sub on an
+   * even result -- without chaining a second full-width adder onto the
+   * first. Same shape as addCore. */
   SMTExprRef sticky_wide = mkBVZeroExt(2 * sbits + 4, alignment_sticky);
+  shifted_f_sig = mkBVOr(shifted_f_sig, sticky_wide);
   SMTExprRef e_plus_f = mkBVAdd(e_sig, shifted_f_sig);
-  e_plus_f = mkIte(mkEqual(mkBVExtract(0, 0, e_plus_f), zero_1),
-                   mkBVAdd(e_plus_f, sticky_wide), e_plus_f);
   SMTExprRef e_minus_f = mkBVSub(e_sig, shifted_f_sig);
-  e_minus_f = mkIte(mkEqual(mkBVExtract(0, 0, e_minus_f), zero_1),
-                    mkBVSub(e_minus_f, sticky_wide), e_minus_f);
 
   SMTExprRef sum = mkIte(eq_sgn, e_plus_f, e_minus_f);
   assert(sum->getWidth() == 2 * sbits + 5);
@@ -1419,10 +1421,6 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef res_sgn_c2 = mkBVAnd(mkBVAnd(e_sgn, not_f_sgn), not_sign_bv);
   SMTExprRef res_sgn_c3 = mkBVAnd(e_sgn, f_sgn);
   SMTExprRef res_sgn = mkBVOr(mkBVOr(res_sgn_c1, res_sgn_c2), res_sgn_c3);
-
-  SMTExprRef is_sig_neg =
-      mkEqual(one_1, mkBVExtract(2 * sbits + 4, 2 * sbits + 4, sig_abs));
-  sig_abs = mkIte(is_sig_neg, mkBVNeg(sig_abs), sig_abs);
 
   // Result could have overflown into 4.xxx.
   assert(sig_abs->getWidth() == 2 * sbits + 5);
