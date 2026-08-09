@@ -621,7 +621,7 @@ public:
                         const SMTSortRef &To) override final;
   SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
                                 const SMTSortRef &To) override final;
-  SMTExprRef mkFXPFromBV(const SMTExprRef &Exp,
+  SMTExprRef mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
                          const SMTSortRef &To) override final;
   SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) override final;
   SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,

@@ -743,15 +743,16 @@ SMTExprRef SMTSolverImpl::mkFXPToFXPSat(const SMTExprRef &Exp,
                         To, SMTExprKind::FXPToFXPSat);
 }
 
-SMTExprRef SMTSolverImpl::mkFXPFromBV(const SMTExprRef &Exp,
+SMTExprRef SMTSolverImpl::mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
                                       const SMTSortRef &To) {
   fatalErrorIf(!Exp->Sort->isBVSort(), "Expected bit-vector expression");
   requireFXPSort(To);
   // An integer is a fixed-point value with zero fraction bits; converting
-  // is then a format conversion from (width, 0, target signedness).
-  // Overflow of this conversion is queryable through mkFXPToFXPOverflow on
-  // the same reinterpretation.
-  SMTSortRef IntSort = mkFXPSort(Exp->getWidth(), 0, To->isFXPSignedSort());
+  // is then a format conversion from (width, 0, source signedness) — the
+  // source type's signedness fixes the value, the target format only the
+  // representation. Overflow of this conversion is queryable through
+  // mkFXPToFXPOverflow on the same reinterpretation.
+  SMTSortRef IntSort = mkFXPSort(Exp->getWidth(), 0, SrcSigned);
   return mkFXPToFXP(mkFXPFromRawBV(Exp, IntSort), To);
 }
 

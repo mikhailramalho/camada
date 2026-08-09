@@ -440,14 +440,30 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
   // Integer bridges: mkFXPFromBV embeds exactly (round-trip through
   // mkFXPToBV is the identity on in-range integers), toward-zero on the way
   // back is covered by fxp_rounding_semantics.
-  {
+  for (bool SrcSigned : {true, false}) {
     solver->reset();
     camada::SMTSortRef Fmt = solver->mkFXPSort(16, 4, true);
     camada::SMTExprRef I = solver->mkSymbol("fxp_int_x", solver->mkBVSort(8));
-    camada::SMTExprRef AsFXP = solver->mkFXPFromBV(I, Fmt);
+    camada::SMTExprRef AsFXP = solver->mkFXPFromBV(I, SrcSigned, Fmt);
     camada::SMTExprRef Back = solver->mkFXPToBV(AsFXP, 8);
     solver->addConstraint(solver->mkNot(solver->mkEqual(Back, I)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+
+  // Source signedness governs the value: the same bits 0xFF are -1 as a
+  // signed int8 and 255 as a uint8, independent of the (signed) target
+  // format. Q11.4: -1 -> raw 0xFFF0, 255 -> raw 0x0FF0.
+  {
+    solver->reset();
+    camada::SMTSortRef Fmt = solver->mkFXPSort(16, 4, true);
+    camada::SMTExprRef Bits = solver->mkBVFromDec(0xFF, 8);
+    solver->addConstraint(
+        solver->mkFXPEqual(solver->mkFXPFromBV(Bits, true, Fmt),
+                           solver->mkFXPFromBin("1111111111110000", Fmt)));
+    solver->addConstraint(
+        solver->mkFXPEqual(solver->mkFXPFromBV(Bits, false, Fmt),
+                           solver->mkFXPFromBin("0000111111110000", Fmt)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
   }
 }
 
