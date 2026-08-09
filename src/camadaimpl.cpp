@@ -386,6 +386,18 @@ SMTSortRef SMTSolverImpl::mkFPSort(const unsigned ExpWidth,
   constexpr unsigned MaxWidth = std::numeric_limits<unsigned>::max();
   fatalErrorIf(SigWidth > MaxWidth - 1 || ExpWidth > MaxWidth - 1 - SigWidth,
                "Floating-point sort width overflow");
+  // The BV encoding's normalization counts leading zeros of intermediates
+  // up to 2*sbits + 5 bits wide (sbits = SigWidth + 1 with the hidden
+  // bit; the widest is FMA's renormalize) in (ExpWidth + 2)-bit signed
+  // arithmetic, so the count must fit as a positive value there. A format
+  // with a wide significand and a tiny exponent would silently misround —
+  // reject it at sort creation. Every IEEE format passes with orders of
+  // magnitude to spare (binary32: 53 <= 511).
+  fatalErrorIf(Encoding == FPEncoding::BV && ExpWidth < 31 &&
+                   2 * (SigWidth + 1) + 5 > (1u << (ExpWidth + 1)) - 1,
+               "Floating-point format unsupported by the BV encoding: the "
+               "significand is too wide for the exponent width (requires "
+               "2*(SigWidth+1) + 5 <= 2^(ExpWidth+1) - 1)");
   auto &Cache = FPSortCaches[fpEncodingIndex(Encoding)];
   FPSortCacheKey Key{ExpWidth, SigWidth};
   auto It = Cache.find(Key);

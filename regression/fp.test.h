@@ -673,3 +673,44 @@ fp_cancellation_and_normalization(const camada::SMTSolverRef &solver,
   solver->addConstraint(solver->mkFPIsNormal(sub));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
+
+// Wide formats previously hit undefined behavior in the BV encoding's
+// host-side constant construction (1ULL << N at N >= 64): binary128
+// constants (2^112-1 significand masks) and x87-extended sqrt
+// (2^(sbits+3) with sbits = 64). The constants are now built as bit
+// strings at any width; these pin the previously-broken formats
+// end-to-end. Constant operands let the backend fold the circuits, so
+// the checks stay fast despite the widths.
+inline void fp_wide_format_semantics(const camada::SMTSolverRef &solver) {
+  // Bit pattern of the power-of-two value 2^K at a given format:
+  // sign 0, exponent bias + K, significand zero.
+  auto pow2At = [&](unsigned EW, unsigned SW, uint64_t K) {
+    uint64_t exp = ((uint64_t(1) << (EW - 1)) - 1) + K;
+    std::string bits = "0";
+    for (unsigned i = 0; i < EW; ++i)
+      bits += (exp >> (EW - 1 - i)) & 1 ? '1' : '0';
+    bits += std::string(SW, '0');
+    return solver->mkFPFromBin(bits, EW, camada::FPEncoding::BV);
+  };
+
+  // binary128: 1.0 + 1.0 == 2.0.
+  {
+    auto one = pow2At(15, 112, 0);
+    auto two = pow2At(15, 112, 1);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkFPAdd(one, one, rm), two)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    solver->reset();
+  }
+
+  // x87-extended-like (15, 63): sqrt(4.0) == 2.0.
+  {
+    auto four = pow2At(15, 63, 2);
+    auto two = pow2At(15, 63, 1);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkFPSqrt(four, rm), two)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
