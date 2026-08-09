@@ -253,6 +253,18 @@ protected:
     std::unordered_map<std::string, std::size_t> ReadsByConstBits;
   };
   std::unordered_map<const SMTExpr *, AckArrayRootState> AckArrayRoots;
+  // Lowered selects memoized per (chain node, index). Store/ite chains
+  // share their bases by construction, so repeated selects — from user
+  // code or the array-equality congruence machinery — reuse one lowered
+  // term instead of rebuilding an ite cascade per call. Same key split
+  // as AckArrayRootState: BV-constant indexes by value, everything else
+  // by object identity. Terms outlive push/pop, so entries never need
+  // scope invalidation.
+  struct AckSelectMemoState {
+    std::unordered_map<const SMTExpr *, SMTExprRef> ByIndex;
+    std::unordered_map<std::string, SMTExprRef> ByConstBits;
+  };
+  std::unordered_map<const SMTExpr *, AckSelectMemoState> AckSelectMemo;
   // Bits of BV constants built through mkBVFromBin/mkBVFromDec, tracked
   // only in Ackermann mode (general expressions are not hash-consed, so
   // the value is otherwise unrecoverable at build time).

@@ -237,13 +237,42 @@ SMTExprRef SMTSolverImpl::mkAckArrayConst(const SMTSortRef &IndexSort,
 SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
                                            const SMTExprRef &Index) {
   const CamadaAckArrayExpr *AE = requireAckArrayExpr(Array);
+  auto BitsIt = AckBVConstBits.find(&*Index);
+  const bool IndexIsConst = BitsIt != AckBVConstBits.end();
+
   switch (AE->getKind()) {
   case SMTExprKind::ArrayStore:
-    return mkIte(mkEqual(Index, AE->Index), AE->Element,
-                 mkAckArraySelect(AE->Base, Index));
-  case SMTExprKind::Ite:
-    return mkIte(AE->Cond, mkAckArraySelect(AE->TrueArr, Index),
-                 mkAckArraySelect(AE->FalseArr, Index));
+  case SMTExprKind::Ite: {
+    // Chain nodes are shared by construction, so memoize the lowered
+    // select per (node, index): repeated selects reuse one term instead
+    // of rebuilding the ite cascade. Constant indexes key by value,
+    // mirroring the read canonicalization at symbol roots below.
+    {
+      AckSelectMemoState &Memo = AckSelectMemo[&*Array];
+      if (IndexIsConst) {
+        if (auto It = Memo.ByConstBits.find(BitsIt->second);
+            It != Memo.ByConstBits.end())
+          return It->second;
+      } else if (auto It = Memo.ByIndex.find(&*Index);
+                 It != Memo.ByIndex.end()) {
+        return It->second;
+      }
+    }
+    SMTExprRef Result =
+        AE->getKind() == SMTExprKind::ArrayStore
+            ? mkIte(mkEqual(Index, AE->Index), AE->Element,
+                    mkAckArraySelect(AE->Base, Index))
+            : mkIte(AE->Cond, mkAckArraySelect(AE->TrueArr, Index),
+                    mkAckArraySelect(AE->FalseArr, Index));
+    // Fresh lookup: the recursion above inserts into AckSelectMemo, which
+    // can rehash and invalidate any reference held across it.
+    AckSelectMemoState &Memo = AckSelectMemo[&*Array];
+    if (IndexIsConst)
+      Memo.ByConstBits.emplace(BitsIt->second, Result);
+    else
+      Memo.ByIndex.emplace(&*Index, Result);
+    return Result;
+  }
   case SMTExprKind::ArrayConst:
     return AE->Init;
   case SMTExprKind::Symbol:
@@ -258,8 +287,6 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
   // structurally equal terms built separately get distinct reads, which
   // is sound (their congruence guard is trivially true) if redundant.
   AckArrayRootState &Root = AckArrayRoots[&*Array];
-  auto BitsIt = AckBVConstBits.find(&*Index);
-  const bool IndexIsConst = BitsIt != AckBVConstBits.end();
   if (IndexIsConst) {
     if (auto It = Root.ReadsByConstBits.find(BitsIt->second);
         It != Root.ReadsByConstBits.end())
