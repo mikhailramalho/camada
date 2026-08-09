@@ -121,8 +121,11 @@ if(${CAMADA_SOLVER_CVC5_ENABLE})
   # the imported location, falling back to the cvc5::cvc5 target otherwise —
   # same self-contained-export rationale as the STP block.
   list(APPEND _camada_backend_link_libs ${CVC5_LINK_LIBRARIES})
+  # SYSTEM, because that is how the cvc5::cvc5 imported target propagated this
+  # directory: bitwuzla and cvc5 both define an ENUM macro, and only
+  # system-header status keeps clang's -Wmacro-redefined quiet under -Werror.
   if(CVC5_INCLUDE_DIRS)
-    target_include_directories(${LIBRARY_TARGET_NAME}
+    target_include_directories(${LIBRARY_TARGET_NAME} SYSTEM
                                PUBLIC "$<BUILD_INTERFACE:${CVC5_INCLUDE_DIRS}>")
   endif()
   if(CAMADA_CVC5_EXTRA_LIBS)
