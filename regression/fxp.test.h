@@ -650,9 +650,9 @@ inline void fxp_sat_conversion_semantics(const camada::SMTSolverRef &solver) {
     int64_t R = refFloorDiv(V, int64_t(1) << (Scale - To.FracBits));
     return uint64_t(R) & ((uint64_t(1) << To.Width) - 1);
   };
-  auto toBVSatRef = [](const RefFormat &From, unsigned ToWidth,
+  auto toBVSatRef = [](const RefFormat &From, unsigned ToWidth, bool ToSigned,
                        int64_t A) -> uint64_t {
-    RefFormat IntTarget{ToWidth, 0, From.IsSigned};
+    RefFormat IntTarget{ToWidth, 0, ToSigned};
     int64_t Trunc = A / (int64_t(1) << From.FracBits); // toward zero
     if (Trunc < IntTarget.minRaw())
       Trunc = IntTarget.minRaw();
@@ -676,18 +676,49 @@ inline void fxp_sat_conversion_semantics(const camada::SMTSolverRef &solver) {
       requireAllHold(solver, Conjuncts);
     }
     for (unsigned ToWidth : {2u, 4u, 8u}) {
-      solver->reset();
-      std::vector<camada::SMTExprRef> Conjuncts;
-      for (uint64_t RA = 0; RA < Count; ++RA) {
-        int64_t A = refDecode(From, RA);
-        camada::SMTExprRef EA = mkConst(solver, From, RA);
-        RefFormat IntF{ToWidth, 0, From.IsSigned};
-        std::string Bits = refBits(IntF, toBVSatRef(From, ToWidth, A));
-        Conjuncts.push_back(
-            solver->mkEqual(solver->mkFXPToBVSat(EA, ToWidth),
-                            solver->mkBVFromBin(Bits, ToWidth)));
+      // Both target signednesses: the clamp range is the TARGET type's —
+      // a negative source clamps to zero for an unsigned target.
+      for (bool ToSigned : {true, false}) {
+        solver->reset();
+        std::vector<camada::SMTExprRef> Conjuncts;
+        for (uint64_t RA = 0; RA < Count; ++RA) {
+          int64_t A = refDecode(From, RA);
+          camada::SMTExprRef EA = mkConst(solver, From, RA);
+          RefFormat IntF{ToWidth, 0, ToSigned};
+          std::string Bits =
+              refBits(IntF, toBVSatRef(From, ToWidth, ToSigned, A));
+          Conjuncts.push_back(
+              solver->mkEqual(solver->mkFXPToBVSat(EA, ToWidth, ToSigned),
+                              solver->mkBVFromBin(Bits, ToWidth)));
+        }
+        requireAllHold(solver, Conjuncts);
       }
-      requireAllHold(solver, Conjuncts);
+    }
+  }
+}
+
+// Runtime-amount shifts agree with the constant-amount variants for
+// every amount below the width — value, overflow predicate, and sat
+// clamp — proven over a fully symbolic operand per (format, amount).
+inline void fxp_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
+  for (const RefFormat &F : sweepFormats()) {
+    for (unsigned K = 0; K < F.Width; ++K) {
+      solver->reset();
+      camada::SMTExprRef X = solver->mkFXPFromRawBV(
+          solver->mkSymbol("shx", solver->mkBVSort(F.Width)),
+          mkSort(solver, F));
+      camada::SMTExprRef KE = solver->mkBVFromDec(K, F.Width);
+      camada::SMTExprRef Same = solver->mkAnd(
+          solver->mkAnd(solver->mkFXPEqual(solver->mkFXPShlExpr(X, KE),
+                                           solver->mkFXPShl(X, K)),
+                        solver->mkFXPEqual(solver->mkFXPShrExpr(X, KE),
+                                           solver->mkFXPShr(X, K))),
+          solver->mkAnd(solver->mkFXPEqual(solver->mkFXPShlSatExpr(X, KE),
+                                           solver->mkFXPShlSat(X, K)),
+                        solver->mkEqual(solver->mkFXPShlOverflowExpr(X, KE),
+                                        solver->mkFXPShlOverflow(X, K))));
+      solver->addConstraint(solver->mkNot(Same));
+      REQUIRE(solver->check() == camada::checkResult::UNSAT);
     }
   }
 }
@@ -706,5 +737,6 @@ using camada_fxp_test::fxp_sat_conversion_semantics;
 using camada_fxp_test::fxp_sat_exhaustive_semantics;
 using camada_fxp_test::fxp_sat_shift_semantics;
 using camada_fxp_test::fxp_shift_semantics;
+using camada_fxp_test::fxp_symbolic_shift_semantics;
 
 #endif // CAMADA_REGRESSION_FXP_TEST_H_

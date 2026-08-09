@@ -419,6 +419,71 @@ SMTExprRef SMTSolverImpl::mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) {
   return rewrapExprImpl(*Clamped, Exp->Sort, SMTExprKind::FXPShlSat);
 }
 
+// Runtime-amount shifts. The overflow test is the round-trip identity:
+// shifting back recovers the operand exactly when nothing significant
+// (including the sign) was discarded — equivalent to the constant
+// version's top-bits check for every Amount < Width.
+
+namespace {
+
+void requireShiftAmount(const SMTExprRef &Exp, const SMTExprRef &Amount) {
+  fatalErrorIf(!Amount->Sort->isBVSort(), "Expected bit-vector shift amount");
+  fatalErrorIf(Amount->getWidth() != Exp->getWidth(),
+               "Shift amount width must match the operand width");
+}
+
+} // namespace
+
+SMTExprRef SMTSolverImpl::mkFXPShlExpr(const SMTExprRef &Exp,
+                                       const SMTExprRef &Amount) {
+  requireFXP(Exp);
+  requireShiftAmount(Exp, Amount);
+  return rewrapExprImpl(*mkBVShl(mkFXPToRawBV(Exp), Amount), Exp->Sort,
+                        SMTExprKind::FXPShl);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPShrExpr(const SMTExprRef &Exp,
+                                       const SMTExprRef &Amount) {
+  requireFXP(Exp);
+  requireShiftAmount(Exp, Amount);
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  SMTExprRef Shifted = Exp->Sort->isFXPSignedSort() ? mkBVAshr(Raw, Amount)
+                                                    : mkBVLshr(Raw, Amount);
+  return rewrapExprImpl(*Shifted, Exp->Sort, SMTExprKind::FXPShr);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPShlOverflowExpr(const SMTExprRef &Exp,
+                                               const SMTExprRef &Amount) {
+  requireFXP(Exp);
+  requireShiftAmount(Exp, Amount);
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  SMTExprRef Shifted = mkBVShl(Raw, Amount);
+  SMTExprRef Back = Exp->Sort->isFXPSignedSort() ? mkBVAshr(Shifted, Amount)
+                                                 : mkBVLshr(Shifted, Amount);
+  return mkNot(mkEqual(Back, Raw));
+}
+
+SMTExprRef SMTSolverImpl::mkFXPShlSatExpr(const SMTExprRef &Exp,
+                                          const SMTExprRef &Amount) {
+  requireFXP(Exp);
+  requireShiftAmount(Exp, Amount);
+  FXPFormat F = formatOf(Exp->Sort);
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  SMTExprRef Shifted = mkBVShl(Raw, Amount);
+  SMTExprRef Ovf = mkFXPShlOverflowExpr(Exp, Amount);
+  SMTExprRef Max = mkBVFromBin(maxRawBits(F, F.Width), F.Width);
+  SMTExprRef Clamped;
+  if (!F.IsSigned) {
+    Clamped = mkIte(Ovf, Max, Shifted);
+  } else {
+    SMTExprRef Neg =
+        mkEqual(mkBVExtract(F.Width - 1, F.Width - 1, Raw), mkBVFromDec(1, 1));
+    SMTExprRef Min = mkBVFromBin(minRawBits(F, F.Width), F.Width);
+    Clamped = mkIte(Ovf, mkIte(Neg, Min, Max), Shifted);
+  }
+  return rewrapExprImpl(*Clamped, Exp->Sort, SMTExprKind::FXPShlSat);
+}
+
 // ---------------------------------------------------------------------------
 // Comparisons
 // ---------------------------------------------------------------------------
@@ -680,7 +745,7 @@ SMTExprRef SMTSolverImpl::mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) {
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToBVOverflow(const SMTExprRef &Exp,
-                                            unsigned ToWidth) {
+                                            unsigned ToWidth, bool ToSigned) {
   requireFXP(Exp);
   fatalErrorIf(ToWidth == 0, "Target width must be non-zero");
   FXPFormat From = formatOf(Exp->Sort);
@@ -696,14 +761,14 @@ SMTExprRef SMTSolverImpl::mkFXPToBVOverflow(const SMTExprRef &Exp,
     SMTExprRef Pow = mkBVFromBin(PowBits, Wide);
     Raw = From.IsSigned ? mkBVSDiv(Raw, Pow) : mkBVUDiv(Raw, Pow);
   }
-  FXPFormat IntTarget{ToWidth, 0, From.IsSigned};
+  FXPFormat IntTarget{ToWidth, 0, ToSigned};
   SMTExprRef Max = mkBVFromBin(maxRawBits(IntTarget, Wide), Wide);
   SMTExprRef Min = mkBVFromBin(minRawBits(IntTarget, Wide), Wide);
   return mkOr(mkBVSgt(Raw, Max), mkBVSlt(Raw, Min));
 }
 
-SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp,
-                                       unsigned ToWidth) {
+SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
+                                       bool ToSigned) {
   requireFXP(Exp);
   fatalErrorIf(ToWidth == 0, "Target width must be non-zero");
   FXPFormat From = formatOf(Exp->Sort);
@@ -719,7 +784,7 @@ SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp,
     SMTExprRef Pow = mkBVFromBin(PowBits, Wide);
     Raw = From.IsSigned ? mkBVSDiv(Raw, Pow) : mkBVUDiv(Raw, Pow);
   }
-  FXPFormat IntTarget{ToWidth, 0, From.IsSigned};
+  FXPFormat IntTarget{ToWidth, 0, ToSigned};
   return rewrapExprImpl(*clampRaw(*this, Raw, Wide, IntTarget,
                                   /*SignedCmp=*/true),
                         mkBVSort(ToWidth), SMTExprKind::FXPToBVSat);
