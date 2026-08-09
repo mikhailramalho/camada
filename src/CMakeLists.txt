@@ -117,7 +117,14 @@ if(${CAMADA_SOLVER_CVC5_ENABLE})
   target_link_directories(
     ${LIBRARY_TARGET_NAME} PRIVATE ${CAMADA_DEPS_INSTALL_DIR}/lib
     ${CAMADA_DEPS_INSTALL_DIR}/lib64)
-  list(APPEND _camada_backend_link_libs cvc5::cvc5)
+  # CVC5_LINK_LIBRARIES is the resolved archive path when FindCVC5 could read
+  # the imported location, falling back to the cvc5::cvc5 target otherwise —
+  # same self-contained-export rationale as the STP block.
+  list(APPEND _camada_backend_link_libs ${CVC5_LINK_LIBRARIES})
+  if(CVC5_INCLUDE_DIRS)
+    target_include_directories(${LIBRARY_TARGET_NAME}
+                               PUBLIC "$<BUILD_INTERFACE:${CVC5_INCLUDE_DIRS}>")
+  endif()
   if(CAMADA_CVC5_EXTRA_LIBS)
     list(APPEND _camada_backend_link_libs ${CAMADA_CVC5_EXTRA_LIBS})
   endif()
