@@ -41,6 +41,18 @@ template <typename Fn> inline void require_abort(Fn &&Body) {
 #endif
 }
 
+// Degenerate formats whose significand cannot be renormalized within the
+// exponent arithmetic width are rejected at sort creation for the BV
+// encoding (they would silently misround; see mkFPSort). Lives here
+// rather than fp.test.h because it needs require_abort.
+inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
+  require_abort(
+      [&]() { (void)solver->mkFPSort(2, 10, camada::FPEncoding::BV); });
+  // The boundary format itself is accepted: 2*(4+1)+5 = 15 = 2^(3+1)-1.
+  auto ok = solver->mkFPSort(3, 4, camada::FPEncoding::BV);
+  REQUIRE(ok->isFPSort());
+}
+
 inline void tests(const camada::SMTSolverRef &solver) {
   constexpr auto NativeFP = camada::FPEncoding::Native;
   constexpr auto BVFP = camada::FPEncoding::BV;
@@ -128,6 +140,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_non_standard_widths, BVFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, NativeFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
+  RESETANDTEST(fp_wide_format_semantics);
+  RESETANDTEST(fp_degenerate_format_rejected);
 
   // Fixed-point: pure common-layer BV encoding, no backend gating needed.
   RESETANDTEST(fxp_exhaustive_semantics);
