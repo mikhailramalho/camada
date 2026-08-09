@@ -258,12 +258,26 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
         return It->second;
       }
     }
-    SMTExprRef Result =
-        AE->getKind() == SMTExprKind::ArrayStore
-            ? mkIte(mkEqual(Index, AE->Index), AE->Element,
-                    mkAckArraySelect(AE->Base, Index))
-            : mkIte(AE->Cond, mkAckArraySelect(AE->TrueArr, Index),
-                    mkAckArraySelect(AE->FalseArr, Index));
+    SMTExprRef Result;
+    if (AE->getKind() == SMTExprKind::ArrayStore) {
+      // Host-side fold before emitting anything: a select whose index is
+      // syntactically the stored index (same object, or equal BV-constant
+      // bits) hits the store; two distinct BV constants provably miss and
+      // skip the level. Only genuinely undecidable levels emit an ite.
+      auto StoreBitsIt = AckBVConstBits.find(&*AE->Index);
+      const bool StoreIsConst = StoreBitsIt != AckBVConstBits.end();
+      if (&*Index == &*AE->Index || (IndexIsConst && StoreIsConst &&
+                                     BitsIt->second == StoreBitsIt->second))
+        Result = AE->Element;
+      else if (IndexIsConst && StoreIsConst)
+        Result = mkAckArraySelect(AE->Base, Index);
+      else
+        Result = mkIte(mkEqual(Index, AE->Index), AE->Element,
+                       mkAckArraySelect(AE->Base, Index));
+    } else {
+      Result = mkIte(AE->Cond, mkAckArraySelect(AE->TrueArr, Index),
+                     mkAckArraySelect(AE->FalseArr, Index));
+    }
     // Fresh lookup: the recursion above inserts into AckSelectMemo, which
     // can rehash and invalidate any reference held across it.
     AckSelectMemoState &Memo = AckSelectMemo[&*Array];
