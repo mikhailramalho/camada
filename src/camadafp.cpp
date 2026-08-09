@@ -2027,8 +2027,15 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
                     mkNot(ovfl)),
               mkBVUle(pre_rounded, ul));
   } else {
-    SMTExprRef ll = mkBVSignExt(3, mkBVConcat(bv1, mkBVFromDec(0, bv_sz - 1)));
-    ul = mkBVZeroExt(4, mkBVNeg(mkBVFromDec(1, bv_sz - 1)));
+    // Bounds of the signed target: ll = -2^(bv_sz-1), ul = 2^(bv_sz-1)-1,
+    // built as bit strings rather than by concatenating a (bv_sz-1)-wide
+    // value, which is a zero-width sort when bv_sz is 1.
+    std::string LlBits(bv_sz + 3, '1');
+    LlBits.replace(4, bv_sz - 1, bv_sz - 1, '0');
+    SMTExprRef ll = mkBVFromBin(LlBits, mkBVSort(bv_sz + 3));
+    std::string UlBits(bv_sz + 3, '0');
+    UlBits.replace(4, bv_sz - 1, bv_sz - 1, '1');
+    ul = mkBVFromBin(UlBits, mkBVSort(bv_sz + 3));
     ovfl = mkOr(ovfl, mkBVSle(pre_rounded, mkBVNeg(mkBVFromDec(1, bv_sz + 3))));
     pre_rounded = mkIte(x_is_neg, mkBVNeg(pre_rounded), pre_rounded);
     in_range = mkAnd(mkAnd(mkNot(ovfl), mkBVSle(ll, pre_rounded)),
