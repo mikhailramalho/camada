@@ -237,9 +237,12 @@ SMTExprRef STPSolver::mkBVMulOverflowImpl(const SMTExprRef &LHS,
 
 SMTExprRef STPSolver::mkBVSRemImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
+  // vc_sbvRemExpr, not vc_sbvModExpr: SMT-LIB's bvsrem takes the sign of
+  // the dividend, while STP's "mod" takes the sign of the divisor. The
+  // two agree only when the operand signs match.
   return makeExprRef<STPExpr>(
       SMTExprKind::BVSRem, &Context, LHS->Sort,
-      STP::vc_sbvModExpr(Context, LHS->getWidth(),
+      STP::vc_sbvRemExpr(Context, LHS->getWidth(),
                          toSolverExpr<STPExpr>(*LHS).Expr,
                          toSolverExpr<STPExpr>(*RHS).Expr));
 }
