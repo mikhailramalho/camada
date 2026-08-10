@@ -19,7 +19,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -860,6 +862,117 @@ inline void fxp_abs_countls_semantics(const camada::SMTSolverRef &solver) {
 // Correctly-rounded square root: the reference is exact integer
 // arithmetic (the unique r with r*r <= raw*2^n < (r+1)*(r+1)), not any
 // library's approximation — see mkFXPSqrt's contract.
+// Correctly-rounded exp for the two 16-bit _Accum formats. `long double`
+// carries a 64-bit mantissa, far more than the ~24 bits these formats can
+// resolve, so rounding the host result is exact for every input here —
+// the wider formats are covered by the offline checks against arbitrary
+// precision instead (see scripts/fxp_exp_bounds.txt).
+inline uint64_t refExp(const RefFormat &F, int64_t Raw) {
+  long double X = (long double)Raw / (long double)(uint64_t(1) << F.FracBits);
+  long double V = expl(X) * (long double)(uint64_t(1) << F.FracBits);
+  long double MaxV = (long double)F.maxRaw();
+  if (!(V < MaxV + 0.5L))
+    return (uint64_t)F.maxRaw();
+  long double Fl = floorl(V);
+  long double Frac = V - Fl;
+  uint64_t Q = (uint64_t)Fl;
+  if (Frac > 0.5L || (Frac == 0.5L && (Q & 1)))
+    ++Q;
+  return std::min<uint64_t>(Q, (uint64_t)F.maxRaw());
+}
+
+// Per-backend check: a handful of vectors spanning the underflow tail,
+// the ordinary range and saturation. The exhaustive comparison against
+// every input of both 16-bit formats is far too heavy to repeat on seven
+// backends (~130s each) and lives in a single dedicated test case
+// instead; the encoding is common-layer, so one backend proves it.
+inline void fxp_exp_semantics(const camada::SMTSolverRef &solver) {
+  for (const RefFormat &F : {RefFormat{16, 7, true}, RefFormat{16, 8, false}}) {
+    solver->reset();
+    camada::SMTExprRef All;
+    const int64_t Probes[] = {0,   1,    -1,  64,   -64,  128, -128,
+                              256, -256, 700, -700, -798, 900, -1200};
+    for (int64_t In : Probes) {
+      if (!F.IsSigned && In < 0)
+        continue;
+      uint64_t Raw = refWrap(F, In);
+      camada::SMTExprRef C =
+          solver->mkFXPEqual(solver->mkFXPExp(mkConst(solver, F, Raw)),
+                             mkConst(solver, F, refExp(F, refDecode(F, Raw))));
+      All = All ? solver->mkAnd(All, C) : C;
+    }
+    solver->addConstraint(All);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+}
+
+// Every input of both 16-bit _Accum formats, against the host reference.
+// One backend only: see fxp_exp_semantics.
+inline void fxp_exp_exhaustive(const camada::SMTSolverRef &solver) {
+  // Only the band where exp() is neither 0 nor saturated is enumerated.
+  // Every input outside it has the same answer and reaches it through the
+  // same two comparisons, so sweeping the other ~63000 spends minutes
+  // re-testing one branch. The real bands are ~1400 inputs wide (see
+  // scripts/fxp_exp_bounds.txt); this walks a generous superset, and the
+  // per-backend fixture probes the tails either side.
+  for (const RefFormat &F : {RefFormat{16, 7, true}, RefFormat{16, 8, false}}) {
+    const int64_t Lo = F.IsSigned ? -900 : 0;
+    const int64_t Hi = 1500;
+    for (int64_t Base = Lo; Base <= Hi; Base += 1024) {
+      solver->reset();
+      camada::SMTExprRef All;
+      for (int64_t I = Base; I < Base + 1024 && I <= Hi; ++I) {
+        uint64_t Raw = refWrap(F, I);
+        camada::SMTExprRef C = solver->mkFXPEqual(
+            solver->mkFXPExp(mkConst(solver, F, Raw)),
+            mkConst(solver, F, refExp(F, refDecode(F, Raw))));
+        All = All ? solver->mkAnd(All, C) : C;
+      }
+      solver->addConstraint(All);
+      REQUIRE(solver->check() == camada::checkResult::SAT);
+    }
+  }
+
+  // The saturating and underflowing tails, sampled across their whole
+  // extent rather than assumed uniform: an early version of the encoding
+  // overflowed the 2^k shift and wrapped to a value that then passed the
+  // range check, and it did so only for large inputs (x = 47.75 in s8.7,
+  // raw 6112) well beyond the band swept above.
+  for (const RefFormat &F : {RefFormat{16, 7, true}, RefFormat{16, 8, false}}) {
+    solver->reset();
+    camada::SMTExprRef All;
+    const int64_t Step = 37; // coprime with the format widths
+    for (int64_t I = F.minRaw(); I <= F.maxRaw(); I += Step) {
+      uint64_t Raw = refWrap(F, I);
+      camada::SMTExprRef C =
+          solver->mkFXPEqual(solver->mkFXPExp(mkConst(solver, F, Raw)),
+                             mkConst(solver, F, refExp(F, refDecode(F, Raw))));
+      All = All ? solver->mkAnd(All, C) : C;
+    }
+    solver->addConstraint(All);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // The wider formats are spot-checked; their exhaustive comparison
+  // against arbitrary-precision arithmetic runs offline.
+  {
+    solver->reset();
+    RefFormat F{32, 15, true};
+    camada::SMTExprRef All;
+    const std::pair<int64_t, uint64_t> V[] = {
+        {0, 32768}, {32768, 89073}, {-32768, 12055}, {1000000, 2147483647}};
+    for (auto [In, Out] : V) {
+      uint64_t InBits = uint64_t(In) & ((uint64_t(1) << F.Width) - 1);
+      camada::SMTExprRef C =
+          solver->mkFXPEqual(solver->mkFXPExp(mkConst(solver, F, InBits)),
+                             mkConst(solver, F, Out));
+      All = All ? solver->mkAnd(All, C) : C;
+    }
+    solver->addConstraint(All);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+}
+
 inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
   uint64_t N = Raw << F.FracBits;
   uint64_t R = 0, Bit = uint64_t(1) << 62;
@@ -1210,6 +1323,8 @@ using camada_fxp_test::fxp_abs_countls_semantics;
 using camada_fxp_test::fxp_boundary_overflow_semantics;
 using camada_fxp_test::fxp_conversion_matrix;
 using camada_fxp_test::fxp_exhaustive_semantics;
+using camada_fxp_test::fxp_exp_exhaustive;
+using camada_fxp_test::fxp_exp_semantics;
 using camada_fxp_test::fxp_fp_conversion_semantics;
 using camada_fxp_test::fxp_mixed_format_semantics;
 using camada_fxp_test::fxp_model_and_constructs;

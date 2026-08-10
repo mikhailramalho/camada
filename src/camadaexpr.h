@@ -170,6 +170,7 @@ enum class SMTExprKind {
   FXPAbs,
   FXPCountls,
   FXPSqrt,
+  FXPExp,
   FXPToFP,
   FPToFXP,
   FPToFXPSat,

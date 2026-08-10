@@ -18,6 +18,15 @@ TEST_CASE("Simple Z3 test", "[Z3]") {
 // seven. The conversions are pure common-layer encoding over BV ops that
 // every backend already exercises, and the encoding-sensitive cases are
 // pinned per backend by fxp_fp_conversion_semantics inside tests().
+// Every input of both 16-bit _Accum formats through mkFXPExp. Each exp is
+// a wide multiply chain, so this costs ~130s and runs on one backend
+// rather than all seven; the encoding is common-layer BV, so the other
+// backends' spot checks in tests() are enough.
+TEST_CASE("Fixed-point exp exhaustive Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver();
+  fxp_exp_exhaustive(z3);
+}
+
 TEST_CASE("Fixed-point/floating-point oracle Z3 test", "[Z3]") {
   auto z3 = camada::createZ3Solver();
   fxp_oracle_fp_semantics(z3, camada::FPEncoding::BV);

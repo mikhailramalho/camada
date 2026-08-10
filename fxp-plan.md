@@ -321,3 +321,43 @@ ops, #134 oracle and division fix, #135 conversions and `roundfx`).
 4. **API naming**: `FXP` chosen to parallel `FP`; bikeshed before the PR.
 5. **Which formats ESBMC emits** (Clang defaults: 8/16/32/64-bit) decides
    the constructor conveniences worth adding beyond `mkFXPFromBin`.
+
+## `exp` (Aug 2026): why it is domain-restricted
+
+ESBMC asked for a correctly-rounded fixed-point `exp` so they can check
+the error bounds LLVM libc claims for `exphk` and `expk` (relative error
+< 2^-8 and < 2^-16 respectively). Camada supplies the ground truth; it
+deliberately does NOT reproduce libc's own approximation, which is a
+lookup table plus a linear correction and has no bit pattern worth
+matching — the same reasoning as `sqrtfx`.
+
+Correct rounding needs an intermediate wide enough to decide every
+rounding, which needs the hardest-to-round distance: how close `exp` ever
+lands to a halfway point between representable values. For floating-point
+formats that is the table maker's dilemma and takes a directed search
+(Lefèvre–Muller; CORE-MATH). For the C `_Accum` formats the interesting
+band — where `exp` is neither 0 nor saturated — is small enough to sweep
+exhaustively, so the bound is measured instead. All six are recorded in
+`scripts/fxp_exp_bounds.txt`; the widest needs 75 fractional bits.
+
+**The measurement does not generalise, and cannot be made to.** Each
+sweep covers one exact `(width, frac, signedness)` triple: the fraction
+width sets the sample spacing and the integer width sets where saturation
+cuts the range off, so two formats of the same storage width share
+nothing. Nor is the bound monotone in either parameter, so there is no
+"widest case dominates" shortcut.
+
+Sweeping the whole format space is not merely undone but infeasible.
+Cost grows as 2^frac while the useful range grows only logarithmically,
+so the low-integer-bit formats dominate: `s2.61` alone is 1.24e19 inputs
+(~6,000 years on 32 threads), and all 64-bit formats together are 1.05e20
+inputs — roughly 51,000 years. `mkFXPExp` therefore accepts an allowlist
+of swept triples and aborts otherwise, rather than encoding with a width
+it cannot justify. Adding a format means running
+`scripts/fxp_exp_worstcase.c` for it (minutes, for anything up to ~38
+fraction bits) and adding a row.
+
+This makes `exp` the one FXP operation with a restricted domain: every
+other one is exact algebra and works at any width. Lifting the
+restriction needs an analytic bound — effective Baker-type bounds on
+linear forms in logarithms — not more compute.

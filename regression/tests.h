@@ -74,6 +74,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
   RESETANDTEST(bv_extend_by_zero_semantics);
+  RESETANDTEST(bv_signed_div_rem_semantics);
   RESETANDTEST(bv_overflow_semantics);
   RESETANDTEST(solver_timeout_semantics);
 
@@ -171,6 +172,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_symbolic_shift_semantics);
   RESETANDTEST(fxp_abs_countls_semantics);
   RESETANDTEST(fxp_sqrt_semantics);
+  RESETANDTEST(fxp_exp_semantics);
   RESETANDTEST(fxp_round_semantics);
   RESETANDTEST(fxp_oracle_semantics);
   RESETANDTEST(fxp_oracle_mixed_semantics);

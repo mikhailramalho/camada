@@ -650,6 +650,7 @@ public:
   SMTExprRef mkFXPCountls(const SMTExprRef &Exp,
                           unsigned ToWidth) override final;
   SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPExp(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
                        RM R) override final;
   SMTExprRef mkFPToFXP(const SMTExprRef &Exp,

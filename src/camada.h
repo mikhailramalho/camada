@@ -956,6 +956,30 @@ public:
   /// mkFXPLt(x, zero), which produces the same term.
   virtual SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) = 0;
 
+  /// Base-e exponential, correctly rounded to nearest with ties to even,
+  /// saturating to the format's maximum where the true value does not fit
+  /// and giving zero where it rounds below half an ulp — TR 18037's
+  /// `expfx`. Like mkFXPSqrt this is the exact mathematical operation,
+  /// not a reproduction of any library's approximation; LLVM libc's
+  /// `exphk`/`expk` document a relative error bound rather than correct
+  /// rounding, so this is what such a claim can be checked against.
+  ///
+  /// Supported only on the fixed-point formats C actually has an _Accum
+  /// type for, and only those whose hardest-to-round input has been
+  /// measured (see scripts/fxp_exp_bounds.txt): (16,7), (16,8), (32,15),
+  /// (32,16), (64,31) and (64,32). Any other format aborts.
+  ///
+  /// The restriction is a property of the operation, not an omission.
+  /// Correct rounding needs an intermediate wide enough to decide every
+  /// rounding, which needs to know how close exp() ever lands to a
+  /// halfway point, and that distance is established by an exhaustive
+  /// sweep whose cost grows as 2^FracBits. Sweeping every 64-bit format
+  /// would take on the order of 10^4 years, and no bound generalises
+  /// between formats: both the sample spacing and the saturation cutoff
+  /// move with the format. Every other fixed-point operation is exact
+  /// algebra and works at any width.
+  virtual SMTExprRef mkFXPExp(const SMTExprRef &Exp) = 0;
+
   /// Converts a fixed-point value to a floating-point value of the given
   /// sort, rounding once per R. C's fixed-to-float conversion rounds to
   /// nearest even: pass RM::ROUND_TO_EVEN (Clang's direction, pinned by
