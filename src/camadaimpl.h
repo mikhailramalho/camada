@@ -646,6 +646,10 @@ public:
                           bool ToSigned) override;
   SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
                         FXPRoundTie Tie) override final;
+  SMTExprRef mkFXPAbs(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPCountls(const SMTExprRef &Exp,
+                          unsigned ToWidth) override final;
+  SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
                        RM R) override final;
   SMTExprRef mkFPToFXP(const SMTExprRef &Exp,

@@ -920,6 +920,42 @@ public:
   virtual SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
                                 FXPRoundTie Tie) = 0;
 
+  /// Absolute value — TR 18037's `absfx`. Saturates: the most negative
+  /// value of a signed format has no positive counterpart, so it maps to
+  /// the format's maximum rather than overflowing (LLVM libc's choice;
+  /// the composition mkIte(mkFXPLt(x,0), mkFXPNeg(x), x) wraps there
+  /// instead). Unsigned formats return the value unchanged.
+  virtual SMTExprRef mkFXPAbs(const SMTExprRef &Exp) = 0;
+
+  /// Count leading sign bits — TR 18037's `countlsfx`: the number of
+  /// redundant copies of the sign bit, i.e. how far the value can be
+  /// shifted left before it changes sign. Returns a bit-vector of
+  /// ToWidth bits; the count never exceeds the format width, so any
+  /// ToWidth wide enough to hold that is safe. For unsigned formats it
+  /// counts leading zeros.
+  virtual SMTExprRef mkFXPCountls(const SMTExprRef &Exp, unsigned ToWidth) = 0;
+
+  /// Square root, rounded toward zero: the unique r in the operand's own
+  /// format with r*r <= x < (r+1)*(r+1) at the format's scale. Always
+  /// representable — square root contracts on [0, max] for every format,
+  /// so no saturation is possible.
+  ///
+  /// This is the exact mathematical operation, NOT a reproduction of any
+  /// library's `sqrtfx`. LLVM libc computes a Sollya-generated linear
+  /// approximation refined by Newton steps and documents an error bound
+  /// rather than correct rounding, and avr-libc has its own approximation
+  /// with different error; the two do not agree bit-for-bit with each
+  /// other or with this. A consumer verifying a program that calls a
+  /// specific library's `sqrtfx` is reproducing that library's
+  /// approximation error, which is not something a shared layer can bake
+  /// in.
+  ///
+  /// Negative operands have no real square root; the result is zero for
+  /// them. There is no paired predicate because the condition is just
+  /// `x < 0` — a consumer that needs to assert it writes
+  /// mkFXPLt(x, zero), which produces the same term.
+  virtual SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) = 0;
+
   /// Converts a fixed-point value to a floating-point value of the given
   /// sort, rounding once per R. C's fixed-to-float conversion rounds to
   /// nearest even: pass RM::ROUND_TO_EVEN (Clang's direction, pinned by
