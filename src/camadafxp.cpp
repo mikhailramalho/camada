@@ -824,6 +824,232 @@ SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
 }
 
 // ---------------------------------------------------------------------------
+// Fixed-point <-> floating-point conversions
+// ---------------------------------------------------------------------------
+//
+// Both directions run through a floating-point format wide enough to hold
+// every intermediate step exactly, so the operation's only rounding is its
+// final conversion step. That single rounding is the property composition
+// cannot provide: converting to the target format first and scaling by a
+// power of two after rounds twice whenever the scale crosses the subnormal
+// boundary. Semantics are pinned by the execution oracle (kToFP/kFromFP):
+// fixed->float rounds per R (C uses RNE), float->fixed truncates toward
+// zero, _Sat clamps with +-infinity at the rails and NaN at zero.
+
+namespace {
+
+// IEEE bit string of +-(2^K + (AddDist == 0 ? 0 : 2^(K-AddDist))) in a
+// (EWidth, SigWidth) format. K must be a normal exponent of the format and
+// AddDist at most SigWidth.
+std::string fpPow2Bits(bool Negative, int64_t K, unsigned AddDist,
+                       unsigned EWidth, unsigned SigWidth) {
+  std::string Bits(1 + EWidth + SigWidth, '0');
+  Bits[0] = Negative ? '1' : '0';
+  uint64_t ExpField =
+      static_cast<uint64_t>((int64_t(1) << (EWidth - 1)) - 1 + K);
+  for (unsigned I = 0; I < EWidth; ++I)
+    if ((ExpField >> (EWidth - 1 - I)) & 1)
+      Bits[1 + I] = '1';
+  if (AddDist != 0)
+    Bits[1 + EWidth + AddDist - 1] = '1';
+  return Bits;
+}
+
+// Smallest FP sort with at least SigWidth significand bits whose normal
+// range covers +-MaxExp with headroom (intermediates never go subnormal).
+//
+// Under the Native encoding the sort must come from {binary32, binary64}:
+// backends restrict which native formats exist (bitwuzla rejects
+// nonstandard ones, cvc5's default build allows only Float32/Float64), and
+// those two are the universal floor wherever native FP exists at all.
+// Returns null when neither fits — the caller then computes in the BV
+// encoding and bit-bridges the result into the native sort.
+SMTSortRef nativeWideFPSortFor(SMTSolverImpl &S, unsigned SigWidth,
+                               uint64_t MaxExp) {
+  static constexpr std::pair<unsigned, unsigned> Ladder[] = {{8, 23}, {11, 52}};
+  for (auto [E, Sig] : Ladder)
+    if (Sig >= SigWidth && (uint64_t(1) << (E - 1)) >= MaxExp + 3)
+      return S.mkFPSort(E, Sig, FPEncoding::Native);
+  return SMTSortRef();
+}
+
+// BV-encoded wide sort: any format works, respecting mkFPSort's
+// structural bound.
+SMTSortRef bvWideFPSortFor(SMTSolverImpl &S, unsigned SigWidth,
+                           uint64_t MaxExp) {
+  unsigned E = 4;
+  while ((uint64_t(1) << (E - 1)) < MaxExp + 3 ||
+         2 * (uint64_t(SigWidth) + 1) + 5 > (uint64_t(1) << (E + 1)) - 1)
+    ++E;
+  return S.mkFPSort(E, SigWidth, FPEncoding::BV);
+}
+
+struct FPFXPParts {
+  SMTExprRef Scaled; // Exp * 2^FracBits in the exact wide format
+  SMTExprRef IsNaN;
+  SMTExprRef TooHi; // !(Scaled < maxRaw+1): above range or +infinity
+  SMTExprRef TooLo; // !(Scaled > minRaw-1): below range or -infinity
+};
+
+FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
+                        const FXPFormat &To) {
+  SMTSortRef Src = Exp->Sort;
+  SMTExprRef Val = Exp;
+  unsigned SrcE = Src->getFPExponentWidth();
+  unsigned SrcS = Src->getWidth() - 1 - SrcE;
+  // Wide holds the widened source exactly (subnormals become normal), the
+  // 2^FracBits scale without overflow, and the range bounds exactly.
+  uint64_t MaxExp =
+      (uint64_t(1) << (SrcE - 1)) + To.FracBits + SrcS + To.Width + 2;
+  unsigned WideSig = std::max({SrcS, To.Width, 2u});
+  FPEncoding Enc = FPEncoding::BV;
+  SMTSortRef Wide;
+  if (!Src->isBVFPSort()) {
+    Wide = nativeWideFPSortFor(S, WideSig, MaxExp);
+    if (Wide) {
+      Enc = FPEncoding::Native;
+    } else {
+      // No universal native format holds the intermediate: reinterpret
+      // the source's IEEE bits into the BV encoder and compute there —
+      // the result is a raw bit-vector either way. A NaN source may
+      // surface as any NaN payload, which the BV encoder still
+      // classifies as NaN.
+      Val = S.mkBVToIEEEFP(S.mkIEEEFPToBV(Exp),
+                           S.mkFPSort(SrcE, SrcS, FPEncoding::BV));
+    }
+  }
+  if (!Wide)
+    Wide = bvWideFPSortFor(S, WideSig, MaxExp);
+  unsigned WE = Wide->getFPExponentWidth();
+  unsigned WS = Wide->getWidth() - 1 - WE;
+  SMTExprRef RNE = S.mkRM(RM::ROUND_TO_EVEN, Enc);
+  SMTExprRef Scaled = S.mkFPtoFP(Val, Wide, RNE); // exact: Wide covers Src
+  if (To.FracBits != 0)
+    Scaled = S.mkFPMul(
+        Scaled,
+        S.mkFPFromBin(fpPow2Bits(false, int64_t(To.FracBits), 0, WE, WS), WE,
+                      Enc),
+        RNE); // exact power-of-two scale
+  FPFXPParts P;
+  P.Scaled = Scaled;
+  P.IsNaN = S.mkFPIsNaN(Exp);
+  // The toward-zero result lands in range iff minRaw-1 < scaled < maxRaw+1
+  // (open interval: maxRaw + 0.9 still truncates to maxRaw). Both bounds
+  // are a power of two or a two-term sum, exactly representable in Wide.
+  // The negated comparisons also classify +-infinity; NaN fails both
+  // comparisons and would read as TooHi and TooLo, so callers test IsNaN
+  // first.
+  SMTExprRef Hi = S.mkFPFromBin(
+      fpPow2Bits(false, To.IsSigned ? To.Width - 1 : To.Width, 0, WE, WS), WE,
+      Enc);
+  // minRaw-1 is -1 unsigned, -(2^(Width-1) + 1) signed (a pure power of
+  // two, -2, when Width == 1).
+  SMTExprRef Lo =
+      !To.IsSigned ? S.mkFPFromBin(fpPow2Bits(true, 0, 0, WE, WS), WE, Enc)
+      : To.Width == 1
+          ? S.mkFPFromBin(fpPow2Bits(true, 1, 0, WE, WS), WE, Enc)
+          : S.mkFPFromBin(fpPow2Bits(true, To.Width - 1, To.Width - 1, WE, WS),
+                          WE, Enc);
+  P.TooHi = S.mkNot(S.mkFPLt(Scaled, Hi));
+  P.TooLo = S.mkNot(S.mkFPGt(Scaled, Lo));
+  return P;
+}
+
+} // namespace
+
+SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
+                                    RM R) {
+  requireFXP(Exp);
+  fatalErrorIf(!To->isFPSort(), "Expected floating-point target sort");
+  FXPFormat From = formatOf(Exp->Sort);
+  unsigned WideSig = std::max(From.Width, 2u);
+  uint64_t MaxExp = uint64_t(std::max(From.Width, From.FracBits)) + 2;
+  // The raw integer converts exactly (wide significand covers the raw
+  // width), the 2^-FracBits scale is an exact power-of-two multiply
+  // inside the wide range, and the final mkFPtoFP performs the
+  // conversion's only rounding, per R. When the target is native but no
+  // universal native format holds the intermediate, the whole conversion
+  // runs in the BV encoder — including the final rounding, into a
+  // BV-encoded twin of the target format — and the resulting bits
+  // reinterpret into the native sort (exact, no extra rounding).
+  FPEncoding Enc = FPEncoding::BV;
+  SMTSortRef Wide, RoundTo = To;
+  if (!To->isBVFPSort()) {
+    Wide = nativeWideFPSortFor(*this, WideSig, MaxExp);
+    if (Wide)
+      Enc = FPEncoding::Native;
+    else
+      RoundTo = mkFPSort(To->getFPExponentWidth(),
+                         To->getWidth() - 1 - To->getFPExponentWidth(),
+                         FPEncoding::BV);
+  }
+  if (!Wide)
+    Wide = bvWideFPSortFor(*this, WideSig, MaxExp);
+  SMTExprRef Rm = mkRM(R, Enc);
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  SMTExprRef Val =
+      From.IsSigned ? mkSBVtoFP(Raw, Wide, Rm) : mkUBVtoFP(Raw, Wide, Rm);
+  if (From.FracBits != 0) {
+    unsigned WE = Wide->getFPExponentWidth();
+    unsigned WS = Wide->getWidth() - 1 - WE;
+    Val = mkFPMul(
+        Val,
+        mkFPFromBin(fpPow2Bits(false, -int64_t(From.FracBits), 0, WE, WS), WE,
+                    Enc),
+        Rm);
+  }
+  SMTExprRef Res = mkFPtoFP(Val, RoundTo, Rm);
+  if (RoundTo != To)
+    Res = mkBVToIEEEFP(mkIEEEFPToBV(Res), To);
+  return rewrapExprImpl(*Res, To, SMTExprKind::FXPToFP);
+}
+
+SMTExprRef SMTSolverImpl::mkFPToFXP(const SMTExprRef &Exp,
+                                    const SMTSortRef &To) {
+  fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
+  requireFXPSort(To);
+  FXPFormat Target = formatOf(To);
+  FPFXPParts P = fpToFXPParts(*this, Exp, Target);
+  // fp.to_sbv / fp.to_ubv round toward zero across all backends and the
+  // BV encoding — C's float->fixed direction (fixed->fixed narrowing
+  // floors instead; both oracle-pinned). Out of range, for infinities,
+  // and for NaN the result is solver-chosen, matching C's UB; gate with
+  // mkFPToFXPOverflow.
+  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(P.Scaled, Target.Width)
+                                   : mkFPtoUBV(P.Scaled, Target.Width);
+  return rewrapExprImpl(*Raw, To, SMTExprKind::FPToFXP);
+}
+
+SMTExprRef SMTSolverImpl::mkFPToFXPOverflow(const SMTExprRef &Exp,
+                                            const SMTSortRef &To) {
+  fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
+  requireFXPSort(To);
+  FPFXPParts P = fpToFXPParts(*this, Exp, formatOf(To));
+  return mkOr(P.IsNaN, mkOr(P.TooHi, P.TooLo));
+}
+
+SMTExprRef SMTSolverImpl::mkFPToFXPSat(const SMTExprRef &Exp,
+                                       const SMTSortRef &To) {
+  fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
+  requireFXPSort(To);
+  FXPFormat Target = formatOf(To);
+  FPFXPParts P = fpToFXPParts(*this, Exp, Target);
+  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(P.Scaled, Target.Width)
+                                   : mkFPtoUBV(P.Scaled, Target.Width);
+  // NaN -> 0 (Clang's _Sat choice; the TR leaves it undefined), rails for
+  // out-of-range and +-infinity, toward-zero otherwise. NaN tests first:
+  // it fails both comparisons, so TooHi and TooLo both hold for it.
+  SMTExprRef Res = mkIte(
+      P.IsNaN, mkBVFromDec(0, Target.Width),
+      mkIte(P.TooHi,
+            mkBVFromBin(maxRawBits(Target, Target.Width), Target.Width),
+            mkIte(P.TooLo,
+                  mkBVFromBin(minRawBits(Target, Target.Width), Target.Width),
+                  Raw)));
+  return rewrapExprImpl(*Res, To, SMTExprKind::FPToFXPSat);
+}
+
+// ---------------------------------------------------------------------------
 // Model query
 // ---------------------------------------------------------------------------
 

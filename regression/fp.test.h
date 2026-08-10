@@ -481,6 +481,19 @@ inline void fp_to_signed_bv_multiple_widths(const camada::SMTSolverRef &solver,
   solver->addConstraint(solver->mkEqual(sbv32, solver->mkBVFromDec(42, 32)));
   solver->addConstraint(solver->mkEqual(sbv64, solver->mkBVFromDec(42, 64)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Width 1 is the degenerate signed target: its range is [-1, 0], so 0
+  // converts and -1 converts, while 42 is out of range. The BV encoding
+  // used to build the range bounds by concatenating a (width-1)-wide
+  // value, which is a zero-width sort here and aborted.
+  solver->reset();
+  auto zero = solver->mkFP32(0.0f, Encoding);
+  auto neg_one = solver->mkFP32(-1.0f, Encoding);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkFPtoSBV(zero, 1), solver->mkBVFromDec(0, 1)));
+  solver->addConstraint(solver->mkEqual(solver->mkFPtoSBV(neg_one, 1),
+                                        solver->mkBVFromDec(1, 1)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
 inline void fp_denormal_round_to_integral(const camada::SMTSolverRef &solver,

@@ -741,6 +741,145 @@ inline void fxp_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
   }
 }
 
+// Fixed <-> floating point: targeted cases the oracle tables cannot carry
+// (a nonstandard FP target, predicate boundaries, a symbolic round-trip).
+// The oracle fixture in fxporacle.test.h pins the full float/double
+// semantics; these pin the parts C programs never reach.
+inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
+                                        camada::FPEncoding Enc) {
+  // Single-rounding discriminator: s(32,30) raw 49185 (= 49185 * 2^-30)
+  // converts into binary16's subnormal range. Rounding the exact value
+  // once gives frac 769 (0x0301); converting to binary16 first and
+  // scaling afterwards rounds twice (49185 -> 49184, then a tie to even
+  // downwards) and gives 0x0300. This is the case that makes the
+  // conversion camada-owned instead of consumer-composed. BV encoding
+  // only: not every backend has a native binary16 (cvc5's default build
+  // stops at Float32/Float64).
+  if (Enc == camada::FPEncoding::BV) {
+    solver->reset();
+    camada::SMTSortRef Fmt = solver->mkFXPSort(32, 30, true);
+    camada::SMTSortRef Half = solver->mkFPSort(5, 10, Enc);
+    camada::SMTExprRef X =
+        solver->mkFXPFromBin(refBits(RefFormat{32, 30, true}, 49185), Fmt);
+    camada::SMTExprRef R =
+        solver->mkFXPToFP(X, Half, camada::RM::ROUND_TO_EVEN);
+    solver->addConstraint(solver->mkEqual(solver->mkIEEEFPToBV(R),
+                                          solver->mkBVFromDec(0x0301, 16)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Overflow predicate boundaries and the toward-zero direction, s.15
+  // target from binary32 sources.
+  {
+    solver->reset();
+    camada::SMTSortRef To = solver->mkFXPSort(16, 15, true);
+    auto fp32 = [&](uint32_t Bits) {
+      return solver->mkFPFromBin(refBits(RefFormat{32, 0, false}, Bits), 8,
+                                 Enc);
+    };
+    // Defined iff the toward-zero result fits (Clang lowers the plain
+    // conversion as fmul-by-2^n + fptosi): the rails themselves — max =
+    // 32767/32768 (0x3f7ffe00), min = -1.0 (0xbf800000) — and even one
+    // ulp beyond them (0x3f7ffe01, 0xbf800001), which still truncates
+    // into range.
+    camada::SMTExprRef Ok = solver->mkBool(true);
+    for (uint32_t Good : {0x3f7ffe00u, 0xbf800000u, 0x3f7ffe01u, 0xbf800001u})
+      Ok = solver->mkAnd(
+          Ok, solver->mkNot(solver->mkFPToFXPOverflow(fp32(Good), To)));
+    // Undefined: values whose truncation falls outside (1.0 scales to
+    // 32768, -1.000030518 to -32769), NaN, and +-infinity.
+    for (uint32_t Bad :
+         {0x3f800000u, 0xbf800100u, 0x7fc00000u, 0x7f800000u, 0xff800000u})
+      Ok = solver->mkAnd(Ok, solver->mkFPToFXPOverflow(fp32(Bad), To));
+    // Toward zero, not floor: -0.7f scales to -22937.6, truncating to
+    // -22937 (raw 0xa667); flooring would give -22938.
+    Ok = solver->mkAnd(
+        Ok,
+        solver->mkFXPEqual(solver->mkFPToFXP(fp32(0xbf333333), To),
+                           solver->mkFXPFromBin(
+                               refBits(RefFormat{16, 15, true}, 0xa667), To)));
+    solver->addConstraint(Ok);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Oracle-pinned vectors on the standard formats, run under BOTH
+  // encodings (the kToFP/kFromFP tables themselves run BV-only). These
+  // are the rows that discriminate the rounding rules: RNE ties in both
+  // directions and the all-ones carry-out for fixed->float, the rails
+  // and NaN for saturating float->fixed.
+  {
+    solver->reset();
+    camada::SMTSortRef L31 = solver->mkFXPSort(32, 31, true);
+    camada::SMTSortRef F32 = solver->mkFP32Sort(Enc);
+    camada::SMTExprRef Ok = solver->mkBool(true);
+    // (raw of long _Fract, expected binary32 bits) straight from kToFP.
+    const std::pair<uint32_t, uint32_t> ToFP32[] = {
+        {0x2AAAAAAB, 0x3eaaaaab}, // tail above half rounds up
+        {0x40000040, 0x3f000000}, // exact tie, keep even
+        {0x400000C0, 0x3f000002}, // exact tie, round up to even
+        {0x40000140, 0x3f000002}, // exact tie, keep even
+        {0x7FFFFFC0, 0x3f800000}, // tie at all-ones carries out to 1.0
+    };
+    for (auto [Raw, Bits] : ToFP32) {
+      camada::SMTExprRef X =
+          solver->mkFXPFromBin(refBits(RefFormat{32, 31, true}, Raw), L31);
+      Ok = solver->mkAnd(
+          Ok, solver->mkEqual(solver->mkIEEEFPToBV(solver->mkFXPToFP(
+                                  X, F32, camada::RM::ROUND_TO_EVEN)),
+                              solver->mkBVFromBin(
+                                  refBits(RefFormat{32, 0, false}, Bits), 32)));
+    }
+    // long _Accum -> double at the 53-bit boundary: tail below half
+    // rounds down.
+    camada::SMTSortRef L31A = solver->mkFXPSort(64, 31, true);
+    camada::SMTExprRef Y = solver->mkFXPFromBin(
+        refBits(RefFormat{64, 31, true}, 0x4000000000000180ull), L31A);
+    Ok = solver->mkAnd(
+        Ok,
+        solver->mkEqual(
+            solver->mkIEEEFPToBV(solver->mkFXPToFP(Y, solver->mkFP64Sort(Enc),
+                                                   camada::RM::ROUND_TO_EVEN)),
+            solver->mkBVFromBin(
+                refBits(RefFormat{64, 0, false}, 0x41e0000000000000ull), 64)));
+    // Saturating float->fixed: rails, infinities, and NaN -> 0.
+    camada::SMTSortRef S15 = solver->mkFXPSort(16, 15, true);
+    const std::pair<uint32_t, uint32_t> FromFP32[] = {
+        {0x40200000, 0x7fff}, // 2.5 clamps to max
+        {0xc0200000, 0x8000}, // -2.5 clamps to min
+        {0x7f800000, 0x7fff}, // +inf
+        {0xff800000, 0x8000}, // -inf
+        {0x7fc00000, 0x0000}, // NaN -> 0
+        {0xbf333333, 0xa667}, // -0.7 truncates toward zero
+    };
+    for (auto [Bits, Raw] : FromFP32) {
+      camada::SMTExprRef F =
+          solver->mkFPFromBin(refBits(RefFormat{32, 0, false}, Bits), 8, Enc);
+      Ok = solver->mkAnd(
+          Ok,
+          solver->mkFXPEqual(solver->mkFPToFXPSat(F, S15),
+                             solver->mkFXPFromBin(
+                                 refBits(RefFormat{16, 15, true}, Raw), S15)));
+    }
+    solver->addConstraint(Ok);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Symbolic round-trip: every s.7 value is exactly representable in
+  // binary32, so converting there and back is the identity and the
+  // overflow predicate never fires (proved UNSAT over a symbolic value).
+  {
+    solver->reset();
+    camada::SMTSortRef Fmt = solver->mkFXPSort(8, 7, true);
+    camada::SMTSortRef F32 = solver->mkFP32Sort(Enc);
+    camada::SMTExprRef X = solver->mkSymbol("fxp_rt_x", Fmt);
+    camada::SMTExprRef F = solver->mkFXPToFP(X, F32, camada::RM::ROUND_TO_EVEN);
+    solver->addConstraint(solver->mkOr(
+        solver->mkNot(solver->mkFXPEqual(solver->mkFPToFXP(F, Fmt), X)),
+        solver->mkFPToFXPOverflow(F, Fmt)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
 } // namespace camada_fxp_test
 
 // The fixtures are referenced unqualified from tests.h and the per-backend
@@ -748,6 +887,7 @@ inline void fxp_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
 using camada_fxp_test::fxp_boundary_overflow_semantics;
 using camada_fxp_test::fxp_conversion_matrix;
 using camada_fxp_test::fxp_exhaustive_semantics;
+using camada_fxp_test::fxp_fp_conversion_semantics;
 using camada_fxp_test::fxp_mixed_format_semantics;
 using camada_fxp_test::fxp_model_and_constructs;
 using camada_fxp_test::fxp_rounding_semantics;

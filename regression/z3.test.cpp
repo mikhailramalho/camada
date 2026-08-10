@@ -13,6 +13,16 @@ TEST_CASE("Simple Z3 test", "[Z3]") {
   tests(z3);
 }
 
+// The fixed<->float oracle tables bit-blast thousands of FP circuits, so
+// unlike the other FXP fixtures they run on one backend instead of all
+// seven. The conversions are pure common-layer encoding over BV ops that
+// every backend already exercises, and the encoding-sensitive cases are
+// pinned per backend by fxp_fp_conversion_semantics inside tests().
+TEST_CASE("Fixed-point/floating-point oracle Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver();
+  fxp_oracle_fp_semantics(z3, camada::FPEncoding::BV);
+}
+
 TEST_CASE("Quantifiers Z3 test", "[Z3]") {
   auto z3 = camada::createZ3Solver();
   quantifier_semantics(z3);

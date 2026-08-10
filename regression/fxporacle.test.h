@@ -174,8 +174,43 @@ inline void fxp_oracle_mixed_semantics(const camada::SMTSolverRef &solver) {
   });
 }
 
+// Fixed <-> floating point. kToFP pins mkFXPToFP(RNE) to the executed
+// float/double bits, compared on the IEEE encoding so the exact bit
+// pattern counts. kFromFP pins mkFPToFXP / mkFPToFXPSat; every plain row
+// is in-range by generation-time filtering, so the overflow predicate
+// must also be false there.
+inline void fxp_oracle_fp_semantics(const camada::SMTSolverRef &solver,
+                                    camada::FPEncoding Enc) {
+  const std::size_t NToFP = sizeof(kToFP) / sizeof(kToFP[0]);
+  checkVectorsChunked(solver, NToFP, [&](std::size_t I) {
+    const OrToFP &V = kToFP[I];
+    camada::SMTExprRef A = mkFXP(solver, V.a, V.fw, V.fn, V.fs != 0);
+    camada::SMTSortRef To =
+        V.fpw == 32 ? solver->mkFP32Sort(Enc) : solver->mkFP64Sort(Enc);
+    camada::SMTExprRef R = solver->mkFXPToFP(A, To, camada::RM::ROUND_TO_EVEN);
+    return solver->mkEqual(solver->mkIEEEFPToBV(R),
+                           solver->mkBVFromBin(rawBits(V.r, V.fpw), V.fpw));
+  });
+
+  const std::size_t NFromFP = sizeof(kFromFP) / sizeof(kFromFP[0]);
+  checkVectorsChunked(solver, NFromFP, [&](std::size_t I) {
+    const OrFromFP &V = kFromFP[I];
+    unsigned EW = V.fpw == 32 ? 8 : 11;
+    camada::SMTExprRef A = solver->mkFPFromBin(rawBits(V.a, V.fpw), EW, Enc);
+    camada::SMTSortRef To = solver->mkFXPSort(V.tw, V.tn, V.ts != 0);
+    camada::SMTExprRef R =
+        V.sat != 0 ? solver->mkFPToFXPSat(A, To) : solver->mkFPToFXP(A, To);
+    camada::SMTExprRef Eq =
+        solver->mkFXPEqual(R, mkFXP(solver, V.r, V.tw, V.tn, V.ts != 0));
+    if (V.sat == 0)
+      Eq = solver->mkAnd(Eq, solver->mkNot(solver->mkFPToFXPOverflow(A, To)));
+    return Eq;
+  });
+}
+
 } // namespace camada_fxp_oracle
 
+using camada_fxp_oracle::fxp_oracle_fp_semantics;
 using camada_fxp_oracle::fxp_oracle_mixed_semantics;
 using camada_fxp_oracle::fxp_oracle_semantics;
 
