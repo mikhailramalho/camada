@@ -59,8 +59,10 @@
 #include "camadacommon.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace camada {
 
@@ -944,6 +946,184 @@ SMTExprRef SMTSolverImpl::mkFXPCountls(const SMTExprRef &Exp,
   SMTExprRef AllSign = mkEqual(Payload, mkBVFromDec(0, Counted));
   Count = mkIte(AllSign, mkBVFromDec(Counted, ToWidth), Count);
   return rewrapExprImpl(*Count, mkBVSort(ToWidth), SMTExprKind::FXPCountls);
+}
+
+namespace {
+
+// Formats mkFXPExp supports: the C _Accum types whose hardest-to-round
+// input has been measured exhaustively (scripts/fxp_exp_bounds.txt).
+// Width, FracBits, IsSigned, and the fractional bits an intermediate
+// needs for the final rounding to be decidable everywhere.
+struct ExpFormatBound {
+  unsigned Width, FracBits;
+  bool IsSigned;
+  unsigned RoundingBits;
+};
+
+constexpr ExpFormatBound ExpBounds[] = {
+    {16, 7, true, 19},   {16, 8, false, 23}, {32, 15, true, 37},
+    {32, 16, false, 37}, {64, 31, true, 68}, {64, 32, false, 75},
+};
+
+const ExpFormatBound *findExpBound(const FXPFormat &F) {
+  for (const ExpFormatBound &B : ExpBounds)
+    if (B.Width == F.Width && B.FracBits == F.FracBits &&
+        B.IsSigned == F.IsSigned)
+      return &B;
+  return nullptr;
+}
+
+// Extra fractional bits carried beyond what the rounding needs. The
+// series below truncates at every division, and those losses compound
+// faster than the remainder bound alone suggests: a model of this
+// encoding in exact integer arithmetic still mis-rounded a handful of
+// inputs with 8 spare bits and needed 12 (u8.8) and 16 (s16.15) to come
+// clean, so the margin is set well above the observed trend. Bit-vector
+// width is cheap here.
+constexpr unsigned ExpGuardBits = 32;
+
+// floor(ln2 * 2^Prec) as a Width-bit binary string, computed exactly from
+// ln2 = sum_{k>=1} 1/(k*2^k). The series is truncated where its terms fall
+// below the last bit kept, so the result is exact for any Prec; deriving
+// it here rather than hard-coding digits keeps the constant tied to the
+// intermediate width the caller actually uses.
+std::string ln2Bits(unsigned Width, unsigned Prec) {
+  std::vector<uint32_t> Acc(Width / 32 + 2, 0);
+  for (unsigned K = 1; K <= Prec; ++K) {
+    // Term = 2^(Prec-K) / K, by long division over the limbs.
+    std::vector<uint32_t> T(Acc.size(), 0);
+    unsigned Bit = Prec - K;
+    T[Bit / 32] = 1u << (Bit % 32);
+    uint64_t Rem = 0;
+    for (size_t I = T.size(); I-- > 0;) {
+      uint64_t Cur = (Rem << 32) | T[I];
+      T[I] = (uint32_t)(Cur / K);
+      Rem = Cur % K;
+    }
+    uint64_t Carry = 0;
+    for (size_t I = 0; I < Acc.size(); ++I) {
+      uint64_t S = (uint64_t)Acc[I] + T[I] + Carry;
+      Acc[I] = (uint32_t)S;
+      Carry = S >> 32;
+    }
+  }
+  std::string Bits(Width, '0');
+  for (unsigned I = 0; I < Width; ++I)
+    if ((Acc[I / 32] >> (I % 32)) & 1)
+      Bits[Width - 1 - I] = '1';
+  return Bits;
+}
+
+// Terms of exp(r) = sum r^i / i! needed for |r| <= ln2, chosen so the
+// truncated tail falls below the intermediate's last bit.
+unsigned expTermCount(unsigned Prec) {
+  // |r|^(N+1)/(N+1)! < 2^-(Prec+1), with |r| <= ln2 < 0.694.
+  double R = 0.6931471805599453, Term = R, Limit = 1.0;
+  for (unsigned I = 0; I < Prec + 1; ++I)
+    Limit /= 2.0;
+  unsigned N = 1;
+  while (Term > Limit && N < 64) {
+    ++N;
+    Term = Term * R / (double)(N + 1);
+  }
+  return N + 1;
+}
+
+} // namespace
+
+SMTExprRef SMTSolverImpl::mkFXPExp(const SMTExprRef &Exp) {
+  requireFXP(Exp);
+  FXPFormat F = formatOf(Exp->Sort);
+  const ExpFormatBound *B = findExpBound(F);
+  fatalErrorIf(B == nullptr,
+               "Fixed-point exp is supported only on the C _Accum formats "
+               "whose hardest-to-round input has been measured; see "
+               "scripts/fxp_exp_bounds.txt");
+
+  // Work at P fractional bits, wide enough that the final rounding is
+  // decidable for every input of this format.
+  const unsigned P = B->RoundingBits + ExpGuardBits;
+  // exp(x) = 2^k * exp(r) with x = k*ln2 + r and 0 <= r < ln2, so the
+  // series only ever sees a small argument and the scaling is a shift.
+  // The intermediate holds exp(r) < 2 plus P fraction bits, the shifted
+  // result up to the format's maximum, and the k*ln2 subtraction; the
+  // integer part of the source and one sign bit sit on top.
+  const unsigned W = P + F.Width + 8;
+
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  SMTExprRef X = extendRaw(*this, Raw, F.IsSigned, W - F.Width);
+  // Bring x to P fractional bits.
+  X = mkBVShl(X, mkBVFromDec(P - F.FracBits, W));
+
+  SMTExprRef Ln2 = mkBVFromBin(ln2Bits(W, P), W);
+
+  // k = floor(x / ln2), computed with a signed division that floors.
+  SMTExprRef K = mkBVSDiv(X, Ln2);
+  SMTExprRef Rem = mkBVSRem(X, Ln2);
+  // bvsdiv truncates toward zero; step down when the remainder is
+  // negative so r stays in [0, ln2).
+  SMTExprRef Zero = mkBVFromDec(0, W);
+  SMTExprRef NegRem = mkBVSlt(Rem, Zero);
+  K = mkIte(NegRem, mkBVSub(K, mkBVFromDec(1, W)), K);
+  SMTExprRef R = mkIte(NegRem, mkBVAdd(Rem, Ln2), Rem);
+
+  // exp(r) by its series, Horner-style from the tail so each step is one
+  // multiply and one division by a constant:
+  //   acc_i = 1 + r*acc_{i+1}/i
+  const unsigned NTerms = expTermCount(P);
+  SMTExprRef One =
+      mkBVFromBin(std::string(W - P - 1, '0') + "1" + std::string(P, '0'), W);
+  SMTExprRef Acc = One;
+  // Both factors carry P fractional bits, so their product needs 2*P of
+  // them before the shift brings it back: the multiply is done at twice
+  // the width and narrowed only once the low bits have been discarded.
+  const unsigned W2 = 2 * W;
+  SMTExprRef RWide = mkBVZeroExt(W, R);
+  for (unsigned I = NTerms; I >= 1; --I) {
+    // acc = 1 + (r * acc >> P) / I
+    SMTExprRef Prod =
+        mkBVLshr(mkBVMul(RWide, mkBVZeroExt(W, Acc)), mkBVFromDec(P, W2));
+    if (I > 1)
+      Prod = mkBVUDiv(Prod, mkBVFromDec(I, W2));
+    Acc = mkBVAdd(One, mkBVExtract(W - 1, 0, Prod));
+  }
+
+  // Scale by 2^k. The shift must not be attempted for inputs whose result
+  // cannot fit: exp() grows far beyond the intermediate long before the
+  // format saturates (x = 47.75 in s8.7 needs ~119 bits), and a shift
+  // that overflows wraps to a small value that then looks in range. So
+  // the out-of-range cases are decided here, from k alone, and the shift
+  // only ever runs where its result is representable.
+  //   k >= KMax  =>  saturates;  k <= -KMin  =>  rounds to zero.
+  const unsigned KMax = F.Width + 2;
+  SMTExprRef Big = mkBVSge(K, mkBVFromDec(KMax, W));
+  SMTExprRef Tiny = mkBVSle(K, mkBVSub(Zero, mkBVFromDec(P, W)));
+  SMTExprRef SafeK = mkIte(mkOr(Big, Tiny), Zero, K);
+  SMTExprRef NegK = mkBVSub(Zero, SafeK);
+  SMTExprRef Scaled =
+      mkIte(mkBVSlt(SafeK, Zero), mkBVLshr(Acc, NegK), mkBVShl(Acc, SafeK));
+
+  // Round to the format's fraction width, to nearest with ties to even.
+  unsigned Shift = P - F.FracBits;
+  SMTExprRef Q = mkBVLshr(Scaled, mkBVFromDec(Shift, W));
+  SMTExprRef Half = mkBVFromBin(
+      std::string(W - Shift, '0') + "1" + std::string(Shift - 1, '0'), W);
+  std::string LowMaskBits(W, '0');
+  for (unsigned I = 0; I < Shift; ++I)
+    LowMaskBits[W - 1 - I] = '1';
+  SMTExprRef Low = mkBVAnd(Scaled, mkBVFromBin(LowMaskBits, W));
+  SMTExprRef Odd = mkEqual(mkBVExtract(0, 0, Q), mkBVFromDec(1, 1));
+  SMTExprRef RoundUp = mkOr(mkBVUgt(Low, Half), mkAnd(mkEqual(Low, Half), Odd));
+  Q = mkIte(RoundUp, mkBVAdd(Q, mkBVFromDec(1, W)), Q);
+
+  // Saturate: everything above the format's maximum clamps to it, and the
+  // out-of-range inputs set aside before the shift take their answers
+  // here rather than from the (meaningless) shifted value.
+  SMTExprRef Max = mkBVFromBin(maxRawBits(F, W), W);
+  Q = mkIte(mkOr(Big, mkBVUgt(Q, Max)), Max, Q);
+  Q = mkIte(Tiny, Zero, Q);
+  return rewrapExprImpl(*mkBVExtract(F.Width - 1, 0, Q), Exp->Sort,
+                        SMTExprKind::FXPExp);
 }
 
 SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp) {
