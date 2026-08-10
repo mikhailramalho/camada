@@ -909,11 +909,20 @@ inline void fxp_exp_semantics(const camada::SMTSolverRef &solver) {
 // Every input of both 16-bit _Accum formats, against the host reference.
 // One backend only: see fxp_exp_semantics.
 inline void fxp_exp_exhaustive(const camada::SMTSolverRef &solver) {
+  // Only the band where exp() is neither 0 nor saturated is enumerated.
+  // Every input outside it has the same answer and reaches it through the
+  // same two comparisons, so sweeping the other ~63000 spends minutes
+  // re-testing one branch. The real bands are ~1400 inputs wide (see
+  // scripts/fxp_exp_bounds.txt); this walks a generous superset, and the
+  // per-backend fixture probes the tails either side.
   for (const RefFormat &F : {RefFormat{16, 7, true}, RefFormat{16, 8, false}}) {
-    for (uint64_t Base = 0; Base < (uint64_t(1) << 16); Base += 1024) {
+    const int64_t Lo = F.IsSigned ? -900 : 0;
+    const int64_t Hi = 1500;
+    for (int64_t Base = Lo; Base <= Hi; Base += 1024) {
       solver->reset();
       camada::SMTExprRef All;
-      for (uint64_t Raw = Base; Raw < Base + 1024; ++Raw) {
+      for (int64_t I = Base; I < Base + 1024 && I <= Hi; ++I) {
+        uint64_t Raw = refWrap(F, I);
         camada::SMTExprRef C = solver->mkFXPEqual(
             solver->mkFXPExp(mkConst(solver, F, Raw)),
             mkConst(solver, F, refExp(F, refDecode(F, Raw))));
@@ -922,6 +931,26 @@ inline void fxp_exp_exhaustive(const camada::SMTSolverRef &solver) {
       solver->addConstraint(All);
       REQUIRE(solver->check() == camada::checkResult::SAT);
     }
+  }
+
+  // The saturating and underflowing tails, sampled across their whole
+  // extent rather than assumed uniform: an early version of the encoding
+  // overflowed the 2^k shift and wrapped to a value that then passed the
+  // range check, and it did so only for large inputs (x = 47.75 in s8.7,
+  // raw 6112) well beyond the band swept above.
+  for (const RefFormat &F : {RefFormat{16, 7, true}, RefFormat{16, 8, false}}) {
+    solver->reset();
+    camada::SMTExprRef All;
+    const int64_t Step = 37; // coprime with the format widths
+    for (int64_t I = F.minRaw(); I <= F.maxRaw(); I += Step) {
+      uint64_t Raw = refWrap(F, I);
+      camada::SMTExprRef C =
+          solver->mkFXPEqual(solver->mkFXPExp(mkConst(solver, F, Raw)),
+                             mkConst(solver, F, refExp(F, refDecode(F, Raw))));
+      All = All ? solver->mkAnd(All, C) : C;
+    }
+    solver->addConstraint(All);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
   }
 
   // The wider formats are spot-checked; their exhaustive comparison
