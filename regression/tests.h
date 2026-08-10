@@ -46,6 +46,17 @@ template <typename Fn> inline void require_abort(Fn &&Body) {
 // exponent arithmetic width are rejected at sort creation for the BV
 // encoding (they would silently misround; see mkFPSort). Lives here
 // rather than fp.test.h because it needs require_abort.
+// A leading-sign count needs a target wide enough to hold it; a narrower
+// one would silently truncate. Lives here because it needs require_abort.
+inline void
+fxp_countls_narrow_target_rejected(const camada::SMTSolverRef &solver) {
+  auto s64 = solver->mkFXPSort(64, 31, true);
+  auto x = solver->mkSymbol("fxp_cls_narrow", s64);
+  require_abort([&]() { (void)solver->mkFXPCountls(x, 4); });
+  // Six bits hold 63, the largest count for this format.
+  REQUIRE(solver->mkFXPCountls(x, 6)->getWidth() == 6);
+}
+
 inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
   require_abort(
       [&]() { (void)solver->mkFPSort(2, 10, camada::FPEncoding::BV); });
@@ -62,6 +73,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(implies_semantics);
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
+  RESETANDTEST(bv_extend_by_zero_semantics);
   RESETANDTEST(bv_overflow_semantics);
   RESETANDTEST(solver_timeout_semantics);
 
@@ -143,6 +155,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
   RESETANDTEST(fp_wide_format_semantics);
   RESETANDTEST(fp_degenerate_format_rejected);
+  RESETANDTEST(fxp_countls_narrow_target_rejected);
 
   // Fixed-point: pure common-layer BV encoding, no backend gating needed.
   RESETANDTEST(fxp_exhaustive_semantics);
@@ -156,6 +169,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_sat_shift_semantics);
   RESETANDTEST(fxp_sat_conversion_semantics);
   RESETANDTEST(fxp_symbolic_shift_semantics);
+  RESETANDTEST(fxp_abs_countls_semantics);
+  RESETANDTEST(fxp_sqrt_semantics);
   RESETANDTEST(fxp_round_semantics);
   RESETANDTEST(fxp_oracle_semantics);
   RESETANDTEST(fxp_oracle_mixed_semantics);

@@ -881,6 +881,121 @@ SMTExprRef SMTSolverImpl::mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
                         SMTExprKind::FXPRound);
 }
 
+SMTExprRef SMTSolverImpl::mkFXPAbs(const SMTExprRef &Exp) {
+  requireFXP(Exp);
+  FXPFormat F = formatOf(Exp->Sort);
+  if (!F.IsSigned)
+    return Exp;
+  // Saturating: the most negative value negates to itself in two's
+  // complement, so it maps to MAX instead of wrapping (LLVM libc's
+  // choice, and the only total one).
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  SMTExprRef Min = mkBVFromBin(minRawBits(F, F.Width), F.Width);
+  SMTExprRef Res =
+      mkIte(mkEqual(Raw, Min), mkBVFromBin(maxRawBits(F, F.Width), F.Width),
+            mkIte(mkBVSlt(Raw, mkBVFromDec(0, F.Width)), mkBVNeg(Raw), Raw));
+  return rewrapExprImpl(*Res, Exp->Sort, SMTExprKind::FXPAbs);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPCountls(const SMTExprRef &Exp,
+                                       unsigned ToWidth) {
+  requireFXP(Exp);
+  fatalErrorIf(ToWidth == 0, "Target width must be non-zero");
+  FXPFormat F = formatOf(Exp->Sort);
+  // The largest possible count is every counted bit being a sign copy;
+  // a narrower target would silently truncate that to a wrong answer.
+  fatalErrorIf(ToWidth < 64 && (F.IsSigned ? F.Width - 1 : F.Width) >
+                                   (uint64_t(1) << ToWidth) - 1,
+               "Target width is too narrow to hold the leading-sign count");
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  // Complementing a negative value turns leading ones into leading
+  // zeros, so both signs reduce to counting leading zeros; the sign bit
+  // itself is not redundant and is excluded from the count.
+  if (F.IsSigned)
+    Raw = mkIte(mkBVSlt(Raw, mkBVFromDec(0, F.Width)), mkBVNot(Raw), Raw);
+  unsigned Counted = F.IsSigned ? F.Width - 1 : F.Width;
+  SMTExprRef Payload = mkBVExtract(Counted - 1, 0, Raw);
+  // Binary search rather than a linear chain of per-bit tests — the shape
+  // the FP leading-zero encoder uses (#127), which measured far better on
+  // hard instances. The payload is left-aligned in a power-of-two window
+  // whose low padding bits are ones, so each step is a plain "is the
+  // upper half zero?" test with no width bookkeeping: the padding can
+  // never be mistaken for a leading zero.
+  unsigned P = 1;
+  while (P < Counted)
+    P *= 2;
+  SMTExprRef Rest = mkBVZeroExt(P - Counted, Payload);
+  if (P != Counted) {
+    Rest = mkBVShl(Rest, mkBVFromDec(P - Counted, P));
+    Rest = mkBVOr(Rest, mkBVFromBin(std::string(Counted, '0') +
+                                        std::string(P - Counted, '1'),
+                                    P));
+  }
+  SMTExprRef Count = mkBVFromDec(0, ToWidth);
+  for (unsigned Step = P / 2; Step != 0; Step /= 2) {
+    SMTExprRef Top = mkBVExtract(P - 1, P - Step, Rest);
+    SMTExprRef AllZero = mkEqual(Top, mkBVFromDec(0, Step));
+    Count = mkBVAdd(Count, mkIte(AllZero, mkBVFromDec(Step, ToWidth),
+                                 mkBVFromDec(0, ToWidth)));
+    Rest = mkIte(AllZero, mkBVShl(Rest, mkBVFromDec(Step, P)), Rest);
+  }
+  // An all-zero payload has every counted bit a sign copy; the padded
+  // search cannot reach that count, so it is selected directly.
+  SMTExprRef AllSign = mkEqual(Payload, mkBVFromDec(0, Counted));
+  Count = mkIte(AllSign, mkBVFromDec(Counted, ToWidth), Count);
+  return rewrapExprImpl(*Count, mkBVSort(ToWidth), SMTExprKind::FXPCountls);
+}
+
+SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp) {
+  requireFXP(Exp);
+  FXPFormat F = formatOf(Exp->Sort);
+  // sqrt(raw/2^n) = sqrt(raw * 2^n) / 2^n, so the result's raw value is
+  // the integer square root of raw shifted up by the fraction width.
+  // That radicand needs Width + FracBits bits, and its square root needs
+  // half as many (rounded up).
+  unsigned NBits = F.Width + F.FracBits;
+  unsigned Digits = (NBits + 1) / 2;
+  // Work at an even radicand width so the digit loop consumes exactly two
+  // bits per step.
+  unsigned RadWidth = 2 * Digits;
+  SMTExprRef Raw = mkFXPToRawBV(Exp);
+  // A negative operand has no real square root; zero-extending
+  // gives its bits a defined reading rather than a trapping one.
+  SMTExprRef Rad = mkBVZeroExt(RadWidth - F.Width, Raw);
+  if (F.FracBits != 0)
+    Rad = mkBVShl(Rad, mkBVFromDec(F.FracBits, RadWidth));
+  // Restoring square root, most significant digit first. Root and
+  // remainder are carried at the radicand width; each step brings down
+  // two radicand bits, compares against the trial value (4*root + 1 in
+  // the shifted frame) and sets the digit when it fits. Exact integer
+  // arithmetic throughout, so the result is the true floor of the square
+  // root — no approximation, unlike the libc implementations.
+  SMTExprRef Root = mkBVFromDec(0, RadWidth);
+  SMTExprRef Rem = mkBVFromDec(0, RadWidth);
+  SMTExprRef Two = mkBVFromDec(2, RadWidth);
+  SMTExprRef One = mkBVFromDec(1, RadWidth);
+  for (unsigned I = Digits; I-- > 0;) {
+    SMTExprRef Pair =
+        mkBVZeroExt(RadWidth - 2, mkBVExtract(2 * I + 1, 2 * I, Rad));
+    Rem = mkBVOr(mkBVShl(Rem, Two), Pair);
+    SMTExprRef Trial = mkBVOr(mkBVShl(Root, Two), One);
+    SMTExprRef Fits = mkBVUge(Rem, Trial);
+    Rem = mkIte(Fits, mkBVSub(Rem, Trial), Rem);
+    Root =
+        mkBVOr(mkBVShl(Root, One), mkIte(Fits, One, mkBVFromDec(0, RadWidth)));
+  }
+  SMTExprRef Res = mkBVExtract(F.Width - 1, 0, Root);
+  // A negative operand has no real square root, and the zero-extension
+  // above reads its two's-complement bits as a large positive radicand,
+  // producing a plausible in-format number rather than visible garbage
+  // (sqrt(-1.0) would read back as -1.0). Pinning those to zero costs
+  // one ITE and keeps a wrong answer from looking like a right one.
+  if (F.IsSigned)
+    Res = mkIte(mkBVSlt(Raw, mkBVFromDec(0, F.Width)), mkBVFromDec(0, F.Width),
+                Res);
+  return rewrapExprImpl(*Res, Exp->Sort, SMTExprKind::FXPSqrt);
+}
+
 // ---------------------------------------------------------------------------
 // Fixed-point <-> floating-point conversions
 // ---------------------------------------------------------------------------

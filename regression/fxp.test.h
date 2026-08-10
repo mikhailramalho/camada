@@ -777,6 +777,171 @@ inline uint64_t refRound(const RefFormat &F, int64_t A, unsigned Digits,
   return refWrap(F, V > F.maxRaw() ? F.maxRaw() : V);
 }
 
+// absfx and countlsfx. Both references are written from the TR/libc
+// definitions rather than the encoding's shape: abs saturates at the most
+// negative value (which has no positive counterpart), and countls is the
+// number of redundant sign copies, i.e. how far the value can shift left
+// before its sign changes.
+inline uint64_t refAbs(const RefFormat &F, int64_t A) {
+  if (!F.IsSigned)
+    return refWrap(F, A);
+  if (A == F.minRaw())
+    return refWrap(F, F.maxRaw());
+  return refWrap(F, A < 0 ? -A : A);
+}
+
+inline unsigned refCountls(const RefFormat &F, uint64_t Raw) {
+  uint64_t Mask = (uint64_t(1) << F.Width) - 1;
+  uint64_t V = Raw & Mask;
+  if (F.IsSigned && (V >> (F.Width - 1)))
+    V = (~V) & Mask;
+  unsigned Lead = 0;
+  for (int I = int(F.Width) - 1; I >= 0; --I) {
+    if ((V >> I) & 1)
+      break;
+    ++Lead;
+  }
+  return Lead - (F.IsSigned ? 1 : 0);
+}
+
+inline void fxp_abs_countls_semantics(const camada::SMTSolverRef &solver) {
+  // Exhaustive over every format up to 6 bits, both signednesses.
+  for (unsigned Width = 2; Width <= 6; ++Width) {
+    for (unsigned Frac = 0; Frac < Width; ++Frac) {
+      for (bool Signed : {true, false}) {
+        if (Signed && Frac + 1 > Width - 1)
+          continue;
+        RefFormat F{Width, Frac, Signed};
+        solver->reset();
+        camada::SMTExprRef All;
+        for (uint64_t Raw = 0; Raw < (uint64_t(1) << Width); ++Raw) {
+          camada::SMTExprRef X = mkConst(solver, F, Raw);
+          camada::SMTExprRef C = solver->mkAnd(
+              solver->mkFXPEqual(
+                  solver->mkFXPAbs(X),
+                  mkConst(solver, F, refAbs(F, refDecode(F, Raw)))),
+              solver->mkEqual(solver->mkFXPCountls(X, 8),
+                              solver->mkBVFromDec(refCountls(F, Raw), 8)));
+          All = All ? solver->mkAnd(All, C) : C;
+        }
+        solver->addConstraint(All);
+        REQUIRE(solver->check() == camada::checkResult::SAT);
+      }
+    }
+  }
+
+  // The saturating case that distinguishes mkFXPAbs from the obvious
+  // composition: in s.7, abs(-1.0) is not representable, so it clamps to
+  // the maximum instead of wrapping back to the minimum.
+  {
+    solver->reset();
+    RefFormat F{8, 7, true};
+    solver->addConstraint(solver->mkFXPEqual(
+        solver->mkFXPAbs(mkConst(solver, F, 0x80)), mkConst(solver, F, 0x7f)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Symbolic properties at a width no host sweep reaches: shifting left
+  // by the sign-copy count never changes the sign, and abs is idempotent.
+  {
+    solver->reset();
+    camada::SMTSortRef Wide = solver->mkFXPSort(40, 20, true);
+    camada::SMTExprRef X = solver->mkSymbol("fxp_cls_x", Wide);
+    camada::SMTExprRef A = solver->mkFXPAbs(X);
+    camada::SMTExprRef Idem = solver->mkFXPEqual(solver->mkFXPAbs(A), A);
+    // Count fits in the format width, so 8 bits is ample for 40.
+    camada::SMTExprRef N = solver->mkFXPCountls(X, 8);
+    camada::SMTExprRef InRange = solver->mkBVUle(N, solver->mkBVFromDec(39, 8));
+    solver->addConstraint(solver->mkNot(solver->mkAnd(Idem, InRange)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
+// Correctly-rounded square root: the reference is exact integer
+// arithmetic (the unique r with r*r <= raw*2^n < (r+1)*(r+1)), not any
+// library's approximation — see mkFXPSqrt's contract.
+inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
+  uint64_t N = Raw << F.FracBits;
+  uint64_t R = 0, Bit = uint64_t(1) << 62;
+  while (Bit > N)
+    Bit >>= 2;
+  while (Bit) {
+    if (N >= R + Bit) {
+      N -= R + Bit;
+      R = (R >> 1) + Bit;
+    } else
+      R >>= 1;
+    Bit >>= 2;
+  }
+  return R;
+}
+
+inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
+  // Exhaustive over every format up to 8 bits, every non-negative value.
+  for (unsigned Width = 2; Width <= 8; ++Width) {
+    for (unsigned Frac = 0; Frac <= Width; ++Frac) {
+      for (bool Signed : {true, false}) {
+        if (Signed && Frac >= Width)
+          continue;
+        RefFormat F{Width, Frac, Signed};
+        solver->reset();
+        camada::SMTExprRef All;
+        for (uint64_t Raw = 0; Raw <= uint64_t(F.maxRaw()); ++Raw) {
+          camada::SMTExprRef C =
+              solver->mkFXPEqual(solver->mkFXPSqrt(mkConst(solver, F, Raw)),
+                                 mkConst(solver, F, refSqrt(F, Raw)));
+          All = All ? solver->mkAnd(All, C) : C;
+        }
+        solver->addConstraint(All);
+        REQUIRE(solver->check() == camada::checkResult::SAT);
+      }
+    }
+  }
+
+  // The defining property, proved over ALL symbolic values rather than
+  // enumerated: r*r <= x < (r+1)*(r+1) at the format's scale. This is
+  // what "correctly rounded" means, and it is checkable precisely
+  // because the operation is exact.
+  {
+    solver->reset();
+    unsigned W = 12, N = 6, Wide = 2 * (W + N) + 4;
+    camada::SMTSortRef F = solver->mkFXPSort(W, N, true);
+    camada::SMTExprRef X = solver->mkSymbol("fxp_sqrt_x", F);
+    camada::SMTExprRef R = solver->mkFXPSqrt(X);
+    auto ext = [&](const camada::SMTExprRef &E) {
+      return solver->mkBVZeroExt(Wide - W, solver->mkFXPToRawBV(E));
+    };
+    camada::SMTExprRef Rx = ext(R), Xx = ext(X);
+    camada::SMTExprRef RR = solver->mkBVMul(Rx, Rx);
+    camada::SMTExprRef R1 = solver->mkBVAdd(Rx, solver->mkBVFromDec(1, Wide));
+    camada::SMTExprRef Xs = solver->mkBVShl(Xx, solver->mkBVFromDec(N, Wide));
+    camada::SMTExprRef Holds = solver->mkAnd(
+        solver->mkBVUle(RR, Xs), solver->mkBVUlt(Xs, solver->mkBVMul(R1, R1)));
+    camada::SMTExprRef NonNeg = solver->mkNot(solver->mkFXPLt(
+        X, solver->mkFXPFromBin(refBits(RefFormat{W, N, true}, 0),
+                                solver->mkFXPSort(W, N, true))));
+    solver->addConstraint(solver->mkAnd(NonNeg, solver->mkNot(Holds)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+
+  // Negative operands: the result is pinned to zero rather than left as
+  // whatever the two's-complement bits happen to encode, so a consumer
+  // who omits the `x < 0` guard sees an obviously wrong answer instead of
+  // a plausible negative one (sqrt(-1.0) would otherwise read as -1.0).
+  {
+    solver->reset();
+    RefFormat F{8, 7, true};
+    camada::SMTExprRef All;
+    for (uint64_t Raw : {uint64_t(0x80), uint64_t(0xC0), uint64_t(0xFF)}) {
+      camada::SMTExprRef C = solver->mkFXPEqual(
+          solver->mkFXPSqrt(mkConst(solver, F, Raw)), mkConst(solver, F, 0));
+      All = All ? solver->mkAnd(All, C) : C;
+    }
+    solver->addConstraint(All);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+}
+
 inline void fxp_round_semantics(const camada::SMTSolverRef &solver) {
   // Exhaustive over every 5- and 6-bit format, every digit count, both
   // signednesses, and all three tie rules: small enough to enumerate
@@ -1041,6 +1206,7 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
 
 // The fixtures are referenced unqualified from tests.h and the per-backend
 // pipeline test files.
+using camada_fxp_test::fxp_abs_countls_semantics;
 using camada_fxp_test::fxp_boundary_overflow_semantics;
 using camada_fxp_test::fxp_conversion_matrix;
 using camada_fxp_test::fxp_exhaustive_semantics;
@@ -1053,6 +1219,7 @@ using camada_fxp_test::fxp_sat_conversion_semantics;
 using camada_fxp_test::fxp_sat_exhaustive_semantics;
 using camada_fxp_test::fxp_sat_shift_semantics;
 using camada_fxp_test::fxp_shift_semantics;
+using camada_fxp_test::fxp_sqrt_semantics;
 using camada_fxp_test::fxp_symbolic_shift_semantics;
 
 #endif // CAMADA_REGRESSION_FXP_TEST_H_
