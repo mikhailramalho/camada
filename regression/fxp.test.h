@@ -741,6 +741,163 @@ inline void fxp_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
   }
 }
 
+// roundfx: round to nearest at a chosen fraction width, ties toward +inf,
+// saturating to the format maximum when the half-ulp bias overflows. The
+// reference is written from the TR/libc semantics (bias then mask, with an
+// exact-arithmetic overflow test), independently of the encoding's shape.
+// Written from the value semantics — round the exact quotient to an
+// integer per the tie rule, then rescale — rather than mirroring the
+// encoding's bias-and-mask shape, so the fixtures pin that the two agree.
+inline uint64_t refRound(const RefFormat &F, int64_t A, unsigned Digits,
+                         camada::FXPRoundTie Tie) {
+  if (Digits >= F.FracBits)
+    return refWrap(F, A);
+  unsigned Shift = F.FracBits - Digits;
+  int64_t Unit = int64_t(1) << Shift;
+  int64_t Q = refFloorDiv(A, Unit); // floor, so Rem is never negative
+  int64_t Rem = A - Q * Unit;
+  int64_t Half = Unit / 2;
+  if (Rem > Half)
+    ++Q;
+  else if (Rem == Half) {
+    switch (Tie) {
+    case camada::FXPRoundTie::TowardPositive:
+      ++Q;
+      break;
+    case camada::FXPRoundTie::AwayFromZero:
+      if (A >= 0)
+        ++Q;
+      break;
+    case camada::FXPRoundTie::ToEven:
+      Q += Q & 1;
+      break;
+    }
+  }
+  int64_t V = Q * Unit;
+  return refWrap(F, V > F.maxRaw() ? F.maxRaw() : V);
+}
+
+inline void fxp_round_semantics(const camada::SMTSolverRef &solver) {
+  // Exhaustive over every 5- and 6-bit format, every digit count, both
+  // signednesses, and all three tie rules: small enough to enumerate
+  // every raw value, wide enough to exercise saturation, ties, and
+  // negative rounding.
+  for (camada::FXPRoundTie Tie :
+       {camada::FXPRoundTie::TowardPositive, camada::FXPRoundTie::AwayFromZero,
+        camada::FXPRoundTie::ToEven}) {
+    for (unsigned Width : {5u, 6u}) {
+      for (unsigned Frac = 0; Frac < Width; ++Frac) {
+        for (bool Signed : {true, false}) {
+          if (Signed && Frac + 1 > Width - 1)
+            continue; // signed needs a non-fraction sign bit
+          RefFormat F{Width, Frac, Signed};
+          for (unsigned Digits = 0; Digits <= Frac + 1; ++Digits) {
+            solver->reset();
+            camada::SMTExprRef All;
+            for (uint64_t Raw = 0; Raw < (uint64_t(1) << Width); ++Raw) {
+              camada::SMTExprRef C = solver->mkFXPEqual(
+                  solver->mkFXPRound(mkConst(solver, F, Raw), Digits, Tie),
+                  mkConst(solver, F,
+                          refRound(F, refDecode(F, Raw), Digits, Tie)));
+              All = All ? solver->mkAnd(All, C) : C;
+            }
+            solver->addConstraint(All);
+            REQUIRE(solver->check() == camada::checkResult::SAT);
+          }
+        }
+      }
+    }
+  }
+
+  // The three rules are pairwise distinguishable, which is the point of
+  // exposing the choice. In s.4 at zero digits: -0.5 (raw -8) stays at 0
+  // toward positive but goes to -1.0 away from zero, and +0.5 (raw 8)
+  // goes to 1.0 under both of those but down to 0 under ties-to-even,
+  // whose neighbour 0 is the one with a zero in the last kept bit.
+  {
+    solver->reset();
+    RefFormat F{6, 4, true};
+    auto R = [&](int64_t Raw, unsigned D, camada::FXPRoundTie T) {
+      return solver->mkFXPRound(mkConst(solver, F, refWrap(F, Raw)), D, T);
+    };
+    auto C = [&](int64_t Raw) { return mkConst(solver, F, refWrap(F, Raw)); };
+    using camada::FXPRoundTie;
+    camada::SMTExprRef All = solver->mkAnd(
+        solver->mkFXPEqual(R(-8, 0, FXPRoundTie::TowardPositive), C(0)),
+        solver->mkFXPEqual(R(-8, 0, FXPRoundTie::AwayFromZero), C(-16)));
+    All = solver->mkAnd(
+        All, solver->mkFXPEqual(R(-8, 0, FXPRoundTie::ToEven), C(0)));
+    All = solver->mkAnd(
+        All,
+        solver->mkAnd(
+            solver->mkFXPEqual(R(8, 0, FXPRoundTie::TowardPositive), C(16)),
+            solver->mkFXPEqual(R(8, 0, FXPRoundTie::AwayFromZero), C(16))));
+    All = solver->mkAnd(All,
+                        solver->mkFXPEqual(R(8, 0, FXPRoundTie::ToEven), C(0)));
+    solver->addConstraint(All);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // LLVM libc's own RoundTest vectors, on _Fract (s.15). EPS is one ulp.
+  {
+    solver->reset();
+    RefFormat Fr{16, 15, true};
+    const uint64_t Half = 1u << 14, Eps = 1, One = 0x7fff; // 1.0 saturates
+    struct {
+      uint64_t In;
+      unsigned Digits;
+      uint64_t Out;
+    } V[] = {
+        {0, 0, 0},                           // zero stays zero
+        {Half, 0, One},                      // 0.5 -> 1 (ties up, saturating)
+        {Half, 1, Half},                     // 0.5 kept at 1 digit
+        {Half + Eps, 0, One},                // just above half rounds up
+        {Half - Eps, 0, 0},                  // just below half rounds down
+        {Eps, 15, Eps},                      // eps kept at full precision
+        {Eps, 14, 2 * Eps},                  // eps at one fewer bit doubles
+        {Eps, 13, 0},                        // eps at two fewer bits vanishes
+        {refWrap(Fr, -int64_t(Half)), 0, 0}, // -0.5 -> 0 (ties to +inf)
+        {refWrap(Fr, -int64_t(Half)), 1, refWrap(Fr, -int64_t(Half))},
+        {refWrap(Fr, -int64_t(Half) - 1), 0, refWrap(Fr, -int64_t(One) - 1)},
+    };
+    camada::SMTExprRef All;
+    for (auto &T : V) {
+      camada::SMTExprRef C = solver->mkFXPEqual(
+          solver->mkFXPRound(mkConst(solver, Fr, T.In), T.Digits,
+                             camada::FXPRoundTie::TowardPositive),
+          mkConst(solver, Fr, T.Out));
+      All = All ? solver->mkAnd(All, C) : C;
+    }
+    solver->addConstraint(All);
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+
+  // Symbolic properties at a width no host sweep reaches: rounding to the
+  // full fraction width is the identity, and every result either has its
+  // discarded fraction bits clear or is the saturated maximum (whose low
+  // bits are all ones, so the mask property genuinely does not hold
+  // there).
+  {
+    solver->reset();
+    camada::SMTSortRef Wide = solver->mkFXPSort(48, 31, true);
+    camada::SMTExprRef X = solver->mkSymbol("fxp_round_x", Wide);
+    camada::SMTExprRef Id = solver->mkFXPEqual(
+        solver->mkFXPRound(X, 31, camada::FXPRoundTie::TowardPositive), X);
+    camada::SMTExprRef R =
+        solver->mkFXPRound(X, 23, camada::FXPRoundTie::TowardPositive);
+    camada::SMTExprRef Max = solver->mkFXPFromBin(
+        refBits(RefFormat{48, 31, true},
+                uint64_t(RefFormat{48, 31, true}.maxRaw())),
+        Wide);
+    camada::SMTExprRef Low = solver->mkOr(
+        solver->mkEqual(solver->mkBVExtract(7, 0, solver->mkFXPToRawBV(R)),
+                        solver->mkBVFromDec(0, 8)),
+        solver->mkFXPEqual(R, Max));
+    solver->addConstraint(solver->mkNot(solver->mkAnd(Id, Low)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
 // Fixed <-> floating point: targeted cases the oracle tables cannot carry
 // (a nonstandard FP target, predicate boundaries, a symbolic round-trip).
 // The oracle fixture in fxporacle.test.h pins the full float/double
@@ -890,6 +1047,7 @@ using camada_fxp_test::fxp_exhaustive_semantics;
 using camada_fxp_test::fxp_fp_conversion_semantics;
 using camada_fxp_test::fxp_mixed_format_semantics;
 using camada_fxp_test::fxp_model_and_constructs;
+using camada_fxp_test::fxp_round_semantics;
 using camada_fxp_test::fxp_rounding_semantics;
 using camada_fxp_test::fxp_sat_conversion_semantics;
 using camada_fxp_test::fxp_sat_exhaustive_semantics;

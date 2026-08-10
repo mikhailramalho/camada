@@ -824,6 +824,64 @@ SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
 }
 
 // ---------------------------------------------------------------------------
+// Rounding to a fraction width (TR 18037 roundfx)
+// ---------------------------------------------------------------------------
+
+SMTExprRef SMTSolverImpl::mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
+                                     FXPRoundTie Tie) {
+  requireFXP(Exp);
+  FXPFormat F = formatOf(Exp->Sort);
+  // Keeping at least every fraction bit is the identity; libc clamps a
+  // negative count to zero, which is unrepresentable in an unsigned
+  // parameter and so cannot occur here.
+  if (Digits >= F.FracBits)
+    return Exp;
+  // Round to nearest by adding a bias and then clearing the bits below
+  // the kept precision. Half an ulp biases ties upward; subtracting one
+  // from it on negative inputs turns that into ties away from zero, and
+  // adding the lowest kept bit instead turns it into ties to even. The
+  // bias can carry past the format's maximum, which saturates to MAX
+  // instead of wrapping — so the sum is computed one bit wider and
+  // compared there, where it is exact for both signednesses.
+  unsigned Shift = F.FracBits - Digits;
+  unsigned W = F.Width + 1;
+  SMTExprRef Raw = extendRaw(*this, mkFXPToRawBV(Exp), F.IsSigned, 1);
+  std::string HalfBits(W, '0');
+  HalfBits[W - Shift] = '1'; // 2^(Shift-1), half an ulp of the result
+  SMTExprRef Bias = mkBVFromBin(HalfBits, W);
+  SMTExprRef One = mkBVFromDec(1, W);
+  switch (Tie) {
+  case FXPRoundTie::TowardPositive:
+    break;
+  case FXPRoundTie::AwayFromZero:
+    // Only signed formats have negative values to bias differently.
+    if (F.IsSigned)
+      Bias = mkBVSub(
+          Bias, mkIte(mkBVSlt(Raw, mkBVFromDec(0, W)), One, mkBVFromDec(0, W)));
+    break;
+  case FXPRoundTie::ToEven:
+    // half - 1 + (lowest kept bit): a tie lands on the even neighbour.
+    Bias = mkBVAdd(mkBVSub(Bias, One),
+                   mkBVZeroExt(W - 1, mkBVExtract(Shift, Shift, Raw)));
+    break;
+  }
+  SMTExprRef Sum = mkBVAdd(Raw, Bias);
+  std::string MaskBits(W, '1');
+  MaskBits.replace(W - Shift, Shift, Shift, '0');
+  SMTExprRef Rounded = mkBVAnd(Sum, mkBVFromBin(MaskBits, W));
+  SMTExprRef Max = mkBVFromBin(maxRawBits(F, W), W);
+  // Overflow is exactly "the biased sum exceeds MAX". The slack bit keeps
+  // the sum exact for both signednesses, but the comparison must follow
+  // the format's own signedness: an unsigned format's MAX is all-ones in
+  // F.Width bits, which a signed compare would read as negative once the
+  // format fills the widened value.
+  SMTExprRef Res =
+      mkIte(F.IsSigned ? mkBVSgt(Sum, Max) : mkBVUgt(Sum, Max), Max, Rounded);
+  return rewrapExprImpl(*mkBVExtract(F.Width - 1, 0, Res), Exp->Sort,
+                        SMTExprKind::FXPRound);
+}
+
+// ---------------------------------------------------------------------------
 // Fixed-point <-> floating-point conversions
 // ---------------------------------------------------------------------------
 //

@@ -144,7 +144,13 @@ both the rounded value **and** the overflow predicate are derived from it.
 | FXP→FXP | **extend first** (per source signedness) to a width that holds both formats, **then** shift by `n_to − n_from`, then truncate to target — never shift-then-extend, which discards high bits on widening conversions | `mkFXPToFXPOverflow` from the wide pre-truncation value |
 | FXP→integer | **round toward zero** (specified by TR 18037): signed divide by `2^n`, or bias the negative case before `ashr` — plain `ashr` alone is wrong (floors: `-1.5 → -2`, C requires `-1`) | `mkFXPToBVOverflow` from the wide value |
 
-## Tier 2 (deferred): `_Sat` and rounding control
+## Tier 2 (shipped Aug 2026): `_Sat` and rounding control
+
+All of tier 2 has landed: the saturating operations in #133, the
+execution oracle and the division-rounding fix in #134, and the
+fixed<->float conversions plus `roundfx` in #135. The rulings below are
+kept as the record of why each piece was built the way it was; the
+"blocked" notes are historical and carry their resolution inline.
 
 **Decided (Aug 2026): saturation is an operation property, not a sort
 property.** `_Sat _Fract` shares its representation with `_Fract`
@@ -168,11 +174,26 @@ out: the frontend must know the types anyway.
   surface and doubles the arithmetic test matrix.
 - Round-to-nearest on narrowing (`roundfx`-style, half-ulp bias before the
   truncating shift). **Ruling (Aug 2026): camada-owned, blocked on the
-  oracle.** The half-ulp bias overflows the source format at its maximum,
-  so the correct composition needs a wider intermediate at the right
-  scale with the `_Sat` clamp ordered after the bias — a width trap the
-  layer exists to own. Not built until the Clang oracle pins the halfway
-  direction empirically (the TR leaves it unspecified).
+  oracle. IMPLEMENTED Aug 2026** as `mkFXPRound(Exp, Digits)`. The
+  blocker was resolved from the wrong direction: Clang ships no
+  `stdfix.h` and no `roundfx` (nor does GCC's, which declares only types,
+  `abs` and `bits`), so the generator cannot measure it. **LLVM libc**
+  implements all twelve variants, and its source shows round to nearest
+  with **ties toward +infinity** (`x + round_bit` then mask) and
+  **saturate to MAX** when the bias overflows — exactly the width trap
+  this ruling predicted. But the TR leaves the tie direction to the
+  implementation and implementations differ (GCC's AVR builtins are the
+  other one that ships `roundfx`; glibc, musl, newlib and uClibc have no
+  fixed-point support at all), so the **tie direction is a parameter**
+  (`FXPRoundTie`: TowardPositive, AwayFromZero, ToEven) rather than one
+  library's choice baked in — the `FPNegBehavior` precedent for an
+  implementation-defined split. Saturation is not parameterized: every
+  implementation surveyed agrees on it.
+  Note the operation keeps its format and clears the low fraction bits;
+  it is not a narrowing conversion. Verified against 52452 vectors from
+  executing libc's algorithm over Clang's fixed-point types. Since it is
+  a library function rather than a builtin, a consumer only needs it when
+  the program under test links LLVM libc.
 - FXP<->FP conversions. **Ruling (Aug 2026): camada-owned, blocked on
   ESBMC Phase 3 demand + the oracle. UNBLOCKED Aug 2026 by
   REPORT-fxp-api-gaps.md: demand live (ESBMC refuses fixed<->float,
@@ -254,15 +275,17 @@ keeps.
 | `fxp.test.h` + per-backend instantiation + oracle tables | ~700–900 lines |
 | README (feature list, parity table row: all ✔️, encoded) | small |
 
-Still one PR for tier 1, but at the upper end; if it grows past that,
-split as (a) sorts + arithmetic + predicates, (b) conversions + shifts +
-generic-construct integration. Tier 2 (`_Sat`) lands as a follow-up PR.
+In the end tier 1 landed as one PR and tier 2 as three (#133 saturating
+ops, #134 oracle and division fix, #135 conversions and `roundfx`).
 
 ## Risks and open questions
 
-1. **Clang pinning**: the oracle configuration (version/target/flags)
-   must match what ESBMC's clang-c-frontend actually uses — needs a look
-   at ESBMC before the oracle tables are generated.
+1. **Clang pinning — RESOLVED (Aug 2026)**: pinned to clang 22.1.6,
+   `x86_64-unknown-linux`, `-ffixed-point`, seed `0xCA3ADA`, per ESBMC's
+   answers in `ANSWERS-fxp-tier2-scope.md`; the generated header records
+   the configuration. ESBMC's own measurements on clang 20.1.8 reproduce
+   exactly under the pin, so the fixed-point lowering is stable across
+   those releases.
 2. **Padding bits**: TR 18037 permits padded fixed-point formats; the
    `(w, n, signedness)` metadata cannot express them. No mainstream
    Clang target uses padding; explicitly out of scope until a consumer

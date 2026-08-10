@@ -166,6 +166,7 @@ enum class SMTExprKind {
   FXPToBVSat,
   BVToFXP,
   FXPToRawBV,
+  FXPRound,
   FXPToFP,
   FPToFXP,
   FPToFXPSat,
