@@ -187,6 +187,20 @@ inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->checkSatAssuming({}) == camada::checkResult::SAT);
 }
 
+// Extending by zero bits is a no-op, not an error: callers compute the
+// extension width arithmetically and a degenerate zero is normal. The STP
+// backend used to build a zero-width constant here and abort.
+inline void bv_extend_by_zero_semantics(const camada::SMTSolverRef &solver) {
+  auto v = solver->mkBVFromBin("1010", 4);
+  auto z = solver->mkBVZeroExt(0, v);
+  auto s = solver->mkBVSignExt(0, v);
+  REQUIRE(z->getWidth() == 4);
+  REQUIRE(s->getWidth() == 4);
+  solver->addConstraint(
+      solver->mkAnd(solver->mkEqual(z, v), solver->mkEqual(s, v)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
 inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
   auto value = solver->mkBVFromBin("1000", 4);
   auto shift = solver->mkBVFromDec(1, 4);

@@ -452,6 +452,10 @@ SMTExprRef STPSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
 }
 
 SMTExprRef STPSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+  // Extending by nothing is the identity; the concat below would ask for
+  // a zero-width constant, which is not a valid sort.
+  if (i == 0)
+    return Exp;
   const SMTExprRef &z = SMTSolverImpl::mkBVFromDec(0, i);
   return mkBVConcat(z, Exp);
 }
