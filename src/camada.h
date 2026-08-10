@@ -96,6 +96,29 @@ enum class FPNegBehavior {
   PreserveNaNPayload,
 };
 
+/// Selects how `mkFXPRound` breaks ties. TR 18037 specifies that the
+/// `roundfx` family rounds to nearest but leaves the halfway direction to
+/// the implementation, and implementations differ, so the caller states
+/// which one it is modelling rather than inheriting one library's choice.
+///
+/// - TowardPositive: a halfway value rounds up, so 0.5 rounds to 1 and
+///   -0.5 rounds to 0. What LLVM libc does (it adds half an ulp and masks
+///   off the low bits), and the only direction verified against an
+///   executing implementation.
+/// - AwayFromZero: a halfway value rounds away from zero, so 0.5 rounds
+///   to 1 and -0.5 rounds to -1 — symmetric about zero, the convention
+///   most C programmers expect from `round()`.
+/// - ToEven: a halfway value rounds to whichever neighbour has a zero in
+///   the last kept bit, the unbiased choice IEEE-754 uses by default.
+///
+/// All three saturate to the format's maximum when the rounding would
+/// carry past it, which every implementation surveyed agrees on.
+enum class FXPRoundTie {
+  TowardPositive,
+  AwayFromZero,
+  ToEven,
+};
+
 /// Selects how the SMT-LIB backend lowers tuples on the wire.
 ///
 /// - Native: emit `(declare-datatypes ...)` and rely on the downstream
@@ -888,6 +911,14 @@ public:
   /// clamps to zero for an unsigned target.
   virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
                                   bool ToSigned) = 0;
+
+  /// Rounds a fixed-point value to Digits fractional bits, keeping the
+  /// same format (the low fraction bits become zero) — TR 18037's
+  /// `roundfx`. Rounds to nearest, breaking ties per Tie, and saturates
+  /// to the format's maximum when the rounding would carry past it.
+  /// Digits >= the format's fraction width returns the value unchanged.
+  virtual SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
+                                FXPRoundTie Tie) = 0;
 
   /// Converts a fixed-point value to a floating-point value of the given
   /// sort, rounding once per R. C's fixed-to-float conversion rounds to
