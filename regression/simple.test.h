@@ -201,6 +201,27 @@ inline void bv_extend_by_zero_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// bvsrem takes the sign of the DIVIDEND and bvsdiv truncates toward zero
+// (SMT-LIB), which differ from the modulo convention whenever the operand
+// signs disagree: -7 srem 2 is -1, not +1. The STP backend used to call
+// STP's modulo routine here and silently returned the divisor's sign.
+inline void bv_signed_div_rem_semantics(const camada::SMTSolverRef &solver) {
+  auto d = [&](int64_t V) { return solver->mkBVFromDec(V, 32); };
+  struct Case {
+    int64_t A, B, SDiv, SRem;
+  };
+  const Case Cases[] = {
+      {-7, 2, -3, -1}, {7, -2, -3, 1}, {-7, -2, 3, -1}, {7, 2, 3, 1}};
+  camada::SMTExprRef All = solver->mkBool(true);
+  for (const Case &C : Cases)
+    All = solver->mkAnd(
+        All, solver->mkAnd(
+                 solver->mkEqual(solver->mkBVSDiv(d(C.A), d(C.B)), d(C.SDiv)),
+                 solver->mkEqual(solver->mkBVSRem(d(C.A), d(C.B)), d(C.SRem))));
+  solver->addConstraint(All);
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
 inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
   auto value = solver->mkBVFromBin("1000", 4);
   auto shift = solver->mkBVFromDec(1, 4);
