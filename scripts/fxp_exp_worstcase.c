@@ -43,6 +43,7 @@
 //        fxp-exp-worstcase 64 31 32     # long accum on 32 threads
 
 #include <inttypes.h>
+#include <limits.h>
 #include <mpfr.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -118,7 +119,7 @@ static void *sweep(void *Arg) {
 // computed generously (one ulp of slack either way) so the swept band is a
 // superset of the inputs whose result is neither 0 nor MAX.
 static struct Range interestingRange(unsigned Width, unsigned FracBits,
-                                     mpfr_prec_t Prec) {
+                                     bool IsSigned, mpfr_prec_t Prec) {
   mpfr_t V, L;
   mpfr_inits2(Prec, V, L, (mpfr_ptr)0);
   struct Range R;
@@ -130,53 +131,71 @@ static struct Range interestingRange(unsigned Width, unsigned FracBits,
   mpfr_mul_2ui(L, L, FracBits, MPFR_RNDN);
   R.Lo = mpfr_get_si(L, MPFR_RNDD) - 1;
 
-  // exp(x) > maxRaw / 2^n  =>  saturates.
+  // exp(x) > maxRaw / 2^n  =>  saturates. maxRaw is 2^(w-1)-1 signed,
+  // 2^w-1 unsigned.
   mpfr_set_ui(V, 1, MPFR_RNDN);
-  mpfr_mul_2ui(V, V, Width - 1, MPFR_RNDN);
+  mpfr_mul_2ui(V, V, IsSigned ? Width - 1 : Width, MPFR_RNDN);
   mpfr_sub_ui(V, V, 1, MPFR_RNDN);
   mpfr_div_2ui(V, V, FracBits, MPFR_RNDN);
   mpfr_log(L, V, MPFR_RNDN);
   mpfr_mul_2ui(L, L, FracBits, MPFR_RNDN);
   R.Hi = mpfr_get_si(L, MPFR_RNDU) + 1;
 
-  // The format itself may be narrower than that band. At Width 64 the
-  // format spans the whole of long, so the clamp is vacuous and computing
-  // its bounds would overflow.
-  if (Width < 64) {
-    long FmtLo = -(1L << (Width - 1)), FmtHi = (1L << (Width - 1)) - 1;
-    if (R.Lo < FmtLo)
-      R.Lo = FmtLo;
-    if (R.Hi > FmtHi)
-      R.Hi = FmtHi;
+  // Clamp to what the format can actually hold. An unsigned format has no
+  // negative inputs at all, so the whole exp(x) < 1 half of the band is
+  // unreachable and the sweep must start at zero. At Width 64 the signed
+  // format spans the whole of long, so computing its bounds would
+  // overflow and the clamp is vacuous anyway.
+  long FmtLo = 0, FmtHi = LONG_MAX;
+  if (IsSigned) {
+    if (Width < 64) {
+      FmtLo = -(1L << (Width - 1));
+      FmtHi = (1L << (Width - 1)) - 1;
+    } else {
+      FmtLo = LONG_MIN;
+    }
+  } else if (Width < 63) {
+    FmtHi = (1L << Width) - 1;
   }
+  if (R.Lo < FmtLo)
+    R.Lo = FmtLo;
+  if (R.Hi > FmtHi)
+    R.Hi = FmtHi;
   mpfr_clears(V, L, (mpfr_ptr)0);
   return R;
 }
 
 int main(int argc, char **argv) {
-  if (argc < 3) {
+  if (argc < 4) {
     fprintf(stderr,
-            "usage: %s <width> <frac_bits> [threads] [precision]\n"
-            "  e.g. %s 32 15        (accum)\n"
-            "       %s 64 31 32     (long accum, 32 threads)\n",
-            argv[0], argv[0], argv[0]);
+            "usage: %s <width> <frac_bits> <s|u> [threads] [precision]\n"
+            "  e.g. %s 32 15 s        (accum)\n"
+            "       %s 64 31 s 32     (long accum, 32 threads)\n"
+            "       %s 32 16 u 32     (unsigned accum)\n",
+            argv[0], argv[0], argv[0], argv[0]);
     return 2;
   }
   unsigned Width = (unsigned)strtoul(argv[1], NULL, 10);
   unsigned FracBits = (unsigned)strtoul(argv[2], NULL, 10);
-  long Threads = argc > 3 ? strtol(argv[3], NULL, 10) : 1;
-  mpfr_prec_t Prec = argc > 4 ? (mpfr_prec_t)strtol(argv[4], NULL, 10) : 192;
-  if (Width < 2 || Width > 64 || FracBits >= Width || Threads < 1) {
+  bool IsSigned = argv[3][0] == 's';
+  if (argv[3][0] != 's' && argv[3][0] != 'u') {
+    fprintf(stderr, "signedness must be 's' or 'u'\n");
+    return 2;
+  }
+  long Threads = argc > 4 ? strtol(argv[4], NULL, 10) : 1;
+  mpfr_prec_t Prec = argc > 5 ? (mpfr_prec_t)strtol(argv[5], NULL, 10) : 192;
+  if (Width < 2 || Width > 64 || FracBits > Width ||
+      (IsSigned && FracBits >= Width) || Threads < 1) {
     fprintf(stderr, "invalid format or thread count\n");
     return 2;
   }
 
-  struct Range Full = interestingRange(Width, FracBits, Prec);
+  struct Range Full = interestingRange(Width, FracBits, IsSigned, Prec);
   long Count = Full.Hi - Full.Lo + 1;
-  printf("format s%u.%u: sweeping raw %ld..%ld (%ld inputs) on %ld thread(s),"
+  printf("format %c%u.%u: sweeping raw %ld..%ld (%ld inputs) on %ld thread(s),"
          " precision %ld\n",
-         Width - FracBits - 1, FracBits, Full.Lo, Full.Hi, Count, Threads,
-         (long)Prec);
+         IsSigned ? 's' : 'u', IsSigned ? Width - FracBits - 1 : Width - FracBits,
+         FracBits, Full.Lo, Full.Hi, Count, Threads, (long)Prec);
   fflush(stdout);
 
   struct Task *Tasks = (struct Task *)calloc((size_t)Threads, sizeof(*Tasks));
