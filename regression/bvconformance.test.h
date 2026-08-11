@@ -224,8 +224,38 @@ inline void bv_conformance_semantics(const camada::SMTSolverRef &solver) {
   }
 }
 
+// The two fixed-point operations no other fixture reaches: mkFXPLe (its
+// siblings are all covered) and mkFXPToBVOverflow. Exhaustive over a
+// 4-bit format, against the same value semantics the rest of the
+// fixed-point suite uses.
+inline void fxp_gap_conformance(const camada::SMTSolverRef &solver) {
+  constexpr unsigned W = 4, N = 2;
+  auto raw = [&](uint64_t V) {
+    return solver->mkFXPFromBin(bvBits(V, W), solver->mkFXPSort(W, N, true));
+  };
+  auto sv = [&](uint64_t V) {
+    return (V >> (W - 1)) ? (int64_t)V - 16 : (int64_t)V;
+  };
+  solver->reset();
+  camada::SMTExprRef All = solver->mkBool(true);
+  for (uint64_t A = 0; A < 16; ++A) {
+    for (uint64_t D = 0; D < 16; ++D)
+      All = solver->mkAnd(All, solver->mkEqual(solver->mkFXPLe(raw(A), raw(D)),
+                                               solver->mkBool(sv(A) <= sv(D))));
+    // Converting to a 2-bit signed integer overflows unless the
+    // toward-zero integer part fits [-2, 1].
+    int64_t Trunc = sv(A) >= 0 ? sv(A) / 4 : -((-sv(A)) / 4);
+    All = solver->mkAnd(
+        All, solver->mkEqual(solver->mkFXPToBVOverflow(raw(A), 2, true),
+                             solver->mkBool(Trunc < -2 || Trunc > 1)));
+  }
+  solver->addConstraint(All);
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
 } // namespace camada_bv_conformance
 
 using camada_bv_conformance::bv_conformance_semantics;
+using camada_bv_conformance::fxp_gap_conformance;
 
 #endif // CAMADA_REGRESSION_BVCONFORMANCE_TEST_H_
