@@ -1,6 +1,7 @@
 
 #include "ackarray.test.h"
 #include "array.test.h"
+#include "bvconformance.test.h"
 #include "fp.test.h"
 #include "fxp.test.h"
 #include "fxporacle.test.h"
@@ -75,6 +76,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(bv_lshr_semantics);
   RESETANDTEST(bv_extend_by_zero_semantics);
   RESETANDTEST(bv_signed_div_rem_semantics);
+  RESETANDTEST(bv_conformance_semantics);
   RESETANDTEST(bv_overflow_semantics);
   RESETANDTEST(solver_timeout_semantics);
 
