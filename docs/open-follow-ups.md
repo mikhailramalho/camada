@@ -58,20 +58,6 @@ only thing that caught #145.
 Doing the same for add, mul, div and the conversions would likely find
 siblings.
 
-### Investigate `fp.sqrt`, the last FP-over-BV outlier
-
-`sqrt` is ~13x native and the only arithmetic operation far above its
-neighbours — add, sub, mul, div, fma and toIntegral all sit within a
-factor of ~2 of each other. It is also stable across query shapes, so
-unlike the earlier `add` scare it is unlikely to be an artifact. Numbers
-and methodology in `docs/fp-bv-vs-native.md`.
-
-Nothing has been diagnosed yet: the first step is to find where the cost
-sits, not to assume the restoring-division loop is at fault.
-
-Gate on ESBMC hard instances. Microbenchmarks have now overstated FP
-encoding gains twice.
-
 ### `fp.rem` fast path for small divisors
 
 The square-and-multiply remainder encoding is 30-100x faster than the

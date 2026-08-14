@@ -78,9 +78,14 @@ structural refutation.
 outlier; add, sub, mul, div, fma and toIntegral are all within a factor
 of ~2 of each other. This is the honest cost of bit-blasting.
 
-**`sqrt` at ~13x is the real outlier** and the only clear optimisation
-target left. It is the one operation whose ratio is stable across both
-shapes and far above its neighbours.
+**`sqrt` at ~13x is the real outlier**, stable across both shapes and
+across f32/f64. It was investigated and is **not** cheaply fixable: see
+`rejected-experiments.md`. The short version is that native emits ~150
+bytes for every operation because it hands the term to bitwuzla whole,
+where SymFPU expands it inside the word-blaster; the gap is structural to
+being a wrapper. Two attempts to close it (narrowing the loop's add,
+adding sqrt rounder hints) both failed, and removing the rounder entirely
+made a 30% smaller formula solve 48% *slower*.
 
 The conversions (`sbvtofp`, `ubvtofp`, `fptofp` narrow) at 4-6x are the
 second tier. Note their normalisation is *load-bearing* — the
@@ -109,3 +114,10 @@ passing them to `mkFPEqual` aborts.
 
 Camada has no `mkFPMin`/`mkFPMax`/`mkFPIsNegative`/`mkFPIsPositive` —
 earlier "30 operation" counts included operations that do not exist.
+
+**Do not substitute formula size for solve time.** `dump()` makes it
+tempting, and emitted size does correlate loosely across operations, but
+the sqrt investigation produced a direct counterexample within a single
+operation: bypassing the rounder cut the formula from 26112 to 18356
+bytes and made it solve 48% slower. This is the same trap as the
+node-count gate in `rejected-experiments.md`.

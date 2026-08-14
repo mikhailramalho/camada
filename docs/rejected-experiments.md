@@ -95,8 +95,8 @@ not revisited expecting a gain.
 splits the near and far cases. Bitwuzla does not call it: `symfpu::add`
 reaches the single-path `arithmeticAdd`. Copying it would be copying dead
 code. The technique bitwuzla actually uses for addition is a rounder-hint
-protocol, recorded in `open-follow-ups.md` rather than here because it is
-deferred, not rejected.
+protocol, recorded below — it was later rejected outright once the
+measurement motivating it turned out to be an artifact.
 
 **The architectural difference underneath all of this**, which no
 individual technique captures: SymFPU's unpacked float carries `nan`,
@@ -430,6 +430,65 @@ operations.
 Full fixed-shape numbers for every FP operation are in
 `docs/fp-bv-vs-native.md`. On that measurement the remaining outlier is
 `sqrt` (~13x), not `add`.
+
+### Narrowing the sqrt loop / sqrt rounder hints — REJECTED on measurement
+
+Investigated because `sqrt` is the last FP-over-BV outlier (~13-14x
+native, stable across query shapes and across f32/f64).
+
+**SymFPU's sqrt is not the reason it wins.** `core/sqrt.h` calls
+`fixedPointSqrt`, whose loop does a full `expandingMultiply(candidate,
+candidate)` every iteration — strictly more work per step than camada's
+restoring loop (one add, one subtract). Its own comment concedes "the
+default algorithm given here isn't a great one". Bitwuzla does not
+override it (`symfpu::sqrt` is called directly from `word_blaster.cpp`).
+
+**What actually differs is where the expansion happens.** Dumping one
+`fp.sqrt` query:
+
+| encoding | emitted |
+|---|---|
+| BV | 26112 bytes |
+| native | 114 bytes |
+
+Native emits ~150 bytes for *every* FP operation — it hands `fp.sqrt` to
+bitwuzla as a single term and SymFPU expands it inside the word-blaster,
+subject to bitwuzla's own rewriting before the SAT solver sees it. That
+is a structural property of being an external wrapper, not an encoding
+defect we can close.
+
+**Two things were tried and both failed:**
+
+1. *Narrowing the per-iteration add.* `S` in the loop is provably
+   constant (dumping it shows no symbols) with a single set bit, and `Q`
+   accumulates top-down, so `Q`'s low bits are structurally zero.
+   Splicing the add down to the live prefix made the formula **larger**
+   (26112 -> 29235 bytes): the extract/concat scaffolding costs more than
+   the zero bits, which bitwuzla was already folding.
+
+2. *Rounder hints.* SymFPU passes `customRounderInfo(noOverflow=true,
+   noUnderflow=true, exact=false, subnormalExact=true, ...)` — for sqrt
+   these are unconditional constants, not caller-derived facts, so unlike
+   the addition case they carry no wrong-hint risk. The invariant holds
+   for camada too: `sqrt(normal)` is never subnormal is UNSAT over all
+   inputs, verified symbolically.
+
+   But the headroom is not there. `round()` is only ~13ms of sqrt's
+   ~61ms (measured against `toIntegral`, which is round-dominated with
+   almost no front end). Replacing the rounder with a raw repack — wrong
+   numerically, but an upper bound on the saving — shrank the formula 30%
+   (26112 -> 18356 bytes) and made it **slower**, 61ms -> 90ms.
+
+That last result is the useful one: for this operation a 30% smaller
+formula solved 48% slower. Formula size is not a proxy for solve time
+here, so "emit fewer nodes" is not a strategy for sqrt.
+
+**If anyone retries:** the remaining ~48ms is the restoring loop itself,
+and beating it needs a better algorithm, not a tighter encoding of this
+one. SymFPU's own comment points at the alternative — assert
+`r < 2o+1 && x = o*o + r` over nondeterministic `o`, `r`, letting the
+solver search rather than bit-blasting a fixed loop. That is a genuinely
+different shape and would have to be gated on ESBMC hard instances.
 
 ## The gates these produced
 
