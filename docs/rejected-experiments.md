@@ -95,8 +95,8 @@ not revisited expecting a gain.
 splits the near and far cases. Bitwuzla does not call it: `symfpu::add`
 reaches the single-path `arithmeticAdd`. Copying it would be copying dead
 code. The technique bitwuzla actually uses for addition is a rounder-hint
-protocol, recorded in `open-follow-ups.md` rather than here because it is
-deferred, not rejected.
+protocol, recorded below — it was later rejected outright once the
+measurement motivating it turned out to be an artifact.
 
 **The architectural difference underneath all of this**, which no
 individual technique captures: SymFPU's unpacked float carries `nan`,
@@ -347,6 +347,148 @@ the execution oracle could measure the answers. Recorded here because the
 work waited for evidence rather than starting on recalled semantics.
 
 ---
+
+### Rounder hints for FP addition — REJECTED, premise was a measurement artifact
+
+Proposed after camada's bit-blasted FP addition appeared far slower than
+bitwuzla's native (SymFPU) one. It is not — see the measurement below.
+The SymFPU technique is recorded anyway, because the obvious guess about
+what it does is wrong and someone will look again.
+
+**Not** the dual-path split. `add.h` contains `dualPathArithmeticAdd`,
+which splits near and far cases — but bitwuzla never calls it. It calls
+`symfpu::add`, reaching the single-path `arithmeticAdd`. Implementing the
+dual-path version would be copying dead code.
+
+What `arithmeticAdd` actually does is build a case table over the
+exponent difference, predicting where the result exponent can land:
+
+```
+Case      A. max(l,r)+1   B. max(l,r)   C. max(l,r)-1   D. max(l,r)-k   E. zero
+diff = 0      Y               Y
+diff = 1      Y, sticky 0     Y, sticky 0
+```
+
+From that it derives five facts and passes them to the rounder as
+`customRounderInfo`:
+
+```cpp
+prop noOverflow;   prop noUnderflow;   prop exact;
+prop subnormalExact;   prop noSignificandOverflow;
+```
+
+The rounder then skips work it can prove unnecessary:
+
+```cpp
+prop incrementExponent(!known.noSignificandOverflow && incrementExponentNeeded);
+prop overflow(!known.noOverflow && ITE(lateOverflow, true, earlyOverflow));
+```
+
+Camada's `round()` computes all of it unconditionally, with no channel
+for a caller to say a case cannot arise.
+
+**Why this is not being built: the motivating number was an artifact.**
+The "add is 1880x slower" figure came from a benchmark that gave each
+operation a different query shape, and add alone drew commutativity
+(`x+y == y+x`). Holding the operation fixed and varying only the shape:
+
+| shape | add | mul |
+|---|---|---|
+| single op, `isNaN` | 3.8x | 4.6x |
+| result equated to a free symbol | 6.8x | 7.0x |
+| commutativity | **1720x** | 8.1x |
+
+On ordinary query shapes add is indistinguishable from multiply, and
+slightly better. There is no add-specific rounder deficit.
+
+The blowup is the *swap network*, not the rounder. `addCore` orders its
+operands by exponent, so `x+y` and `y+x` bit-blast into mirror-image
+circuits, and the solver must prove the swap symmetric before anything
+downstream cancels. Multiply takes its operands symmetrically and has no
+such network. Constraining both operands to one binade — which pins
+`exp_delta` to 0 and makes the alignment shift constant — drops the
+commutativity query from 9113 ms to 1251 ms, a 7.3x collapse. That is
+where the cost lives.
+
+`round()`'s share of a single add is roughly 70% (`toIntegral`, which is
+round-dominated with almost no front end, costs 12.4 ms against add's
+17.6 ms) — but since add is already at parity with multiply, shrinking
+the rounder is a general FP optimisation, not an add fix, and would have
+to be justified on its own.
+
+Against that, the cost stays what it was: `round()` is shared by seven
+call sites, so a hints parameter obliges every caller to derive its own
+hints, and a wrong hint silently produces a wrong value rather than
+failing loudly — the same failure shape as the FMA subnormal bug in this
+file.
+
+If anyone revisits this, the gate is ESBMC hard instances, every hint
+needs a symbolic cross-check against native FP the way the conformance
+fixtures do, and the benchmark must hold the query shape fixed across
+operations.
+
+Full fixed-shape numbers for every FP operation are in
+`docs/fp-bv-vs-native.md`. On that measurement the outlier is `sqrt`
+(~13x), not `add` — and that was investigated too; see the next entry.
+
+### Narrowing the sqrt loop / sqrt rounder hints — REJECTED on measurement
+
+Investigated because `sqrt` is the last FP-over-BV outlier (~13-14x
+native, stable across query shapes and across f32/f64).
+
+**SymFPU's sqrt is not the reason it wins.** `core/sqrt.h` calls
+`fixedPointSqrt`, whose loop does a full `expandingMultiply(candidate,
+candidate)` every iteration — strictly more work per step than camada's
+restoring loop (one add, one subtract). Its own comment concedes "the
+default algorithm given here isn't a great one". Bitwuzla does not
+override it (`symfpu::sqrt` is called directly from `word_blaster.cpp`).
+
+**What actually differs is where the expansion happens.** Dumping one
+`fp.sqrt` query:
+
+| encoding | emitted |
+|---|---|
+| BV | 26112 bytes |
+| native | 114 bytes |
+
+Native emits ~150 bytes for *every* FP operation — it hands `fp.sqrt` to
+bitwuzla as a single term and SymFPU expands it inside the word-blaster,
+subject to bitwuzla's own rewriting before the SAT solver sees it. That
+is a structural property of being an external wrapper, not an encoding
+defect we can close.
+
+**Two things were tried and both failed:**
+
+1. *Narrowing the per-iteration add.* `S` in the loop is provably
+   constant (dumping it shows no symbols) with a single set bit, and `Q`
+   accumulates top-down, so `Q`'s low bits are structurally zero.
+   Splicing the add down to the live prefix made the formula **larger**
+   (26112 -> 29235 bytes): the extract/concat scaffolding costs more than
+   the zero bits, which bitwuzla was already folding.
+
+2. *Rounder hints.* SymFPU passes `customRounderInfo(noOverflow=true,
+   noUnderflow=true, exact=false, subnormalExact=true, ...)` — for sqrt
+   these are unconditional constants, not caller-derived facts, so unlike
+   the addition case they carry no wrong-hint risk. The invariant holds
+   for camada too: `sqrt(normal)` is never subnormal is UNSAT over all
+   inputs, verified symbolically.
+
+   But the headroom is not there. `round()` is only ~13ms of sqrt's
+   ~61ms (measured against `toIntegral`, which is round-dominated with
+   almost no front end). Replacing the rounder with a raw repack — wrong
+   numerically, but an upper bound on the saving — shrank the formula 30%
+   (26112 -> 18356 bytes) and made it **slower**, 61ms -> 90ms.
+
+That last result is the useful one: for this operation a 30% smaller
+formula solved 48% slower. Formula size is not a proxy for solve time
+here, so "emit fewer nodes" is not a strategy for sqrt.
+
+**If anyone retries:** the remaining ~48ms is the restoring loop itself,
+and beating it needs a better algorithm, not a tighter encoding of this
+one. SymFPU's own comment points at the alternative — assert
+`r < 2o+1 && x = o*o + r` over nondeterministic `o`, `r`, letting the
+solver search rather than bit-blasting a fixed loop. That is a genuinely
+different shape and would have to be gated on ESBMC hard instances.
 
 ## The gates these produced
 
