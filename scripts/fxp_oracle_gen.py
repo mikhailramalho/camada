@@ -15,6 +15,13 @@ would produce garbage, not an oracle. Saturating ops need no filtering.
 Determinism: fixed PRNG seed; the output header records the generating
 Clang version, target, flags, and seed.
 
+Version pin: ESBMC bundles clang 22.1.6 on Linux and 22.1.4 on Windows,
+so "22.1.x" is the honest pin rather than any single patch release —
+these are C-semantics-stable conversions and no deltas have been observed
+across them (ESBMC independently reproduced the division-floor finding on
+20.1.8). Regenerate with whatever the consumer's frontend actually parses
+with, not the oldest version the repo claims to build against.
+
 Usage: fxp_oracle_gen.py --clang /path/to/clang [--out FILE]
 """
 
@@ -475,7 +482,7 @@ def main():
                         emit_tobv_fn(idx, from_fmt, to_w, to_signed, inrange))
                     idx += 1
 
-    # Fixed <-> floating point (REPORT-fxp-api-gaps.md section 1).
+    # Fixed <-> floating point, per ESBMC's Phase 3 gap report.
     # fixed -> float/double is defined for every input (fixed ranges are
     # tiny next to FP ranges); Clang rounds RNE. Crafted inputs exercise
     # both tie directions and the all-ones carry-out at the 24- and

@@ -339,6 +339,11 @@ public:
   virtual SMTSortRef mkRMSort(FPEncoding Encoding) = 0;
 
   /// Returns an appropriate floating-point sort for the given bitwidth.
+  /// Both widths must be non-zero and their total must fit a bit-vector
+  /// sort. Under FPEncoding::BV the format must also satisfy
+  /// 2*(SigWidth+1) + 5 <= 2^(ExpWidth+1) - 1, since a significand too
+  /// wide for its exponent cannot be renormalized within the encoding's
+  /// exponent arithmetic; such formats abort instead of misrounding.
   virtual SMTSortRef mkFPSort(const unsigned ExpWidth, const unsigned SigWidth,
                               FPEncoding Encoding) = 0;
 
@@ -566,9 +571,10 @@ public:
   /// modulo 2^Width, so negative integers wrap to their two's-complement
   /// representation. Native on Z3, cvc5, and MathSAT; on backends without
   /// a native conversion (Yices, the SMT-LIB pipe) the result is a fresh
-  /// bit-vector symbol constrained through the inverse direction, and —
-  /// like mkIEEEFPToBV — that constraint lives at the current (push)/(pop)
-  /// level.
+  /// bit-vector symbol constrained through the inverse direction, and
+  /// that constraint lives at the current (push)/(pop) level — unlike
+  /// mkIEEEFPToBV's tie, which is journalled and re-asserted after a pop
+  /// because it states a definitional fact rather than an assumption.
   virtual SMTExprRef mkInt2BV(unsigned Width, const SMTExprRef &Exp) = 0;
 
   /// Converts a bit-vector to the integer it denotes: two's complement
@@ -725,6 +731,11 @@ public:
   /// Creates a fixed-point sort. Width must be non-zero; FracBits <= Width
   /// for unsigned formats and FracBits < Width for signed formats (the sign
   /// bit is not a fraction bit).
+  ///
+  /// TR 18037 also permits formats with padding bits, which this triple
+  /// cannot express. No mainstream Clang target uses them, so they are
+  /// deliberately out of scope; supporting them would add a fourth sort
+  /// parameter rather than require a redesign.
   virtual SMTSortRef mkFXPSort(unsigned Width, unsigned FracBits,
                                bool IsSigned) = 0;
 
@@ -930,9 +941,11 @@ public:
   /// Count leading sign bits — TR 18037's `countlsfx`: the number of
   /// redundant copies of the sign bit, i.e. how far the value can be
   /// shifted left before it changes sign. Returns a bit-vector of
-  /// ToWidth bits; the count never exceeds the format width, so any
-  /// ToWidth wide enough to hold that is safe. For unsigned formats it
-  /// counts leading zeros.
+  /// ToWidth bits. The largest possible count is the number of counted
+  /// bits — the format width for an unsigned format, one less for a
+  /// signed one, since the sign bit itself is not redundant — and a
+  /// ToWidth too narrow to hold that aborts rather than silently
+  /// wrapping. For unsigned formats it counts leading zeros.
   virtual SMTExprRef mkFXPCountls(const SMTExprRef &Exp, unsigned ToWidth) = 0;
 
   /// Square root, rounded toward zero: the unique r in the operand's own
