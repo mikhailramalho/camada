@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <limits>
+#include <tuple>
 #include <utility>
 
 inline void fp_native_bv_predicate_parity(const camada::SMTSolverRef &solver) {
@@ -596,6 +597,43 @@ inline void check_rem_pair_f64(const camada::SMTSolverRef &solver,
     solver->addConstraint(
         solver->mkEqual(rem, solver->mkFP64(Expected, Encoding)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+// FMA against the host CPU's fused multiply-add, which is exact per
+// IEEE-754: one rounding of x*y+z, never two. The subnormal cases are the
+// point — camada's bit-blast inherited a one-ulp error from Z3's
+// fpa2bv_converter that only shows when an operand is subnormal, and the
+// symbolic fixtures above do not reach it.
+inline void fp_fma_host_oracle(const camada::SMTSolverRef &solver,
+                               camada::FPEncoding Encoding) {
+  const float Sub = std::numeric_limits<float>::denorm_min();
+  const std::tuple<float, float, float> Triples[] = {
+      // Ordinary values, as a control.
+      {2.0f, 3.0f, 1.0f},
+      {0.5f, 0.5f, 0.25f},
+      {-2.5f, 4.0f, 0.5f},
+      // Subnormal operands: a subnormal times a large value lands back in
+      // the normal range, so the product's leading zeros must be accounted
+      // for before it is aligned against the addend.
+      {Sub, 1e38f, 0.6467139f},
+      {Sub * 3.0f, -1.6482427e38f, 0.6467139f},
+      {-1.1180757e-38f, -1.6482427e38f, 0.64671391f},
+      {Sub, Sub, 1.0f},
+      {Sub * 7.0f, 2.0f, -Sub},
+  };
+
+  for (auto [X, Y, Z] : Triples) {
+    solver->reset();
+    auto x = solver->mkFP32(X, Encoding);
+    auto y = solver->mkFP32(Y, Encoding);
+    auto z = solver->mkFP32(Z, Encoding);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+    auto got = solver->mkFPFMA(x, y, z, rm);
+    auto want = solver->mkFP32(std::fma(X, Y, Z), Encoding);
+    INFO("fma(" << X << ", " << Y << ", " << Z << ")");
+    solver->addConstraint(solver->mkNot(solver->mkFPEqual(got, want)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
 }
 
 inline void fp_remainder_host_oracle(const camada::SMTSolverRef &solver,

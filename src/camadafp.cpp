@@ -1500,7 +1500,12 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
   SMTExprRef sig_abs_h2 =
       mkBVExtract(2 * sbits + too_short + 4, sbits + too_short, sig_abs);
-  SMTExprRef sticky_h2_red = mkBVZeroExt(sbits + 4, mkBVRedOr(sticky_h1));
+  // h2 drops one bit more than h1, so it needs its own sticky over that
+  // wider range. Reusing sticky_h1 loses bit (sbits + too_short - 1): the
+  // rounder then sees an exact tie where the value is actually above the
+  // halfway point and rounds to even instead of up.
+  SMTExprRef sticky_h2 = mkBVExtract(sbits + too_short - 1, 0, sig_abs);
+  SMTExprRef sticky_h2_red = mkBVZeroExt(sbits + 4, mkBVRedOr(sticky_h2));
   SMTExprRef sig_abs_h2_f = mkBVZeroExt(1, mkBVOr(sig_abs_h2, sticky_h2_red));
   SMTExprRef res_sig_2 = mkBVExtract(sbits + 3, 0, sig_abs_h2_f);
   assert(sig_abs_h2->getWidth() == sbits + 5);
