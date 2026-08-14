@@ -20,43 +20,20 @@ IEEE-754.
 
 Not yet reported upstream.
 
-### Camada's BV-encoded FMA is wrong on subnormal inputs
+### Report the Z3 `fpa2bv` FMA sticky-bit bug
 
-**A correctness defect in shipped code**, inherited from Z3's
-`fpa2bv_converter` along with the rest of camada's FP bit-blast.
+Camada's copy is fixed (#145); Z3's is not, and we owe the report.
 
-Counterexample, 32-bit IEEE bit patterns:
+FMA narrows its sum through one of two paths. The wider one discards an
+extra bit but reused the narrower path's sticky, so that bit vanished,
+the rounder saw a false exact tie and rounded to even — one ulp low on
+subnormal operands. Reproduce with an explicit
+`(then fpa2bv simplify bit-blast smt)` tactic; Z3's default pipeline
+hides it because `propagate-values` folds constants before the
+bit-blaster runs.
 
-```
-x  10000000011110011011111101100111   (subnormal)
-y  11111110111110000000000000000000
-z  00111111001001011000111100001011
-
-correct    01000000000111110101010100101111
-camada BV  01000000000111110101010100101110   <- one ulp low
-```
-
-The correct value is confirmed three ways: exact rational arithmetic on
-`x*y + z`, the host CPU's hardware `fmaf()`, and bitwuzla's native FP.
-
-Z3 has the same bug. Running the same query through `z3` with an explicit
-`(then fpa2bv simplify bit-blast smt)` tactic reproduces camada's wrong
-answer bit-for-bit; Z3's *default* pipeline gets it right only because
-`propagate-values` folds the constants and its rewriter evaluates the FMA
-exactly, so the bit-blaster never runs on this input. A genuinely
-symbolic FMA hits the bug there too.
-
-This is the second subnormal-triggered defect found in that converter —
-see the `mk_rem` entry above — which suggests those paths are
-systematically under-tested upstream. Both deserve a report.
-
-**Note what did not catch it.** The full 237-test suite passes with FMA's
-operand normalization removed *entirely*, which should be impossible. The
-suite has no symbolic subnormal FP arithmetic coverage; the bug surfaced
-only from cross-checking the BV and native encodings against each other
-over symbolic inputs. Extending the conformance fixtures to arithmetic
-the way they already cover predicates would likely find siblings in add,
-mul, div and the conversions — worth doing before or alongside the fix.
+This is the second subnormal-triggered defect in that converter (see
+`mk_rem` above), so report both together.
 
 ### MathSAT macOS packaging
 
@@ -69,6 +46,31 @@ meanwhile — see `CAMADA_MATHSAT_MACOS_VERSION` in
 Not yet reported to FBK.
 
 ## Exploratory, no commitment
+
+### Extend the conformance fixtures to arithmetic
+
+The 237-test suite passes with FMA's operand normalization removed
+*entirely*, which should be impossible. The fixtures cover predicates
+symbolically but not arithmetic, so nothing cross-checks the BV and
+native encodings against each other on subnormal inputs — which is the
+only thing that caught #145.
+
+Doing the same for add, mul, div and the conversions would likely find
+siblings.
+
+### Investigate `fp.sqrt`, the last FP-over-BV outlier
+
+`sqrt` is ~13x native and the only arithmetic operation far above its
+neighbours — add, sub, mul, div, fma and toIntegral all sit within a
+factor of ~2 of each other. It is also stable across query shapes, so
+unlike the earlier `add` scare it is unlikely to be an artifact. Numbers
+and methodology in `docs/fp-bv-vs-native.md`.
+
+Nothing has been diagnosed yet: the first step is to find where the cost
+sits, not to assume the restoring-division loop is at fault.
+
+Gate on ESBMC hard instances. Microbenchmarks have now overstated FP
+encoding gains twice.
 
 ### `fp.rem` fast path for small divisors
 
@@ -100,89 +102,6 @@ the same investigation — a Z3 5.0.0 hang reproduced only through
 `tactic(...).mk_solver()` and never from a file.
 
 Minutes of work, and it decides whether the rest is worth doing.
-
-### Rounder hints for FP addition
-
-Camada's bit-blasted FP addition is far slower than bitwuzla's native
-(SymFPU) one on queries that reason about the operation symbolically. The
-technique SymFPU uses to win is worth recording precisely, because the
-obvious guess is wrong.
-
-**Not** the dual-path split. `add.h` contains `dualPathArithmeticAdd`,
-which splits near and far cases — but bitwuzla never calls it. It calls
-`symfpu::add`, reaching the single-path `arithmeticAdd`. Implementing the
-dual-path version would be copying dead code.
-
-What `arithmeticAdd` actually does is build a case table over the
-exponent difference, predicting where the result exponent can land:
-
-```
-Case      A. max(l,r)+1   B. max(l,r)   C. max(l,r)-1   D. max(l,r)-k   E. zero
-diff = 0      Y               Y
-diff = 1      Y, sticky 0     Y, sticky 0
-```
-
-From that it derives five facts and passes them to the rounder as
-`customRounderInfo`:
-
-```cpp
-prop noOverflow;   prop noUnderflow;   prop exact;
-prop subnormalExact;   prop noSignificandOverflow;
-```
-
-The rounder then skips work it can prove unnecessary:
-
-```cpp
-prop incrementExponent(!known.noSignificandOverflow && incrementExponentNeeded);
-prop overflow(!known.noOverflow && ITE(lateOverflow, true, earlyOverflow));
-```
-
-Camada's `round()` computes all of it unconditionally, with no channel
-for a caller to say a case cannot arise.
-
-**Why this is not being built: the motivating number was an artifact.**
-The "add is 1880x slower" figure came from a benchmark that gave each
-operation a different query shape, and add alone drew commutativity
-(`x+y == y+x`). Holding the operation fixed and varying only the shape:
-
-| shape | add | mul |
-|---|---|---|
-| single op, `isNaN` | 3.8x | 4.6x |
-| result equated to a free symbol | 6.8x | 7.0x |
-| commutativity | **1720x** | 8.1x |
-
-On ordinary query shapes add is indistinguishable from multiply, and
-slightly better. There is no add-specific rounder deficit.
-
-The blowup is the *swap network*, not the rounder. `addCore` orders its
-operands by exponent, so `x+y` and `y+x` bit-blast into mirror-image
-circuits, and the solver must prove the swap symmetric before anything
-downstream cancels. Multiply takes its operands symmetrically and has no
-such network. Constraining both operands to one binade — which pins
-`exp_delta` to 0 and makes the alignment shift constant — drops the
-commutativity query from 9113 ms to 1251 ms, a 7.3x collapse. That is
-where the cost lives.
-
-`round()`'s share of a single add is roughly 70% (`toIntegral`, which is
-round-dominated with almost no front end, costs 12.4 ms against add's
-17.6 ms) — but since add is already at parity with multiply, shrinking
-the rounder is a general FP optimisation, not an add fix, and would have
-to be justified on its own.
-
-Against that, the cost stays what it was: `round()` is shared by seven
-call sites, so a hints parameter obliges every caller to derive its own
-hints, and a wrong hint silently produces a wrong value rather than
-failing loudly — the same failure shape as the FMA subnormal bug in this
-file.
-
-If anyone revisits this, the gate is ESBMC hard instances, every hint
-needs a symbolic cross-check against native FP the way the conformance
-fixtures do, and the benchmark must hold the query shape fixed across
-operations.
-
-Full fixed-shape numbers for every FP operation are in
-`docs/fp-bv-vs-native.md`. On that measurement the remaining outlier is
-`sqrt` (~13x), not `add`.
 
 ### Term introspection, walkers, translation
 

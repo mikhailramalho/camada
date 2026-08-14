@@ -348,6 +348,89 @@ work waited for evidence rather than starting on recalled semantics.
 
 ---
 
+### Rounder hints for FP addition — REJECTED, premise was a measurement artifact
+
+Proposed after camada's bit-blasted FP addition appeared far slower than
+bitwuzla's native (SymFPU) one. It is not — see the measurement below.
+The SymFPU technique is recorded anyway, because the obvious guess about
+what it does is wrong and someone will look again.
+
+**Not** the dual-path split. `add.h` contains `dualPathArithmeticAdd`,
+which splits near and far cases — but bitwuzla never calls it. It calls
+`symfpu::add`, reaching the single-path `arithmeticAdd`. Implementing the
+dual-path version would be copying dead code.
+
+What `arithmeticAdd` actually does is build a case table over the
+exponent difference, predicting where the result exponent can land:
+
+```
+Case      A. max(l,r)+1   B. max(l,r)   C. max(l,r)-1   D. max(l,r)-k   E. zero
+diff = 0      Y               Y
+diff = 1      Y, sticky 0     Y, sticky 0
+```
+
+From that it derives five facts and passes them to the rounder as
+`customRounderInfo`:
+
+```cpp
+prop noOverflow;   prop noUnderflow;   prop exact;
+prop subnormalExact;   prop noSignificandOverflow;
+```
+
+The rounder then skips work it can prove unnecessary:
+
+```cpp
+prop incrementExponent(!known.noSignificandOverflow && incrementExponentNeeded);
+prop overflow(!known.noOverflow && ITE(lateOverflow, true, earlyOverflow));
+```
+
+Camada's `round()` computes all of it unconditionally, with no channel
+for a caller to say a case cannot arise.
+
+**Why this is not being built: the motivating number was an artifact.**
+The "add is 1880x slower" figure came from a benchmark that gave each
+operation a different query shape, and add alone drew commutativity
+(`x+y == y+x`). Holding the operation fixed and varying only the shape:
+
+| shape | add | mul |
+|---|---|---|
+| single op, `isNaN` | 3.8x | 4.6x |
+| result equated to a free symbol | 6.8x | 7.0x |
+| commutativity | **1720x** | 8.1x |
+
+On ordinary query shapes add is indistinguishable from multiply, and
+slightly better. There is no add-specific rounder deficit.
+
+The blowup is the *swap network*, not the rounder. `addCore` orders its
+operands by exponent, so `x+y` and `y+x` bit-blast into mirror-image
+circuits, and the solver must prove the swap symmetric before anything
+downstream cancels. Multiply takes its operands symmetrically and has no
+such network. Constraining both operands to one binade — which pins
+`exp_delta` to 0 and makes the alignment shift constant — drops the
+commutativity query from 9113 ms to 1251 ms, a 7.3x collapse. That is
+where the cost lives.
+
+`round()`'s share of a single add is roughly 70% (`toIntegral`, which is
+round-dominated with almost no front end, costs 12.4 ms against add's
+17.6 ms) — but since add is already at parity with multiply, shrinking
+the rounder is a general FP optimisation, not an add fix, and would have
+to be justified on its own.
+
+Against that, the cost stays what it was: `round()` is shared by seven
+call sites, so a hints parameter obliges every caller to derive its own
+hints, and a wrong hint silently produces a wrong value rather than
+failing loudly — the same failure shape as the FMA subnormal bug in this
+file.
+
+If anyone revisits this, the gate is ESBMC hard instances, every hint
+needs a symbolic cross-check against native FP the way the conformance
+fixtures do, and the benchmark must hold the query shape fixed across
+operations.
+
+Full fixed-shape numbers for every FP operation are in
+`docs/fp-bv-vs-native.md`. On that measurement the remaining outlier is
+`sqrt` (~13x), not `add`.
+
 ## The gates these produced
 
 **Hard-instance gate.** Encoding performance changes merge only on ESBMC
