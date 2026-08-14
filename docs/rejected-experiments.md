@@ -32,6 +32,36 @@ is not a proxy for solve time**, and mechanism arguments ("this is
 obviously less work") are unreliable in both directions. See the
 hard-instance gate below.
 
+### Caching and interning layers — SIX ATTEMPTS, all REVERTED
+
+Benchmarked against a pinned baseline with repeated-run median comparison
+(`scripts/compare-bench.py`), and each reverted:
+
+1. Broad hash-based expression interning (unary/binary/ternary caches,
+   extract/extend caches)
+2. Broad generic bit-vector constant caching
+3. Generic `unpack()` caching
+4. Solver-level width-keyed exponent constant caches
+5. Eager common-singleton initialization
+6. FP special-value cache variants beyond the one kept
+
+They failed for one recurring reason: **the lookup and miss overhead
+exceeded the construction work avoided.** Camada's expression
+construction is already cheap, so a cache has to hit very often to pay
+for the hash of every miss. Miss-heavy workloads — varied constants,
+array-store chains — paid the cost without the benefit, and FP-heavy
+paths measurably worsened even where isolated microcases improved.
+Attempt 4 made `unpack()` and its callers *much* slower.
+
+What did work instead was narrower: solver-owned expression and sort
+storage, sort interning, conservative (not broad) expression interning,
+and dedicated singleton paths for the FP special values. The pattern is
+that a targeted cache on a known-hot, high-hit-rate path pays, and a
+general one does not.
+
+Do not retry these without a new profiler signal or a materially
+different strategy.
+
 ### Relational `bvurem` for `fp.rem` (B2) — REJECTED on anti-foldability
 
 No branch retained; abandoned during development.
