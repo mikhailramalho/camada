@@ -731,6 +731,11 @@ public:
   /// Creates a fixed-point sort. Width must be non-zero; FracBits <= Width
   /// for unsigned formats and FracBits < Width for signed formats (the sign
   /// bit is not a fraction bit).
+  ///
+  /// TR 18037 also permits formats with padding bits, which this triple
+  /// cannot express. No mainstream Clang target uses them, so they are
+  /// deliberately out of scope; supporting them would add a fourth sort
+  /// parameter rather than require a redesign.
   virtual SMTSortRef mkFXPSort(unsigned Width, unsigned FracBits,
                                bool IsSigned) = 0;
 
