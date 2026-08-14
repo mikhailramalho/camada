@@ -6,9 +6,9 @@ the way it did — so the idea is not rediscovered and re-implemented from
 scratch, and so a future proposal has to beat the measurement rather than
 repeat it.
 
-The branches named here are kept for reference. Deleting one is fine once
-its entry below is accurate; the entry is the artifact worth keeping, not
-the code.
+Where a branch has been deleted its tip commit is given, so the work can
+be recovered with `git checkout <sha>` while the object survives in the
+repository. The entry is the artifact worth keeping, not the code.
 
 ---
 
@@ -16,7 +16,7 @@ the code.
 
 ### Rounder restructuring (A3/A4) — REJECTED on measurement
 
-Branch: `perf/rounder-structure`
+Branch: `perf/rounder-structure` (deleted; tip was `4f0b5f6`)
 
 Two changes to the floating-point rounder: computing the overflow test
 from the pre-increment operands, and folding the rounder's constant
@@ -64,7 +64,7 @@ instances — the LZC tree despite toy benchmarks suggesting otherwise.
 
 ### Eager read-over-write scalarization (EagerRoW) — REJECTED on scope
 
-Branch: `feat/eager-row-arrays`
+Branch: `feat/eager-row-arrays` (deleted; tip was `c35007f`)
 
 Implemented, reviewed, and working. It scalarizes array reads eagerly,
 which helps workloads with many symbolic loop iterations over small
