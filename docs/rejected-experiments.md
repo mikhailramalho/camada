@@ -129,9 +129,91 @@ round-trips for functional consistency alone. Master keeps both, so
 round-trips stay exact *and* value-equal terms agree. The two mechanisms
 answer different questions and the shipped design needs both.
 
-Kept as a record because "why does camada carry two mechanisms here?" is
-otherwise an obvious-looking thing to simplify away. `REPORT-ieeebv-
-shadow-equality-order.md` has the failing case that motivated #126.
+#### The failing case, since it explains why one mechanism is not enough
+
+Found on ESBMC's `camada` branch by `regression/python/github_3719_4-nondet`.
+A program writes a float's bytes into a container and reads them back; the
+read saw a different pattern than was written, and the assertion failed on
+a model that cannot occur in C.
+
+The formula asserted `y == list_elem` *before* either term had any tie to
+a bit-vector, then later tied each one separately:
+
+```
+(assert (= y list_elem))                          ; line 220
+(assert (= list_elem ((_ to_fp 11 53) ieeebv0)))  ; line 248
+(assert (= y         ((_ to_fp 11 53) ieeebv1)))  ; line 336
+```
+
+Nothing forces `ieeebv0 == ieeebv1` — in the dump they appear in 10 and 12
+asserts respectively, and **zero** asserts mention both. For a non-NaN
+value that is harmless, since `to_fp` is injective there and equal floats
+force equal bits. At NaN `to_fp` is many-to-one, so a model can satisfy
+all three constraints with two different payloads for one float value.
+
+#125 could not cover it because its seeding is **forward-only**: a shadow
+link is recorded when exactly one side of an equality is already shadowed,
+and at line 220 neither side is. Each later `mkIEEEFPToBV` then
+legitimately mints its own symbol. Nothing is inconsistent per term — the
+memo does return the cached symbol for a repeated call — the gap is that
+the equality arrived before either side had provenance.
+
+The alternatives considered were a union-find over asserted FP equalities
+(fixes the general case, but more invasive and needs the same scope
+discipline the shadow levels already implement) and leaving it documented
+with callers using `FPEncoding::BV` when they need bit-exact floats. #126's
+uninterpreted function was chosen instead: congruence gives the guarantee
+without tracking provenance at all.
+
+Scope note: this only ever affected the fresh-symbol backends — bitwuzla,
+cvc5 and the SMT-LIB pipeline. Z3 and MathSAT use native fp->bv
+primitives, so repeated reads of one term are the same function
+application and agree by construction, even where the NaN result is
+unspecified.
+
+### Packed tuple representation — REJECTED on expressiveness
+
+Considered while designing the tuple subsystem (#102): represent a tuple
+as a single `Array<Idx, BV>` with the fields bit-concatenated into one
+payload, instead of decomposing into a bundle of per-field arrays.
+
+It only works when every leaf is a fixed-width scalar. It cannot
+represent tuple fields that are themselves arrays, which camada already
+supported and ESBMC's type universe includes. The usage pattern pointed
+the same way: ESBMC's hot tuple shape is a two- or three-field pointer
+struct under fine-grained field project and update, which decomposition
+serves directly and a packed payload would force to extract and reassemble
+on every access.
+
+Tuple-typed *index* sorts remain rejected for the same expressiveness
+reason, independently of the representation choice.
+
+### Bit-exact FP storage sort — DECLINED, contract delivered instead
+
+ESBMC asked for an FP-typed value whose *storage* is bit-exact — byte
+reads and writes recover the pattern written, NaN payloads included —
+while its *operations* stay native FP. The motivation was byte-addressable
+memory: an FP value written to memory and read back must return the same
+bits, which `mkIEEEFPToBV` does not guarantee at NaN.
+
+Two designs were on the table. The first was extending the shadow
+mechanism so `mkIEEEFPToBV` returns provenance-exact bits everywhere; it
+was declined because it makes the operation stop being a function of the
+FP value at NaN, which is a real semantic cost, and because measurements
+showed the consumer-side fix was cheap. The second — a dedicated storage
+sort camada would represent per backend — was declined as knowledge-holder
+territory: only ESBMC knows its own memory model.
+
+What camada owes, and shipped, is the **contract**: `mkIEEEFPToBV`'s
+documentation now states plainly that the result is NaN-payload
+unspecified, that round-tripping is not the identity, and where the
+provenance rewrite does and does not reach — so a caller building
+byte-level memory discovers the hazard from the API rather than from a
+wrong SV-COMP verdict.
+
+The split follows the boundary rule: bit-exact byte-addressable memory
+belongs to the knowledge holder, while the FP-encoding contract is
+theory-internal and camada-owned.
 
 ---
 
@@ -192,6 +274,39 @@ work waited for evidence rather than starting on recalled semantics.
 hard-instance wins. Toy benchmarks and mechanism arguments have proven
 unpredictive in both directions: the LZC tree looked bad on toys and won;
 A3/A4 were exact node reductions and lost.
+
+The leading-zero investigation is worth recording in detail, because all
+three reasons a toy misses the effect recur:
+
+1. *Small instances solve instantly under either encoding.* The
+   difference is visible at term level in a two-line program, but both
+   variants finish in milliseconds. Divergence needs an instance where
+   the SAT solver actually searches — the benchmark that exposed it had a
+   380-assignment VCC over a five-layer neural net's float arithmetic,
+   with a baseline solve around six minutes.
+
+2. *Every size metric pointed the wrong way.* The chain encoding was
+   smaller by all of them — roughly 3x fewer ITE/bvadd terms per
+   operation, half the initial nodes (54,744 against 110,357), fewer
+   nodes after preprocessing (405k against 712k), less memory (87 against
+   147 MB), fewer lemmas. Screening candidates by "which encoding is
+   bigger" discards the culprit. The chain's cost is **sequential
+   dependency, not node count**: the tree's subtrees are independent and
+   the bit-blaster and SAT solver exploit that; the chain's levels are
+   not.
+
+3. *The magnitude was version-sensitive in a misleading way.* On bitwuzla
+   0.9.0 the chain cost about 1.4x; on 0.9.1 the same formula went from
+   answering in ~500s to not answering within 1200s. That looked like a
+   solver regression until the tree encoding showed 0.9.1 is in fact
+   *faster* than 0.9.0 — there was no version regression, only an
+   encoding newer bitwuzla tolerates worse. A toy attempted on one
+   version can land on either side of the question.
+
+The useful probe was not a timing repro but a **term-shape** one:
+ESBMC's `--ssa-trace --ssa-smt-trace` prints the SMT term each SSA
+assignment encodes to, so the structural difference shows up on a
+two-line program even though the timing difference does not.
 
 **Measure, do not recall.** Semantics come from executing the reference
 implementation, not from memory or documentation. This caught a
