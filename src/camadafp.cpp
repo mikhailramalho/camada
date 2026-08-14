@@ -633,8 +633,14 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   // else comes the actual multiplication.
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
-  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
-  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
+  // Unpacked WITHOUT pre-normalization: round() below already computes a
+  // leading-zero count over the product and renormalizes from it, so
+  // normalizing each operand first duplicates that work — two extra
+  // leading-zero trees and two variable-amount shifts per multiply, and
+  // variable shifts bit-blast into barrel shifters. SymFPU's multiply
+  // does the same, correcting the product with the exponent instead.
+  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, false);
+  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, false);
 
   SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
   SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
@@ -742,8 +748,8 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
-  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
-  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
+  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, false);
+  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, false);
 
   unsigned extra_bits = sbits + 2;
   SMTExprRef a_sig_ext = mkBVConcat(a_sig, mkBVFromDec(0, sbits + extra_bits));
