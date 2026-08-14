@@ -838,7 +838,8 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   const SMTExprRef &c5 = x_is_zero;
   const SMTExprRef &v5 = pzero;
 
-  // exp(x) < exp(y) -> x
+  // exp(x) < exp(y) - 1 -> x, since then |x| < |y|/2 already and the IEEE
+  // remainder, which lies in [-|y|/2, |y|/2], is x itself.
   SMTExprRef x_sgn = extractSgn(*this, LHS);
   SMTExprRef x_exp = extractExp(*this, LHS);
   SMTExprRef y_exp = extractExp(*this, RHS);

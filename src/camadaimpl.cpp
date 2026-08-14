@@ -2004,10 +2004,12 @@ SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int) {
 
 SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
                                    const SMTSortRef &Sort) {
-  // The `__CAMADA_` prefix is reserved for Camada-internal symbol names
-  // (currently tuple field decompositions and FP-to-BV shadowing). User
-  // names with that prefix would alias internal symbols and silently
-  // corrupt encoded-tuple semantics; reject up front.
+  // The `__CAMADA_` prefix is reserved for the symbols Camada's own
+  // encodings introduce — tuple fields, lazy and Ackermann arrays, array
+  // equality witnesses, FP-to-BV shadowing, int-to-BV, assumption
+  // literals and quantifier variables. A user name with that prefix
+  // would alias one of them and silently corrupt whichever encoding it
+  // collided with; reject up front.
   fatalErrorIf(Name.compare(0, 9, "__CAMADA_") == 0,
                "Symbol names with the reserved __CAMADA_ prefix are not "
                "permitted; rename the symbol");
@@ -2628,7 +2630,8 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
   // fresh symbol constrained via the inverse direction (the mkIEEEFPToBV
   // precedent). Euclidean mod puts the wrap in [0, 2^Width) for negative
   // integers too. The constraint is asserted at the current push level
-  // and unwound by (pop), same caveat as mkIEEEFPToBV.
+  // and unwound by (pop) — unlike mkIEEEFPToBV's tie, which is journalled
+  // into LazyConstraintLevels and re-asserted afterwards.
   SMTExprRef Fresh = mkSymbolUnchecked(
       "__CAMADA_int2bv_" + std::to_string(NextInt2BVId++), mkBVSort(Width));
   SMTExprRef Wrapped = mkArithMod(Exp, mkInt(power2Dec(Width)));
