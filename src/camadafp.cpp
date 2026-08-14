@@ -642,9 +642,6 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, false);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, false);
 
-  SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
-  SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
-
   SMTExprRef a_sig_ext = mkBVZeroExt(sbits, a_sig);
   SMTExprRef b_sig_ext = mkBVZeroExt(sbits, b_sig);
 
@@ -654,7 +651,10 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   SMTExprRef res_sgn, res_sig, res_exp;
   res_sgn = mkBVXor(a_sgn, b_sgn);
 
-  res_exp = mkBVAdd(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+  // The unnormalized unpack leaves both leading-zero counts at zero, so
+  // the exponent is just the sum; round() derives the correction it needs
+  // from the product's own leading zeros.
+  res_exp = mkBVAdd(a_exp_ext, b_exp_ext);
 
   SMTExprRef product = mkBVMul(a_sig_ext, b_sig_ext);
 
@@ -760,11 +760,9 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 
   SMTExprRef res_sgn = mkBVXor(a_sgn, b_sgn);
 
-  SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
-  SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
-
-  SMTExprRef res_exp =
-      mkBVSub(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+  // Both leading-zero counts are zero after the unnormalized unpack, so
+  // the exponent is just the difference.
+  SMTExprRef res_exp = mkBVSub(a_exp_ext, b_exp_ext);
 
   // b_sig_ext can't be 0 here, so it's safe to use OP_BUDIV_I
   SMTExprRef quotient = mkBVUDiv(a_sig_ext, b_sig_ext);
@@ -1356,6 +1354,13 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
   SMTExprRef c_sgn, c_sig, c_exp, c_lz;
+  // Normalized deliberately: unlike mul and div, FMA COMPARES the product's
+  // exponent against the addend's (swap_cond below) to decide the alignment
+  // shift. Unnormalized exponents are not comparable — a subnormal operand
+  // carries an exponent that understates its magnitude by its leading-zero
+  // count — so dropping this misaligns the addend. Verified: with these set
+  // to false, a symbolic cross-check against native FP finds divergence on
+  // subnormal inputs, which the regression suite does not currently cover.
   unpack(*this, X, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, Y, b_sgn, b_sig, b_exp, b_lz, true);
   unpack(*this, Z, c_sgn, c_sig, c_exp, c_lz, true);
