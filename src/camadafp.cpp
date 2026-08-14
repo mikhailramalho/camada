@@ -633,11 +633,10 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   // else comes the actual multiplication.
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
-  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
-  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
-
-  SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
-  SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
+  // Unnormalized: round() renormalizes from the product's own leading
+  // zeros, so normalizing the operands first is duplicated work.
+  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, false);
+  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, false);
 
   SMTExprRef a_sig_ext = mkBVZeroExt(sbits, a_sig);
   SMTExprRef b_sig_ext = mkBVZeroExt(sbits, b_sig);
@@ -648,7 +647,8 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   SMTExprRef res_sgn, res_sig, res_exp;
   res_sgn = mkBVXor(a_sgn, b_sgn);
 
-  res_exp = mkBVAdd(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+  // Both leading-zero counts are zero above.
+  res_exp = mkBVAdd(a_exp_ext, b_exp_ext);
 
   SMTExprRef product = mkBVMul(a_sig_ext, b_sig_ext);
 
@@ -742,8 +742,9 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
-  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
-  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
+  // Unnormalized: round() renormalizes from the quotient's leading zeros.
+  unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, false);
+  unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, false);
 
   unsigned extra_bits = sbits + 2;
   SMTExprRef a_sig_ext = mkBVConcat(a_sig, mkBVFromDec(0, sbits + extra_bits));
@@ -754,11 +755,8 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 
   SMTExprRef res_sgn = mkBVXor(a_sgn, b_sgn);
 
-  SMTExprRef a_lz_ext = mkBVZeroExt(2, a_lz);
-  SMTExprRef b_lz_ext = mkBVZeroExt(2, b_lz);
-
-  SMTExprRef res_exp =
-      mkBVSub(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+  // Both leading-zero counts are zero above.
+  SMTExprRef res_exp = mkBVSub(a_exp_ext, b_exp_ext);
 
   // b_sig_ext can't be 0 here, so it's safe to use OP_BUDIV_I
   SMTExprRef quotient = mkBVUDiv(a_sig_ext, b_sig_ext);
@@ -1350,6 +1348,9 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
   SMTExprRef c_sgn, c_sig, c_exp, c_lz;
+  // Normalized, unlike mul and div: swap_cond below compares the product's
+  // exponent against the addend's, and unnormalized exponents understate a
+  // subnormal by its leading-zero count, misaligning the addend.
   unpack(*this, X, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, Y, b_sgn, b_sig, b_exp, b_lz, true);
   unpack(*this, Z, c_sgn, c_sig, c_exp, c_lz, true);

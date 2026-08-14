@@ -62,6 +62,56 @@ general one does not.
 Do not retry these without a new profiler signal or a materially
 different strategy.
 
+### SymFPU techniques that do not transfer — REJECTED on inspection
+
+Camada's FP bit-blast was compared against bitwuzla's native FP (SymFPU)
+across all 30 comparable operations. Two changes landed from that
+comparison — multiply and divide stopped pre-normalizing their operands,
+worth -35% and -28% — and three candidates were examined and dropped.
+
+**One-bit conditional shift in divide.** SymFPU corrects its quotient
+with `conditionalLeftShiftOne` instead of a variable-amount shift, which
+bit-blasts into a barrel shifter. It can do this *because* it normalizes
+its operands first, which bounds the quotient to [0.5, 2) and so its
+leading-zero count to 0 or 1. Camada no longer normalizes, so the
+quotient can be arbitrarily small — a subnormal dividend over a large
+divisor needs up to `sbits` of shift — and the variable shift is
+load-bearing.
+
+The two techniques are **alternatives, not complements**: normalize and
+get cheap fixed shifts, or skip normalization and pay for one variable
+shift. Measurement favours our side of that trade (divide 23.2ms to
+16.3ms), but it means the SymFPU shift trick can never be layered on top.
+
+**Folding normalization into the exponent add.** SymFPU's
+`expandingAddWithCarryIn(le, re, topBitSet)` looked like a cheaper way to
+combine exponents than our subtract-then-adjust. Once operands are
+unpacked unnormalized the leading-zero counts are provably zero, so our
+subtractions were simply dead — removing them is bookkeeping, not an
+optimization, and produced no measurable change. Recorded so the idea is
+not revisited expecting a gain.
+
+**Dual-path addition.** `add.h` defines `dualPathArithmeticAdd`, which
+splits the near and far cases. Bitwuzla does not call it: `symfpu::add`
+reaches the single-path `arithmeticAdd`. Copying it would be copying dead
+code. The technique bitwuzla actually uses for addition is a rounder-hint
+protocol, recorded in `open-follow-ups.md` rather than here because it is
+deferred, not rejected.
+
+**The architectural difference underneath all of this**, which no
+individual technique captures: SymFPU's unpacked float carries `nan`,
+`inf` and `zero` as separate boolean fields, so its arithmetic never
+rebuilds a value's classification. Camada keeps values packed as IEEE
+bit-vectors and re-derives classification at every operation — our
+multiply builds 21 special-case terms where SymFPU's builds 5.
+
+That choice is why the measured results split so cleanly: every
+classification predicate is *faster* under camada's encoding (`isNaN`
+0.39x, `isZero` 0.35x, and the IEEE bit round-trip 0.15x, since under BV
+it is the identity), while everything that computes a value is slower.
+Adopting SymFPU's representation would be a rewrite of `camadafp.cpp`
+that trades those wins away — a different design, not an improvement.
+
 ### Relational `bvurem` for `fp.rem` (B2) — REJECTED on anti-foldability
 
 No branch retained; abandoned during development.
