@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 set(CAMADA_VER_MAJOR 0)
-set(CAMADA_VER_MINOR 13)
+set(CAMADA_VER_MINOR 17)
 
 project(
   camada
@@ -229,7 +229,7 @@ config_solver(CVC5 1.0.8)
 config_solver(MathSAT 5.6.3)
 config_solver(STP 2.4.0)
 config_solver(Yices 2.6.1)
-config_solver(Z3 4.16.0)
+config_solver(Z3 4.13.3)
 
 # The SMT-LIB pipeline backend drives an external SMT-LIB-speaking process via
 # fork/exec/setrlimit/select, so it is POSIX-only. Default ON elsewhere; force

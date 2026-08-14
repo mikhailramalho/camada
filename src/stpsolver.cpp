@@ -237,9 +237,12 @@ SMTExprRef STPSolver::mkBVMulOverflowImpl(const SMTExprRef &LHS,
 
 SMTExprRef STPSolver::mkBVSRemImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS) {
+  // vc_sbvRemExpr, not vc_sbvModExpr: SMT-LIB's bvsrem takes the sign of
+  // the dividend, while STP's "mod" takes the sign of the divisor. The
+  // two agree only when the operand signs match.
   return makeExprRef<STPExpr>(
       SMTExprKind::BVSRem, &Context, LHS->Sort,
-      STP::vc_sbvModExpr(Context, LHS->getWidth(),
+      STP::vc_sbvRemExpr(Context, LHS->getWidth(),
                          toSolverExpr<STPExpr>(*LHS).Expr,
                          toSolverExpr<STPExpr>(*RHS).Expr));
 }
@@ -452,6 +455,10 @@ SMTExprRef STPSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
 }
 
 SMTExprRef STPSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+  // Extending by nothing is the identity; the concat below would ask for
+  // a zero-width constant, which is not a valid sort.
+  if (i == 0)
+    return Exp;
   const SMTExprRef &z = SMTSolverImpl::mkBVFromDec(0, i);
   return mkBVConcat(z, Exp);
 }

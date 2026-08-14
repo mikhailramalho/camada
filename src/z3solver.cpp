@@ -113,8 +113,8 @@ Z3Solver::Z3Solver(const SolverConfig &Config) : Solver(Context) {
   initializeCommonSingletons();
 }
 
-Z3Solver::Z3Solver(z3::context C, const SolverConfig &Config)
-    : Context(std::move(C)), Solver(Context) {
+Z3Solver::Z3Solver(z3::config &Z3Config, const SolverConfig &Config)
+    : Context(Z3Config), Solver(Context) {
   ArrayMode = Config.Arrays;
   TupleMode = Config.Tuples;
   z3::set_param("rewriter.hi_fp_unspecified", true);

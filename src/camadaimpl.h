@@ -253,6 +253,18 @@ protected:
     std::unordered_map<std::string, std::size_t> ReadsByConstBits;
   };
   std::unordered_map<const SMTExpr *, AckArrayRootState> AckArrayRoots;
+  // Lowered selects memoized per (chain node, index). Store/ite chains
+  // share their bases by construction, so repeated selects — from user
+  // code or the array-equality congruence machinery — reuse one lowered
+  // term instead of rebuilding an ite cascade per call. Same key split
+  // as AckArrayRootState: BV-constant indexes by value, everything else
+  // by object identity. Terms outlive push/pop, so entries never need
+  // scope invalidation.
+  struct AckSelectMemoState {
+    std::unordered_map<const SMTExpr *, SMTExprRef> ByIndex;
+    std::unordered_map<std::string, SMTExprRef> ByConstBits;
+  };
+  std::unordered_map<const SMTExpr *, AckSelectMemoState> AckSelectMemo;
   // Bits of BV constants built through mkBVFromBin/mkBVFromDec, tracked
   // only in Ackermann mode (general expressions are not hash-consed, so
   // the value is otherwise unrecoverable at build time).
@@ -283,6 +295,52 @@ protected:
                                     const SMTExprRef &Index);
   SMTResult<ArrayModel> ackArrayModel(const SMTExprRef &Array);
   void noteAckBVConstBits(const SMTExprRef &Exp, const std::string &Bits);
+
+  // --- IEEE bit-pattern shadow for mkIEEEFPToBV ---
+  // fp.to_ieee_bv is underspecified at NaN: the FP sort has one NaN value
+  // while the encoding has millions of NaN patterns, so no function out
+  // of the sort can recover which pattern produced a NaN, and a backend
+  // may answer with any of them. That is unsound for callers that need
+  // bit-exact fp<->bv round-trips (byte-level memory models). Where
+  // camada can PROVE the bits — the FP term was built by mkBVToIEEEFP or
+  // mkFPFromBin, or a top-level asserted equality ties it to such a term
+  // — mkIEEEFPToBV returns the original bits instead of asking the
+  // backend. This is a term-level rewrite, not a constraint: nothing is
+  // asserted, so it composes with push/pop and every backend uniformly.
+  //
+  // Provenance entries (terms camada itself built from bits) are
+  // scope-independent identity facts. Entries derived from asserted
+  // equalities die with their push scope: the tying constraint is
+  // retracted by pop(), and keeping the bits without it could conjure
+  // contradictions out of thin air.
+  std::unordered_map<const SMTExpr *, SMTExprRef> IEEEBVShadow;
+  // mkEqual results pairing a native-FP term with a shadowed counterpart;
+  // the shadow commits only if the equality is actually asserted
+  // top-level (a negated or embedded equality proves nothing).
+  struct PendingShadowLink {
+    const SMTExpr *Target;
+    SMTExprRef Bits;
+  };
+  std::unordered_map<const SMTExpr *, PendingShadowLink> PendingShadowLinks;
+  // Scope journal for assert-derived entries: pop() erases them — the
+  // opposite of LazyConstraintLevels' re-assert, deliberately.
+  std::vector<std::vector<const SMTExpr *>> ShadowScopeLevels{1};
+  void commitShadowLink(const SMTExprRef &Constraint);
+
+  // --- IEEE bits function for backends without a native fp->bv ---
+  // The old emulation minted a fresh constant per call, so two FP terms
+  // asserted equal could report different bit patterns (the equality may
+  // arrive before either side has shadow provenance, and to_fp is
+  // many-to-one at NaN, so the inverse ties constrain nothing). Emulate
+  // the FUNCTION instead: one uninterpreted function per FP sort, applied
+  // to the term, tied per-term by `to_fp(fn(x)) == x`. Functional
+  // congruence then makes value-equal terms agree by construction — the
+  // same guarantee z3's native primitive has. The tie is a definitional,
+  // scope-independent fact, journaled in LazyConstraintLevels so pop()
+  // re-asserts it; applications are memoized per term.
+  std::unordered_map<const SMTSort *, SMTExprRef> IEEEBVFnCache;
+  std::unordered_map<const SMTExpr *, SMTExprRef> IEEEBVAppCache;
+  SMTExprRef mkIEEEFPToBVViaUF(const SMTExprRef &Exp);
 
   /// Lower a constant array as a fresh backend array symbol whose
   /// "every element equals InitValue" semantics are enforced lazily: the
@@ -563,11 +621,44 @@ public:
                         const SMTSortRef &To) override final;
   SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
                                 const SMTSortRef &To) override final;
-  SMTExprRef mkFXPFromBV(const SMTExprRef &Exp,
+  SMTExprRef mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
                          const SMTSortRef &To) override final;
   SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) override final;
-  SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp,
-                               unsigned ToWidth) override final;
+  SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,
+                               bool ToSigned) override final;
+  SMTExprRef mkFXPAddSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPSubSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) override;
+  SMTExprRef mkFXPMulSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPDivSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) override;
+  SMTExprRef mkFXPShlExpr(const SMTExprRef &Exp,
+                          const SMTExprRef &Amount) override;
+  SMTExprRef mkFXPShrExpr(const SMTExprRef &Exp,
+                          const SMTExprRef &Amount) override;
+  SMTExprRef mkFXPShlOverflowExpr(const SMTExprRef &Exp,
+                                  const SMTExprRef &Amount) override;
+  SMTExprRef mkFXPShlSatExpr(const SMTExprRef &Exp,
+                             const SMTExprRef &Amount) override;
+  SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
+                           const SMTSortRef &To) override;
+  SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
+                          bool ToSigned) override;
+  SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
+                        FXPRoundTie Tie) override final;
+  SMTExprRef mkFXPAbs(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPCountls(const SMTExprRef &Exp,
+                          unsigned ToWidth) override final;
+  SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPExp(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
+                       RM R) override final;
+  SMTExprRef mkFPToFXP(const SMTExprRef &Exp,
+                       const SMTSortRef &To) override final;
+  SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
+                               const SMTSortRef &To) override final;
+  SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp,
+                          const SMTSortRef &To) override final;
   SMTExprRef mkArraySelect(const SMTExprRef &Array,
                            const SMTExprRef &Index) override final;
   SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,

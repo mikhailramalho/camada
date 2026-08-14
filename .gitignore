@@ -31,3 +31,6 @@
 *.out
 *.app
 __pycache__/
+
+# Build directories
+build*/

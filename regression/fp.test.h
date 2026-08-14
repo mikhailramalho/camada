@@ -308,6 +308,125 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver,
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Regression for the ESBMC fp.to_ieee_bv round-trip report: bit-exact
+// fp<->bv correspondence wherever camada can prove the bits.
+inline void fp_ieee_bv_bitexact_roundtrip(const camada::SMTSolverRef &solver,
+                                          camada::FPEncoding Encoding) {
+  auto fp32 = [&]() { return solver->mkFP32Sort(Encoding); };
+  auto bv32 = [&]() { return solver->mkBVSort(32); };
+
+  // 1. Direct round-trip is exact for EVERY pattern, NaN payloads
+  // included: bits(to_fp(b)) == b universally. fp.to_ieee_bv alone cannot
+  // provide this (it is underspecified at NaN); the provenance shadow
+  // makes it a term-level identity.
+  {
+    auto b = solver->mkSymbol("rt_b", bv32());
+    auto f = solver->mkBVToIEEEFP(b, fp32());
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(f), b)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 2. ESBMC's byte-write laundering chain: an uninitialized float
+  // written byte-by-byte (0x40490FDB, little-endian), each step
+  // round-tripping the partial state through the FP sort via a fresh SSA
+  // symbol tied by an asserted equality. Before the shadow, any
+  // partial-write state encoding NaN let the solver discard the bytes
+  // already written; the final byte read must nevertheless be exact.
+  {
+    auto byteAt = [&](const camada::SMTExprRef &bits, unsigned lo) {
+      return solver->mkBVExtract(lo + 7, lo, bits);
+    };
+    const uint64_t Bytes[4] = {0xDB, 0x0F, 0x49, 0x40};
+    auto f = solver->mkSymbol("lc_f0", fp32());
+    for (unsigned i = 0; i < 4; ++i) {
+      auto bits = solver->mkIEEEFPToBV(f);
+      auto wr = solver->mkBVFromDec(static_cast<int64_t>(Bytes[i]), 8);
+      // Rebuild the 32-bit pattern with byte i replaced.
+      camada::SMTExprRef nbits;
+      if (i == 0)
+        nbits = solver->mkBVConcat(solver->mkBVExtract(31, 8, bits), wr);
+      else if (i == 3)
+        nbits = solver->mkBVConcat(wr, solver->mkBVExtract(23, 0, bits));
+      else
+        nbits = solver->mkBVConcat(
+            solver->mkBVConcat(solver->mkBVExtract(31, 8 * (i + 1), bits), wr),
+            solver->mkBVExtract(8 * i - 1, 0, bits));
+      auto next = solver->mkSymbol("lc_f" + std::to_string(i + 1), fp32());
+      solver->addConstraint(
+          solver->mkEqual(solver->mkBVToIEEEFP(nbits, fp32()), next));
+      f = next;
+    }
+    auto finalBits = solver->mkIEEEFPToBV(f);
+    solver->addConstraint(solver->mkNot(
+        solver->mkEqual(byteAt(finalBits, 0), solver->mkBVFromDec(0xDB, 8))));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 3. Assert-derived provenance dies with its push scope: after the
+  // tying equality is popped, the bits are unconstrained again, so a
+  // divergent pattern must be satisfiable.
+  {
+    auto g = solver->mkSymbol("sc_g", fp32());
+    auto pat = solver->mkBVFromDec(0x40490FDB, 32);
+    solver->push();
+    solver->addConstraint(
+        solver->mkEqual(g, solver->mkBVToIEEEFP(pat, fp32())));
+    solver->pop();
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(g), pat)));
+    REQUIRE(solver->check() == camada::checkResult::SAT);
+  }
+}
+
+// Regression for the second ESBMC fp.to_ieee_bv report
+// (github_3719_4-nondet): mkIEEEFPToBV must be functionally consistent —
+// value-equal FP terms report equal bits, matching z3's native
+// primitive. The fresh-symbol emulation minted unrelated constants per
+// call, so an equality asserted BEFORE either side had provenance left
+// the two symbols free to diverge at NaN.
+inline void fp_ieee_bv_consistency(const camada::SMTSolverRef &solver,
+                                   camada::FPEncoding Encoding) {
+  auto fp32 = [&]() { return solver->mkFP32Sort(Encoding); };
+
+  // 1. Equality-before-provenance: two plain FP symbols asserted equal
+  // before any fp->bv conversion exists must report equal bits, NaN
+  // included.
+  {
+    auto y = solver->mkSymbol("cy", fp32());
+    auto z = solver->mkSymbol("cz", fp32());
+    solver->addConstraint(solver->mkEqual(y, z));
+    auto by = solver->mkIEEEFPToBV(y);
+    auto bz = solver->mkIEEEFPToBV(z);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(by, bz)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 2. Repeated reads of one term cannot diverge.
+  {
+    auto f = solver->mkSymbol("cf", fp32());
+    auto b1 = solver->mkIEEEFPToBV(f);
+    auto b2 = solver->mkIEEEFPToBV(f);
+    solver->addConstraint(solver->mkNot(solver->mkEqual(b1, b2)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+  solver->reset();
+
+  // 3. Exactness where the encoding is injective: a non-NaN value's bits
+  // are fully determined.
+  {
+    auto f = solver->mkSymbol("cg", fp32());
+    solver->addConstraint(solver->mkEqual(f, solver->mkFP32(1.5f, Encoding)));
+    auto bits = solver->mkIEEEFPToBV(f);
+    solver->addConstraint(solver->mkNot(
+        solver->mkEqual(bits, solver->mkBVFromDec(0x3FC00000, 32))));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
 // Regression: mkIEEEFPToBV must return a PLAIN BV sort, not BVFP. The
 // native backends used to tag the bit pattern with the BVFP sort, which
 // leaked into caller sort comparisons — ESBMC's float→int bitcast
@@ -361,6 +480,19 @@ inline void fp_to_signed_bv_multiple_widths(const camada::SMTSolverRef &solver,
   REQUIRE(sbv64->getKind() == camada::SMTExprKind::FPtoSBV);
   solver->addConstraint(solver->mkEqual(sbv32, solver->mkBVFromDec(42, 32)));
   solver->addConstraint(solver->mkEqual(sbv64, solver->mkBVFromDec(42, 64)));
+  REQUIRE(solver->check() == camada::checkResult::SAT);
+
+  // Width 1 is the degenerate signed target: its range is [-1, 0], so 0
+  // converts and -1 converts, while 42 is out of range. The BV encoding
+  // used to build the range bounds by concatenating a (width-1)-wide
+  // value, which is a zero-width sort here and aborted.
+  solver->reset();
+  auto zero = solver->mkFP32(0.0f, Encoding);
+  auto neg_one = solver->mkFP32(-1.0f, Encoding);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkFPtoSBV(zero, 1), solver->mkBVFromDec(0, 1)));
+  solver->addConstraint(solver->mkEqual(solver->mkFPtoSBV(neg_one, 1),
+                                        solver->mkBVFromDec(1, 1)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
@@ -553,4 +685,45 @@ fp_cancellation_and_normalization(const camada::SMTSolverRef &solver,
   solver->addConstraint(eq);
   solver->addConstraint(solver->mkFPIsNormal(sub));
   REQUIRE(solver->check() == camada::checkResult::SAT);
+}
+
+// Wide formats previously hit undefined behavior in the BV encoding's
+// host-side constant construction (1ULL << N at N >= 64): binary128
+// constants (2^112-1 significand masks) and x87-extended sqrt
+// (2^(sbits+3) with sbits = 64). The constants are now built as bit
+// strings at any width; these pin the previously-broken formats
+// end-to-end. Constant operands let the backend fold the circuits, so
+// the checks stay fast despite the widths.
+inline void fp_wide_format_semantics(const camada::SMTSolverRef &solver) {
+  // Bit pattern of the power-of-two value 2^K at a given format:
+  // sign 0, exponent bias + K, significand zero.
+  auto pow2At = [&](unsigned EW, unsigned SW, uint64_t K) {
+    uint64_t exp = ((uint64_t(1) << (EW - 1)) - 1) + K;
+    std::string bits = "0";
+    for (unsigned i = 0; i < EW; ++i)
+      bits += (exp >> (EW - 1 - i)) & 1 ? '1' : '0';
+    bits += std::string(SW, '0');
+    return solver->mkFPFromBin(bits, EW, camada::FPEncoding::BV);
+  };
+
+  // binary128: 1.0 + 1.0 == 2.0.
+  {
+    auto one = pow2At(15, 112, 0);
+    auto two = pow2At(15, 112, 1);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkFPAdd(one, one, rm), two)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    solver->reset();
+  }
+
+  // x87-extended-like (15, 63): sqrt(4.0) == 2.0.
+  {
+    auto four = pow2At(15, 63, 2);
+    auto two = pow2At(15, 63, 1);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkFPSqrt(four, rm), two)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
 }

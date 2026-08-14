@@ -278,7 +278,13 @@ void SMTSolverImpl::clearExprCaches() {
   ArrayEqualLinksByIndexSort.clear();
   ArrayEqualCongruenceDone.clear();
   AckArrayRoots.clear();
+  AckSelectMemo.clear();
   AckBVConstBits.clear();
+  IEEEBVShadow.clear();
+  PendingShadowLinks.clear();
+  ShadowScopeLevels.assign(1, {});
+  IEEEBVFnCache.clear();
+  IEEEBVAppCache.clear();
   invalidateUnsatAssumptions();
 }
 
@@ -380,6 +386,18 @@ SMTSortRef SMTSolverImpl::mkFPSort(const unsigned ExpWidth,
   constexpr unsigned MaxWidth = std::numeric_limits<unsigned>::max();
   fatalErrorIf(SigWidth > MaxWidth - 1 || ExpWidth > MaxWidth - 1 - SigWidth,
                "Floating-point sort width overflow");
+  // The BV encoding's normalization counts leading zeros of intermediates
+  // up to 2*sbits + 5 bits wide (sbits = SigWidth + 1 with the hidden
+  // bit; the widest is FMA's renormalize) in (ExpWidth + 2)-bit signed
+  // arithmetic, so the count must fit as a positive value there. A format
+  // with a wide significand and a tiny exponent would silently misround —
+  // reject it at sort creation. Every IEEE format passes with orders of
+  // magnitude to spare (binary32: 53 <= 511).
+  fatalErrorIf(Encoding == FPEncoding::BV && ExpWidth < 31 &&
+                   2 * (SigWidth + 1) + 5 > (1u << (ExpWidth + 1)) - 1,
+               "Floating-point format unsupported by the BV encoding: the "
+               "significand is too wide for the exponent width (requires "
+               "2*(SigWidth+1) + 5 <= 2^(ExpWidth+1) - 1)");
   auto &Cache = FPSortCaches[fpEncodingIndex(Encoding)];
   FPSortCacheKey Key{ExpWidth, SigWidth};
   auto It = Cache.find(Key);
@@ -563,7 +581,18 @@ SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
   requireBoolSort(Exp, "Expected boolean constraint");
   invalidateUnsatAssumptions();
+  commitShadowLink(Exp);
   return addConstraintImpl(Exp);
+}
+
+void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
+  auto It = PendingShadowLinks.find(&*Constraint);
+  if (It == PendingShadowLinks.end())
+    return;
+  // Keep the first (outermost) entry on collision so a pop cannot erase a
+  // fact established in an outer scope; only journal what was inserted.
+  if (IEEEBVShadow.emplace(It->second.Target, It->second.Bits).second)
+    ShadowScopeLevels.back().push_back(It->second.Target);
 }
 
 #define CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(ReturnType, Name, SortAssert,      \
@@ -794,6 +823,19 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
   assert(theExp->isBoolSort());
+  // Native-FP equality with exactly one shadowed side: if this equality
+  // gets asserted top-level, the other side provably carries the same
+  // bits (see IEEEBVShadow; commit happens in addConstraint).
+  if (LHS->isFPSort() && !usesBVFPEncoding(LHS)) {
+    auto L = IEEEBVShadow.find(&*LHS);
+    auto R = IEEEBVShadow.find(&*RHS);
+    const bool HasL = L != IEEEBVShadow.end();
+    const bool HasR = R != IEEEBVShadow.end();
+    if (HasL != HasR)
+      PendingShadowLinks.emplace(
+          &*theExp, PendingShadowLink{HasL ? &*RHS : &*LHS,
+                                      HasL ? L->second : R->second});
+  }
   return theExp;
 }
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkImplies,
@@ -1962,10 +2004,12 @@ SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int) {
 
 SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
                                    const SMTSortRef &Sort) {
-  // The `__CAMADA_` prefix is reserved for Camada-internal symbol names
-  // (currently tuple field decompositions and FP-to-BV shadowing). User
-  // names with that prefix would alias internal symbols and silently
-  // corrupt encoded-tuple semantics; reject up front.
+  // The `__CAMADA_` prefix is reserved for the symbols Camada's own
+  // encodings introduce — tuple fields, lazy and Ackermann arrays, array
+  // equality witnesses, FP-to-BV shadowing, int-to-BV, assumption
+  // literals and quantifier variables. A user name with that prefix
+  // would alias one of them and silently corrupt whichever encoding it
+  // collided with; reject up front.
   fatalErrorIf(Name.compare(0, 9, "__CAMADA_") == 0,
                "Symbol names with the reserved __CAMADA_ prefix are not "
                "permitted; rename the symbol");
@@ -2029,6 +2073,12 @@ SMTExprRef SMTSolverImpl::mkFPFromBin(const std::string &FP, unsigned EWidth,
                           : mkFPFromBinImpl(FP, EWidth);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == FP.length());
+  // The bits of a native-FP constant are known here and nowhere else;
+  // remember them so mkIEEEFPToBV round-trips exactly, NaN payloads
+  // included (see IEEEBVShadow).
+  if (!usesBVFPEncoding(Sort))
+    IEEEBVShadow.emplace(&*theExp,
+                         mkBVFromBin(FP, static_cast<unsigned>(FP.length())));
   FPConstExprCache.emplace(std::move(Key), theExp);
   return theExp;
 }
@@ -2154,11 +2204,50 @@ SMTExprRef SMTSolverImpl::mkBVToIEEEFP(const SMTExprRef &Exp,
                           : mkBVToIEEEFPImpl(Exp, To);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == Exp->getWidth());
+  // Remember the bits this native-FP term was built from, so a later
+  // mkIEEEFPToBV round-trips exactly (see IEEEBVShadow). BV-encoded FP is
+  // already exact (the base mkIEEEFPToBVImpl retags the same term), and
+  // only a plain-BV source can be handed back by mkIEEEFPToBV.
+  if (!usesBVFPEncoding(To) && Exp->Sort->getSortKind() == SMTSortKind::BV)
+    IEEEBVShadow.emplace(&*theExp, Exp);
   return theExp;
+}
+
+SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
+  // Emulate the fp->bv primitive as a per-sort uninterpreted FUNCTION,
+  // not a per-call constant: functional congruence then forces
+  // value-equal terms to report equal bits, the same guarantee z3's
+  // native fp.to_ieee_bv provides. The per-term tie `to_fp(fn(x)) == x`
+  // pins the exact bits wherever the encoding is injective (everything
+  // but NaN); at NaN the payload is unspecified but consistent. The tie
+  // is a definitional, scope-independent fact — journal it so pop()
+  // re-asserts it, keeping the application memo valid across scopes.
+  if (auto It = IEEEBVAppCache.find(&*Exp); It != IEEEBVAppCache.end())
+    return It->second;
+  auto [FnIt, Inserted] = IEEEBVFnCache.try_emplace(&*Exp->Sort);
+  if (Inserted)
+    FnIt->second = mkSymbolUnchecked(
+        "__CAMADA_ieeebv_fn" + std::to_string(IEEEBVFnCache.size() - 1),
+        mkFunctionSort({Exp->Sort}, mkBVSort(Exp->getWidth())));
+  SMTExprRef Bits = mkApply(FnIt->second, {Exp});
+  IEEEBVAppCache.emplace(&*Exp, Bits);
+  SMTExprRef Tie = mkEqual(mkBVToIEEEFP(Bits, Exp->Sort), Exp);
+  addConstraint(Tie);
+  LazyConstraintLevels.back().push_back(std::move(Tie));
+  return Bits;
 }
 
 SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   requireFPSort(Exp, "Expected floating-point expression");
+  // Bit-exact where provenance is known: if this term was built from bits
+  // (or an asserted equality ties it to one that was), hand the original
+  // bits back instead of asking the backend — fp.to_ieee_bv is
+  // underspecified at NaN and a backend may otherwise answer with any NaN
+  // pattern. See IEEEBVShadow. Terms with no provable provenance fall
+  // back to the underspecified operation SILENTLY; callers that need
+  // unconditional bit-exactness must use FPEncoding::BV.
+  if (auto It = IEEEBVShadow.find(&*Exp); It != IEEEBVShadow.end())
+    return It->second;
   SMTExprRef theExp = usesBVFPEncoding(Exp)
                           ? SMTSolverImpl::mkIEEEFPToBVImpl(Exp)
                           : mkIEEEFPToBVImpl(Exp);
@@ -2270,6 +2359,7 @@ void SMTSolverImpl::reset() {
 void SMTSolverImpl::push(unsigned nscopes) {
   invalidateUnsatAssumptions();
   LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
+  ShadowScopeLevels.resize(ShadowScopeLevels.size() + nscopes);
   pushImpl(nscopes);
 }
 
@@ -2285,6 +2375,14 @@ void SMTSolverImpl::pop(unsigned nscopes) {
     Reassert.insert(Reassert.end(), std::make_move_iterator(Level.begin()),
                     std::make_move_iterator(Level.end()));
     LazyConstraintLevels.pop_back();
+  }
+  // Assert-derived bit-pattern shadows die with their scope: the tying
+  // equality is retracted by the pop, and keeping the bits without it
+  // would let mkIEEEFPToBV claim facts no longer asserted.
+  for (unsigned I = 0; I < nscopes && ShadowScopeLevels.size() > 1; ++I) {
+    for (const SMTExpr *Key : ShadowScopeLevels.back())
+      IEEEBVShadow.erase(Key);
+    ShadowScopeLevels.pop_back();
   }
   popImpl(nscopes);
   for (SMTExprRef &Constraint : Reassert) {
@@ -2532,7 +2630,8 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
   // fresh symbol constrained via the inverse direction (the mkIEEEFPToBV
   // precedent). Euclidean mod puts the wrap in [0, 2^Width) for negative
   // integers too. The constraint is asserted at the current push level
-  // and unwound by (pop), same caveat as mkIEEEFPToBV.
+  // and unwound by (pop) — unlike mkIEEEFPToBV's tie, which is journalled
+  // into LazyConstraintLevels and re-asserted afterwards.
   SMTExprRef Fresh = mkSymbolUnchecked(
       "__CAMADA_int2bv_" + std::to_string(NextInt2BVId++), mkBVSort(Width));
   SMTExprRef Wrapped = mkArithMod(Exp, mkInt(power2Dec(Width)));

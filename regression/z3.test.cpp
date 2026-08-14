@@ -13,6 +13,25 @@ TEST_CASE("Simple Z3 test", "[Z3]") {
   tests(z3);
 }
 
+// The fixed<->float oracle tables bit-blast thousands of FP circuits, so
+// unlike the other FXP fixtures they run on one backend instead of all
+// seven. The conversions are pure common-layer encoding over BV ops that
+// every backend already exercises, and the encoding-sensitive cases are
+// pinned per backend by fxp_fp_conversion_semantics inside tests().
+// Every input of both 16-bit _Accum formats through mkFXPExp. Each exp is
+// a wide multiply chain, so this costs ~130s and runs on one backend
+// rather than all seven; the encoding is common-layer BV, so the other
+// backends' spot checks in tests() are enough.
+TEST_CASE("Fixed-point exp exhaustive Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver();
+  fxp_exp_exhaustive(z3);
+}
+
+TEST_CASE("Fixed-point/floating-point oracle Z3 test", "[Z3]") {
+  auto z3 = camada::createZ3Solver();
+  fxp_oracle_fp_semantics(z3, camada::FPEncoding::BV);
+}
+
 TEST_CASE("Quantifiers Z3 test", "[Z3]") {
   auto z3 = camada::createZ3Solver();
   quantifier_semantics(z3);
@@ -91,7 +110,7 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
 
   class myZ3Solver : public camada::Z3Solver {
   public:
-    explicit myZ3Solver(z3::context C) : camada::Z3Solver(std::move(C)) {
+    explicit myZ3Solver(z3::config &Cfg) : camada::Z3Solver(Cfg) {
       setSolver(makeSolver(context()));
     }
 
@@ -103,8 +122,10 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
     }
   };
 
-  // Create Z3 Solver
-  camada::SMTSolverRef z3 = std::make_unique<myZ3Solver>(z3::context{});
+  // Create Z3 Solver from a caller-owned configuration; the context is
+  // built inside the solver (z3::context cannot be moved in Z3 4.13.x).
+  z3::config Cfg;
+  camada::SMTSolverRef z3 = std::make_unique<myZ3Solver>(Cfg);
 
   tests(z3);
 }

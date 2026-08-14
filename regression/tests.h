@@ -1,8 +1,11 @@
 
 #include "ackarray.test.h"
 #include "array.test.h"
+#include "bvconformance.test.h"
 #include "fp.test.h"
+#include "fpconformance.test.h"
 #include "fxp.test.h"
+#include "fxporacle.test.h"
 #include "simple.test.h"
 #include "tuple.test.h"
 
@@ -41,6 +44,29 @@ template <typename Fn> inline void require_abort(Fn &&Body) {
 #endif
 }
 
+// Degenerate formats whose significand cannot be renormalized within the
+// exponent arithmetic width are rejected at sort creation for the BV
+// encoding (they would silently misround; see mkFPSort). Lives here
+// rather than fp.test.h because it needs require_abort.
+// A leading-sign count needs a target wide enough to hold it; a narrower
+// one would silently truncate. Lives here because it needs require_abort.
+inline void
+fxp_countls_narrow_target_rejected(const camada::SMTSolverRef &solver) {
+  auto s64 = solver->mkFXPSort(64, 31, true);
+  auto x = solver->mkSymbol("fxp_cls_narrow", s64);
+  require_abort([&]() { (void)solver->mkFXPCountls(x, 4); });
+  // Six bits hold 63, the largest count for this format.
+  REQUIRE(solver->mkFXPCountls(x, 6)->getWidth() == 6);
+}
+
+inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
+  require_abort(
+      [&]() { (void)solver->mkFPSort(2, 10, camada::FPEncoding::BV); });
+  // The boundary format itself is accepted: 2*(4+1)+5 = 15 = 2^(3+1)-1.
+  auto ok = solver->mkFPSort(3, 4, camada::FPEncoding::BV);
+  REQUIRE(ok->isFPSort());
+}
+
 inline void tests(const camada::SMTSolverRef &solver) {
   constexpr auto NativeFP = camada::FPEncoding::Native;
   constexpr auto BVFP = camada::FPEncoding::BV;
@@ -49,6 +75,12 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(implies_semantics);
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
+  RESETANDTEST(bv_extend_by_zero_semantics);
+  RESETANDTEST(bv_signed_div_rem_semantics);
+  RESETANDTEST(bv_conformance_semantics);
+  RESETANDTEST(fxp_gap_conformance);
+  RESETANDARGTEST(fp_conformance_semantics, NativeFP);
+  RESETANDARGTEST(fp_conformance_semantics, BVFP);
   RESETANDTEST(bv_overflow_semantics);
   RESETANDTEST(solver_timeout_semantics);
 
@@ -111,6 +143,10 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_bv_conversions, BVFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, NativeFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, BVFP);
+  RESETANDARGTEST(fp_ieee_bv_bitexact_roundtrip, NativeFP);
+  RESETANDARGTEST(fp_ieee_bv_bitexact_roundtrip, BVFP);
+  RESETANDARGTEST(fp_ieee_bv_consistency, NativeFP);
+  RESETANDARGTEST(fp_ieee_bv_consistency, BVFP);
   RESETANDARGTEST(fp_to_signed_bv_multiple_widths, BVFP);
   RESETANDARGTEST(fp_denormal_round_to_integral, NativeFP);
   RESETANDARGTEST(fp_denormal_round_to_integral, BVFP);
@@ -124,6 +160,9 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_non_standard_widths, BVFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, NativeFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
+  RESETANDTEST(fp_wide_format_semantics);
+  RESETANDTEST(fp_degenerate_format_rejected);
+  RESETANDTEST(fxp_countls_narrow_target_rejected);
 
   // Fixed-point: pure common-layer BV encoding, no backend gating needed.
   RESETANDTEST(fxp_exhaustive_semantics);
@@ -133,4 +172,16 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_mixed_format_semantics);
   RESETANDTEST(fxp_shift_semantics);
   RESETANDTEST(fxp_model_and_constructs);
+  RESETANDTEST(fxp_sat_exhaustive_semantics);
+  RESETANDTEST(fxp_sat_shift_semantics);
+  RESETANDTEST(fxp_sat_conversion_semantics);
+  RESETANDTEST(fxp_symbolic_shift_semantics);
+  RESETANDTEST(fxp_abs_countls_semantics);
+  RESETANDTEST(fxp_sqrt_semantics);
+  RESETANDTEST(fxp_exp_semantics);
+  RESETANDTEST(fxp_round_semantics);
+  RESETANDTEST(fxp_oracle_semantics);
+  RESETANDTEST(fxp_oracle_mixed_semantics);
+  RESETANDARGTEST(fxp_fp_conversion_semantics, NativeFP);
+  RESETANDARGTEST(fxp_fp_conversion_semantics, BVFP);
 }

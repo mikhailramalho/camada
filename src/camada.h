@@ -96,6 +96,29 @@ enum class FPNegBehavior {
   PreserveNaNPayload,
 };
 
+/// Selects how `mkFXPRound` breaks ties. TR 18037 specifies that the
+/// `roundfx` family rounds to nearest but leaves the halfway direction to
+/// the implementation, and implementations differ, so the caller states
+/// which one it is modelling rather than inheriting one library's choice.
+///
+/// - TowardPositive: a halfway value rounds up, so 0.5 rounds to 1 and
+///   -0.5 rounds to 0. What LLVM libc does (it adds half an ulp and masks
+///   off the low bits), and the only direction verified against an
+///   executing implementation.
+/// - AwayFromZero: a halfway value rounds away from zero, so 0.5 rounds
+///   to 1 and -0.5 rounds to -1 — symmetric about zero, the convention
+///   most C programmers expect from `round()`.
+/// - ToEven: a halfway value rounds to whichever neighbour has a zero in
+///   the last kept bit, the unbiased choice IEEE-754 uses by default.
+///
+/// All three saturate to the format's maximum when the rounding would
+/// carry past it, which every implementation surveyed agrees on.
+enum class FXPRoundTie {
+  TowardPositive,
+  AwayFromZero,
+  ToEven,
+};
+
 /// Selects how the SMT-LIB backend lowers tuples on the wire.
 ///
 /// - Native: emit `(declare-datatypes ...)` and rely on the downstream
@@ -359,6 +382,11 @@ public:
   virtual SMTSortRef mkRMSort(FPEncoding Encoding) = 0;
 
   /// Returns an appropriate floating-point sort for the given bitwidth.
+  /// Both widths must be non-zero and their total must fit a bit-vector
+  /// sort. Under FPEncoding::BV the format must also satisfy
+  /// 2*(SigWidth+1) + 5 <= 2^(ExpWidth+1) - 1, since a significand too
+  /// wide for its exponent cannot be renormalized within the encoding's
+  /// exponent arithmetic; such formats abort instead of misrounding.
   virtual SMTSortRef mkFPSort(const unsigned ExpWidth, const unsigned SigWidth,
                               FPEncoding Encoding) = 0;
 
@@ -586,9 +614,10 @@ public:
   /// modulo 2^Width, so negative integers wrap to their two's-complement
   /// representation. Native on Z3, cvc5, and MathSAT; on backends without
   /// a native conversion (Yices, the SMT-LIB pipe) the result is a fresh
-  /// bit-vector symbol constrained through the inverse direction, and —
-  /// like mkIEEEFPToBV — that constraint lives at the current (push)/(pop)
-  /// level.
+  /// bit-vector symbol constrained through the inverse direction, and
+  /// that constraint lives at the current (push)/(pop) level — unlike
+  /// mkIEEEFPToBV's tie, which is journalled and re-asserted after a pop
+  /// because it states a definitional fact rather than an assumption.
   virtual SMTExprRef mkInt2BV(unsigned Width, const SMTExprRef &Exp) = 0;
 
   /// Converts a bit-vector to the integer it denotes: two's complement
@@ -745,6 +774,11 @@ public:
   /// Creates a fixed-point sort. Width must be non-zero; FracBits <= Width
   /// for unsigned formats and FracBits < Width for signed formats (the sign
   /// bit is not a fraction bit).
+  ///
+  /// TR 18037 also permits formats with padding bits, which this triple
+  /// cannot express. No mainstream Clang target uses them, so they are
+  /// deliberately out of scope; supporting them would add a fourth sort
+  /// parameter rather than require a redesign.
   virtual SMTSortRef mkFXPSort(unsigned Width, unsigned FracBits,
                                bool IsSigned) = 0;
 
@@ -773,7 +807,9 @@ public:
   /// low fractional bits are dropped).
   virtual SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
-  /// Creates a fixed-point division (truncating).
+  /// Creates a fixed-point division. The quotient rounds toward negative
+  /// infinity (floor), matching Clang's -ffixed-point behavior as pinned
+  /// by the execution oracle.
   virtual SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
 
   /// Creates a fixed-point left shift by a concrete amount.
@@ -832,6 +868,62 @@ public:
   virtual SMTExprRef mkFXPShlOverflow(const SMTExprRef &Exp,
                                       unsigned Amount) = 0;
 
+  // Saturating variants (TR 18037 `_Sat` types / the FX pragmas in SAT
+  // state). Saturation is an operation property, not a sort property: a
+  // `_Sat` type shares its representation with the plain type, so the
+  // frontend picks the sat variant by expression type, mirroring LLVM's
+  // fixed-point intrinsics. Saturating overflow is defined behavior —
+  // results clamp to the format's min/max and there is no paired
+  // predicate — but division by zero remains UB even for `_Sat` types, so
+  // mkFXPDivSat still pairs with mkFXPDivByZero.
+
+  /// Saturating fixed-point addition.
+  virtual SMTExprRef mkFXPAddSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point subtraction.
+  virtual SMTExprRef mkFXPSubSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point negation (unsigned formats clamp to zero for
+  /// any non-zero operand; signed formats clamp the minimum to the max).
+  virtual SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) = 0;
+
+  /// Saturating fixed-point multiplication.
+  virtual SMTExprRef mkFXPMulSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point division. The value is meaningful only under
+  /// the negation of mkFXPDivByZero.
+  virtual SMTExprRef mkFXPDivSat(const SMTExprRef &LHS,
+                                 const SMTExprRef &RHS) = 0;
+
+  /// Saturating fixed-point left shift.
+  virtual SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) = 0;
+
+  // Runtime-amount shift variants: C allows `x << n` with a runtime n, so
+  // each shift takes an Amount expression (a bit-vector of the operand's
+  // width). The value is meaningful under Amount < Width — C's own shift
+  // constraint, which the consumer's UB check guards; at or beyond the
+  // width the SMT shift semantics (zero) apply.
+
+  /// Left shift by a runtime amount.
+  virtual SMTExprRef mkFXPShlExpr(const SMTExprRef &Exp,
+                                  const SMTExprRef &Amount) = 0;
+
+  /// Right shift by a runtime amount (arithmetic for signed formats).
+  virtual SMTExprRef mkFXPShrExpr(const SMTExprRef &Exp,
+                                  const SMTExprRef &Amount) = 0;
+
+  /// True iff the runtime-amount left shift discards significant bits
+  /// (or changes the sign for signed formats).
+  virtual SMTExprRef mkFXPShlOverflowExpr(const SMTExprRef &Exp,
+                                          const SMTExprRef &Amount) = 0;
+
+  /// Saturating left shift by a runtime amount.
+  virtual SMTExprRef mkFXPShlSatExpr(const SMTExprRef &Exp,
+                                     const SMTExprRef &Amount) = 0;
+
   /// Converts between fixed-point formats (truncating on narrowing).
   virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
                                 const SMTSortRef &To) = 0;
@@ -841,9 +933,17 @@ public:
   virtual SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
                                         const SMTSortRef &To) = 0;
 
-  /// Converts an integer bit-vector (signed per the target format) into a
-  /// fixed-point value.
-  virtual SMTExprRef mkFXPFromBV(const SMTExprRef &Exp,
+  /// Saturating fixed-point format conversion: out-of-range values clamp
+  /// to the target format's min/max instead of being undefined.
+  virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
+                                   const SMTSortRef &To) = 0;
+
+  /// Converts an integer bit-vector into a fixed-point value. SrcSigned is
+  /// the signedness of the SOURCE integer type: it governs the value (C's
+  /// int-to-fixed conversion converts the source value, so int8 0xFF is -1
+  /// while uint8 0xFF is 255), independent of the target format's
+  /// signedness, which only governs the representation.
+  virtual SMTExprRef mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
                                  const SMTSortRef &To) = 0;
 
   /// Converts a fixed-point value to an integer bit-vector of the given
@@ -851,10 +951,121 @@ public:
   /// fixed-point to integer conversion).
   virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) = 0;
 
-  /// True iff the integer part does not fit the target width of a
-  /// mkFXPToBV conversion.
-  virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp,
-                                       unsigned ToWidth) = 0;
+  /// True iff the toward-zero integer part does not fit the target
+  /// integer type's range: [0, 2^w-1] for an unsigned target,
+  /// two's-complement bounds for a signed one. The plain mkFXPToBV needs
+  /// no signedness parameter — its value bits are the integral part mod
+  /// 2^w either way; only this range report and mkFXPToBVSat's clamp
+  /// depend on the target's signedness.
+  virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,
+                                       bool ToSigned) = 0;
+
+  /// Saturating fixed-point to integer conversion (round toward zero,
+  /// then clamp to the TARGET integer type's range — a negative source
+  /// clamps to zero for an unsigned target.
+  virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
+                                  bool ToSigned) = 0;
+
+  /// Rounds a fixed-point value to Digits fractional bits, keeping the
+  /// same format (the low fraction bits become zero) — TR 18037's
+  /// `roundfx`. Rounds to nearest, breaking ties per Tie, and saturates
+  /// to the format's maximum when the rounding would carry past it.
+  /// Digits >= the format's fraction width returns the value unchanged.
+  virtual SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
+                                FXPRoundTie Tie) = 0;
+
+  /// Absolute value — TR 18037's `absfx`. Saturates: the most negative
+  /// value of a signed format has no positive counterpart, so it maps to
+  /// the format's maximum rather than overflowing (LLVM libc's choice;
+  /// the composition mkIte(mkFXPLt(x,0), mkFXPNeg(x), x) wraps there
+  /// instead). Unsigned formats return the value unchanged.
+  virtual SMTExprRef mkFXPAbs(const SMTExprRef &Exp) = 0;
+
+  /// Count leading sign bits — TR 18037's `countlsfx`: the number of
+  /// redundant copies of the sign bit, i.e. how far the value can be
+  /// shifted left before it changes sign. Returns a bit-vector of
+  /// ToWidth bits. The largest possible count is the number of counted
+  /// bits — the format width for an unsigned format, one less for a
+  /// signed one, since the sign bit itself is not redundant — and a
+  /// ToWidth too narrow to hold that aborts rather than silently
+  /// wrapping. For unsigned formats it counts leading zeros.
+  virtual SMTExprRef mkFXPCountls(const SMTExprRef &Exp, unsigned ToWidth) = 0;
+
+  /// Square root, rounded toward zero: the unique r in the operand's own
+  /// format with r*r <= x < (r+1)*(r+1) at the format's scale. Always
+  /// representable — square root contracts on [0, max] for every format,
+  /// so no saturation is possible.
+  ///
+  /// This is the exact mathematical operation, NOT a reproduction of any
+  /// library's `sqrtfx`. LLVM libc computes a Sollya-generated linear
+  /// approximation refined by Newton steps and documents an error bound
+  /// rather than correct rounding, and avr-libc has its own approximation
+  /// with different error; the two do not agree bit-for-bit with each
+  /// other or with this. A consumer verifying a program that calls a
+  /// specific library's `sqrtfx` is reproducing that library's
+  /// approximation error, which is not something a shared layer can bake
+  /// in.
+  ///
+  /// Negative operands have no real square root; the result is zero for
+  /// them. There is no paired predicate because the condition is just
+  /// `x < 0` — a consumer that needs to assert it writes
+  /// mkFXPLt(x, zero), which produces the same term.
+  virtual SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) = 0;
+
+  /// Base-e exponential, correctly rounded to nearest with ties to even,
+  /// saturating to the format's maximum where the true value does not fit
+  /// and giving zero where it rounds below half an ulp — TR 18037's
+  /// `expfx`. Like mkFXPSqrt this is the exact mathematical operation,
+  /// not a reproduction of any library's approximation; LLVM libc's
+  /// `exphk`/`expk` document a relative error bound rather than correct
+  /// rounding, so this is what such a claim can be checked against.
+  ///
+  /// Supported only on the fixed-point formats C actually has an _Accum
+  /// type for, and only those whose hardest-to-round input has been
+  /// measured (see scripts/fxp_exp_bounds.txt): (16,7), (16,8), (32,15),
+  /// (32,16), (64,31) and (64,32). Any other format aborts.
+  ///
+  /// The restriction is a property of the operation, not an omission.
+  /// Correct rounding needs an intermediate wide enough to decide every
+  /// rounding, which needs to know how close exp() ever lands to a
+  /// halfway point, and that distance is established by an exhaustive
+  /// sweep whose cost grows as 2^FracBits. Sweeping every 64-bit format
+  /// would take on the order of 10^4 years, and no bound generalises
+  /// between formats: both the sample spacing and the saturation cutoff
+  /// move with the format. Every other fixed-point operation is exact
+  /// algebra and works at any width.
+  virtual SMTExprRef mkFXPExp(const SMTExprRef &Exp) = 0;
+
+  /// Converts a fixed-point value to a floating-point value of the given
+  /// sort, rounding once per R. C's fixed-to-float conversion rounds to
+  /// nearest even: pass RM::ROUND_TO_EVEN (Clang's direction, pinned by
+  /// the execution oracle). Always defined — every fixed-point range is
+  /// tiny next to any floating-point range. R is the enum, not a
+  /// rounding-mode expression: the encoding routes through an exact wide
+  /// intermediate whose encoding it chooses internally (falling back to
+  /// the BV encoder when the backend's native formats cannot hold the
+  /// intermediate), so it mints the rounding-mode term itself.
+  virtual SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
+                               RM R) = 0;
+
+  /// Converts a floating-point value to a fixed-point value, rounding
+  /// toward zero — C's float-to-fixed direction, which differs from
+  /// fixed-to-fixed narrowing (floor); both pinned by the execution
+  /// oracle. The value is meaningful only under the negation of
+  /// mkFPToFXPOverflow (out-of-range, infinity, and NaN stay UB in C).
+  virtual SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To) = 0;
+
+  /// True iff the float-to-fixed conversion is undefined: NaN, +-infinity,
+  /// or the toward-zero result lies outside the target format's range.
+  virtual SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
+                                       const SMTSortRef &To) = 0;
+
+  /// Saturating float-to-fixed conversion, defined for every input:
+  /// out-of-range values and +-infinity clamp to the format's rails, NaN
+  /// converts to 0 (Clang's choice for _Sat targets; the TR leaves it
+  /// undefined).
+  virtual SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp,
+                                  const SMTSortRef &To) = 0;
 
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.
@@ -1060,13 +1271,33 @@ public:
 
   /// Reinterpret a floating-point as a bitvector, using the IEEE format.
   ///
-  /// Scope caveat: bitwuzla, cvc5, and the SMT-LIB pipeline backend implement
-  /// this by materializing a fresh BV symbol and binding it to the FP value
-  /// through an asserted equality. That equality is tied to the current
-  /// (push) level, so the returned bitvector is only meaningful at the
-  /// nesting level where this method was called — using it after a (pop)
-  /// that crosses the call site leaves the result effectively unconstrained.
-  /// Z3's native backend uses fp.to_ieee_bv directly and is not affected.
+  /// NaN caveat: the underlying operation (fp.to_ieee_bv) is
+  /// underspecified for NaN inputs — the FP sort has a single NaN value
+  /// while the bit-vector encoding has many NaN patterns, so no function
+  /// out of the sort can recover which pattern produced a NaN, and a
+  /// backend may answer with any of them. Camada compensates where it can
+  /// PROVE the bits: when Exp was built by mkBVToIEEEFP or an FP-constant
+  /// constructor, or a top-level asserted equality ties it to such a
+  /// term, the original bit pattern is returned exactly (a term-level
+  /// rewrite, uniform across backends, exact for round-trips like
+  /// byte-level memory models). The trade: with that rewrite the result
+  /// is a function of the TERM's provenance, not only of the FP value —
+  /// two value-equal NaN terms may report different patterns, which is
+  /// C's memory semantics rather than SMT-LIB's functional one.
+  ///
+  /// IMPORTANT: a term whose provenance camada cannot prove falls back to
+  /// the underspecified backend operation SILENTLY — there is no
+  /// diagnostic. Callers that need unconditional bit-exactness must use
+  /// FPEncoding::BV, where FP values ARE their bit patterns.
+  ///
+  /// The fallback is nevertheless FUNCTIONALLY CONSISTENT on every
+  /// backend: value-equal FP terms report equal bits. Z3 and MathSAT get
+  /// this from their native fp->bv primitives; backends without one
+  /// (bitwuzla, cvc5, the SMT-LIB pipeline) emulate the primitive as a
+  /// per-sort uninterpreted function tied per-term by `to_fp(fn(x)) == x`,
+  /// so functional congruence provides the same guarantee. The tie is a
+  /// definitional fact re-asserted across (pop), so the result stays
+  /// meaningful at any nesting level.
   virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) = 0;
 
   /// Check if the constraints are satisfiable

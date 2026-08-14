@@ -177,7 +177,7 @@ unsigned SMTLIBSort::getWidthFromSolver() const {
   // truth. Return the stored payload directly. validateSortWidth() short-
   // circuits for array/function/tuple/arith sorts, so this method is only
   // ever called for kinds where getStoredWidth() succeeds (BV, FP, BVFP, RM,
-  // BVRM, Bool). For FP sorts in particular the stored Width already reflects
+  // BVRM, FXP, Bool). For FP sorts in particular the stored Width reflects
   // the encoded representation; do not re-derive it from sig/exp here, since
   // BVFP stores SigWidth as the *encoded* significand width.
   return getStoredWidth();
@@ -1588,15 +1588,10 @@ SMTExprRef SMTLIBSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTLIBSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  // Same trick as the cvc5 backend: SMT-LIB has no direct fp→bv that
-  // preserves the IEEE bit pattern, so introduce a fresh BV symbol and tie it
-  // back via the inverse direction.
-  const std::string Name = "__CAMADA_ieeebv" + std::to_string(NextIEEEBVId++);
-  SMTSortRef BVSort = mkBVSort(Exp->Sort->getFPExponentWidth() +
-                               Exp->Sort->getFPSignificandWidth() + 1);
-  SMTExprRef NewSymbol = mkSymbolUnchecked(Name, BVSort);
-  addConstraint(mkEqual(Exp, mkBVToIEEEFP(NewSymbol, Exp->Sort)));
-  return NewSymbol;
+  // SMT-LIB has no portable fp->bv that preserves the IEEE bit pattern:
+  // emulate it as an uninterpreted function so equal FP values report
+  // equal bits (see mkIEEEFPToBVViaUF).
+  return mkIEEEFPToBVViaUF(Exp);
 }
 
 // --- Int / Real literals + arithmetic ---
@@ -2179,9 +2174,6 @@ bool decimalToFraction(const std::string &S, std::string &Num,
   return true;
 }
 
-// Parse an SMT-LIB integer model value into a signed decimal string.
-// Accepted shapes: `N`, `(- N)` where N is a non-negative integer literal.
-// Returns the empty string on failure.
 // Forward declaration; full definition follows. intValueToDecimal reuses the
 // rational parser so it accepts the same wire shapes (decimals, rationals,
 // signed forms) and only returns success if the value is integral.

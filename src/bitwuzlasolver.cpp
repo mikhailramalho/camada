@@ -1007,14 +1007,9 @@ SMTExprRef BitwuzlaSolver::mkBVToIEEEFPImpl(const SMTExprRef &Exp,
 }
 
 SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
-  const std::string name = "__CAMADA_ieeebv" + std::to_string(ToBVCounter++);
-  // Plain BV, not BVFP: the contract is "give me the bit pattern", and a
-  // BVFP-sorted result leaks into caller sort comparisons (a float→int
-  // bitcast would carry a BVFP sort where the caller's type says BV).
-  const SMTExprRef &newSymbol =
-      mkSymbolUnchecked(name, mkBVSort(Exp->getWidth()));
-  addConstraint(mkEqual(Exp, mkBVToIEEEFP(newSymbol, Exp->Sort)));
-  return newSymbol;
+  // No native fp->bv primitive: emulate it as an uninterpreted function
+  // so equal FP values report equal bits (see mkIEEEFPToBVViaUF).
+  return mkIEEEFPToBVViaUF(Exp);
 }
 
 bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
@@ -1130,9 +1125,22 @@ void BitwuzlaSolver::dumpImpl(std::string &Out) {
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {
   Out.clear();
   for (const auto &entry : SymbolExprCache) {
-    const BitwuzlaTerm term = toSolverExpr<BitwExpr>(*entry.second).Expr;
+    // The symbol cache also holds Camada-owned nodes (encoded tuples,
+    // tuple-array bundles, Ackermann arrays) that carry no bitwuzla term
+    // at all — casting one yields a garbage term and a SIGSEGV inside
+    // bitwuzla. Skip them: their backing per-field/per-read backend
+    // symbols are separate cache entries and print on their own.
+    const auto *BE = dynamic_cast<const BitwExpr *>(entry.second.get());
+    if (BE == nullptr)
+      continue;
+    const BitwuzlaTerm term = BE->Expr;
+    // A term without a symbol has nothing to name in a define-fun (and
+    // appending a null char* to std::string is undefined behavior).
+    const char *Symbol = bitwuzla_term_get_symbol(term);
+    if (Symbol == nullptr)
+      continue;
     Out += "(define-fun ";
-    Out += bitwuzla_term_get_symbol(term);
+    Out += Symbol;
     Out += " () ";
     Out += bitwuzla_sort_to_string(bitwuzla_term_get_sort(term));
     Out += " ";

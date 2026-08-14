@@ -123,27 +123,58 @@ static inline SMTExprRef extractExpSig(SMTSolver &S, const SMTExprRef &Exp) {
   return S.mkBVExtract(Exp->getWidth() - 2, 0, Exp);
 }
 
-static inline int64_t power2(unsigned int N, bool Negated) {
-  int64_t b = 1ULL << N;
-  return Negated ? -b : b;
-}
-
-static inline int64_t power2m1(unsigned int N, bool Negated) {
-  int64_t b = 1ULL << N;
-  b -= 1;
-  return Negated ? -b : b;
+// Two's-complement bit string of +-(2^Pow + Add) at the given width,
+// computed entirely in string arithmetic. Every constant this file needs
+// has that shape, and the previous int64 helpers (1ULL << N) capped the
+// representable widths — undefined at N >= 64 — which silently broke
+// wide formats (binary128 significands, x87-extended sqrt). |Add| is
+// tiny at every call site (0, -1 or -2), so the ripple loops below run
+// at most twice.
+static std::string pow2Bits(unsigned Pow, int64_t Add, bool Negated,
+                            unsigned Width) {
+  std::string Bits(Width, '0');
+  if (Pow < Width)
+    Bits[Width - 1 - Pow] = '1';
+  auto increment = [&Bits] {
+    for (auto It = Bits.rbegin(); It != Bits.rend(); ++It) {
+      if (*It == '0') {
+        *It = '1';
+        return;
+      }
+      *It = '0';
+    }
+  };
+  auto decrement = [&Bits] {
+    for (auto It = Bits.rbegin(); It != Bits.rend(); ++It) {
+      if (*It == '1') {
+        *It = '0';
+        return;
+      }
+      *It = '1';
+    }
+  };
+  for (; Add > 0; --Add)
+    increment();
+  for (; Add < 0; ++Add)
+    decrement();
+  if (Negated) {
+    for (char &C : Bits)
+      C = C == '0' ? '1' : '0';
+    increment();
+  }
+  return Bits;
 }
 
 SMTExprRef mkMinExp(SMTSolver &S, unsigned int ExpWidth) {
-  return S.mkBVFromDec(power2m1(ExpWidth - 1, true) + 1, ExpWidth);
+  return S.mkBVFromBin(pow2Bits(ExpWidth - 1, -2, true, ExpWidth), ExpWidth);
 }
 
 SMTExprRef mkMaxExp(SMTSolver &S, unsigned int ExpWidth) {
-  return S.mkBVFromDec(power2m1(ExpWidth - 1, false), ExpWidth);
+  return S.mkBVFromBin(pow2Bits(ExpWidth - 1, -1, false, ExpWidth), ExpWidth);
 }
 
 static inline SMTExprRef mkTopExp(SMTSolver &S, unsigned int ExpWidth) {
-  return S.mkBVFromDec(power2m1(ExpWidth, false), ExpWidth);
+  return S.mkBVFromBin(pow2Bits(ExpWidth, -1, false, ExpWidth), ExpWidth);
 }
 
 static inline SMTExprRef mkBotExp(SMTSolver &S, unsigned int ExpWidth) {
@@ -217,9 +248,10 @@ static inline SMTExprRef mkIsNInf(SMTSolver &S, const SMTExprRef &Exp) {
 SMTExprRef mkOne(SMTSolver &S, const SMTExprRef &Sgn, unsigned int EWidth,
                  unsigned int SWidth) {
   return S.mkBVToIEEEFP(
-      S.mkBVConcat(
-          Sgn, S.mkBVConcat(S.mkBVFromDec(power2m1(EWidth - 1, false), EWidth),
-                            S.mkBVFromDec(0, SWidth - 1))),
+      S.mkBVConcat(Sgn, S.mkBVConcat(S.mkBVFromBin(pow2Bits(EWidth - 1, -1,
+                                                            false, EWidth),
+                                                   EWidth),
+                                     S.mkBVFromDec(0, SWidth - 1))),
       S.mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
 }
 
@@ -255,50 +287,47 @@ SMTExprRef SMTSolverImpl::getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
 
 static inline SMTExprRef mkBias(SMTSolver &S, const SMTExprRef &e) {
   unsigned int ExpWidth = e->getWidth();
-  SMTExprRef bias = S.mkBVFromDec(power2m1(ExpWidth - 1, false), ExpWidth);
+  SMTExprRef bias =
+      S.mkBVFromBin(pow2Bits(ExpWidth - 1, -1, false, ExpWidth), ExpWidth);
   return S.mkBVAdd(e, bias);
 }
 
 static inline SMTExprRef mkUnbias(SMTSolver &S, const SMTExprRef &Src) {
   unsigned EWidth = Src->getWidth();
-  SMTExprRef bias = S.mkBVFromDec(power2m1(EWidth - 1, false), EWidth);
+  SMTExprRef bias =
+      S.mkBVFromBin(pow2Bits(EWidth - 1, -1, false, EWidth), EWidth);
   return S.mkBVSub(Src, bias);
 }
 
-static inline SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
-                                        unsigned int MaxBits) {
+/* Recurses into BOTH halves and selects with one ite per level, so every
+ * zero-test examines a static slice of the original input. The obvious
+ * alternative -- a narrowing loop that keeps muxing a "current" half -- emits
+ * fewer nodes, but each step's condition then tests the previous step's mux
+ * output; that sequential dependence defeats the solvers' rewriting and
+ * measurably slows bit-blasted FP formulas. The tree form rewrites toward a
+ * priority encoder instead. */
+static SMTExprRef mkLeadingZeros(SMTSolver &S, const SMTExprRef &Src,
+                                 unsigned int MaxBits) {
   std::size_t bv_sz = Src->getWidth();
   if (bv_sz == 0)
     return S.mkBVFromDec(0, MaxBits);
 
-  std::size_t padded_sz = 1;
-  while (padded_sz < bv_sz)
-    padded_sz <<= 1;
-
-  SMTExprRef current =
-      padded_sz == bv_sz ? Src : S.mkBVZeroExt(padded_sz - bv_sz, Src);
-  SMTExprRef count = S.mkBVFromDec(0, MaxBits);
-
-  std::size_t current_sz = padded_sz;
-  while (current_sz > 1) {
-    std::size_t half = current_sz / 2;
-    SMTExprRef upper = S.mkBVExtract(current_sz - 1, half, current);
-    SMTExprRef lower = S.mkBVExtract(half - 1, 0, current);
-    SMTExprRef upper_is_zero = S.mkEqual(upper, S.mkBVFromDec(0, half));
-    SMTExprRef next_count = S.mkBVAdd(count, S.mkBVFromDec(half, MaxBits));
-    count = S.mkIte(upper_is_zero, next_count, count);
-    current = S.mkIte(upper_is_zero, lower, upper);
-    current_sz = half;
+  if (bv_sz == 1) {
+    SMTExprRef eq = S.mkEqual(Src, mkBVZero1(S));
+    return S.mkIte(eq, S.mkBVFromDec(1, MaxBits), S.mkBVFromDec(0, MaxBits));
   }
 
-  SMTExprRef total =
-      S.mkIte(S.mkEqual(current, mkBVZero1(S)),
-              S.mkBVAdd(count, S.mkBVFromDec(1, MaxBits)), count);
+  SMTExprRef H = S.mkBVExtract(bv_sz - 1, bv_sz / 2, Src);
+  SMTExprRef L = S.mkBVExtract(bv_sz / 2 - 1, 0, Src);
 
-  if (padded_sz != bv_sz)
-    total = S.mkBVSub(total, S.mkBVFromDec(padded_sz - bv_sz, MaxBits));
+  const unsigned H_size = H->getWidth();
 
-  return total;
+  SMTExprRef lzH = mkLeadingZeros(S, H, MaxBits);
+  SMTExprRef lzL = mkLeadingZeros(S, L, MaxBits);
+
+  SMTExprRef H_is_zero = S.mkEqual(H, S.mkBVFromDec(0, H_size));
+  SMTExprRef sum = S.mkBVAdd(S.mkBVFromDec(H_size, MaxBits), lzL);
+  return S.mkIte(H_is_zero, sum, lzH);
 }
 
 static inline SMTExprRef mkIsRM(SMTSolver &S, const SMTExprRef &RME,
@@ -524,7 +553,7 @@ SMTExprRef SMTSolverImpl::mkFPIsNormalImpl(const SMTExprRef &Exp) {
   SMTExprRef isZero = mkFPIsZero(Exp);
 
   unsigned eWidth = exp->getWidth();
-  SMTExprRef p = mkBVFromDec(power2m1(eWidth, false), eWidth);
+  SMTExprRef p = mkBVFromBin(pow2Bits(eWidth, -1, false, eWidth), eWidth);
 
   SMTExprRef isSpecial = mkEqual(exp, p);
 
@@ -809,7 +838,8 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   const SMTExprRef &c5 = x_is_zero;
   const SMTExprRef &v5 = pzero;
 
-  // exp(x) < exp(y) -> x
+  // exp(x) < exp(y) - 1 -> x, since then |x| < |y|/2 already and the IEEE
+  // remainder, which lies in [-|y|/2, |y|/2], is x itself.
   SMTExprRef x_sgn = extractSgn(*this, LHS);
   SMTExprRef x_exp = extractExp(*this, LHS);
   SMTExprRef y_exp = extractExp(*this, RHS);
@@ -1183,8 +1213,8 @@ SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp,
   assert(sig_prime->getWidth() == sbits + 1);
 
   // This is algorithm 10.2 in the Handbook of Floating-Point Arithmetic
-  auto p2 = power2(sbits + 3, false);
-  SMTExprRef Q = mkBVFromDec(p2, sbits + 5);
+  SMTExprRef Q =
+      mkBVFromBin(pow2Bits(sbits + 3, 0, false, sbits + 5), sbits + 5);
   SMTExprRef R = mkBVSub(mkBVConcat(sig_prime, mkBVZero4(*this)), Q);
   SMTExprRef S = Q;
 
@@ -1316,7 +1346,6 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
   // else comes the fused multiplication.
   SMTExprRef one_1 = mkBVOne1(*this);
-  SMTExprRef zero_1 = mkBVZero1(*this);
 
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
@@ -1399,13 +1428,16 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   assert(e_sig->getWidth() == 2 * sbits + 5);
   assert(shifted_f_sig->getWidth() == 2 * sbits + 5);
 
+  /* Jam the alignment sticky into the aligned operand before the one
+   * add/sub. e_sig is always even (mul_sig and c_sig_ext both carry
+   * trailing zeros), so the sum/difference LSB equals shifted_f_sig's LSB
+   * and this is exactly equivalent to the conditional post-add/sub on an
+   * even result -- without chaining a second full-width adder onto the
+   * first. Same shape as addCore. */
   SMTExprRef sticky_wide = mkBVZeroExt(2 * sbits + 4, alignment_sticky);
+  shifted_f_sig = mkBVOr(shifted_f_sig, sticky_wide);
   SMTExprRef e_plus_f = mkBVAdd(e_sig, shifted_f_sig);
-  e_plus_f = mkIte(mkEqual(mkBVExtract(0, 0, e_plus_f), zero_1),
-                   mkBVAdd(e_plus_f, sticky_wide), e_plus_f);
   SMTExprRef e_minus_f = mkBVSub(e_sig, shifted_f_sig);
-  e_minus_f = mkIte(mkEqual(mkBVExtract(0, 0, e_minus_f), zero_1),
-                    mkBVSub(e_minus_f, sticky_wide), e_minus_f);
 
   SMTExprRef sum = mkIte(eq_sgn, e_plus_f, e_minus_f);
   assert(sum->getWidth() == 2 * sbits + 5);
@@ -1424,10 +1456,6 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef res_sgn_c2 = mkBVAnd(mkBVAnd(e_sgn, not_f_sgn), not_sign_bv);
   SMTExprRef res_sgn_c3 = mkBVAnd(e_sgn, f_sgn);
   SMTExprRef res_sgn = mkBVOr(mkBVOr(res_sgn_c1, res_sgn_c2), res_sgn_c3);
-
-  SMTExprRef is_sig_neg =
-      mkEqual(one_1, mkBVExtract(2 * sbits + 4, 2 * sbits + 4, sig_abs));
-  sig_abs = mkIte(is_sig_neg, mkBVNeg(sig_abs), sig_abs);
 
   // Result could have overflown into 4.xxx.
   assert(sig_abs->getWidth() == 2 * sbits + 5);
@@ -1660,13 +1688,15 @@ SMTExprRef SMTSolverImpl::mkFPtoFPImpl(const SMTExprRef &From,
     SMTExprRef exp_sub_lz = mkBVSub(mkBVSignExt(2, exp), mkBVSignExt(2, lz));
 
     // check whether exponent is within roundable (to_ebits+2) range.
-    unsigned int z = power2(to_ebits + 1, true);
     SMTExprRef max_exp = mkBVConcat(
-        mkBVFromDec(power2m1(to_ebits, false), to_ebits + 1), mkBVZero1(*this));
-    SMTExprRef min_exp = mkBVFromDec(z + 2, to_ebits + 2);
+        mkBVFromBin(pow2Bits(to_ebits, -1, false, to_ebits + 1), to_ebits + 1),
+        mkBVZero1(*this));
+    // -(2^(to_ebits+1)) + 2 == -(2^(to_ebits+1) - 2)
+    SMTExprRef min_exp = mkBVFromBin(
+        pow2Bits(to_ebits + 1, -2, true, to_ebits + 2), to_ebits + 2);
 
-    unsigned int ovft = power2m1(to_ebits + 1, false);
-    SMTExprRef first_ovf_exp = mkBVFromDec(ovft, from_ebits + 2);
+    SMTExprRef first_ovf_exp = mkBVFromBin(
+        pow2Bits(to_ebits + 1, -1, false, from_ebits + 2), from_ebits + 2);
     SMTExprRef first_udf_exp = mkBVConcat(
         mkBVNeg(mkBVFromDec(1, ebits_diff + 3)), mkBVFromDec(1, to_ebits + 1));
 
@@ -1998,8 +2028,15 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
                     mkNot(ovfl)),
               mkBVUle(pre_rounded, ul));
   } else {
-    SMTExprRef ll = mkBVSignExt(3, mkBVConcat(bv1, mkBVFromDec(0, bv_sz - 1)));
-    ul = mkBVZeroExt(4, mkBVNeg(mkBVFromDec(1, bv_sz - 1)));
+    // Bounds of the signed target: ll = -2^(bv_sz-1), ul = 2^(bv_sz-1)-1,
+    // built as bit strings rather than by concatenating a (bv_sz-1)-wide
+    // value, which is a zero-width sort when bv_sz is 1.
+    std::string LlBits(bv_sz + 3, '1');
+    LlBits.replace(4, bv_sz - 1, bv_sz - 1, '0');
+    SMTExprRef ll = mkBVFromBin(LlBits, mkBVSort(bv_sz + 3));
+    std::string UlBits(bv_sz + 3, '0');
+    UlBits.replace(4, bv_sz - 1, bv_sz - 1, '1');
+    ul = mkBVFromBin(UlBits, mkBVSort(bv_sz + 3));
     ovfl = mkOr(ovfl, mkBVSle(pre_rounded, mkBVNeg(mkBVFromDec(1, bv_sz + 3))));
     pre_rounded = mkIte(x_is_neg, mkBVNeg(pre_rounded), pre_rounded);
     in_range = mkAnd(mkAnd(mkNot(ovfl), mkBVSle(ll, pre_rounded)),
@@ -2070,7 +2107,8 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
   SMTExprRef none = mkFPOne(*this, ebits, sbits, true);
   SMTExprRef xone = mkIte(sgn_eq_1, none, pone);
 
-  SMTExprRef pow_2_sbitsm1 = mkBVFromDec(power2(sbits - 1, false), sbits);
+  SMTExprRef pow_2_sbitsm1 =
+      mkBVFromBin(pow2Bits(sbits - 1, 0, false, sbits), sbits);
   SMTExprRef m1 = mkBVNeg(mkBVFromDec(1, ebits));
   SMTExprRef t1 = mkEqual(a_sig, pow_2_sbitsm1);
   SMTExprRef t2 = mkEqual(a_exp, m1);
@@ -2256,6 +2294,15 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
   // in sgn. Furthermore, note that sig is an unsigned bit-vector, while exp is
   // signed.
 
+  // The leading-zero count of the (SWidth + 4)-bit significand is used in
+  // (EWidth + 2)-bit signed arithmetic below, so it must fit as a positive
+  // value. mkFPSort rejects such formats for the BV encoding; this backstop
+  // catches BVFP sorts minted through backend-internal routes (e.g.
+  // MathSAT's bvfpView) that bypass the public sort constructor.
+  fatalErrorIf(EWidth < 31 && SWidth + 4 > (1u << (EWidth + 1)) - 1,
+               "Floating-point format unsupported by the BV rounder: the "
+               "significand is too wide for the exponent width");
+
   assert(R->getWidth() == 3);
   assert(Sgn->getWidth() == 1);
   assert(Sig->getWidth() >= 5);
@@ -2388,7 +2435,8 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
   SMTExprRef exp_redand = mkBVRedAnd(biased_exp);
   SMTExprRef preOVF2 = mkEqual(exp_redand, one_1);
   SMTExprRef OVF2 = mkAnd(SIGovf, preOVF2);
-  SMTExprRef pem2m1 = mkBVFromDec(power2m1(EWidth - 2, false), EWidth);
+  SMTExprRef pem2m1 =
+      mkBVFromBin(pow2Bits(EWidth - 2, -1, false, EWidth), EWidth);
   biased_exp = mkIte(OVF2, pem2m1, biased_exp);
   SMTExprRef OVF = mkOr(OVF1, OVF2);
 
@@ -2409,9 +2457,11 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
 
   SMTExprRef sgn_is_zero = mkEqual(Sgn, nil_1);
 
-  SMTExprRef max_sig = mkBVFromDec(power2m1(SWidth - 1, false), SWidth - 1);
+  SMTExprRef max_sig =
+      mkBVFromBin(pow2Bits(SWidth - 1, -1, false, SWidth - 1), SWidth - 1);
   SMTExprRef max_exp = mkBVConcat(
-      mkBVFromDec(power2m1(EWidth - 1, false), EWidth - 1), mkBVZero1(*this));
+      mkBVFromBin(pow2Bits(EWidth - 1, -1, false, EWidth - 1), EWidth - 1),
+      mkBVZero1(*this));
   SMTExprRef inf_sig = mkBVFromDec(0, SWidth - 1);
   const SMTExprRef &inf_exp = top_exp;
 
