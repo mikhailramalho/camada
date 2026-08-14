@@ -96,13 +96,42 @@ Branch: `feat/solver-config`, PR #123 (open)
 Consolidates creation-time options into a config object. Parked as a
 knob-shaped change; worth closing unless a capability argument appears.
 
-### UF emulation without shadow terms — PARKED, incomplete
+---
 
-Branch: `experiment/uf-ieeebv-no-shadow`, local only
+## Design alternatives that lost to a specific case
 
-An experiment in emulating uninterpreted functions for the IEEE-BV
-bridge without the shadow-term machinery. Never finished; kept only as a
-starting point if the shadow approach ever becomes a problem.
+### `mkIEEEFPToBV` without the provenance rewrite — SUPERSEDED
+
+Branch: `experiment/uf-ieeebv-no-shadow` (deleted; tip was `f699078`)
+
+`fp.to_ieee_bv` is underspecified for NaN: the FP sort has one NaN value
+while the bit encoding has many NaN patterns, so no function out of the
+sort can say which pattern produced a given NaN, and a backend may answer
+with any of them. Two mechanisms address different halves of that.
+
+**#125** returns the exact bits where camada can *prove* them — the term
+came from `mkBVToIEEEFP`, an FP constant, or a top-level equality tying
+it to one. That makes round-trips bit-exact, which is what a byte-level
+memory model needs. The cost is that the result depends on the term's
+provenance rather than only on the FP value.
+
+**#126** fixed a soundness gap #125 did not reach: two FP terms asserted
+*equal* were each given their own unconstrained bit-vector symbol, so a
+sound program's assertion became violable on bitwuzla under native FP.
+Emulating the primitive as a per-sort uninterpreted function, tied by
+`to_fp(fn(x)) == x`, makes functional congruence force value-equal terms
+to report equal bits.
+
+This branch was the exploratory version of #126, written the same day.
+It differs from what shipped in one respect: it **removes** the #125
+provenance rewrite instead of layering on top of it, trading bit-exact
+round-trips for functional consistency alone. Master keeps both, so
+round-trips stay exact *and* value-equal terms agree. The two mechanisms
+answer different questions and the shipped design needs both.
+
+Kept as a record because "why does camada carry two mechanisms here?" is
+otherwise an obvious-looking thing to simplify away. `REPORT-ieeebv-
+shadow-equality-order.md` has the failing case that motivated #126.
 
 ---
 
