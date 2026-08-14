@@ -633,12 +633,8 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   // else comes the actual multiplication.
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
-  // Unpacked WITHOUT pre-normalization: round() below already computes a
-  // leading-zero count over the product and renormalizes from it, so
-  // normalizing each operand first duplicates that work — two extra
-  // leading-zero trees and two variable-amount shifts per multiply, and
-  // variable shifts bit-blast into barrel shifters. SymFPU's multiply
-  // does the same, correcting the product with the exponent instead.
+  // Unnormalized: round() renormalizes from the product's own leading
+  // zeros, so normalizing the operands first is duplicated work.
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, false);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, false);
 
@@ -651,9 +647,7 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   SMTExprRef res_sgn, res_sig, res_exp;
   res_sgn = mkBVXor(a_sgn, b_sgn);
 
-  // The unnormalized unpack leaves both leading-zero counts at zero, so
-  // the exponent is just the sum; round() derives the correction it needs
-  // from the product's own leading zeros.
+  // Both leading-zero counts are zero above.
   res_exp = mkBVAdd(a_exp_ext, b_exp_ext);
 
   SMTExprRef product = mkBVMul(a_sig_ext, b_sig_ext);
@@ -748,6 +742,7 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
+  // Unnormalized: round() renormalizes from the quotient's leading zeros.
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, false);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, false);
 
@@ -760,8 +755,7 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 
   SMTExprRef res_sgn = mkBVXor(a_sgn, b_sgn);
 
-  // Both leading-zero counts are zero after the unnormalized unpack, so
-  // the exponent is just the difference.
+  // Both leading-zero counts are zero above.
   SMTExprRef res_exp = mkBVSub(a_exp_ext, b_exp_ext);
 
   // b_sig_ext can't be 0 here, so it's safe to use OP_BUDIV_I
@@ -1354,13 +1348,9 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
   SMTExprRef c_sgn, c_sig, c_exp, c_lz;
-  // Normalized deliberately: unlike mul and div, FMA COMPARES the product's
-  // exponent against the addend's (swap_cond below) to decide the alignment
-  // shift. Unnormalized exponents are not comparable — a subnormal operand
-  // carries an exponent that understates its magnitude by its leading-zero
-  // count — so dropping this misaligns the addend. Verified: with these set
-  // to false, a symbolic cross-check against native FP finds divergence on
-  // subnormal inputs, which the regression suite does not currently cover.
+  // Normalized, unlike mul and div: swap_cond below compares the product's
+  // exponent against the addend's, and unnormalized exponents understate a
+  // subnormal by its leading-zero count, misaligning the addend.
   unpack(*this, X, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, Y, b_sgn, b_sig, b_exp, b_lz, true);
   unpack(*this, Z, c_sgn, c_sig, c_exp, c_lz, true);

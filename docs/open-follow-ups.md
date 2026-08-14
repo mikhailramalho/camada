@@ -20,6 +20,44 @@ IEEE-754.
 
 Not yet reported upstream.
 
+### Camada's BV-encoded FMA is wrong on subnormal inputs
+
+**A correctness defect in shipped code**, inherited from Z3's
+`fpa2bv_converter` along with the rest of camada's FP bit-blast.
+
+Counterexample, 32-bit IEEE bit patterns:
+
+```
+x  10000000011110011011111101100111   (subnormal)
+y  11111110111110000000000000000000
+z  00111111001001011000111100001011
+
+correct    01000000000111110101010100101111
+camada BV  01000000000111110101010100101110   <- one ulp low
+```
+
+The correct value is confirmed three ways: exact rational arithmetic on
+`x*y + z`, the host CPU's hardware `fmaf()`, and bitwuzla's native FP.
+
+Z3 has the same bug. Running the same query through `z3` with an explicit
+`(then fpa2bv simplify bit-blast smt)` tactic reproduces camada's wrong
+answer bit-for-bit; Z3's *default* pipeline gets it right only because
+`propagate-values` folds the constants and its rewriter evaluates the FMA
+exactly, so the bit-blaster never runs on this input. A genuinely
+symbolic FMA hits the bug there too.
+
+This is the second subnormal-triggered defect found in that converter —
+see the `mk_rem` entry above — which suggests those paths are
+systematically under-tested upstream. Both deserve a report.
+
+**Note what did not catch it.** The full 237-test suite passes with FMA's
+operand normalization removed *entirely*, which should be impossible. The
+suite has no symbolic subnormal FP arithmetic coverage; the bug surfaced
+only from cross-checking the BV and native encodings against each other
+over symbolic inputs. Extending the conformance fixtures to arithmetic
+the way they already cover predicates would likely find siblings in add,
+mul, div and the conversions — worth doing before or alongside the fix.
+
 ### MathSAT macOS packaging
 
 The 5.6.17 macOS tarball ships `libmathsat.a` as a plain `ar` archive
@@ -62,6 +100,59 @@ the same investigation — a Z3 5.0.0 hang reproduced only through
 `tactic(...).mk_solver()` and never from a file.
 
 Minutes of work, and it decides whether the rest is worth doing.
+
+### Rounder hints for FP addition
+
+Camada's bit-blasted FP addition is far slower than bitwuzla's native
+(SymFPU) one on queries that reason about the operation symbolically. The
+technique SymFPU uses to win is worth recording precisely, because the
+obvious guess is wrong.
+
+**Not** the dual-path split. `add.h` contains `dualPathArithmeticAdd`,
+which splits near and far cases — but bitwuzla never calls it. It calls
+`symfpu::add`, reaching the single-path `arithmeticAdd`. Implementing the
+dual-path version would be copying dead code.
+
+What `arithmeticAdd` actually does is build a case table over the
+exponent difference, predicting where the result exponent can land:
+
+```
+Case      A. max(l,r)+1   B. max(l,r)   C. max(l,r)-1   D. max(l,r)-k   E. zero
+diff = 0      Y               Y
+diff = 1      Y, sticky 0     Y, sticky 0
+```
+
+From that it derives five facts and passes them to the rounder as
+`customRounderInfo`:
+
+```cpp
+prop noOverflow;   prop noUnderflow;   prop exact;
+prop subnormalExact;   prop noSignificandOverflow;
+```
+
+The rounder then skips work it can prove unnecessary:
+
+```cpp
+prop incrementExponent(!known.noSignificandOverflow && incrementExponentNeeded);
+prop overflow(!known.noOverflow && ITE(lateOverflow, true, earlyOverflow));
+```
+
+Camada's `round()` computes all of it unconditionally, with no channel
+for a caller to say a case cannot arise.
+
+**Why this is not being built now.** `round()` is shared by seven call
+sites, so adding a hints parameter obliges every caller to derive its own
+hints — and a wrong hint silently produces a wrong value rather than
+failing loudly. That is the same failure shape as the FMA subnormal bug
+found in this file, which argues for fixing correctness before adding a
+new way to get it wrong. The measurement motivating it is also
+adversarial (proving addition commutative), so the gain on ordinary
+queries is unknown.
+
+If it is built, the gate is ESBMC hard instances, and every hint needs a
+symbolic cross-check against native FP the way the conformance fixtures
+do — deriving a hint incorrectly is indistinguishable from a correct
+encoding until it is wrong.
 
 ### Term introspection, walkers, translation
 
