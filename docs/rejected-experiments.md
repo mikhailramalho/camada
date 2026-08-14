@@ -119,13 +119,6 @@ The same reasoning sent several sibling ideas to the consumer side:
 bounded array explosion, lazy array symbol declaration, and address-space
 store deferral.
 
-### `SolverConfig` — PARKED for the same reason
-
-Branch: `feat/solver-config`, PR #123 (open)
-
-Consolidates creation-time options into a config object. Parked as a
-knob-shaped change; worth closing unless a capability argument appears.
-
 ---
 
 ## Design alternatives that lost to a specific case
@@ -251,6 +244,40 @@ theory-internal and camada-owned.
 
 Two refinements were needed before the rule above stopped
 over-rejecting things.
+
+### `SolverConfig` — filed here in error; NOT a knob
+
+Branch: `feat/solver-config`, PR #123.
+
+This was filed here as knob-shaped and that was wrong, so the correction
+is worth stating: the razor cuts *adding* a behavioural choice, and this
+adds none. It reorganises how the options that already exist are passed.
+
+The defect it fixes is visible in the old signatures — six factories, no
+two agreeing:
+
+```
+createZ3Solver(ArrayEncoding = Native)
+createCVC5Solver(UnsatAssumptionsMode = Off, ArrayEncoding = Native)
+createYicesSolver(ArrayEncoding = Native)
+...
+```
+
+Two took `UnsatAssumptionsMode`, four did not, and because the parameters
+are positional, any third creation-time option breaks every call site or
+spawns another overload. That gets monotonically worse as options
+accumulate.
+
+The design keeps a distinction worth preserving: `Arrays`, `Tuples`,
+`UnsatAssumptions`, `Logic` and the one-shot ack deadline are frozen at
+construction and belong in the object, while `FPEncoding` (on 14
+signatures), `FXPRoundTie`, `ConstArrayLowering` and `RM` are arguments
+to individual operations and stay there. `FPEncoding` in particular is
+deliberately per-sort — one solver holds native and BV-encoded FP at the
+same time — so folding it into a solver-wide config would be a semantic
+regression, not a tidy-up.
+
+---
 
 **Implementation quality is in scope.** The razor cuts *knobs*, not
 improvements. "Camada's bit-blast is structurally bad" is a camada bug
