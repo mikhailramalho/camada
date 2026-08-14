@@ -1648,7 +1648,11 @@ SMTExprRef SMTSolverImpl::mkFPtoFPImpl(const SMTExprRef &From,
 
   // otherwise: the actual conversion with rounding.
   SMTExprRef sgn, sig, exp, lz;
-  unpack(*this, From, sgn, sig, exp, lz, true);
+  // Unnormalized: the significand is only padded or collapsed to a sticky
+  // below, neither of which touches its leading zeros, and the exponent
+  // path already subtracts lz explicitly — so round() sees a consistent
+  // pair and renormalizes from its own count.
+  unpack(*this, From, sgn, sig, exp, lz, false);
 
   SMTExprRef res_sgn = sgn;
 
