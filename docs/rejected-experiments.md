@@ -428,8 +428,8 @@ fixtures do, and the benchmark must hold the query shape fixed across
 operations.
 
 Full fixed-shape numbers for every FP operation are in
-`docs/fp-bv-vs-native.md`. On that measurement the remaining outlier is
-`sqrt` (~13x), not `add`.
+`docs/fp-bv-vs-native.md`. On that measurement the outlier is `sqrt`
+(~13x), not `add` — and that was investigated too; see the next entry.
 
 ### Narrowing the sqrt loop / sqrt rounder hints — REJECTED on measurement
 
