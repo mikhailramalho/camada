@@ -18,6 +18,24 @@ Reproducer: `fp.rem(3.0e38f, 7.0e-39f)` returns the wrong value. Found by
 cross-checking against the host CPU, where `std::remainder` is exact per
 IEEE-754.
 
+A second, smaller witness in binary16, found by cross-checking camada's BV
+encoding against z3's native FP symbolically:
+
+```
+x = 0111100101100010   (44096.0)
+y = 0000001111001100   (5.793571472167969e-05, subnormal)
+
+exact (host remainder) -1.9550323486328125e-05   1000000101001000
+camada BV              -1.9550323486328125e-05   exact
+z3 native              -2.6464462280273438e-05   1000000110111100  (116 ulp out)
+```
+
+**The query must be symbolic.** Passing the operands as constants makes
+every backend agree, because `propagate-values` folds them before
+`fpa2bv` runs and the buggy bit-blaster never executes. Assert the inputs
+through symbols, or use an explicit `(then fpa2bv simplify bit-blast smt)`
+tactic.
+
 Not yet reported upstream.
 
 ### Camada's BV-encoded FMA is wrong on subnormal inputs
