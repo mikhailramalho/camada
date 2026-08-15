@@ -38,10 +38,11 @@ tactic.
 
 Not yet reported upstream.
 
-### Camada's BV-encoded FMA is wrong on subnormal inputs
+### Z3 `fpa2bv` FMA: sticky bit dropped, wrong rounding
 
-**A correctness defect in shipped code**, inherited from Z3's
-`fpa2bv_converter` along with the rest of camada's FP bit-blast.
+Camada's copy of this was fixed in #145; Z3's is still open, and we owe
+the report. Originally recorded here as a camada defect, inherited from
+Z3's `fpa2bv_converter` along with the rest of the FP bit-blast.
 
 Counterexample, 32-bit IEEE bit patterns:
 
@@ -51,8 +52,12 @@ y  11111110111110000000000000000000
 z  00111111001001011000111100001011
 
 correct    01000000000111110101010100101111
-camada BV  01000000000111110101010100101110   <- one ulp low
+camada BV  01000000000111110101010100101110   <- one ulp low, BEFORE #145
 ```
+
+(That camada column is the pre-#145 behaviour, kept because it is the
+witness that identified the shared defect. Camada returns the correct
+value now; Z3 still returns the wrong one.)
 
 The correct value is confirmed three ways: exact rational arithmetic on
 `x*y + z`, the host CPU's hardware `fmaf()`, and bitwuzla's native FP.
@@ -63,6 +68,26 @@ answer bit-for-bit; Z3's *default* pipeline gets it right only because
 `propagate-values` folds the constants and its rewriter evaluates the FMA
 exactly, so the bit-blaster never runs on this input. A genuinely
 symbolic FMA hits the bug there too.
+
+A second, smaller witness in binary16, from cross-checking camada's BV
+encoding against z3's native FP symbolically. This one is *not*
+subnormal — it is a plain rounding error, so the defect is wider than the
+subnormal path:
+
+```
+fma(x, y, x)  with  x = 984.0        0110001110110000
+                    y = 3.546875     0100001100011000
+
+exact x*y+x  4474.125
+neighbours   4472 and 4476 (spacing 4), midpoint 4474.0
+             exact is ABOVE the midpoint, so RNE gives 4476
+
+camada BV    4476   0110110001011111   correct
+z3 native    4472   0110110001011110   rounds the wrong way
+```
+
+As with `mk_rem`, the query must be symbolic: constant operands are folded
+by `propagate-values` before `fpa2bv` runs, and z3 then answers correctly.
 
 This is the second subnormal-triggered defect found in that converter —
 see the `mk_rem` entry above — which suggests those paths are
