@@ -1820,8 +1820,11 @@ SMTExprRef SMTSolverImpl::mkSBVtoFPImpl(const SMTExprRef &From,
   unsigned exp_worst_case_sz = static_cast<unsigned>(
       (log(static_cast<double>(bv_sz)) / log(static_cast<double>(2))) + 1.0);
 
-  if (exp_sz < exp_worst_case_sz) {
-    // exp_sz < exp_worst_case_sz and exp >= 0.
+  // `<=`, not `<`: round() reads the exponent as signed, so a value
+  // needing the full exp_sz bits is already unrepresentable and must be
+  // clamped before round() consumes it. The boundary case is a binary16
+  // target from a 64-bit operand, where both sides are 7.
+  if (exp_sz <= exp_worst_case_sz) {
     // Take the maximum legal exponent; this
     // allows us to keep the most precision.
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
@@ -1916,8 +1919,11 @@ SMTExprRef SMTSolverImpl::mkUBVtoFPImpl(const SMTExprRef &From,
   unsigned exp_worst_case_sz = static_cast<unsigned>(
       (log(static_cast<double>(bv_sz)) / log(static_cast<double>(2))) + 1.0);
 
-  if (exp_sz < exp_worst_case_sz) {
-    // exp_sz < exp_worst_case_sz and exp >= 0.
+  // `<=`, not `<`: round() reads the exponent as signed, so a value
+  // needing the full exp_sz bits is already unrepresentable and must be
+  // clamped before round() consumes it. The boundary case is a binary16
+  // target from a 64-bit operand, where both sides are 7.
+  if (exp_sz <= exp_worst_case_sz) {
     // Take the maximum legal exponent; this
     // allows us to keep the most precision.
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
