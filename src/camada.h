@@ -879,13 +879,13 @@ public:
   virtual SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) = 0;
 
   /// Saturating fixed-point multiplication.
-  virtual SMTExprRef mkFXPMulSat(const SMTExprRef &LHS,
-                                 const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkFXPMulSat(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 FXPRM Mode) = 0;
 
   /// Saturating fixed-point division. The value is meaningful only under
   /// the negation of mkFXPDivByZero.
-  virtual SMTExprRef mkFXPDivSat(const SMTExprRef &LHS,
-                                 const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkFXPDivSat(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 FXPRM Mode) = 0;
 
   /// Saturating fixed-point left shift.
   virtual SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) = 0;
@@ -914,18 +914,18 @@ public:
                                      const SMTExprRef &Amount) = 0;
 
   /// Converts between fixed-point formats (truncating on narrowing).
-  virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
-                                const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
+                                FXPRM Mode) = 0;
 
   /// True iff the value does not fit the target format of a mkFXPToFXP
   /// conversion.
   virtual SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
-                                        const SMTSortRef &To) = 0;
+                                        const SMTSortRef &To, FXPRM Mode) = 0;
 
   /// Saturating fixed-point format conversion: out-of-range values clamp
   /// to the target format's min/max instead of being undefined.
-  virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
-                                   const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp, const SMTSortRef &To,
+                                   FXPRM Mode) = 0;
 
   /// Converts an integer bit-vector into a fixed-point value. SrcSigned is
   /// the signedness of the SOURCE integer type: it governs the value (C's
@@ -938,7 +938,8 @@ public:
   /// Converts a fixed-point value to an integer bit-vector of the given
   /// width, rounding toward zero (the direction TR 18037 specifies for
   /// fixed-point to integer conversion).
-  virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) = 0;
+  virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth,
+                               FXPRM Mode) = 0;
 
   /// True iff the toward-zero integer part does not fit the target
   /// integer type's range: [0, 2^w-1] for an unsigned target,
@@ -947,13 +948,13 @@ public:
   /// 2^w either way; only this range report and mkFXPToBVSat's clamp
   /// depend on the target's signedness.
   virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,
-                                       bool ToSigned) = 0;
+                                       bool ToSigned, FXPRM Mode) = 0;
 
   /// Saturating fixed-point to integer conversion (round toward zero,
   /// then clamp to the TARGET integer type's range — a negative source
   /// clamps to zero for an unsigned target.
   virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
-                                  bool ToSigned) = 0;
+                                  bool ToSigned, FXPRM Mode) = 0;
 
   /// Rounds a fixed-point value to Digits fractional bits, keeping the
   /// same format (the low fraction bits become zero) — TR 18037's
@@ -1050,19 +1051,20 @@ public:
   /// fixed-to-fixed narrowing (floor); both pinned by the execution
   /// oracle. The value is meaningful only under the negation of
   /// mkFPToFXPOverflow (out-of-range, infinity, and NaN stay UB in C).
-  virtual SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
+                               FXPRM Mode) = 0;
 
   /// True iff the float-to-fixed conversion is undefined: NaN, +-infinity,
   /// or the toward-zero result lies outside the target format's range.
   virtual SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
-                                       const SMTSortRef &To) = 0;
+                                       const SMTSortRef &To, FXPRM Mode) = 0;
 
   /// Saturating float-to-fixed conversion, defined for every input:
   /// out-of-range values and +-infinity clamp to the format's rails, NaN
   /// converts to 0 (Clang's choice for _Sat targets; the TR leaves it
   /// undefined).
-  virtual SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp,
-                                  const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp, const SMTSortRef &To,
+                                  FXPRM Mode) = 0;
 
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.

@@ -364,7 +364,8 @@ inline void fxp_rounding_semantics(const camada::SMTSolverRef &solver) {
   // shift would floor to -2).
   solver->reset();
   camada::SMTExprRef MinusOneHalf = mkConst(solver, F, uint64_t(-24) & 0xFF);
-  camada::SMTExprRef AsInt = solver->mkFXPToBV(MinusOneHalf, 8);
+  camada::SMTExprRef AsInt =
+      solver->mkFXPToBV(MinusOneHalf, 8, camada::FXPRM::TowardZero);
   solver->addConstraint(solver->mkEqual(AsInt, solver->mkBVFromDec(-1, 8)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 
@@ -374,8 +375,8 @@ inline void fxp_rounding_semantics(const camada::SMTSolverRef &solver) {
   solver->reset();
   camada::SMTExprRef MinusOneQ3 = mkConst(solver, F, uint64_t(-28) & 0xFF);
   RefFormat Narrow{8, 1, true};
-  camada::SMTExprRef Converted =
-      solver->mkFXPToFXP(MinusOneQ3, mkSort(solver, Narrow));
+  camada::SMTExprRef Converted = solver->mkFXPToFXP(
+      MinusOneQ3, mkSort(solver, Narrow), camada::FXPRM::TowardNegative);
   solver->addConstraint(solver->mkFXPEqual(
       Converted, mkConst(solver, Narrow, uint64_t(-4) & 0xFF)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
@@ -398,10 +399,12 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
       camada::SMTExprRef V = mkConst(solver, From, Raw);
       camada::SMTSortRef ToSort = mkSort(solver, To);
       // Widening never overflows...
-      Conjuncts.push_back(solver->mkNot(solver->mkFXPToFXPOverflow(V, ToSort)));
+      Conjuncts.push_back(solver->mkNot(solver->mkFXPToFXPOverflow(
+          V, ToSort, camada::FXPRM::TowardNegative)));
       // ...and is exact: converting up compares equal to the original
       // (mkFXPEqual scale-aligns across the two formats).
-      Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPToFXP(V, ToSort), V));
+      Conjuncts.push_back(solver->mkFXPEqual(
+          solver->mkFXPToFXP(V, ToSort, camada::FXPRM::TowardNegative), V));
     }
     requireAllHold(solver, Conjuncts);
   }
@@ -412,7 +415,8 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     solver->reset();
     RefFormat U{4, 2, false}, S4{4, 2, true};
     camada::SMTExprRef V = mkConst(solver, U, 8);
-    solver->addConstraint(solver->mkFXPToFXPOverflow(V, mkSort(solver, S4)));
+    solver->addConstraint(solver->mkFXPToFXPOverflow(
+        V, mkSort(solver, S4), camada::FXPRM::TowardNegative));
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
 
@@ -421,7 +425,8 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     solver->reset();
     RefFormat S4{4, 2, true}, U{4, 2, false};
     camada::SMTExprRef V = mkConst(solver, S4, uint64_t(-1) & 0xF);
-    solver->addConstraint(solver->mkFXPToFXPOverflow(V, mkSort(solver, U)));
+    solver->addConstraint(solver->mkFXPToFXPOverflow(
+        V, mkSort(solver, U), camada::FXPRM::TowardNegative));
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
 
@@ -432,14 +437,15 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     camada::SMTSortRef WideSrc = solver->mkFXPSort(70, 35, true);
     camada::SMTSortRef WideDst = solver->mkFXPSort(140, 70, true);
     camada::SMTExprRef X = solver->mkSymbol("fxp_wide_x", WideSrc);
-    solver->addConstraint(solver->mkFXPToFXPOverflow(X, WideDst));
+    solver->addConstraint(
+        solver->mkFXPToFXPOverflow(X, WideDst, camada::FXPRM::TowardNegative));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
     solver->reset();
     WideSrc = solver->mkFXPSort(70, 35, true);
     WideDst = solver->mkFXPSort(140, 70, true);
     X = solver->mkSymbol("fxp_wide_x", WideSrc);
-    solver->addConstraint(
-        solver->mkNot(solver->mkFXPEqual(solver->mkFXPToFXP(X, WideDst), X)));
+    solver->addConstraint(solver->mkNot(solver->mkFXPEqual(
+        solver->mkFXPToFXP(X, WideDst, camada::FXPRM::TowardNegative), X)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
 
@@ -451,7 +457,8 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     camada::SMTSortRef Fmt = solver->mkFXPSort(16, 4, true);
     camada::SMTExprRef I = solver->mkSymbol("fxp_int_x", solver->mkBVSort(8));
     camada::SMTExprRef AsFXP = solver->mkFXPFromBV(I, SrcSigned, Fmt);
-    camada::SMTExprRef Back = solver->mkFXPToBV(AsFXP, 8);
+    camada::SMTExprRef Back =
+        solver->mkFXPToBV(AsFXP, 8, camada::FXPRM::TowardZero);
     solver->addConstraint(solver->mkNot(solver->mkEqual(Back, I)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
@@ -615,13 +622,13 @@ inline void fxp_sat_exhaustive_semantics(const camada::SMTSolverRef &solver) {
             break;
           case Op::Mul:
             Ref = refMulSat(F, A, B);
-            Value = solver->mkFXPMulSat(EA, EB);
+            Value = solver->mkFXPMulSat(EA, EB, camada::FXPRM::TowardNegative);
             break;
           case Op::Div:
             if (B == 0)
               continue;
             Ref = refDivSat(F, A, B);
-            Value = solver->mkFXPDivSat(EA, EB);
+            Value = solver->mkFXPDivSat(EA, EB, camada::FXPRM::TowardNegative);
             break;
           case Op::Neg:
             Ref = refNegSat(F, A);
@@ -693,9 +700,10 @@ inline void fxp_sat_conversion_semantics(const camada::SMTSolverRef &solver) {
       for (uint64_t RA = 0; RA < Count; ++RA) {
         int64_t A = refDecode(From, RA);
         camada::SMTExprRef EA = mkConst(solver, From, RA);
-        Conjuncts.push_back(
-            solver->mkFXPEqual(solver->mkFXPToFXPSat(EA, mkSort(solver, To)),
-                               mkConst(solver, To, toFXPSatRef(From, To, A))));
+        Conjuncts.push_back(solver->mkFXPEqual(
+            solver->mkFXPToFXPSat(EA, mkSort(solver, To),
+                                  camada::FXPRM::TowardNegative),
+            mkConst(solver, To, toFXPSatRef(From, To, A))));
       }
       requireAllHold(solver, Conjuncts);
     }
@@ -712,7 +720,8 @@ inline void fxp_sat_conversion_semantics(const camada::SMTSolverRef &solver) {
           std::string Bits =
               refBits(IntF, toBVSatRef(From, ToWidth, ToSigned, A));
           Conjuncts.push_back(
-              solver->mkEqual(solver->mkFXPToBVSat(EA, ToWidth, ToSigned),
+              solver->mkEqual(solver->mkFXPToBVSat(EA, ToWidth, ToSigned,
+                                                   camada::FXPRM::TowardZero),
                               solver->mkBVFromBin(Bits, ToWidth)));
         }
         requireAllHold(solver, Conjuncts);
@@ -1283,20 +1292,22 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
     // into range.
     camada::SMTExprRef Ok = solver->mkBool(true);
     for (uint32_t Good : {0x3f7ffe00u, 0xbf800000u, 0x3f7ffe01u, 0xbf800001u})
-      Ok = solver->mkAnd(
-          Ok, solver->mkNot(solver->mkFPToFXPOverflow(fp32(Good), To)));
+      Ok = solver->mkAnd(Ok, solver->mkNot(solver->mkFPToFXPOverflow(
+                                 fp32(Good), To, camada::FXPRM::TowardZero)));
     // Undefined: values whose truncation falls outside (1.0 scales to
     // 32768, -1.000030518 to -32769), NaN, and +-infinity.
     for (uint32_t Bad :
          {0x3f800000u, 0xbf800100u, 0x7fc00000u, 0x7f800000u, 0xff800000u})
-      Ok = solver->mkAnd(Ok, solver->mkFPToFXPOverflow(fp32(Bad), To));
+      Ok = solver->mkAnd(Ok, solver->mkFPToFXPOverflow(
+                                 fp32(Bad), To, camada::FXPRM::TowardZero));
     // Toward zero, not floor: -0.7f scales to -22937.6, truncating to
     // -22937 (raw 0xa667); flooring would give -22938.
     Ok = solver->mkAnd(
         Ok,
-        solver->mkFXPEqual(solver->mkFPToFXP(fp32(0xbf333333), To),
-                           solver->mkFXPFromBin(
-                               refBits(RefFormat{16, 15, true}, 0xa667), To)));
+        solver->mkFXPEqual(
+            solver->mkFPToFXP(fp32(0xbf333333), To, camada::FXPRM::TowardZero),
+            solver->mkFXPFromBin(refBits(RefFormat{16, 15, true}, 0xa667),
+                                 To)));
     solver->addConstraint(Ok);
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
@@ -1354,10 +1365,10 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
       camada::SMTExprRef F =
           solver->mkFPFromBin(refBits(RefFormat{32, 0, false}, Bits), 8, Enc);
       Ok = solver->mkAnd(
-          Ok,
-          solver->mkFXPEqual(solver->mkFPToFXPSat(F, S15),
-                             solver->mkFXPFromBin(
-                                 refBits(RefFormat{16, 15, true}, Raw), S15)));
+          Ok, solver->mkFXPEqual(
+                  solver->mkFPToFXPSat(F, S15, camada::FXPRM::TowardZero),
+                  solver->mkFXPFromBin(refBits(RefFormat{16, 15, true}, Raw),
+                                       S15)));
     }
     solver->addConstraint(Ok);
     REQUIRE(solver->check() == camada::checkResult::SAT);
@@ -1373,8 +1384,9 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
     camada::SMTExprRef X = solver->mkSymbol("fxp_rt_x", Fmt);
     camada::SMTExprRef F = solver->mkFXPToFP(X, F32, camada::RM::ROUND_TO_EVEN);
     solver->addConstraint(solver->mkOr(
-        solver->mkNot(solver->mkFXPEqual(solver->mkFPToFXP(F, Fmt), X)),
-        solver->mkFPToFXPOverflow(F, Fmt)));
+        solver->mkNot(solver->mkFXPEqual(
+            solver->mkFPToFXP(F, Fmt, camada::FXPRM::TowardZero), X)),
+        solver->mkFPToFXPOverflow(F, Fmt, camada::FXPRM::TowardZero)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
 }

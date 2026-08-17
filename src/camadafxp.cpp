@@ -267,6 +267,52 @@ SMTExprRef roundQuotient(SMTSolverImpl &S, const SMTExprRef &Quot,
                  Quot);
 }
 
+// Rounds an FP value to an integral FP value under a fixed-point mode.
+//
+// fp.to_sbv / fp.to_ubv always round toward zero, so mkFPToFXP applies
+// any other mode in the FP domain first and then converts exactly.
+//
+// FXPRM::NearestTiesTowardPositive has no FP counterpart -- IEEE-754 has
+// no "nearest, ties toward +inf" -- so it is built as: round to nearest
+// with ties away from zero, then correct the negative halfway cases,
+// which are the only inputs where the two disagree.
+SMTExprRef roundFPToIntegral(SMTSolverImpl &S, const SMTExprRef &V,
+                             FXPRM Mode) {
+  FPEncoding E = V->Sort->isBVFPSort() ? FPEncoding::BV : FPEncoding::Native;
+  auto integral = [&](RM R) { return S.mkFPtoIntegral(V, S.mkRM(R, E)); };
+  switch (Mode) {
+  case FXPRM::TowardZero:
+    return integral(RM::ROUND_TO_ZERO);
+  case FXPRM::TowardNegative:
+    return integral(RM::ROUND_TO_MINUS_INF);
+  case FXPRM::TowardPositive:
+    return integral(RM::ROUND_TO_PLUS_INF);
+  case FXPRM::NearestTiesToEven:
+    return integral(RM::ROUND_TO_EVEN);
+  case FXPRM::NearestTiesAwayFromZero:
+    return integral(RM::ROUND_TO_AWAY);
+  case FXPRM::NearestTiesTowardPositive:
+    break;
+  }
+  // Ties toward +inf: away-from-zero agrees everywhere except a negative
+  // exact halfway, where it goes down and this mode goes up. Detect that
+  // as "the two nearest roundings straddle" and take the ceiling there.
+  SMTExprRef Away = integral(RM::ROUND_TO_AWAY);
+  SMTExprRef Ceil = integral(RM::ROUND_TO_PLUS_INF);
+  SMTExprRef Floor = integral(RM::ROUND_TO_MINUS_INF);
+  // A halfway value is one whose floor and ceiling are equidistant, i.e.
+  // v - floor == ceil - v. Comparing doubled avoids a division.
+  SMTExprRef RmE = S.mkRM(RM::ROUND_TO_EVEN, E);
+  SMTExprRef Twice = S.mkFPAdd(V, V, RmE);
+  SMTExprRef Sum = S.mkFPAdd(Floor, Ceil, RmE);
+  SMTExprRef IsTie = S.mkFPEqual(Twice, Sum);
+  // "v < 0" without needing a zero constant: only a negative value has
+  // its ceiling strictly greater than its floor AND rounds away downward.
+  // Simpler: a negative v satisfies v + v < v, false for v >= 0.
+  SMTExprRef IsNeg = S.mkFPLt(Twice, V);
+  return S.mkIte(S.mkAnd(IsTie, IsNeg), Ceil, Away);
+}
+
 // Shifts Val right by Shift bits under a rounding mode, at Val's width.
 //
 // Every fixed-point operation that discards precision reduces to this:
@@ -516,7 +562,7 @@ SMTExprRef SMTSolverImpl::mkFXPNegSat(const SMTExprRef &Exp) {
 }
 
 SMTExprRef SMTSolverImpl::mkFXPMulSat(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
+                                      const SMTExprRef &RHS, FXPRM Mode) {
   AlignedPair P = alignPair(*this, LHS, RHS);
   // Same 2W exact product and floor shift as mkFXPMul; clamp instead of
   // truncating. Unsigned products can set the top bit at 2W, so the
@@ -525,10 +571,8 @@ SMTExprRef SMTSolverImpl::mkFXPMulSat(const SMTExprRef &LHS,
   SMTExprRef L = extendRaw(*this, P.LHS, P.Fmt.IsSigned, P.Fmt.Width);
   SMTExprRef R = extendRaw(*this, P.RHS, P.Fmt.IsSigned, P.Fmt.Width);
   SMTExprRef Prod = mkBVMul(L, R);
-  if (P.Fmt.FracBits != 0) {
-    SMTExprRef Amount = mkBVFromDec(P.Fmt.FracBits, 2 * P.Fmt.Width);
-    Prod = P.Fmt.IsSigned ? mkBVAshr(Prod, Amount) : mkBVLshr(Prod, Amount);
-  }
+  Prod = shiftRounded(*this, Prod, P.Fmt.FracBits, 2 * P.Fmt.Width,
+                      P.Fmt.IsSigned, Mode);
   return rewrapExprImpl(
       *clampRaw(*this, Prod, 2 * P.Fmt.Width, P.Fmt, P.Fmt.IsSigned),
       mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
@@ -536,7 +580,7 @@ SMTExprRef SMTSolverImpl::mkFXPMulSat(const SMTExprRef &LHS,
 }
 
 SMTExprRef SMTSolverImpl::mkFXPDivSat(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
+                                      const SMTExprRef &RHS, FXPRM Mode) {
   AlignedPair P = alignPair(*this, LHS, RHS);
   // Same 2W scaled dividend and floored quotient as mkFXPDiv; clamp
   // instead of truncating. The signed min/-1 case lands above max at 2W
@@ -548,6 +592,8 @@ SMTExprRef SMTSolverImpl::mkFXPDivSat(const SMTExprRef &LHS,
   SMTExprRef Quot = P.Fmt.IsSigned ? mkBVSDiv(L, R) : mkBVUDiv(L, R);
   if (P.Fmt.IsSigned)
     Quot = floorAdjustQuotient(*this, Quot, L, R, 2 * P.Fmt.Width);
+  Quot =
+      roundQuotient(*this, Quot, L, R, 2 * P.Fmt.Width, P.Fmt.IsSigned, Mode);
   return rewrapExprImpl(
       *clampRaw(*this, Quot, 2 * P.Fmt.Width, P.Fmt, P.Fmt.IsSigned),
       mkFXPSort(P.Fmt.Width, P.Fmt.FracBits, P.Fmt.IsSigned),
@@ -809,36 +855,44 @@ std::pair<SMTExprRef, unsigned> wideForConversion(SMTSolverImpl &S,
 } // namespace
 
 SMTExprRef SMTSolverImpl::mkFXPToFXP(const SMTExprRef &Exp,
-                                     const SMTSortRef &To) {
+                                     const SMTSortRef &To, FXPRM Mode) {
   requireFXP(Exp);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
   auto [Raw, Wide] = wideForConversion(*this, Exp, Target);
   if (Target.FracBits > From.FracBits) {
+    // Widening the fraction is exact, so Mode never applies.
     Raw = mkBVShl(Raw, mkBVFromDec(Target.FracBits - From.FracBits, Wide));
   } else if (From.FracBits > Target.FracBits) {
-    // Narrowing the fraction truncates low bits (floor).
-    SMTExprRef Amount = mkBVFromDec(From.FracBits - Target.FracBits, Wide);
-    Raw = From.IsSigned ? mkBVAshr(Raw, Amount) : mkBVLshr(Raw, Amount);
+    Raw = shiftRounded(*this, Raw, From.FracBits - Target.FracBits, Wide,
+                       From.IsSigned, Mode);
   }
   return rewrapExprImpl(*mkBVExtract(Target.Width - 1, 0, Raw), To,
                         SMTExprKind::FXPToFXP);
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToFXPOverflow(const SMTExprRef &Exp,
-                                             const SMTSortRef &To) {
+                                             const SMTSortRef &To, FXPRM Mode) {
   requireFXP(Exp);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
   auto [Raw, Wide] = wideForConversion(*this, Exp, Target);
-  // Compare the exact (pre-rounding) value: bring value and bounds to the
-  // *larger* fraction scale of the two formats so no fraction bit is
-  // dropped before the check; Wide has headroom for both shifts.
-  unsigned Scale = std::max(From.FracBits, Target.FracBits);
-  if (Scale > From.FracBits)
-    Raw = mkBVShl(Raw, mkBVFromDec(Scale - From.FracBits, Wide));
+  // Round FIRST, then compare against the bounds. Testing the exact value
+  // would be wrong for any mode that can round away from zero: a Q8.8
+  // value of 7.96875 fits a signed Q4.4 exactly (127) under truncation
+  // but rounds to 128 under nearest, which does not fit. The predicate
+  // has to agree with the conversion it describes.
+  if (From.FracBits > Target.FracBits)
+    Raw = shiftRounded(*this, Raw, From.FracBits - Target.FracBits, Wide,
+                       From.IsSigned, Mode);
+  // Bring value and bounds to a common scale; Wide has headroom for both.
+  unsigned Effective =
+      From.FracBits > Target.FracBits ? Target.FracBits : From.FracBits;
+  unsigned Scale = std::max(Effective, Target.FracBits);
+  if (Scale > Effective)
+    Raw = mkBVShl(Raw, mkBVFromDec(Scale - Effective, Wide));
   unsigned BoundShift = Scale - Target.FracBits;
   // The wide value is sign-correct thanks to the slack bit, so signed
   // comparisons are exact for both signednesses of the source.
@@ -848,21 +902,22 @@ SMTExprRef SMTSolverImpl::mkFXPToFXPOverflow(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToFXPSat(const SMTExprRef &Exp,
-                                        const SMTSortRef &To) {
+                                        const SMTSortRef &To, FXPRM Mode) {
   requireFXP(Exp);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
-  // Same wide intermediate and fraction shifts as mkFXPToFXP (floor on
-  // narrowing), clamped instead of truncated. Wide's slack bit keeps the
-  // view sign-correct for both source signednesses, so the comparisons
-  // are signed (the overflow predicate's argument).
+  // Same wide intermediate and fraction shifts as mkFXPToFXP, clamped
+  // instead of truncated. Rounding happens before the clamp, so a value
+  // that rounds past the maximum saturates rather than wrapping. Wide's
+  // slack bit keeps the view sign-correct for both source signednesses,
+  // so the comparisons are signed (the overflow predicate's argument).
   auto [Raw, Wide] = wideForConversion(*this, Exp, Target);
   if (Target.FracBits > From.FracBits) {
     Raw = mkBVShl(Raw, mkBVFromDec(Target.FracBits - From.FracBits, Wide));
   } else if (From.FracBits > Target.FracBits) {
-    SMTExprRef Amount = mkBVFromDec(From.FracBits - Target.FracBits, Wide);
-    Raw = From.IsSigned ? mkBVAshr(Raw, Amount) : mkBVLshr(Raw, Amount);
+    Raw = shiftRounded(*this, Raw, From.FracBits - Target.FracBits, Wide,
+                       From.IsSigned, Mode);
   }
   return rewrapExprImpl(*clampRaw(*this, Raw, Wide, Target,
                                   /*SignedCmp=*/true),
@@ -878,48 +933,46 @@ SMTExprRef SMTSolverImpl::mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
   // source type's signedness fixes the value, the target format only the
   // representation. Overflow of this conversion is queryable through
   // mkFXPToFXPOverflow on the same reinterpretation.
+  // The source has no fraction bits, so widening to the target's scale
+  // is exact and the rounding mode cannot matter; any value would do.
   SMTSortRef IntSort = mkFXPSort(Exp->getWidth(), 0, SrcSigned);
-  return mkFXPToFXP(mkFXPFromRawBV(Exp, IntSort), To);
+  return mkFXPToFXP(mkFXPFromRawBV(Exp, IntSort), To, FXPRM::TowardNegative);
 }
 
-SMTExprRef SMTSolverImpl::mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) {
+SMTExprRef SMTSolverImpl::mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth,
+                                    FXPRM Mode) {
   requireFXP(Exp);
   fatalErrorIf(ToWidth == 0, "Target width must be non-zero");
   FXPFormat From = formatOf(Exp->Sort);
-  // Round toward zero — the direction TR 18037 specifies for fixed-point to
-  // integer conversion. A plain arithmetic shift would floor (-1.5 -> -2);
-  // signed division by 2^N truncates toward zero (-1.5 -> -1). The target
-  // integer's signedness follows the source format's.
+  // Pass FXPRM::TowardZero for the direction TR 18037 specifies for
+  // fixed-point to integer conversion; shiftRounded implements it as a
+  // floor plus a correction for negatives, which is what the previous
+  // signed-division-by-2^N encoding computed (-1.5 -> -1, where a plain
+  // arithmetic shift would give -2). The target integer's signedness
+  // follows the source format's.
   unsigned Wide = std::max(From.Width, ToWidth + From.FracBits) + 1;
   SMTExprRef Raw = mkFXPToRawBV(Exp);
   Raw = extendRaw(*this, Raw, From.IsSigned, Wide - From.Width);
-  if (From.FracBits != 0) {
-    std::string PowBits(Wide, '0');
-    PowBits[Wide - 1 - From.FracBits] = '1';
-    SMTExprRef Pow = mkBVFromBin(PowBits, Wide);
-    Raw = From.IsSigned ? mkBVSDiv(Raw, Pow) : mkBVUDiv(Raw, Pow);
-  }
+  Raw = shiftRounded(*this, Raw, From.FracBits, Wide, From.IsSigned, Mode);
   return rewrapExprImpl(*mkBVExtract(ToWidth - 1, 0, Raw), mkBVSort(ToWidth),
                         SMTExprKind::FXPToBV);
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToBVOverflow(const SMTExprRef &Exp,
-                                            unsigned ToWidth, bool ToSigned) {
+                                            unsigned ToWidth, bool ToSigned,
+                                            FXPRM Mode) {
   requireFXP(Exp);
   fatalErrorIf(ToWidth == 0, "Target width must be non-zero");
   FXPFormat From = formatOf(Exp->Sort);
-  // C converts to integer by taking the toward-zero integral part first;
-  // it is UB iff *that* does not fit the target. So unlike the mul/div and
-  // fixed-to-fixed predicates, this one checks the rounded quotient.
+  // C converts to integer by taking the toward-zero integral part first
+  // and is UB iff *that* does not fit; pass FXPRM::TowardZero for it.
+  // The check is on the ROUNDED value under Mode, so the predicate always
+  // agrees with the conversion it describes -- a value that fits when
+  // truncated can round out of range under a nearest mode.
   unsigned Wide = std::max(From.Width, ToWidth + From.FracBits) + 1;
   SMTExprRef Raw = mkFXPToRawBV(Exp);
   Raw = extendRaw(*this, Raw, From.IsSigned, Wide - From.Width);
-  if (From.FracBits != 0) {
-    std::string PowBits(Wide, '0');
-    PowBits[Wide - 1 - From.FracBits] = '1';
-    SMTExprRef Pow = mkBVFromBin(PowBits, Wide);
-    Raw = From.IsSigned ? mkBVSDiv(Raw, Pow) : mkBVUDiv(Raw, Pow);
-  }
+  Raw = shiftRounded(*this, Raw, From.FracBits, Wide, From.IsSigned, Mode);
   FXPFormat IntTarget{ToWidth, 0, ToSigned};
   SMTExprRef Max = mkBVFromBin(maxRawBits(IntTarget, Wide), Wide);
   SMTExprRef Min = mkBVFromBin(minRawBits(IntTarget, Wide), Wide);
@@ -927,22 +980,18 @@ SMTExprRef SMTSolverImpl::mkFXPToBVOverflow(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
-                                       bool ToSigned) {
+                                       bool ToSigned, FXPRM Mode) {
   requireFXP(Exp);
   fatalErrorIf(ToWidth == 0, "Target width must be non-zero");
   FXPFormat From = formatOf(Exp->Sort);
-  // Same toward-zero rounding as mkFXPToBV (signed division by 2^N),
-  // clamped to the integer target's range instead of truncated. Wide's
-  // slack bit keeps the comparisons sign-correct for both signednesses.
+  // Same rounding as mkFXPToBV under Mode, clamped to the integer
+  // target's range instead of truncated, so a value that rounds past the
+  // maximum saturates. Wide's slack bit keeps the comparisons
+  // sign-correct for both signednesses.
   unsigned Wide = std::max(From.Width, ToWidth + From.FracBits) + 1;
   SMTExprRef Raw = mkFXPToRawBV(Exp);
   Raw = extendRaw(*this, Raw, From.IsSigned, Wide - From.Width);
-  if (From.FracBits != 0) {
-    std::string PowBits(Wide, '0');
-    PowBits[Wide - 1 - From.FracBits] = '1';
-    SMTExprRef Pow = mkBVFromBin(PowBits, Wide);
-    Raw = From.IsSigned ? mkBVSDiv(Raw, Pow) : mkBVUDiv(Raw, Pow);
-  }
+  Raw = shiftRounded(*this, Raw, From.FracBits, Wide, From.IsSigned, Mode);
   FXPFormat IntTarget{ToWidth, 0, ToSigned};
   return rewrapExprImpl(*clampRaw(*this, Raw, Wide, IntTarget,
                                   /*SignedCmp=*/true),
@@ -1522,24 +1571,27 @@ SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
   return rewrapExprImpl(*Res, To, SMTExprKind::FXPToFP);
 }
 
-SMTExprRef SMTSolverImpl::mkFPToFXP(const SMTExprRef &Exp,
-                                    const SMTSortRef &To) {
+SMTExprRef SMTSolverImpl::mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
+                                    FXPRM Mode) {
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
   requireFXPSort(To);
   FXPFormat Target = formatOf(To);
   FPFXPParts P = fpToFXPParts(*this, Exp, Target);
-  // fp.to_sbv / fp.to_ubv round toward zero across all backends and the
-  // BV encoding — C's float->fixed direction (fixed->fixed narrowing
-  // floors instead; both oracle-pinned). Out of range, for infinities,
-  // and for NaN the result is solver-chosen, matching C's UB; gate with
+  // fp.to_sbv / fp.to_ubv always round toward zero, so any other mode has
+  // to be applied in the FP domain first: round the scaled value to an
+  // integer under Mode, then convert exactly. Pass FXPRM::TowardZero for
+  // C's float->fixed direction (fixed->fixed narrowing floors instead;
+  // both oracle-pinned). Out of range, for infinities, and for NaN the
+  // result is solver-chosen, matching C's UB; gate with
   // mkFPToFXPOverflow.
-  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(P.Scaled, Target.Width)
-                                   : mkFPtoUBV(P.Scaled, Target.Width);
+  SMTExprRef Scaled = roundFPToIntegral(*this, P.Scaled, Mode);
+  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(Scaled, Target.Width)
+                                   : mkFPtoUBV(Scaled, Target.Width);
   return rewrapExprImpl(*Raw, To, SMTExprKind::FPToFXP);
 }
 
 SMTExprRef SMTSolverImpl::mkFPToFXPOverflow(const SMTExprRef &Exp,
-                                            const SMTSortRef &To) {
+                                            const SMTSortRef &To, FXPRM Mode) {
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
   requireFXPSort(To);
   FPFXPParts P = fpToFXPParts(*this, Exp, formatOf(To));
@@ -1547,7 +1599,7 @@ SMTExprRef SMTSolverImpl::mkFPToFXPOverflow(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkFPToFXPSat(const SMTExprRef &Exp,
-                                       const SMTSortRef &To) {
+                                       const SMTSortRef &To, FXPRM Mode) {
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
   requireFXPSort(To);
   FXPFormat Target = formatOf(To);
