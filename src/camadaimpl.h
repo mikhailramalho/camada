@@ -645,7 +645,7 @@ public:
   SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
                           bool ToSigned) override;
   SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
-                        FXPRoundTie Tie) override final;
+                        FXPRM Tie) override final;
   SMTExprRef mkFXPAbs(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPCountls(const SMTExprRef &Exp,
                           unsigned ToWidth) override final;

@@ -830,7 +830,7 @@ SMTExprRef SMTSolverImpl::mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
 // ---------------------------------------------------------------------------
 
 SMTExprRef SMTSolverImpl::mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
-                                     FXPRoundTie Tie) {
+                                     FXPRM Tie) {
   requireFXP(Exp);
   FXPFormat F = formatOf(Exp->Sort);
   // Keeping at least every fraction bit is the identity; libc clamps a
@@ -852,19 +852,41 @@ SMTExprRef SMTSolverImpl::mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
   HalfBits[W - Shift] = '1'; // 2^(Shift-1), half an ulp of the result
   SMTExprRef Bias = mkBVFromBin(HalfBits, W);
   SMTExprRef One = mkBVFromDec(1, W);
+  SMTExprRef Zero = mkBVFromDec(0, W);
+  // Every mode is the same mask with a different bias. The nearest modes
+  // start from half an ulp and adjust; the directed modes never consult
+  // the halfway point at all.
+  SMTExprRef DroppedMask =
+      mkBVFromBin(std::string(W - Shift, '0') + std::string(Shift, '1'), W);
+  SMTExprRef HasDropped = mkNot(mkEqual(mkBVAnd(Raw, DroppedMask), Zero));
   switch (Tie) {
-  case FXPRoundTie::TowardPositive:
+  case FXPRM::NearestTiesTowardPositive:
     break;
-  case FXPRoundTie::AwayFromZero:
+  case FXPRM::NearestTiesAwayFromZero:
     // Only signed formats have negative values to bias differently.
     if (F.IsSigned)
-      Bias = mkBVSub(
-          Bias, mkIte(mkBVSlt(Raw, mkBVFromDec(0, W)), One, mkBVFromDec(0, W)));
+      Bias = mkBVSub(Bias, mkIte(mkBVSlt(Raw, Zero), One, Zero));
     break;
-  case FXPRoundTie::ToEven:
+  case FXPRM::NearestTiesToEven:
     // half - 1 + (lowest kept bit): a tie lands on the even neighbour.
     Bias = mkBVAdd(mkBVSub(Bias, One),
                    mkBVZeroExt(W - 1, mkBVExtract(Shift, Shift, Raw)));
+    break;
+  case FXPRM::TowardNegative:
+    // Masking alone floors, for both signednesses.
+    Bias = Zero;
+    break;
+  case FXPRM::TowardZero:
+    // Floor for non-negative values; for negatives, floor is one ulp too
+    // low whenever bits were actually dropped, so add them back.
+    Bias = F.IsSigned
+               ? mkIte(mkAnd(mkBVSlt(Raw, Zero), HasDropped), DroppedMask, Zero)
+               : Zero;
+    break;
+  case FXPRM::TowardPositive:
+    // Ceiling: masking floors, so push up by the dropped bits when any
+    // were nonzero.
+    Bias = mkIte(HasDropped, DroppedMask, Zero);
     break;
   }
   SMTExprRef Sum = mkBVAdd(Raw, Bias);

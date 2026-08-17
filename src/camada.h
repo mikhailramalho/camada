@@ -96,27 +96,47 @@ enum class FPNegBehavior {
   PreserveNaNPayload,
 };
 
-/// Selects how `mkFXPRound` breaks ties. TR 18037 specifies that the
-/// `roundfx` family rounds to nearest but leaves the halfway direction to
-/// the implementation, and implementations differ, so the caller states
-/// which one it is modelling rather than inheriting one library's choice.
+/// Rounding direction for the fixed-point operations that discard bits.
 ///
-/// - TowardPositive: a halfway value rounds up, so 0.5 rounds to 1 and
-///   -0.5 rounds to 0. What LLVM libc does (it adds half an ulp and masks
-///   off the low bits), and the only direction verified against an
-///   executing implementation.
-/// - AwayFromZero: a halfway value rounds away from zero, so 0.5 rounds
-///   to 1 and -0.5 rounds to -1 — symmetric about zero, the convention
-///   most C programmers expect from `round()`.
-/// - ToEven: a halfway value rounds to whichever neighbour has a zero in
-///   the last kept bit, the unbiased choice IEEE-754 uses by default.
+/// Separate from `RM` rather than reusing it, because fixed point needs a
+/// mode IEEE-754 has no name for. TR 18037's `roundfx` rounds to nearest
+/// but leaves the halfway direction to the implementation, and LLVM libc
+/// breaks ties toward positive infinity — nearest for every other value.
+/// `RM::ROUND_TO_PLUS_INF` is a different operation: it rounds *all*
+/// values up, so 0.25 becomes 1 where nearest-ties-up leaves it 0. With no
+/// RM member denoting "nearest, ties toward +inf", reusing RM would have
+/// silently dropped the one `roundfx` direction verified against an
+/// executing implementation.
 ///
-/// All three saturate to the format's maximum when the rounding would
-/// carry past it, which every implementation surveyed agrees on.
-enum class FXPRoundTie {
+/// The three nearest modes differ only on exact halfway values:
+///
+/// - NearestTiesTowardPositive: 0.5 rounds to 1 and -0.5 rounds to 0.
+///   LLVM libc's `roundfx` (it adds half an ulp and masks off the low
+///   bits), and the only direction verified against a running libc.
+/// - NearestTiesAwayFromZero: 0.5 rounds to 1 and -0.5 rounds to -1 —
+///   symmetric about zero, what most C programmers expect from `round()`.
+///   Equivalent to `RM::ROUND_TO_AWAY`.
+/// - NearestTiesToEven: a halfway value rounds to whichever neighbour has
+///   a zero in the last kept bit, IEEE-754's default and the unbiased
+///   choice. Equivalent to `RM::ROUND_TO_EVEN`.
+///
+/// The directed modes never consult the halfway point:
+///
+/// - TowardZero: truncate. C's fixed-to-integer and float-to-fixed
+///   direction, pinned by the execution oracle.
+/// - TowardNegative: floor. What Clang's `-ffixed-point` division does —
+///   verified: -0.5 / 0.75 gives -0.671875, not -0.6640625.
+/// - TowardPositive: ceiling.
+///
+/// Every nearest mode saturates to the format's maximum when the rounding
+/// would carry past it, which every implementation surveyed agrees on.
+enum class FXPRM {
+  NearestTiesTowardPositive,
+  NearestTiesAwayFromZero,
+  NearestTiesToEven,
+  TowardZero,
+  TowardNegative,
   TowardPositive,
-  AwayFromZero,
-  ToEven,
 };
 
 /// Selects how the SMT-LIB backend lowers tuples on the wire.
@@ -929,7 +949,7 @@ public:
   /// to the format's maximum when the rounding would carry past it.
   /// Digits >= the format's fraction width returns the value unchanged.
   virtual SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
-                                FXPRoundTie Tie) = 0;
+                                FXPRM Tie) = 0;
 
   /// Absolute value — TR 18037's `absfx`. Saturates: the most negative
   /// value of a signed format has no positive counterpart, so it maps to
