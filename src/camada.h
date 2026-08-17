@@ -780,14 +780,26 @@ public:
   /// Creates a fixed-point negation.
   virtual SMTExprRef mkFXPNeg(const SMTExprRef &Exp) = 0;
 
-  /// Creates a fixed-point multiplication (truncating: the exact product's
-  /// low fractional bits are dropped).
-  virtual SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  /// Creates a fixed-point multiplication. The exact product carries twice
+  /// the fraction bits; Mode decides how the surplus is discarded.
+  ///
+  /// Pass FXPRM::TowardNegative to reproduce C, which truncates. A
+  /// consumer cannot recover any other mode from that result: the bits
+  /// that decide the rounding are gone once the product is narrowed, and
+  /// 41% of Q4.4 products differ between truncation and nearest.
+  virtual SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                              FXPRM Mode) = 0;
 
-  /// Creates a fixed-point division. The quotient rounds toward negative
-  /// infinity (floor), matching Clang's -ffixed-point behavior as pinned
-  /// by the execution oracle.
-  virtual SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  /// Creates a fixed-point division, rounding the quotient per Mode.
+  ///
+  /// Pass FXPRM::TowardNegative to reproduce C: Clang's -ffixed-point
+  /// floors, which the execution oracle pins (-0.5 / 0.75 gives
+  /// -0.671875, not the -0.6640625 that truncation would give). No
+  /// widening lets a consumer round differently after the fact — a
+  /// quotient like 1/3 never terminates, so composing a wider divide with
+  /// a narrowing step double-rounds.
+  virtual SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                              FXPRM Mode) = 0;
 
   /// Creates a fixed-point left shift by a concrete amount.
   virtual SMTExprRef mkFXPShl(const SMTExprRef &Exp, unsigned Amount) = 0;

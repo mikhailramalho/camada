@@ -589,10 +589,10 @@ public:
   SMTExprRef mkFXPSub(const SMTExprRef &LHS,
                       const SMTExprRef &RHS) override final;
   SMTExprRef mkFXPNeg(const SMTExprRef &Exp) override final;
-  SMTExprRef mkFXPMul(const SMTExprRef &LHS,
-                      const SMTExprRef &RHS) override final;
-  SMTExprRef mkFXPDiv(const SMTExprRef &LHS,
-                      const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                      FXPRM Mode) override final;
+  SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                      FXPRM Mode) override final;
   SMTExprRef mkFXPShl(const SMTExprRef &Exp, unsigned Amount) override final;
   SMTExprRef mkFXPShr(const SMTExprRef &Exp, unsigned Amount) override final;
   SMTExprRef mkFXPLt(const SMTExprRef &LHS,

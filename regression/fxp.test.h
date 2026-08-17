@@ -261,12 +261,12 @@ inline void fxp_exhaustive_semantics(const camada::SMTSolverRef &solver) {
             break;
           case Op::Mul:
             Ref = refMul(F, A, B);
-            Value = solver->mkFXPMul(EA, EB);
+            Value = solver->mkFXPMul(EA, EB, camada::FXPRM::TowardNegative);
             Pred = solver->mkFXPMulOverflow(EA, EB);
             break;
           case Op::Div:
             Ref = refDiv(F, A, B);
-            Value = solver->mkFXPDiv(EA, EB);
+            Value = solver->mkFXPDiv(EA, EB, camada::FXPRM::TowardNegative);
             Pred = solver->mkFXPDivOverflow(EA, EB);
             Conjuncts.push_back(
                 boolIs(solver, solver->mkFXPDivByZero(EB), Ref.DivByZero));
@@ -306,8 +306,9 @@ fxp_boundary_overflow_semantics(const camada::SMTSolverRef &solver) {
     A = mkConst(solver, F, 89);
     B = mkConst(solver, F, 23);
     // ... and the truncated value is exactly the boundary.
-    solver->addConstraint(
-        solver->mkFXPEqual(solver->mkFXPMul(A, B), mkConst(solver, F, 127)));
+    solver->addConstraint(solver->mkFXPEqual(
+        solver->mkFXPMul(A, B, camada::FXPRM::TowardNegative),
+        mkConst(solver, F, 127)));
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
   // 127 * 16 = 2032 = max*16 exactly: representable, NOT an overflow.
@@ -346,14 +347,17 @@ inline void fxp_rounding_semantics(const camada::SMTSolverRef &solver) {
   // (-3/16) / 2.0: exact raw quotient -1.5, not representable; floor
   // gives raw -2 (toward zero would give -1 — Clang floors, per the
   // execution oracle).
-  Conjuncts.push_back(
-      solver->mkFXPEqual(solver->mkFXPDiv(C(-3), C(32)), C(-2)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPDiv(C(-3), C(32), camada::FXPRM::TowardNegative), C(-2)));
   // (3/16) / 2.0: exact raw quotient 1.5 -> raw 1.
-  Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPDiv(C(3), C(32)), C(1)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPDiv(C(3), C(32), camada::FXPRM::TowardNegative), C(1)));
   // (-1/16) * (8/16): exact -0.5 raw; floor -> -1 raw (not 0).
-  Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPMul(C(-1), C(8)), C(-1)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPMul(C(-1), C(8), camada::FXPRM::TowardNegative), C(-1)));
   // ( 1/16) * (8/16): exact 0.5 raw; floor -> 0 raw.
-  Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPMul(C(1), C(8)), C(0)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPMul(C(1), C(8), camada::FXPRM::TowardNegative), C(0)));
   requireAllHold(solver, Conjuncts);
 
   // Fixed -> integer rounds toward zero: -1.5 -> -1 (a plain arithmetic

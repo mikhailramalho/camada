@@ -66,10 +66,12 @@ inline void fxp_oracle_semantics(const camada::SMTSolverRef &solver) {
       R = solver->mkFXPSub(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
       break;
     case OrOp::Mul:
-      R = solver->mkFXPMul(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
+      R = solver->mkFXPMul(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0),
+                           camada::FXPRM::TowardNegative);
       break;
     case OrOp::Div:
-      R = solver->mkFXPDiv(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
+      R = solver->mkFXPDiv(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0),
+                           camada::FXPRM::TowardNegative);
       break;
     case OrOp::Neg:
       R = solver->mkFXPNeg(A);
@@ -146,10 +148,10 @@ inline void fxp_oracle_mixed_semantics(const camada::SMTSolverRef &solver) {
       R = solver->mkFXPSub(A, B);
       break;
     case OrMixOp::Mul:
-      R = solver->mkFXPMul(A, B);
+      R = solver->mkFXPMul(A, B, camada::FXPRM::TowardNegative);
       break;
     case OrMixOp::Div:
-      R = solver->mkFXPDiv(A, B);
+      R = solver->mkFXPDiv(A, B, camada::FXPRM::TowardNegative);
       break;
     case OrMixOp::AddSat:
       R = solver->mkFXPAddSat(A, B);
