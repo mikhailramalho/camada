@@ -1008,7 +1008,15 @@ public:
   /// them. There is no paired predicate because the condition is just
   /// `x < 0` — a consumer that needs to assert it writes
   /// mkFXPLt(x, zero), which produces the same term.
-  virtual SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) = 0;
+  ///
+  /// Mode selects the rounding. Nothing in TR 18037 pins a direction --
+  /// the standard has no sqrtfx and the libc implementations are
+  /// approximations that disagree with each other -- so no mode is "the C
+  /// one"; pass a nearest mode for the exact answer, which is what an
+  /// implementation checked against camada should be compared with. The
+  /// operand is non-negative by construction, so TowardZero and
+  /// TowardNegative coincide, as do the two non-even tie directions.
+  virtual SMTExprRef mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) = 0;
 
   /// Base-e exponential, correctly rounded to nearest with ties to even,
   /// saturating to the format's maximum where the true value does not fit

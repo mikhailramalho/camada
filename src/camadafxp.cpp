@@ -1321,7 +1321,7 @@ SMTExprRef SMTSolverImpl::mkFXPExp(const SMTExprRef &Exp) {
                         SMTExprKind::FXPExp);
 }
 
-SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp) {
+SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
   requireFXP(Exp);
   FXPFormat F = formatOf(Exp->Sort);
   // sqrt(raw/2^n) = sqrt(raw * 2^n) / 2^n, so the result's raw value is
@@ -1359,23 +1359,41 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp) {
     Root =
         mkBVOr(mkBVShl(Root, One), mkIte(Fits, One, mkBVFromDec(0, RadWidth)));
   }
-  // The loop leaves Root = floor(sqrt(Rad)) and Rem = Rad - Root^2 exactly.
-  // Camada is meant to be an oracle other implementations are checked
-  // against, so round to nearest rather than stopping at the floor: the
-  // true root lies above the midpoint between Root and Root+1 exactly when
+  // The loop leaves Root = floor(sqrt(Rad)) and Rem = Rad - Root^2
+  // exactly, so every mode is an adjustment from the floor. The true root
+  // lies above the midpoint between Root and Root+1 exactly when
   // Rem > Root, since (Root + 1/2)^2 = Root^2 + Root + 1/4 and Rem is an
-  // integer. Ties (Rem == Root) go to even.
+  // integer; it is an exact tie when Rem == Root.
   //
-  // Nothing in TR 18037 or C pins this direction -- there is no sqrtfx in
-  // the standard, and the libc implementations are approximations that
-  // disagree with each other -- so the exact operation is ours to choose.
-  // The truncating FXP operations elsewhere are NOT free this way: they
-  // reproduce C's semantics and must keep doing so.
-  SMTExprRef RootOdd = mkEqual(mkBVExtract(0, 0, Root), mkBVFromDec(1, 1));
-  SMTExprRef RoundUp =
-      mkOr(mkBVUgt(Rem, Root), mkAnd(mkEqual(Rem, Root), RootOdd));
+  // A square root is never exactly representable unless Rem == 0, so the
+  // directed modes only need to know whether the result is inexact.
   // Root+1 cannot overflow RadWidth: Root <= sqrt(2^RadWidth - 1) and
-  // RadWidth >= 2, so Root is at most 2^(RadWidth/2) - 1.
+  // RadWidth >= 2, so Root is at most 2^(RadWidth/2) - 1. The radicand is
+  // never negative here (negatives are pinned to zero below), so
+  // TowardZero and TowardNegative coincide.
+  SMTExprRef RemZero = mkEqual(Rem, mkBVFromDec(0, RadWidth));
+  SMTExprRef RoundUp;
+  switch (Mode) {
+  case FXPRM::TowardZero:
+  case FXPRM::TowardNegative:
+    RoundUp = mkBool(false);
+    break;
+  case FXPRM::TowardPositive:
+    RoundUp = mkNot(RemZero);
+    break;
+  case FXPRM::NearestTiesTowardPositive:
+  case FXPRM::NearestTiesAwayFromZero:
+    // The root is non-negative, so both tie directions round up. The
+    // Rem != 0 guard matters at Root == 0: an exact zero would otherwise
+    // satisfy Rem >= Root and round up to one.
+    RoundUp = mkAnd(mkNot(RemZero), mkBVUge(Rem, Root));
+    break;
+  case FXPRM::NearestTiesToEven: {
+    SMTExprRef RootOdd = mkEqual(mkBVExtract(0, 0, Root), mkBVFromDec(1, 1));
+    RoundUp = mkOr(mkBVUgt(Rem, Root), mkAnd(mkEqual(Rem, Root), RootOdd));
+    break;
+  }
+  }
   Root = mkIte(RoundUp, mkBVAdd(Root, One), Root);
 
   SMTExprRef Res = mkBVExtract(F.Width - 1, 0, Root);

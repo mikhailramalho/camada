@@ -1033,9 +1033,10 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
         solver->reset();
         camada::SMTExprRef All;
         for (uint64_t Raw = 0; Raw <= uint64_t(F.maxRaw()); ++Raw) {
-          camada::SMTExprRef C =
-              solver->mkFXPEqual(solver->mkFXPSqrt(mkConst(solver, F, Raw)),
-                                 mkConst(solver, F, refSqrt(F, Raw)));
+          camada::SMTExprRef C = solver->mkFXPEqual(
+              solver->mkFXPSqrt(mkConst(solver, F, Raw),
+                                camada::FXPRM::NearestTiesToEven),
+              mkConst(solver, F, refSqrt(F, Raw)));
           All = All ? solver->mkAnd(All, C) : C;
         }
         solver->addConstraint(All);
@@ -1060,7 +1061,8 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
     unsigned W = 12, N = 6, Wide = 2 * (W + N) + 6;
     camada::SMTSortRef F = solver->mkFXPSort(W, N, true);
     camada::SMTExprRef X = solver->mkSymbol("fxp_sqrt_x", F);
-    camada::SMTExprRef R = solver->mkFXPSqrt(X);
+    camada::SMTExprRef R =
+        solver->mkFXPSqrt(X, camada::FXPRM::NearestTiesToEven);
     auto ext = [&](const camada::SMTExprRef &E) {
       return solver->mkBVZeroExt(Wide - W, solver->mkFXPToRawBV(E));
     };
@@ -1097,7 +1099,9 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
     camada::SMTExprRef All;
     for (uint64_t Raw : {uint64_t(0x80), uint64_t(0xC0), uint64_t(0xFF)}) {
       camada::SMTExprRef C = solver->mkFXPEqual(
-          solver->mkFXPSqrt(mkConst(solver, F, Raw)), mkConst(solver, F, 0));
+          solver->mkFXPSqrt(mkConst(solver, F, Raw),
+                            camada::FXPRM::NearestTiesToEven),
+          mkConst(solver, F, 0));
       All = All ? solver->mkAnd(All, C) : C;
     }
     solver->addConstraint(All);

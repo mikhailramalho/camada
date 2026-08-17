@@ -652,7 +652,7 @@ public:
   SMTExprRef mkFXPAbs(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPCountls(const SMTExprRef &Exp,
                           unsigned ToWidth) override final;
-  SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) override final;
   SMTExprRef mkFXPExp(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
                        RM R) override final;
