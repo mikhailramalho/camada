@@ -948,10 +948,18 @@ public:
   /// wrapping. For unsigned formats it counts leading zeros.
   virtual SMTExprRef mkFXPCountls(const SMTExprRef &Exp, unsigned ToWidth) = 0;
 
-  /// Square root, rounded toward zero: the unique r in the operand's own
-  /// format with r*r <= x < (r+1)*(r+1) at the format's scale. Always
-  /// representable — square root contracts on [0, max] for every format,
-  /// so no saturation is possible.
+  /// Square root, correctly rounded to nearest with ties to even: the
+  /// representable value closest to the true square root at the format's
+  /// scale. Always representable — square root contracts on [0, max] for
+  /// every format, so no saturation is possible.
+  ///
+  /// Nearest rather than toward zero because camada is meant to serve as
+  /// an oracle: an implementation being checked against it should be
+  /// compared with the exact answer, not with a floor that is up to one
+  /// ulp below it. Nothing in TR 18037 pins the direction — the standard
+  /// has no sqrtfx — so unlike the truncating conversions elsewhere in
+  /// this API, which reproduce C's semantics deliberately, this one is
+  /// free to be exact.
   ///
   /// This is the exact mathematical operation, NOT a reproduction of any
   /// library's `sqrtfx`. LLVM libc computes a Sollya-generated linear

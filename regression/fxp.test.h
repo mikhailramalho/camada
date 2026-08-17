@@ -973,8 +973,13 @@ inline void fxp_exp_exhaustive(const camada::SMTSolverRef &solver) {
   }
 }
 
+// Correctly-rounded fixed-point square root: nearest, ties to even.
+// The loop yields the floor and leaves N as the remainder S - R*R, and
+// the true root exceeds the midpoint exactly when that remainder is
+// greater than R, since (R + 1/2)^2 = R*R + R + 1/4.
 inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
-  uint64_t N = Raw << F.FracBits;
+  const uint64_t S = Raw << F.FracBits;
+  uint64_t N = S;
   uint64_t R = 0, Bit = uint64_t(1) << 62;
   while (Bit > N)
     Bit >>= 2;
@@ -986,6 +991,9 @@ inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
       R >>= 1;
     Bit >>= 2;
   }
+  const uint64_t Rem = S - R * R;
+  if (Rem > R || (Rem == R && (R & 1)))
+    ++R;
   return R;
 }
 
@@ -1012,12 +1020,19 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
   }
 
   // The defining property, proved over ALL symbolic values rather than
-  // enumerated: r*r <= x < (r+1)*(r+1) at the format's scale. This is
-  // what "correctly rounded" means, and it is checkable precisely
-  // because the operation is exact.
+  // enumerated. Correct rounding to nearest means the true root lies
+  // within half an ulp of r, i.e. between the two midpoints:
+  //
+  //     (2r - 1)^2 <= 4*x + 1   and   4*x <= (2r + 1)^2
+  //
+  // at the format's scale. The `+ 1` on the lower bound matters: a tie
+  // rounded UP sits exactly one below (2r-1)^2, since 4*x is an integer
+  // and the midpoint squared is not. Ties satisfy both bounds either
+  // way, so this admits both directions; the exhaustive loop above is
+  // what pins ties-to-even.
   {
     solver->reset();
-    unsigned W = 12, N = 6, Wide = 2 * (W + N) + 4;
+    unsigned W = 12, N = 6, Wide = 2 * (W + N) + 6;
     camada::SMTSortRef F = solver->mkFXPSort(W, N, true);
     camada::SMTExprRef X = solver->mkSymbol("fxp_sqrt_x", F);
     camada::SMTExprRef R = solver->mkFXPSqrt(X);
@@ -1025,11 +1040,21 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
       return solver->mkBVZeroExt(Wide - W, solver->mkFXPToRawBV(E));
     };
     camada::SMTExprRef Rx = ext(R), Xx = ext(X);
-    camada::SMTExprRef RR = solver->mkBVMul(Rx, Rx);
-    camada::SMTExprRef R1 = solver->mkBVAdd(Rx, solver->mkBVFromDec(1, Wide));
+    camada::SMTExprRef Two = solver->mkBVFromDec(2, Wide);
+    camada::SMTExprRef One = solver->mkBVFromDec(1, Wide);
     camada::SMTExprRef Xs = solver->mkBVShl(Xx, solver->mkBVFromDec(N, Wide));
-    camada::SMTExprRef Holds = solver->mkAnd(
-        solver->mkBVUle(RR, Xs), solver->mkBVUlt(Xs, solver->mkBVMul(R1, R1)));
+    camada::SMTExprRef FourX = solver->mkBVShl(Xs, Two);
+    camada::SMTExprRef TwoR = solver->mkBVMul(Rx, Two);
+    camada::SMTExprRef Lo = solver->mkBVSub(TwoR, One);
+    camada::SMTExprRef Hi = solver->mkBVAdd(TwoR, One);
+    // r == 0 has no lower midpoint; the lower bound is vacuous there.
+    camada::SMTExprRef RIsZero =
+        solver->mkEqual(Rx, solver->mkBVFromDec(0, Wide));
+    camada::SMTExprRef LoOk =
+        solver->mkOr(RIsZero, solver->mkBVUle(solver->mkBVMul(Lo, Lo),
+                                              solver->mkBVAdd(FourX, One)));
+    camada::SMTExprRef Holds =
+        solver->mkAnd(LoOk, solver->mkBVUle(FourX, solver->mkBVMul(Hi, Hi)));
     camada::SMTExprRef NonNeg = solver->mkNot(solver->mkFXPLt(
         X, solver->mkFXPFromBin(refBits(RefFormat{W, N, true}, 0),
                                 solver->mkFXPSort(W, N, true))));

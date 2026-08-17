@@ -1164,6 +1164,25 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp) {
     Root =
         mkBVOr(mkBVShl(Root, One), mkIte(Fits, One, mkBVFromDec(0, RadWidth)));
   }
+  // The loop leaves Root = floor(sqrt(Rad)) and Rem = Rad - Root^2 exactly.
+  // Camada is meant to be an oracle other implementations are checked
+  // against, so round to nearest rather than stopping at the floor: the
+  // true root lies above the midpoint between Root and Root+1 exactly when
+  // Rem > Root, since (Root + 1/2)^2 = Root^2 + Root + 1/4 and Rem is an
+  // integer. Ties (Rem == Root) go to even.
+  //
+  // Nothing in TR 18037 or C pins this direction -- there is no sqrtfx in
+  // the standard, and the libc implementations are approximations that
+  // disagree with each other -- so the exact operation is ours to choose.
+  // The truncating FXP operations elsewhere are NOT free this way: they
+  // reproduce C's semantics and must keep doing so.
+  SMTExprRef RootOdd = mkEqual(mkBVExtract(0, 0, Root), mkBVFromDec(1, 1));
+  SMTExprRef RoundUp =
+      mkOr(mkBVUgt(Rem, Root), mkAnd(mkEqual(Rem, Root), RootOdd));
+  // Root+1 cannot overflow RadWidth: Root <= sqrt(2^RadWidth - 1) and
+  // RadWidth >= 2, so Root is at most 2^(RadWidth/2) - 1.
+  Root = mkIte(RoundUp, mkBVAdd(Root, One), Root);
+
   SMTExprRef Res = mkBVExtract(F.Width - 1, 0, Root);
   // A negative operand has no real square root, and the zero-extension
   // above reads its two's-complement bits as a large positive radicand,
