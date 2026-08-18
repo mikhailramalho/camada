@@ -646,6 +646,19 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
 #define CAMADA_DEFINE_UNSUPPORTED_IMPL(Name, Feature, ...)                     \
   SMTExprRef SMTSolverImpl::Name(__VA_ARGS__) { unsupportedFeature(Feature); }
 
+// Width-extension wrapper: same guard and postcondition for sign- and
+// zero-extension. The guard is what stops i + width wrapping unsigned, so it
+// belongs with the operation rather than being retyped per extension.
+#define CAMADA_DEFINE_BV_EXTEND_WRAPPER(Name, ImplName, What)                  \
+  SMTExprRef SMTSolverImpl::Name(unsigned i, const SMTExprRef &Exp) {          \
+    requireBVSort(Exp, "Expected bit-vector expression");                      \
+    fatalErrorIf(i > std::numeric_limits<unsigned>::max() - Exp->getWidth(),   \
+                 "Bit-vector " What " extension width overflow");              \
+    SMTExprRef theExp = ImplName(i, Exp);                                      \
+    assert(theExp->getWidth() == Exp->getWidth() + i);                         \
+    return theExp;                                                             \
+  }
+
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
                                     requireBVSameSort(LHS, RHS),
                                     mkBVAddImpl(LHS, RHS),
@@ -1045,23 +1058,9 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkBVSignExt(unsigned i, const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  fatalErrorIf(i > std::numeric_limits<unsigned>::max() - Exp->getWidth(),
-               "Bit-vector sign extension width overflow");
-  SMTExprRef theExp = mkBVSignExtImpl(i, Exp);
-  assert(theExp->getWidth() == Exp->getWidth() + i);
-  return theExp;
-}
+CAMADA_DEFINE_BV_EXTEND_WRAPPER(mkBVSignExt, mkBVSignExtImpl, "sign")
 
-SMTExprRef SMTSolverImpl::mkBVZeroExt(unsigned i, const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  fatalErrorIf(i > std::numeric_limits<unsigned>::max() - Exp->getWidth(),
-               "Bit-vector zero extension width overflow");
-  SMTExprRef theExp = mkBVZeroExtImpl(i, Exp);
-  assert(theExp->getWidth() == Exp->getWidth() + i);
-  return theExp;
-}
+CAMADA_DEFINE_BV_EXTEND_WRAPPER(mkBVZeroExt, mkBVZeroExtImpl, "zero")
 
 SMTExprRef SMTSolverImpl::mkBVExtract(unsigned High, unsigned Low,
                                       const SMTExprRef &Exp) {
