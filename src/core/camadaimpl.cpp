@@ -643,8 +643,8 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
 // Default *Impl for a feature a backend does not implement: abort with the
 // theory's name. Variadic so one macro covers every parameter shape, and the
 // parameters stay unnamed because nothing reads them.
-#define CAMADA_DEFINE_UNSUPPORTED_IMPL(Name, Feature, ...)                     \
-  SMTExprRef SMTSolverImpl::Name(__VA_ARGS__) { unsupportedFeature(Feature); }
+#define CAMADA_DEFINE_UNSUPPORTED_IMPL(ReturnType, Name, Feature, ...)         \
+  ReturnType SMTSolverImpl::Name(__VA_ARGS__) { unsupportedFeature(Feature); }
 
 // Width-extension wrapper: same guard and postcondition for sign- and
 // zero-extension. The guard is what stops i + width wrapping unsigned, so it
@@ -1596,8 +1596,8 @@ SMTExprRef SMTSolverImpl::mkApply(const SMTExprRef &Function,
   return theExp;
 }
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkApplyImpl, "Uninterpreted functions",
-                               const SMTExprRef &,
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkApplyImpl,
+                               "Uninterpreted functions", const SMTExprRef &,
                                const std::vector<SMTExprRef> &)
 
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
@@ -1624,7 +1624,7 @@ SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
   return theExp;
 }
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkForallImpl, "Quantifiers",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkForallImpl, "Quantifiers",
                                const std::vector<SMTExprRef> &,
                                const SMTExprRef &)
 
@@ -1645,7 +1645,7 @@ SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
   return theExp;
 }
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkExistsImpl, "Quantifiers",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkExistsImpl, "Quantifiers",
                                const std::vector<SMTExprRef> &,
                                const SMTExprRef &)
 
@@ -2345,9 +2345,8 @@ void SMTSolverImpl::dumpModel() {
 
 void SMTSolverImpl::dumpModel(std::string &Out) { return dumpModelImpl(Out); }
 
-SMTSortRef SMTSolverImpl::mkTupleSortImpl(const std::vector<SMTSortRef> &) {
-  unsupportedFeature("Tuples");
-}
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTSortRef, mkTupleSortImpl, "Tuples",
+                               const std::vector<SMTSortRef> &)
 
 CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVNorImpl,
                                   mkBVNotImpl(mkBVOrImpl(LHS, RHS)), BVNor)
@@ -2453,21 +2452,22 @@ SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Xor);
 }
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithNegImpl, "Arithmetic", const SMTExprRef &)
-
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithAddImpl, "Arithmetic", const SMTExprRef &,
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithNegImpl, "Arithmetic",
                                const SMTExprRef &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithSubImpl, "Arithmetic", const SMTExprRef &,
-                               const SMTExprRef &)
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithAddImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithMulImpl, "Arithmetic", const SMTExprRef &,
-                               const SMTExprRef &)
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithSubImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithDivImpl, "Arithmetic", const SMTExprRef &,
-                               const SMTExprRef &)
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithMulImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithModImpl, "Integer arithmetic",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithDivImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
+
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithModImpl, "Integer arithmetic",
                                const SMTExprRef &, const SMTExprRef &)
 
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
@@ -2476,28 +2476,28 @@ SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
   return rewrapExprImpl(*TheExp, TheExp->Sort, SMTExprKind::ArithShl);
 }
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithShlImpl, "Integer arithmetic",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithShlImpl, "Integer arithmetic",
                                const SMTExprRef &, const SMTExprRef &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithLtImpl, "Arithmetic", const SMTExprRef &,
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithLtImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
+
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithGtImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
+
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithLeImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
+
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithGeImpl, "Arithmetic",
+                               const SMTExprRef &, const SMTExprRef &)
+
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkInt2RealImpl, "Real arithmetic",
                                const SMTExprRef &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithGtImpl, "Arithmetic", const SMTExprRef &,
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkReal2IntImpl, "Integer arithmetic",
                                const SMTExprRef &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithLeImpl, "Arithmetic", const SMTExprRef &,
-                               const SMTExprRef &)
-
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkArithGeImpl, "Arithmetic", const SMTExprRef &,
-                               const SMTExprRef &)
-
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkInt2RealImpl, "Real arithmetic",
-                               const SMTExprRef &)
-
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkReal2IntImpl, "Integer arithmetic",
-                               const SMTExprRef &)
-
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkIsIntImpl, "Integer arithmetic",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkIsIntImpl, "Integer arithmetic",
                                const SMTExprRef &)
 
 SMTExprRef SMTSolverImpl::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
@@ -2566,28 +2566,31 @@ SMTExprRef SMTSolverImpl::mkFPGeImpl(const SMTExprRef &LHS,
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPGe);
 }
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkTupleImpl, "Tuples",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkTupleImpl, "Tuples",
                                const std::vector<SMTExprRef> &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkTupleSelectImpl, "Tuples", const SMTExprRef &,
-                               unsigned)
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkTupleSelectImpl, "Tuples",
+                               const SMTExprRef &, unsigned)
 
 SMTResult<std::string> SMTSolverImpl::getIntImpl(const SMTExprRef &Exp) {
   return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
                   "Integer arithmetic is not supported by this backend"};
 }
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkIntImpl, "Integer arithmetic", int64_t)
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkIntImpl, "Integer arithmetic",
+                               int64_t)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkIntImpl, "Integer arithmetic",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkIntImpl, "Integer arithmetic",
                                const std::string &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkRealImpl, "Real arithmetic",
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkRealImpl, "Real arithmetic",
                                const std::string &)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkRealImpl, "Real arithmetic", int64_t)
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkRealImpl, "Real arithmetic",
+                               int64_t)
 
-CAMADA_DEFINE_UNSUPPORTED_IMPL(mkRealImpl, "Real arithmetic", int64_t, int64_t)
+CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkRealImpl, "Real arithmetic",
+                               int64_t, int64_t)
 
 void SMTSolverImpl::dumpImpl() {
   std::string Out;
