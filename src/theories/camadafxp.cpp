@@ -54,9 +54,9 @@
 // no native-vs-encoded split here: everything below is built once from the
 // public BV surface and works on every backend, including the SMT-LIB pipe.
 
-#include "camadaimpl.h"
+#include "../core/camadaimpl.h"
 
-#include "camadacommon.h"
+#include "../camadacommon.h"
 
 #include <algorithm>
 #include <cstdint>

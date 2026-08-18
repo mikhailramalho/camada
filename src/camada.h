@@ -29,86 +29,14 @@
 #include <vector>
 
 #include "camadacommon.h"
-#include "camadaenums.h"
 #include "camadaexpr.h"
 #include "camadasort.h"
+#include "camadatypes.h"
 
 namespace camada {
 
 /// Return camada version
 std::string getCamadaVersion();
-
-/// Structured error payload carried by `SMTResult<T>` on failure.
-struct SMTError {
-  SMTError() = default;
-
-  SMTError(SMTErrorCode TheCode, SMTBackendKind TheBackend,
-           std::string TheMessage)
-      : Code(TheCode), Backend(TheBackend), Message(std::move(TheMessage)) {}
-
-  SMTErrorCode Code = SMTErrorCode::None;
-  SMTBackendKind Backend{};
-  std::string Message;
-};
-
-/// Lightweight C++17 result type used by fallible Camada APIs.
-///
-/// A result either contains a value of type `T` or an `SMTError`.
-/// Successful results convert to `true`; failures convert to `false`.
-///
-/// Example:
-/// ```cpp
-/// auto value = solver->getBool(x);
-/// if (!value) {
-///   std::cerr << value.error().Message << "\n";
-/// } else {
-///   bool b = value.value();
-/// }
-/// ```
-template <typename T> class SMTResult {
-public:
-  SMTResult(T Value) : Value_(std::move(Value)), HasValue_(true) {}
-  SMTResult(SMTError Error) : Error_(std::move(Error)), HasValue_(false) {}
-
-  explicit operator bool() const noexcept { return HasValue_; }
-
-  const T &value() const {
-    fatalErrorIf(!HasValue_, "Accessing value of failed SMTResult");
-    return Value_;
-  }
-
-  T &value() {
-    fatalErrorIf(!HasValue_, "Accessing value of failed SMTResult");
-    return Value_;
-  }
-
-  const SMTError &error() const {
-    fatalErrorIf(HasValue_, "Accessing error of successful SMTResult");
-    return Error_;
-  }
-
-private:
-  T Value_{};
-  SMTError Error_{};
-  bool HasValue_ = false;
-};
-
-/// Sparse model of an array expression, produced by
-/// SMTSolver::getArrayValues after a SAT check.
-///
-/// The model value of the array at index `i` is the element of the first
-/// entry whose index has the same model value as `i`, or the value of
-/// `Base` when no entry matches. `Base` is a null ref when the solver did
-/// not report a default — every constrained index is then covered by an
-/// entry, and unlisted indexes are unconstrained.
-///
-/// Both expressions in each entry and `Base` are valid arguments to the
-/// model-value getters (getBV, getBool, ...) for as long as the model that
-/// produced them stays current (no new constraints or checks).
-struct ArrayModel {
-  SMTExprRef Base;
-  std::vector<std::pair<SMTExprRef, SMTExprRef>> Entries;
-};
 
 /// Generic base class for SMT Solvers
 ///

@@ -31,14 +31,14 @@ set(LIBRARY_TARGET_NAME ${PROJECT_NAME})
 
 # List of CPP (source) library files.
 set(${LIBRARY_TARGET_NAME}_SRC
-    camada.cpp
-    camadaarray.cpp
-    camadaexpr.cpp
-    camadafp.cpp
-    camadafxp.cpp
-    camadaimpl.cpp
-    camadasort.cpp
-    camadatuple.cpp
+    core/camada.cpp
+    theories/camadaarray.cpp
+    core/camadaexpr.cpp
+    theories/camadafp.cpp
+    theories/camadafxp.cpp
+    core/camadaimpl.cpp
+    core/camadasort.cpp
+    theories/camadatuple.cpp
     solvers/bitwuzlasolver.cpp
     solvers/cvc5solver.cpp
     solvers/mathsatsolver.cpp
@@ -57,11 +57,14 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camadaarena.h
     camadacache.h
     camadacommon.h
-    camadaenums.h
+    camadatypes.h
     camadaexpr.h
     camadahandle.h
-    camadaimpl.h
     camadasort.h)
+
+# camadaimpl.h is the base class an out-of-tree backend inherits, not part
+# of the API a consumer calls -- installed under core/ to say so.
+set(${LIBRARY_TARGET_NAME}_CORE_HDR core/camadaimpl.h)
 
 if(CAMADA_SOLVER_SMTLIB_ENABLE)
   list(APPEND ${LIBRARY_TARGET_NAME}_SOLVER_HDR solvers/smtlibsolver.h)
@@ -70,14 +73,15 @@ endif()
 # add each solver specific header, if it is enabled
 add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
-set(${LIBRARY_TARGET_NAME}_HDR camadaimpl.h)
+set(${LIBRARY_TARGET_NAME}_HDR core/camadaimpl.h)
 
 # Adds a library target called ${LIBRARY_TARGET_NAME} to be built from the
 # source and header files listed in the command invocation.
 add_library(
   ${LIBRARY_TARGET_NAME}
   ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR}
-  ${${LIBRARY_TARGET_NAME}_PUB_HDR} ${${LIBRARY_TARGET_NAME}_SOLVER_HDR})
+  ${${LIBRARY_TARGET_NAME}_PUB_HDR} ${${LIBRARY_TARGET_NAME}_SOLVER_HDR}
+  ${${LIBRARY_TARGET_NAME}_CORE_HDR})
 
 # Within this project, you can link to this library by just specifing the name
 # of the target, i.e. ${LIBRARY_TARGET_NAME} = LibTemplateCMake. It is useful,
@@ -253,4 +257,9 @@ install(
 install(
   FILES ${${LIBRARY_TARGET_NAME}_SOLVER_HDR}
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/solvers"
+  COMPONENT dev)
+
+install(
+  FILES ${${LIBRARY_TARGET_NAME}_CORE_HDR}
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/core"
   COMPONENT dev)

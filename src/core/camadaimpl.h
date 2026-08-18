@@ -32,11 +32,11 @@
 #include <utility>
 #include <vector>
 
-#include "camada.h"
-#include "camadaarena.h"
-#include "camadacache.h"
-#include "camadaexpr.h"
-#include "camadasort.h"
+#include "../camada.h"
+#include "../camadaarena.h"
+#include "../camadacache.h"
+#include "../camadaexpr.h"
+#include "../camadasort.h"
 
 namespace camada {
 

@@ -19,7 +19,7 @@
  *
  **************************************************************************/
 
-#include "camada.h"
+#include "../camada.h"
 #include "ac_config.h"
 
 #if SOLVER_Z3_ENABLED

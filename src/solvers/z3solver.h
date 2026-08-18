@@ -28,7 +28,7 @@
 #include <z3++.h>
 
 #include "../camadaexpr.h"
-#include "../camadaimpl.h"
+#include "../core/camadaimpl.h"
 #include "../camadasort.h"
 
 namespace camada {
