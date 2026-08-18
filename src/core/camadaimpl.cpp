@@ -1568,7 +1568,7 @@ SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
   ElementSorts.reserve(Elements.size());
   for (const auto &Element : Elements)
     ElementSorts.push_back(Element->Sort);
-  SMTSortRef TupleSort = mkTupleSort(ElementSorts);
+  [[maybe_unused]] SMTSortRef TupleSort = mkTupleSort(ElementSorts);
   SMTExprRef theExp = mkTupleImpl(Elements);
   assert(theExp->Sort == TupleSort);
   return theExp;
