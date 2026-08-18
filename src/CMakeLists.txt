@@ -50,6 +50,7 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camadaarena.h
     camadacache.h
     camadacommon.h
+    camadaenums.h
     camadaexpr.h
     camadahandle.h
     camadaimpl.h
