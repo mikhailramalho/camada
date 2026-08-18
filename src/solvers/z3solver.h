@@ -19,74 +19,72 @@
  *
  **************************************************************************/
 
-#ifndef BITWUZLASOLVER_H_
-#define BITWUZLASOLVER_H_
+#ifndef Z3SOLVER_H_
+#define Z3SOLVER_H_
 
-#include <chrono>
 #include <cstdint>
 #include <string>
+#include <utility>
+#include <z3++.h>
 
-extern "C" {
-#include <bitwuzla/c/bitwuzla.h>
-}
-
-#include "camadaexpr.h"
-#include "camadaimpl.h"
-#include "camadasort.h"
+#include "../camadaexpr.h"
+#include "../camadaimpl.h"
+#include "../camadasort.h"
 
 namespace camada {
 
-using BitwuzlaContextRef = Bitwuzla *;
+using Z3ContextRef = z3::context *;
 
-class BitwSort : public SolverSort<BitwuzlaContextRef, BitwuzlaSort> {
+/// Wrapper for Z3 Sort
+class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Bitwuzla;
-  using SolverSort<BitwuzlaContextRef, BitwuzlaSort>::SolverSort;
-  ~BitwSort() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
+  using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
+  ~Z3Sort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
-  void dump() const override { return SMTSort::dump(); }
-  void dump(std::string &Out) const override;
-};
 
-class BitwExpr : public SolverExpr<BitwuzlaContextRef, BitwuzlaTerm> {
+  void dump() const override;
+  void dump(std::string &Out) const override;
+}; // end class Z3Sort
+
+class Z3Expr : public SolverExpr<Z3ContextRef, z3::ast> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Bitwuzla;
-  using SolverExpr<BitwuzlaContextRef, BitwuzlaTerm>::SolverExpr;
-  ~BitwExpr() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
+  using SolverExpr<Z3ContextRef, z3::ast>::SolverExpr;
+  ~Z3Expr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
+  /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
+
   void dump() const override;
   void dump(std::string &Out) const override;
-};
+}; // end class Z3Expr
 
-class BitwuzlaSolver : public SMTSolverImpl {
+class Z3Solver : public SMTSolverImpl {
 public:
-  explicit BitwuzlaSolver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
-                          ArrayEncoding Arrays = ArrayEncoding::Native);
-  ~BitwuzlaSolver() override;
+  explicit Z3Solver(ArrayEncoding Arrays = ArrayEncoding::Native);
+  // z3::context is neither copyable nor movable in Z3 4.13.x, so a
+  // caller-configured context cannot cross this API; the configuration
+  // does instead, and the context is built in place from it. For the
+  // same reason there is no (context, solver) constructor: any solver a
+  // caller could pass would reference a context object outside this
+  // class. Subclass and call setSolver() against context() to install a
+  // custom solver (see the Override Z3 regression).
+  explicit Z3Solver(z3::config &Config,
+                    ArrayEncoding Arrays = ArrayEncoding::Native);
+  ~Z3Solver() override;
 
 protected:
-  BitwuzlaContextRef context() const { return Context; }
-  BitwuzlaOptions *options() const { return Options; }
-  BitwuzlaTermManager *termManager() const { return TermManager; }
-
-  void initializeContext();
-  void destroyContext();
-
-  /// Whether contexts are created with BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS
-  /// (opt-in: tracking assumption participation slows every check, and the
-  /// option is frozen at context creation). Survives reset(), which recreates
-  /// the context through initializeContext().
-  bool ProduceUnsatAssumptions = false;
-
-  // Arm CheckDeadline from TimeoutMs; both check paths call it before
-  // querying the solver.
-  void armCheckDeadline();
+  z3::context &context() { return Context; }
+  const z3::context &context() const { return Context; }
+  z3::solver &solver() { return Solver; }
+  const z3::solver &solver() const { return Solver; }
+  void setSolver(z3::solver S) { Solver = std::move(S); }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -94,55 +92,99 @@ protected:
                             SMTExprKind Kind) override;
 
   SMTSortRef mkBoolSortImpl() override;
+  SMTSortRef mkIntSortImpl() override;
+  SMTSortRef mkRealSortImpl() override;
+
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
+
   SMTSortRef mkRMSortImpl() override;
+
   SMTSortRef mkFPSortImpl(const unsigned ExpWidth,
                           const unsigned SigWidth) override;
+
   SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
                             const unsigned SigWidth) override;
   SMTSortRef mkFXPSortImpl(unsigned Width, unsigned FracBits,
                            bool IsSigned) override;
+
   SMTSortRef mkBVRMSortImpl() override;
+
   SMTSortRef mkArraySortImpl(const SMTSortRef &IndexSort,
                              const SMTSortRef &ElemSort) override;
 
   SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
                                 const SMTSortRef &CodomainSort) override;
 
+  SMTSortRef
+  mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
+
+  // Native datatypes cannot hold an Ackermann-encoded array member (it
+  // has no backend term), so the Ackermann array mode forces the Camada
+  // tuple encoding.
+  bool nativeTupleSupport() const override {
+    return ArrayMode != ArrayEncoding::Ackermann;
+  }
+
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkBVNotImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkNotImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkBVAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVSRemImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVURemImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVSDivImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUDivImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVShlImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVAshrImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVLshrImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVSltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVSleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVAddOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -158,61 +200,70 @@ protected:
                                   const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVNegOverflowImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
+
   SMTExprRef mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkArithNegImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkArithAddImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithSubImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithMulImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithDivImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithModImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithShlImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
+  SMTExprRef mkArithLtImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithGtImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithLeImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkArithGeImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+  SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) override;
+  SMTExprRef mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) override;
+
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                        const SMTExprRef &F) override;
+
   SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) override;
+
   SMTExprRef mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) override;
+
   SMTExprRef mkBVExtractImpl(unsigned High, unsigned Low,
                              const SMTExprRef &Exp) override;
+
   SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
-  SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-  SMTExprRef mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-  SMTExprRef mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-  SMTExprRef mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-  SMTExprRef mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-  SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const SMTExprRef &R) override;
-  SMTExprRef mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                         const SMTExprRef &Z, const SMTExprRef &R) override;
-  SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-  SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-  SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-  SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-  SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
-                           const SMTExprRef &RHS) override;
-  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                          const SMTExprRef &R) override;
-  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                           const SMTExprRef &R) override;
-  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                           const SMTExprRef &R) override;
-  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
-  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
-  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
-                                const SMTExprRef &R) override;
+
   SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
                                const SMTExprRef &Index) override;
+
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
+  SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &Elements) override;
+  SMTExprRef mkTupleSelectImpl(const SMTExprRef &Tuple,
+                               unsigned Index) override;
   SMTExprRef mkApplyImpl(const SMTExprRef &Function,
                          const std::vector<SMTExprRef> &Args) override;
   SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
@@ -220,69 +271,142 @@ protected:
   SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                           const SMTExprRef &Body) override;
 
+  SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
+
+  SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const SMTExprRef &R) override;
+
+  SMTExprRef mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
+                         const SMTExprRef &Z, const SMTExprRef &R) override;
+
+  SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                          const SMTExprRef &R) override;
+
+  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const SMTExprRef &R) override;
+
+  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const SMTExprRef &R) override;
+
+  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+
+  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+
+  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
+                                const SMTExprRef &R) override;
+
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
+
   SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
+
+  SMTResult<std::string> getIntImpl(const SMTExprRef &Exp) override;
+
+  SMTResult<std::pair<std::string, std::string>>
+  getRationalImpl(const SMTExprRef &Exp) override;
+
   SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
 
   SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array) override;
 
   SMTExprRef mkBoolImpl(const bool b) override;
+  SMTExprRef mkIntImpl(int64_t v) override;
+  SMTExprRef mkIntImpl(const std::string &v) override;
+  SMTExprRef mkRealImpl(const std::string &v) override;
+  SMTExprRef mkRealImpl(int64_t v) override;
+  SMTExprRef mkRealImpl(int64_t num, int64_t den) override;
+
   SMTExprRef mkBVFromDecImpl(const int64_t Int,
                              const SMTSortRef &Sort) override;
+
   SMTExprRef mkBVFromBinImpl(const std::string &Int,
                              const SMTSortRef &Sort) override;
-  SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
-  SMTExprRef mkRMImpl(const RM &R) override;
-  SMTExprRef mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
-                       const unsigned SigWidth) override;
-  SMTExprRef mkInfImpl(const bool Sgn, const unsigned ExpWidth,
-                       const unsigned SigWidth) override;
+
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
 
-  // Bitwuzla 0.9.x answers UNKNOWN (with an "Equality over constant
-  // arrays not fully supported yet" warning) for any formula that
-  // equates a constant array with another array — including the common
-  // `symbol = ((as const ...) v)` pattern — so the common layer lowers
-  // constant arrays lazily instead (nativeConstArraySupport() below) and
-  // this override is unreachable.
+  SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
+
+  SMTExprRef mkRMImpl(const RM &R) override;
+
+  SMTExprRef mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
+                       const unsigned SigWidth) override;
+
+  SMTExprRef mkInfImpl(const bool Sgn, const unsigned ExpWidth,
+                       const unsigned SigWidth) override;
+
+  SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
+                              const SMTSortRef &To) override;
+
+  SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 
-  bool nativeConstArraySupport() const override { return false; }
-  SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
-                              const SMTSortRef &To) override;
-  SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
-
   checkResult checkImpl() override;
+
   bool setTimeoutImpl(uint64_t Milliseconds) override;
 
   checkResult
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
+
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
   bool supportsImpl(SolverFeature Feature) const override;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
 
   std::string getSolverNameAndVersion() const override;
+
   void dumpImpl(std::string &Out) override;
+
   void dumpModelImpl(std::string &Out) override;
 
 private:
-  BitwuzlaContextRef Context = nullptr;
-  BitwuzlaOptions *Options = nullptr;
-  BitwuzlaTermManager *TermManager = nullptr;
-
-  // Per-check wall-clock deadline enforced through bitwuzla's termination
-  // callback (registered in initializeContext, which passes this member's
-  // address as the callback state). The epoch value means "no deadline";
-  // the check paths arm it from TimeoutMs before each query.
-  std::chrono::steady_clock::time_point CheckDeadline{};
-};
+  z3::context Context;
+  z3::solver Solver;
+  unsigned TupleCounter = 0;
+}; // end class Z3Solver
 
 } // namespace camada
 

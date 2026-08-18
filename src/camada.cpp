@@ -23,34 +23,34 @@
 #include "ac_config.h"
 
 #if SOLVER_Z3_ENABLED
-#include "z3solver.h"
+#include "solvers/z3solver.h"
 #endif
 
 #if SOLVER_MATHSAT_ENABLED
-#include "mathsatsolver.h"
+#include "solvers/mathsatsolver.h"
 #endif
 
 #if SOLVER_CVC5_ENABLED
-#include "cvc5solver.h"
+#include "solvers/cvc5solver.h"
 #endif
 
 #if SOLVER_BITWUZLA_ENABLED
-#include "bitwuzlasolver.h"
+#include "solvers/bitwuzlasolver.h"
 #endif
 
 #if SOLVER_YICES_ENABLED
-#include "yicessolver.h"
+#include "solvers/yicessolver.h"
 #endif
 
 #if SOLVER_STP_ENABLED
-#include "stpsolver.h"
+#include "solvers/stpsolver.h"
 #endif
 
 // The SMT-LIB pipeline backend has no native solver dep — it drives an
 // external SMT-LIB-speaking process via fork/exec/setrlimit/select, so it
 // is POSIX-only and gated behind SOLVER_SMTLIB_ENABLED.
 #if SOLVER_SMTLIB_ENABLED
-#include "smtlibsolver.h"
+#include "solvers/smtlibsolver.h"
 #endif
 
 namespace camada {

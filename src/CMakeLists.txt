@@ -4,17 +4,24 @@ function(add_header_to_install)
     string(TOUPPER ${name} upper_name)
 
     if(CAMADA_SOLVER_${upper_name}_ENABLE AND ${name}_FOUND)
-      list(APPEND solver_src_test_files "${lower_name}solver.h")
+      list(APPEND solver_src_test_files "solvers/${lower_name}solver.h")
     endif()
 
-    set(${LIBRARY_TARGET_NAME}_PUB_HDR
-        ${${LIBRARY_TARGET_NAME}_PUB_HDR} ${solver_src_test_files}
+    # Solver headers go to their own list: PUBLIC_HEADER flattens every path
+    # into one destination, so these are installed separately to keep them under
+    # camada/solvers/.
+    set(${LIBRARY_TARGET_NAME}_SOLVER_HDR
+        ${${LIBRARY_TARGET_NAME}_SOLVER_HDR} ${solver_src_test_files}
         PARENT_SCOPE)
   endforeach()
 endfunction()
 
 # Include binary path so we can include ac_config.h
 include_directories(${CMAKE_BINARY_DIR}/src)
+# and the source dir, so headers under solvers/ can include their siblings by
+# plain name -- the same way an installed consumer resolves them from camada/'s
+# include root.
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # This is the "physical" (i.e. real) name of the library. The actual file name
 # of the library built is constructed based on conventions of the native
@@ -32,15 +39,15 @@ set(${LIBRARY_TARGET_NAME}_SRC
     camadaimpl.cpp
     camadasort.cpp
     camadatuple.cpp
-    bitwuzlasolver.cpp
-    cvc5solver.cpp
-    mathsatsolver.cpp
-    stpsolver.cpp
-    yicessolver.cpp
-    z3solver.cpp)
+    solvers/bitwuzlasolver.cpp
+    solvers/cvc5solver.cpp
+    solvers/mathsatsolver.cpp
+    solvers/stpsolver.cpp
+    solvers/yicessolver.cpp
+    solvers/z3solver.cpp)
 
 if(CAMADA_SOLVER_SMTLIB_ENABLE)
-  list(APPEND ${LIBRARY_TARGET_NAME}_SRC smtlibsolver.cpp)
+  list(APPEND ${LIBRARY_TARGET_NAME}_SRC solvers/smtlibsolver.cpp)
 endif()
 
 # List of HPP (header) library files, the public ones will be installed on the
@@ -57,7 +64,7 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camadasort.h)
 
 if(CAMADA_SOLVER_SMTLIB_ENABLE)
-  list(APPEND ${LIBRARY_TARGET_NAME}_PUB_HDR smtlibsolver.h)
+  list(APPEND ${LIBRARY_TARGET_NAME}_SOLVER_HDR solvers/smtlibsolver.h)
 endif()
 
 # add each solver specific header, if it is enabled
@@ -70,7 +77,7 @@ set(${LIBRARY_TARGET_NAME}_HDR camadaimpl.h)
 add_library(
   ${LIBRARY_TARGET_NAME}
   ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR}
-  ${${LIBRARY_TARGET_NAME}_PUB_HDR})
+  ${${LIBRARY_TARGET_NAME}_PUB_HDR} ${${LIBRARY_TARGET_NAME}_SOLVER_HDR})
 
 # Within this project, you can link to this library by just specifing the name
 # of the target, i.e. ${LIBRARY_TARGET_NAME} = LibTemplateCMake. It is useful,
@@ -239,4 +246,11 @@ install(
 install(
   FILES "${CMAKE_BINARY_DIR}/src/camadafeatures.h"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}"
+  COMPONENT dev)
+
+# Solver headers keep their subdirectory: consumers include them as
+# <camada/solvers/z3solver.h>.
+install(
+  FILES ${${LIBRARY_TARGET_NAME}_SOLVER_HDR}
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}/solvers"
   COMPONENT dev)

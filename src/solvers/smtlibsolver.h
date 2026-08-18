@@ -30,9 +30,9 @@
 #include <string>
 #include <vector>
 
-#include "camadaexpr.h"
-#include "camadaimpl.h"
-#include "camadasort.h"
+#include "../camadaexpr.h"
+#include "../camadaimpl.h"
+#include "../camadasort.h"
 
 namespace camada {
 

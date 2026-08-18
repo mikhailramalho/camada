@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "smtlibsolver.h"
-#include "camadacommon.h"
+#include "../camadacommon.h"
 
 #include <algorithm>
 #include <atomic>

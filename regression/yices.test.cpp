@@ -5,7 +5,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <yicessolver.h>
+#include <solvers/yicessolver.h>
 
 TEST_CASE("Ackermann arrays Yices test", "[YICES]") {
   auto yices = camada::createYicesSolver(camada::ArrayEncoding::Ackermann);

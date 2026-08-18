@@ -2,7 +2,7 @@
 #include "camada.h"
 
 #if SOLVER_SMTLIB_ENABLED
-#include "smtlibsolver.h"
+#include "solvers/smtlibsolver.h"
 #endif
 
 #include <algorithm>

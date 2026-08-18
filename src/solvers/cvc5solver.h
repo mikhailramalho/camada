@@ -19,28 +19,27 @@
  *
  **************************************************************************/
 
-#ifndef Z3SOLVER_H_
-#define Z3SOLVER_H_
+#ifndef CVC5SOLVER_H_
+#define CVC5SOLVER_H_
 
 #include <cstdint>
+#include <cvc5/cvc5.h>
 #include <string>
-#include <utility>
-#include <z3++.h>
 
-#include "camadaexpr.h"
-#include "camadaimpl.h"
-#include "camadasort.h"
+#include "../camadaexpr.h"
+#include "../camadaimpl.h"
+#include "../camadasort.h"
 
 namespace camada {
 
-using Z3ContextRef = z3::context *;
+using CVC5ContextRef = cvc5::Solver *;
 
-/// Wrapper for Z3 Sort
-class Z3Sort : public SolverSort<Z3ContextRef, z3::sort> {
+/// Wrapper for CVC5 Sort
+class CVC5Sort : public SolverSort<CVC5ContextRef, cvc5::Sort> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
-  using SolverSort<Z3ContextRef, z3::sort>::SolverSort;
-  ~Z3Sort() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
+  using SolverSort<CVC5ContextRef, cvc5::Sort>::SolverSort;
+  ~CVC5Sort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -48,13 +47,13 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
-}; // end class Z3Sort
+}; // end class CVC5Sort
 
-class Z3Expr : public SolverExpr<Z3ContextRef, z3::ast> {
+class CVC5Expr : public SolverExpr<CVC5ContextRef, cvc5::Term> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Z3;
-  using SolverExpr<Z3ContextRef, z3::ast>::SolverExpr;
-  ~Z3Expr() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
+  using SolverExpr<CVC5ContextRef, cvc5::Term>::SolverExpr;
+  ~CVC5Expr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -63,28 +62,19 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
-}; // end class Z3Expr
+}; // end class CVC5Expr
 
-class Z3Solver : public SMTSolverImpl {
+class CVC5Solver : public SMTSolverImpl {
 public:
-  explicit Z3Solver(ArrayEncoding Arrays = ArrayEncoding::Native);
-  // z3::context is neither copyable nor movable in Z3 4.13.x, so a
-  // caller-configured context cannot cross this API; the configuration
-  // does instead, and the context is built in place from it. For the
-  // same reason there is no (context, solver) constructor: any solver a
-  // caller could pass would reference a context object outside this
-  // class. Subclass and call setSolver() against context() to install a
-  // custom solver (see the Override Z3 regression).
-  explicit Z3Solver(z3::config &Config,
-                    ArrayEncoding Arrays = ArrayEncoding::Native);
-  ~Z3Solver() override;
+  explicit CVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
+                      ArrayEncoding Arrays = ArrayEncoding::Native);
+  ~CVC5Solver() override;
 
 protected:
-  z3::context &context() { return Context; }
-  const z3::context &context() const { return Context; }
-  z3::solver &solver() { return Solver; }
-  const z3::solver &solver() const { return Solver; }
-  void setSolver(z3::solver S) { Solver = std::move(S); }
+  cvc5::TermManager &termManager() { return Terms; }
+  const cvc5::TermManager &termManager() const { return Terms; }
+  cvc5::Solver &context() { return Context; }
+  const cvc5::Solver &context() const { return Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -252,10 +242,6 @@ protected:
   SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
-
   SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
                                const SMTExprRef &Index) override;
 
@@ -392,6 +378,11 @@ protected:
 
   bool supportsImpl(SolverFeature Feature) const override;
 
+  /// Whether the context was created with produce-unsat-assumptions
+  /// (opt-in: tracking assumption participation slows every check, and
+  /// cvc5 only honors the option when set before solving starts).
+  bool ProduceUnsatAssumptions = false;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
@@ -403,10 +394,10 @@ protected:
   void dumpModelImpl(std::string &Out) override;
 
 private:
-  z3::context Context;
-  z3::solver Solver;
-  unsigned TupleCounter = 0;
-}; // end class Z3Solver
+  cvc5::TermManager Terms;
+  cvc5::Solver Context;
+
+}; // end class CVC5Solver
 
 } // namespace camada
 
