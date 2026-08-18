@@ -1476,8 +1476,12 @@ struct FPFXPParts {
   SMTExprRef TooLo; // !(Scaled > minRaw-1): below range or -infinity
 };
 
+// Mode is applied to the scaled value before the range bounds are
+// derived, so TooHi/TooLo describe the value that will actually be
+// converted. Testing the unrounded value would let a predicate report
+// "in range" for an input whose rounded result does not fit.
 FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
-                        const FXPFormat &To) {
+                        const FXPFormat &To, FXPRM Mode) {
   SMTSortRef Src = Exp->Sort;
   SMTExprRef Val = Exp;
   unsigned SrcE = Src->getFPExponentWidth();
@@ -1516,6 +1520,7 @@ FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
                       Enc),
         RNE); // exact power-of-two scale
   FPFXPParts P;
+  Scaled = roundFPToIntegral(S, Scaled, Mode);
   P.Scaled = Scaled;
   P.IsNaN = S.mkFPIsNaN(Exp);
   // The toward-zero result lands in range iff minRaw-1 < scaled < maxRaw+1
@@ -1594,17 +1599,16 @@ SMTExprRef SMTSolverImpl::mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
   requireFXPSort(To);
   FXPFormat Target = formatOf(To);
-  FPFXPParts P = fpToFXPParts(*this, Exp, Target);
-  // fp.to_sbv / fp.to_ubv always round toward zero, so any other mode has
-  // to be applied in the FP domain first: round the scaled value to an
-  // integer under Mode, then convert exactly. Pass FXPRM::TowardZero for
+  // fp.to_sbv / fp.to_ubv always round toward zero, so any other mode is
+  // applied in the FP domain first -- fpToFXPParts rounds the scaled value
+  // under Mode, leaving this conversion exact. Pass FXPRM::TowardZero for
   // C's float->fixed direction (fixed->fixed narrowing floors instead;
   // both oracle-pinned). Out of range, for infinities, and for NaN the
   // result is solver-chosen, matching C's UB; gate with
   // mkFPToFXPOverflow.
-  SMTExprRef Scaled = roundFPToIntegral(*this, P.Scaled, Mode);
-  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(Scaled, Target.Width)
-                                   : mkFPtoUBV(Scaled, Target.Width);
+  FPFXPParts P = fpToFXPParts(*this, Exp, Target, Mode);
+  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(P.Scaled, Target.Width)
+                                   : mkFPtoUBV(P.Scaled, Target.Width);
   return rewrapExprImpl(*Raw, To, SMTExprKind::FPToFXP);
 }
 
@@ -1612,7 +1616,10 @@ SMTExprRef SMTSolverImpl::mkFPToFXPOverflow(const SMTExprRef &Exp,
                                             const SMTSortRef &To, FXPRM Mode) {
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
   requireFXPSort(To);
-  FPFXPParts P = fpToFXPParts(*this, Exp, formatOf(To));
+  // Round before testing the range, so the predicate agrees with
+  // mkFPToFXP: a value inside the target's range can round out of it, and
+  // reporting it as in-range would contradict the conversion.
+  FPFXPParts P = fpToFXPParts(*this, Exp, formatOf(To), Mode);
   return mkOr(P.IsNaN, mkOr(P.TooHi, P.TooLo));
 }
 
@@ -1621,11 +1628,12 @@ SMTExprRef SMTSolverImpl::mkFPToFXPSat(const SMTExprRef &Exp,
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
   requireFXPSort(To);
   FXPFormat Target = formatOf(To);
-  FPFXPParts P = fpToFXPParts(*this, Exp, Target);
+  FPFXPParts P = fpToFXPParts(*this, Exp, Target, Mode);
+  // P.Scaled is already rounded per Mode, so the conversion is exact.
   SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(P.Scaled, Target.Width)
                                    : mkFPtoUBV(P.Scaled, Target.Width);
   // NaN -> 0 (Clang's _Sat choice; the TR leaves it undefined), rails for
-  // out-of-range and +-infinity, toward-zero otherwise. NaN tests first:
+  // out-of-range and +-infinity, rounded per Mode otherwise. NaN first:
   // it fails both comparisons, so TooHi and TooLo both hold for it.
   SMTExprRef Res = mkIte(
       P.IsNaN, mkBVFromDec(0, Target.Width),
