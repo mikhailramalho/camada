@@ -96,27 +96,47 @@ enum class FPNegBehavior {
   PreserveNaNPayload,
 };
 
-/// Selects how `mkFXPRound` breaks ties. TR 18037 specifies that the
-/// `roundfx` family rounds to nearest but leaves the halfway direction to
-/// the implementation, and implementations differ, so the caller states
-/// which one it is modelling rather than inheriting one library's choice.
+/// Rounding direction for the fixed-point operations that discard bits.
 ///
-/// - TowardPositive: a halfway value rounds up, so 0.5 rounds to 1 and
-///   -0.5 rounds to 0. What LLVM libc does (it adds half an ulp and masks
-///   off the low bits), and the only direction verified against an
-///   executing implementation.
-/// - AwayFromZero: a halfway value rounds away from zero, so 0.5 rounds
-///   to 1 and -0.5 rounds to -1 — symmetric about zero, the convention
-///   most C programmers expect from `round()`.
-/// - ToEven: a halfway value rounds to whichever neighbour has a zero in
-///   the last kept bit, the unbiased choice IEEE-754 uses by default.
+/// Separate from `RM` rather than reusing it, because fixed point needs a
+/// mode IEEE-754 has no name for. TR 18037's `roundfx` rounds to nearest
+/// but leaves the halfway direction to the implementation, and LLVM libc
+/// breaks ties toward positive infinity — nearest for every other value.
+/// `RM::ROUND_TO_PLUS_INF` is a different operation: it rounds *all*
+/// values up, so 0.25 becomes 1 where nearest-ties-up leaves it 0. With no
+/// RM member denoting "nearest, ties toward +inf", reusing RM would have
+/// silently dropped the one `roundfx` direction verified against an
+/// executing implementation.
 ///
-/// All three saturate to the format's maximum when the rounding would
-/// carry past it, which every implementation surveyed agrees on.
-enum class FXPRoundTie {
+/// The three nearest modes differ only on exact halfway values:
+///
+/// - NearestTiesTowardPositive: 0.5 rounds to 1 and -0.5 rounds to 0.
+///   LLVM libc's `roundfx` (it adds half an ulp and masks off the low
+///   bits), and the only direction verified against a running libc.
+/// - NearestTiesAwayFromZero: 0.5 rounds to 1 and -0.5 rounds to -1 —
+///   symmetric about zero, what most C programmers expect from `round()`.
+///   Equivalent to `RM::ROUND_TO_AWAY`.
+/// - NearestTiesToEven: a halfway value rounds to whichever neighbour has
+///   a zero in the last kept bit, IEEE-754's default and the unbiased
+///   choice. Equivalent to `RM::ROUND_TO_EVEN`.
+///
+/// The directed modes never consult the halfway point:
+///
+/// - TowardZero: truncate. C's fixed-to-integer and float-to-fixed
+///   direction, pinned by the execution oracle.
+/// - TowardNegative: floor. What Clang's `-ffixed-point` division does —
+///   verified: -0.5 / 0.75 gives -0.671875, not -0.6640625.
+/// - TowardPositive: ceiling.
+///
+/// Every nearest mode saturates to the format's maximum when the rounding
+/// would carry past it, which every implementation surveyed agrees on.
+enum class FXPRM {
+  NearestTiesTowardPositive,
+  NearestTiesAwayFromZero,
+  NearestTiesToEven,
+  TowardZero,
+  TowardNegative,
   TowardPositive,
-  AwayFromZero,
-  ToEven,
 };
 
 /// Selects how the SMT-LIB backend lowers tuples on the wire.
@@ -760,14 +780,26 @@ public:
   /// Creates a fixed-point negation.
   virtual SMTExprRef mkFXPNeg(const SMTExprRef &Exp) = 0;
 
-  /// Creates a fixed-point multiplication (truncating: the exact product's
-  /// low fractional bits are dropped).
-  virtual SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  /// Creates a fixed-point multiplication. The exact product carries twice
+  /// the fraction bits; Mode decides how the surplus is discarded.
+  ///
+  /// Pass FXPRM::TowardNegative to reproduce C, which truncates. A
+  /// consumer cannot recover any other mode from that result: the bits
+  /// that decide the rounding are gone once the product is narrowed, and
+  /// 41% of Q4.4 products differ between truncation and nearest.
+  virtual SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                              FXPRM Mode) = 0;
 
-  /// Creates a fixed-point division. The quotient rounds toward negative
-  /// infinity (floor), matching Clang's -ffixed-point behavior as pinned
-  /// by the execution oracle.
-  virtual SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS) = 0;
+  /// Creates a fixed-point division, rounding the quotient per Mode.
+  ///
+  /// Pass FXPRM::TowardNegative to reproduce C: Clang's -ffixed-point
+  /// floors, which the execution oracle pins (-0.5 / 0.75 gives
+  /// -0.671875, not the -0.6640625 that truncation would give). No
+  /// widening lets a consumer round differently after the fact — a
+  /// quotient like 1/3 never terminates, so composing a wider divide with
+  /// a narrowing step double-rounds.
+  virtual SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                              FXPRM Mode) = 0;
 
   /// Creates a fixed-point left shift by a concrete amount.
   virtual SMTExprRef mkFXPShl(const SMTExprRef &Exp, unsigned Amount) = 0;
@@ -847,13 +879,13 @@ public:
   virtual SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) = 0;
 
   /// Saturating fixed-point multiplication.
-  virtual SMTExprRef mkFXPMulSat(const SMTExprRef &LHS,
-                                 const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkFXPMulSat(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 FXPRM Mode) = 0;
 
   /// Saturating fixed-point division. The value is meaningful only under
   /// the negation of mkFXPDivByZero.
-  virtual SMTExprRef mkFXPDivSat(const SMTExprRef &LHS,
-                                 const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkFXPDivSat(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 FXPRM Mode) = 0;
 
   /// Saturating fixed-point left shift.
   virtual SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) = 0;
@@ -882,18 +914,18 @@ public:
                                      const SMTExprRef &Amount) = 0;
 
   /// Converts between fixed-point formats (truncating on narrowing).
-  virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
-                                const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFXPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
+                                FXPRM Mode) = 0;
 
   /// True iff the value does not fit the target format of a mkFXPToFXP
   /// conversion.
   virtual SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
-                                        const SMTSortRef &To) = 0;
+                                        const SMTSortRef &To, FXPRM Mode) = 0;
 
   /// Saturating fixed-point format conversion: out-of-range values clamp
   /// to the target format's min/max instead of being undefined.
-  virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
-                                   const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp, const SMTSortRef &To,
+                                   FXPRM Mode) = 0;
 
   /// Converts an integer bit-vector into a fixed-point value. SrcSigned is
   /// the signedness of the SOURCE integer type: it governs the value (C's
@@ -906,7 +938,8 @@ public:
   /// Converts a fixed-point value to an integer bit-vector of the given
   /// width, rounding toward zero (the direction TR 18037 specifies for
   /// fixed-point to integer conversion).
-  virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) = 0;
+  virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth,
+                               FXPRM Mode) = 0;
 
   /// True iff the toward-zero integer part does not fit the target
   /// integer type's range: [0, 2^w-1] for an unsigned target,
@@ -915,13 +948,13 @@ public:
   /// 2^w either way; only this range report and mkFXPToBVSat's clamp
   /// depend on the target's signedness.
   virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,
-                                       bool ToSigned) = 0;
+                                       bool ToSigned, FXPRM Mode) = 0;
 
   /// Saturating fixed-point to integer conversion (round toward zero,
   /// then clamp to the TARGET integer type's range — a negative source
   /// clamps to zero for an unsigned target.
   virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
-                                  bool ToSigned) = 0;
+                                  bool ToSigned, FXPRM Mode) = 0;
 
   /// Rounds a fixed-point value to Digits fractional bits, keeping the
   /// same format (the low fraction bits become zero) — TR 18037's
@@ -929,7 +962,7 @@ public:
   /// to the format's maximum when the rounding would carry past it.
   /// Digits >= the format's fraction width returns the value unchanged.
   virtual SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
-                                FXPRoundTie Tie) = 0;
+                                FXPRM Tie) = 0;
 
   /// Absolute value — TR 18037's `absfx`. Saturates: the most negative
   /// value of a signed format has no positive counterpart, so it maps to
@@ -948,10 +981,18 @@ public:
   /// wrapping. For unsigned formats it counts leading zeros.
   virtual SMTExprRef mkFXPCountls(const SMTExprRef &Exp, unsigned ToWidth) = 0;
 
-  /// Square root, rounded toward zero: the unique r in the operand's own
-  /// format with r*r <= x < (r+1)*(r+1) at the format's scale. Always
-  /// representable — square root contracts on [0, max] for every format,
-  /// so no saturation is possible.
+  /// Square root, correctly rounded to nearest with ties to even: the
+  /// representable value closest to the true square root at the format's
+  /// scale. Always representable — square root contracts on [0, max] for
+  /// every format, so no saturation is possible.
+  ///
+  /// Nearest rather than toward zero because camada is meant to serve as
+  /// an oracle: an implementation being checked against it should be
+  /// compared with the exact answer, not with a floor that is up to one
+  /// ulp below it. Nothing in TR 18037 pins the direction — the standard
+  /// has no sqrtfx — so unlike the truncating conversions elsewhere in
+  /// this API, which reproduce C's semantics deliberately, this one is
+  /// free to be exact.
   ///
   /// This is the exact mathematical operation, NOT a reproduction of any
   /// library's `sqrtfx`. LLVM libc computes a Sollya-generated linear
@@ -967,7 +1008,15 @@ public:
   /// them. There is no paired predicate because the condition is just
   /// `x < 0` — a consumer that needs to assert it writes
   /// mkFXPLt(x, zero), which produces the same term.
-  virtual SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) = 0;
+  ///
+  /// Mode selects the rounding. Nothing in TR 18037 pins a direction --
+  /// the standard has no sqrtfx and the libc implementations are
+  /// approximations that disagree with each other -- so no mode is "the C
+  /// one"; pass a nearest mode for the exact answer, which is what an
+  /// implementation checked against camada should be compared with. The
+  /// operand is non-negative by construction, so TowardZero and
+  /// TowardNegative coincide, as do the two non-even tie directions.
+  virtual SMTExprRef mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) = 0;
 
   /// Base-e exponential, correctly rounded to nearest with ties to even,
   /// saturating to the format's maximum where the true value does not fit
@@ -1010,19 +1059,20 @@ public:
   /// fixed-to-fixed narrowing (floor); both pinned by the execution
   /// oracle. The value is meaningful only under the negation of
   /// mkFPToFXPOverflow (out-of-range, infinity, and NaN stay UB in C).
-  virtual SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
+                               FXPRM Mode) = 0;
 
   /// True iff the float-to-fixed conversion is undefined: NaN, +-infinity,
   /// or the toward-zero result lies outside the target format's range.
   virtual SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
-                                       const SMTSortRef &To) = 0;
+                                       const SMTSortRef &To, FXPRM Mode) = 0;
 
   /// Saturating float-to-fixed conversion, defined for every input:
   /// out-of-range values and +-infinity clamp to the format's rails, NaN
   /// converts to 0 (Clang's choice for _Sat targets; the TR leaves it
   /// undefined).
-  virtual SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp,
-                                  const SMTSortRef &To) = 0;
+  virtual SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp, const SMTSortRef &To,
+                                  FXPRM Mode) = 0;
 
   /// Creates an array select operation. It returns the element in position
   /// Index of Array.
