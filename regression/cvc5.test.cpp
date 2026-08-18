@@ -5,7 +5,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <cvc5solver.h>
+#include <solvers/cvc5solver.h>
 
 namespace {
 // C++17: no designated initializers, so a tiny builder for the one field

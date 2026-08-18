@@ -19,30 +19,27 @@
  *
  **************************************************************************/
 
-#ifndef YICESSOLVER_H_
-#define YICESSOLVER_H_
+#ifndef CVC5SOLVER_H_
+#define CVC5SOLVER_H_
 
-#include <cstddef>
 #include <cstdint>
-#include <gmp.h>
+#include <cvc5/cvc5.h>
 #include <string>
-#include <vector>
-#include <yices.h>
 
-#include "camadaexpr.h"
-#include "camadaimpl.h"
-#include "camadasort.h"
+#include "../camadaexpr.h"
+#include "../camadasort.h"
+#include "../core/camadaimpl.h"
 
 namespace camada {
 
-using YicesContextRef = context_t *;
+using CVC5ContextRef = cvc5::Solver *;
 
-/// Wrapper for Yices Sort
-class YicesSort : public SolverSort<YicesContextRef, type_t> {
+/// Wrapper for CVC5 Sort
+class CVC5Sort : public SolverSort<CVC5ContextRef, cvc5::Sort> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
-  using SolverSort<YicesContextRef, type_t>::SolverSort;
-  ~YicesSort() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
+  using SolverSort<CVC5ContextRef, cvc5::Sort>::SolverSort;
+  ~CVC5Sort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -50,13 +47,13 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
-}; // end class YicesSort
+}; // end class CVC5Sort
 
-class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
+class CVC5Expr : public SolverExpr<CVC5ContextRef, cvc5::Term> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
-  using SolverExpr<YicesContextRef, term_t>::SolverExpr;
-  ~YicesExpr() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
+  using SolverExpr<CVC5ContextRef, cvc5::Term>::SolverExpr;
+  ~CVC5Expr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -65,27 +62,18 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
-}; // end class YicesExpr
+}; // end class CVC5Expr
 
-class YicesSolver : public SMTSolverImpl {
+class CVC5Solver : public SMTSolverImpl {
 public:
-  explicit YicesSolver(const SolverConfig &Config = {});
-  ~YicesSolver() override;
+  explicit CVC5Solver(const SolverConfig &Config = {});
+  ~CVC5Solver() override;
 
 protected:
-  YicesContextRef context() const { return Context; }
-  void setContext(YicesContextRef NewContext) { Context = NewContext; }
-  void clearContext() { Context = nullptr; }
-  void recreateContext(const char *Logic);
-  void recreateContextWithConfig(const char *Logic,
-                                 void (*Configure)(ctx_config_t *));
-  void destroyContext();
-
-  /// The logic and extra configuration the current context was created
-  /// with, remembered so reset() recreates an equivalent context instead
-  /// of silently reverting a custom-configured solver to the default.
-  std::string ContextLogic = "QF_AUFBV";
-  void (*ContextConfigure)(ctx_config_t *) = nullptr;
+  cvc5::TermManager &termManager() { return Terms; }
+  const cvc5::TermManager &termManager() const { return Terms; }
+  cvc5::Solver &context() { return Context; }
+  const cvc5::Solver &context() const { return Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -97,6 +85,11 @@ protected:
   SMTSortRef mkRealSortImpl() override;
 
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
+
+  SMTSortRef mkRMSortImpl() override;
+
+  SMTSortRef mkFPSortImpl(const unsigned ExpWidth,
+                          const unsigned SigWidth) override;
 
   SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
                             const unsigned SigWidth) override;
@@ -110,6 +103,22 @@ protected:
 
   SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
                                 const SMTSortRef &CodomainSort) override;
+
+  SMTSortRef
+  mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
+
+  /// Tuple lowering chosen at construction (SolverConfig::Tuples):
+  /// Camada forces the per-field lowering even though cvc5 has native
+  /// datatypes.
+  TupleEncoding TupleMode = TupleEncoding::Native;
+
+  // Native datatypes cannot hold an Ackermann-encoded array member (it
+  // has no backend term), so the Ackermann array mode forces the Camada
+  // tuple encoding regardless of TupleMode.
+  bool nativeTupleSupport() const override {
+    return TupleMode == TupleEncoding::Native &&
+           ArrayMode != ArrayEncoding::Ackermann;
+  }
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
@@ -173,6 +182,20 @@ protected:
 
   SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVAddOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVSubOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVMulOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNegOverflowImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
 
@@ -193,6 +216,8 @@ protected:
                             const SMTExprRef &RHS) override;
   SMTExprRef mkArithModImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
+  SMTExprRef mkArithShlImpl(const SMTExprRef &LHS,
+                            const SMTExprRef &RHS) override;
   SMTExprRef mkArithLtImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
   SMTExprRef mkArithGtImpl(const SMTExprRef &LHS,
@@ -204,6 +229,8 @@ protected:
   SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) override;
+  SMTExprRef mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) override;
 
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
@@ -220,17 +247,80 @@ protected:
   SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
 
-  SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
-
   SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
                                const SMTExprRef &Index) override;
 
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
+  SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &Elements) override;
+  SMTExprRef mkTupleSelectImpl(const SMTExprRef &Tuple,
+                               unsigned Index) override;
   SMTExprRef mkApplyImpl(const SMTExprRef &Function,
                          const std::vector<SMTExprRef> &Args) override;
+  SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
+  SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
+
+  SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
+
+  SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         const SMTExprRef &R) override;
+
+  SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const SMTExprRef &R) override;
+
+  SMTExprRef mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
+                         const SMTExprRef &Z, const SMTExprRef &R) override;
+
+  SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                          const SMTExprRef &R) override;
+
+  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const SMTExprRef &R) override;
+
+  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+                           const SMTExprRef &R) override;
+
+  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+
+  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+
+  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
+                                const SMTExprRef &R) override;
 
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
 
@@ -240,6 +330,8 @@ protected:
 
   SMTResult<std::pair<std::string, std::string>>
   getRationalImpl(const SMTExprRef &Exp) override;
+
+  SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
@@ -262,15 +354,23 @@ protected:
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
 
-  // Yices can build a constant array as a lambda, but its context
-  // reasoning over lambda terms is incomplete (a symbolic-index read of
-  // the default satisfied formulas it should refute), so the common layer
-  // lowers constant arrays lazily instead and this override is
-  // unreachable.
+  SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
+
+  SMTExprRef mkRMImpl(const RM &R) override;
+
+  SMTExprRef mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
+                       const unsigned SigWidth) override;
+
+  SMTExprRef mkInfImpl(const bool Sgn, const unsigned ExpWidth,
+                       const unsigned SigWidth) override;
+
+  SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
+                              const SMTSortRef &To) override;
+
+  SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
-
-  bool nativeConstArraySupport() const override { return false; }
 
   checkResult checkImpl() override;
 
@@ -283,6 +383,11 @@ protected:
 
   bool supportsImpl(SolverFeature Feature) const override;
 
+  /// Whether the context was created with produce-unsat-assumptions
+  /// (opt-in: tracking assumption participation slows every check, and
+  /// cvc5 only honors the option when set before solving starts).
+  bool ProduceUnsatAssumptions = false;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
@@ -293,25 +398,11 @@ protected:
 
   void dumpModelImpl(std::string &Out) override;
 
-protected:
-  using TermVectort = std::vector<SMTExprRef>;
-  TermVectort Assertions;
-  std::vector<std::size_t> AssertionScopeSizes;
-
 private:
-  void releaseSymbolNames();
+  cvc5::TermManager Terms;
+  cvc5::Solver Context;
 
-  // SIGALRM-based per-check time limit (POSIX only): armTimeout installs a
-  // handler that calls yices_stop_search on this context and starts an
-  // interval timer from TimeoutMs; disarmTimeout cancels the timer and
-  // restores the previous handler. No-ops when TimeoutMs is 0.
-  void armTimeout();
-  void disarmTimeout();
-
-  YicesContextRef Context = nullptr;
-  std::vector<std::string> NamedSymbols;
-
-}; // namespace camada
+}; // end class CVC5Solver
 
 } // namespace camada
 

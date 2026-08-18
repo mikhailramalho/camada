@@ -5,7 +5,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <stpsolver.h>
+#include <solvers/stpsolver.h>
 
 TEST_CASE("Ackermann arrays STP test", "[STP]") {
   camada::SolverConfig Cfg;

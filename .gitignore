@@ -34,3 +34,7 @@ __pycache__/
 
 # Build directories
 build*/
+
+# clangd/editor index
+.cache/
+.vscode/

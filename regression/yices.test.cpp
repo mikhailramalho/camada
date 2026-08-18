@@ -5,7 +5,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <yicessolver.h>
+#include <solvers/yicessolver.h>
 
 // SolverConfig::Logic drives the Yices context logic; it must survive
 // reset(), which recreates the context.

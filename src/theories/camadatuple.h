@@ -22,7 +22,7 @@
 #ifndef CAMADATUPLE_H_
 #define CAMADATUPLE_H_
 
-#include "camada.h"
+#include "../camada.h"
 
 #include <string>
 #include <vector>

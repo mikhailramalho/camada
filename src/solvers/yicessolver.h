@@ -19,32 +19,30 @@
  *
  **************************************************************************/
 
-#ifndef MATHSATSOLVER_H_
-#define MATHSATSOLVER_H_
+#ifndef YICESSOLVER_H_
+#define YICESSOLVER_H_
 
-#include <cassert>
-#include <chrono>
+#include <cstddef>
 #include <cstdint>
-#include <mathsat.h>
+#include <gmp.h>
 #include <string>
-#include <utility>
-#include <variant>
+#include <vector>
+#include <yices.h>
 
-#include "camadaexpr.h"
-#include "camadaimpl.h"
-#include "camadasort.h"
+#include "../camadaexpr.h"
+#include "../camadasort.h"
+#include "../core/camadaimpl.h"
 
 namespace camada {
 
-using MathSATContextRef = msat_env *;
-using MathSATNode = std::variant<msat_term, msat_decl>;
+using YicesContextRef = context_t *;
 
-/// Wrapper for MathSAT Sort
-class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
+/// Wrapper for Yices Sort
+class YicesSort : public SolverSort<YicesContextRef, type_t> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
-  using SolverSort<MathSATContextRef, msat_type>::SolverSort;
-  ~MathSATSort() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
+  using SolverSort<YicesContextRef, type_t>::SolverSort;
+  ~YicesSort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -52,21 +50,13 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
-}; // end class MathSATSort
+}; // end class YicesSort
 
-class MathSATExpr : public SolverExpr<MathSATContextRef, MathSATNode> {
+class YicesExpr : public SolverExpr<YicesContextRef, term_t> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
-  using SolverExpr<MathSATContextRef, MathSATNode>::SolverExpr;
-  MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
-              const msat_term &T)
-      : SolverExpr<MathSATContextRef, MathSATNode>(Kind, C, S, MathSATNode(T)) {
-  }
-  MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
-              const msat_decl &D)
-      : SolverExpr<MathSATContextRef, MathSATNode>(Kind, C, S, MathSATNode(D)) {
-  }
-  ~MathSATExpr() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::Yices;
+  using SolverExpr<YicesContextRef, term_t>::SolverExpr;
+  ~YicesExpr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -75,32 +65,27 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
+}; // end class YicesExpr
 
-  bool isDecl() const { return std::holds_alternative<msat_decl>(Expr); }
-  bool isTerm() const { return std::holds_alternative<msat_term>(Expr); }
-  const msat_decl &getDecl() const {
-    assert(isDecl() && "Expected MathSAT declaration");
-    return std::get<msat_decl>(Expr);
-  }
-  const msat_term &getTerm() const {
-    assert(isTerm() && "Expected MathSAT term");
-    return std::get<msat_term>(Expr);
-  }
-}; // end class MathSATExpr
-
-class MathSATSolver : public SMTSolverImpl {
+class YicesSolver : public SMTSolverImpl {
 public:
-  explicit MathSATSolver(const SolverConfig &SolverCfg = {});
-
-  /// Take ownership of a MathSAT configuration and reuse it across resets.
-  /// Caller-built msat_config: SolverCfg.Logic is ignored — the logic is
-  /// whatever the given configuration was created with.
-  explicit MathSATSolver(msat_config Config,
-                         const SolverConfig &SolverCfg = {});
-  ~MathSATSolver() override;
+  explicit YicesSolver(const SolverConfig &Config = {});
+  ~YicesSolver() override;
 
 protected:
-  msat_env context() const { return Context; }
+  YicesContextRef context() const { return Context; }
+  void setContext(YicesContextRef NewContext) { Context = NewContext; }
+  void clearContext() { Context = nullptr; }
+  void recreateContext(const char *Logic);
+  void recreateContextWithConfig(const char *Logic,
+                                 void (*Configure)(ctx_config_t *));
+  void destroyContext();
+
+  /// The logic and extra configuration the current context was created
+  /// with, remembered so reset() recreates an equivalent context instead
+  /// of silently reverting a custom-configured solver to the default.
+  std::string ContextLogic = "QF_AUFBV";
+  void (*ContextConfigure)(ctx_config_t *) = nullptr;
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -112,11 +97,6 @@ protected:
   SMTSortRef mkRealSortImpl() override;
 
   SMTSortRef mkBVSortImpl(unsigned BitWidth) override;
-
-  SMTSortRef mkRMSortImpl() override;
-
-  SMTSortRef mkFPSortImpl(const unsigned ExpWidth,
-                          const unsigned SigWidth) override;
 
   SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
                             const unsigned SigWidth) override;
@@ -169,17 +149,38 @@ protected:
 
   SMTExprRef mkBVAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVSltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVUleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVSleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkArithNegImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkArithAddImpl(const SMTExprRef &LHS,
@@ -192,8 +193,6 @@ protected:
                             const SMTExprRef &RHS) override;
   SMTExprRef mkArithModImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
-  SMTExprRef mkArithShlImpl(const SMTExprRef &LHS,
-                            const SMTExprRef &RHS) override;
   SMTExprRef mkArithLtImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
   SMTExprRef mkArithGtImpl(const SMTExprRef &LHS,
@@ -205,8 +204,6 @@ protected:
   SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) override;
-  SMTExprRef mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) override;
 
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
@@ -223,6 +220,10 @@ protected:
   SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
                             const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVRedOrImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkBVRedAndImpl(const SMTExprRef &Exp) override;
+
   SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
                                const SMTExprRef &Index) override;
 
@@ -230,62 +231,6 @@ protected:
                               const SMTExprRef &Element) override;
   SMTExprRef mkApplyImpl(const SMTExprRef &Function,
                          const std::vector<SMTExprRef> &Args) override;
-
-  SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPNegImpl(const SMTExprRef &Exp, FPNegBehavior) override;
-
-  SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp) override;
-
-  SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-
-  SMTExprRef mkFPDivImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-
-  SMTExprRef mkFPRemImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPAddImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-
-  SMTExprRef mkFPSubImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                         const SMTExprRef &R) override;
-
-  SMTExprRef mkFPSqrtImpl(const SMTExprRef &Exp, const SMTExprRef &R) override;
-
-  SMTExprRef mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
-                         const SMTExprRef &Z, const SMTExprRef &R) override;
-
-  SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
-                           const SMTExprRef &RHS) override;
-
-  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                          const SMTExprRef &R) override;
-
-  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                           const SMTExprRef &R) override;
-
-  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
-                           const SMTExprRef &R) override;
-
-  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
-
-  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
-
-  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
-                                const SMTExprRef &R) override;
 
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
 
@@ -295,8 +240,6 @@ protected:
 
   SMTResult<std::pair<std::string, std::string>>
   getRationalImpl(const SMTExprRef &Exp) override;
-
-  SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) override;
@@ -319,29 +262,15 @@ protected:
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
 
-  SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;
-
-  SMTExprRef mkRMImpl(const RM &R) override;
-
-  SMTExprRef mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
-                       const unsigned SigWidth) override;
-
-  SMTExprRef mkInfImpl(const bool Sgn, const unsigned ExpWidth,
-                       const unsigned SigWidth) override;
-
-  SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
-                              const SMTSortRef &To) override;
-
-  SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
-
-  /// View a native FP term as a Camada BVFP-encoded expression: the raw
-  /// IEEE bits carrying the BVFP sort, which is what the common-layer FP
-  /// bit-blasts (mkFPRemImpl, mkFPFMAImpl) operate on. Distinct from
-  /// mkIEEEFPToBVImpl, whose public contract is a PLAIN BV bit pattern.
-  SMTExprRef bvfpView(const SMTExprRef &Exp);
-
+  // Yices can build a constant array as a lambda, but its context
+  // reasoning over lambda terms is incomplete (a symbolic-index read of
+  // the default satisfied formulas it should refute), so the common layer
+  // lowers constant arrays lazily instead and this override is
+  // unreachable.
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
+
+  bool nativeConstArraySupport() const override { return false; }
 
   checkResult checkImpl() override;
 
@@ -364,31 +293,25 @@ protected:
 
   void dumpModelImpl(std::string &Out) override;
 
+protected:
+  using TermVectort = std::vector<SMTExprRef>;
+  TermVectort Assertions;
+  std::vector<std::size_t> AssertionScopeSizes;
+
 private:
-  void initializeContext();
-  void destroyContext();
+  void releaseSymbolNames();
 
-  // Arm CheckDeadline from TimeoutMs; both check paths call it before
-  // querying the solver.
-  void armCheckDeadline();
+  // SIGALRM-based per-check time limit (POSIX only): armTimeout installs a
+  // handler that calls yices_stop_search on this context and starts an
+  // interval timer from TimeoutMs; disarmTimeout cancels the timer and
+  // restores the previous handler. No-ops when TimeoutMs is 0.
+  void armTimeout();
+  void disarmTimeout();
 
-  msat_config Config{};
-  msat_env Context{};
+  YicesContextRef Context = nullptr;
+  std::vector<std::string> NamedSymbols;
 
-  // Per-check wall-clock deadline enforced through MathSAT's termination
-  // test (registered in initializeContext, which passes this member's
-  // address as the callback state). The epoch value means "no deadline";
-  // the check paths arm it from TimeoutMs before each query.
-  std::chrono::steady_clock::time_point CheckDeadline{};
-
-  // msat_solve_with_assumptions accepts only (negated) Boolean constants,
-  // so checkSatAssumingImpl assumes fresh activation literals
-  // (`__CAMADA_assume_N`) implying the caller's terms instead. This maps
-  // each literal's term id from the most recent call back to the
-  // assumption it activates, for decoding msat_get_unsat_assumptions.
-  uint64_t NextAssumeId = 0;
-  std::vector<std::pair<size_t, SMTExprRef>> LastAssumptionLits;
-}; // end class MathSATSolver
+}; // namespace camada
 
 } // namespace camada
 

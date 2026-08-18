@@ -9,7 +9,9 @@ from pathlib import Path
 
 
 def check_root_dir():
-    if not os.path.exists('src/camadaimpl.h'):
+    # camada.h rather than a file under src/core or src/solvers: it is the
+    # public API header and the least likely to move.
+    if not os.path.exists('src/camada.h'):
         raise SystemExit("Please run this script from the camada root directory")
 
 

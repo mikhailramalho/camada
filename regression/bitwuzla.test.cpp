@@ -4,10 +4,10 @@
 #endif
 #include "tests.h"
 
-#include <bitwuzlasolver.h>
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 #include <random>
+#include <solvers/bitwuzlasolver.h>
 
 namespace {
 // C++17: no designated initializers, so a tiny builder for the one field

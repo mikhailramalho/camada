@@ -42,7 +42,7 @@
 #include <unistd.h>
 
 #include "camada.h"
-#include "smtlibsolver.h"
+#include "solvers/smtlibsolver.h"
 
 namespace {
 

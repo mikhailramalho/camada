@@ -26,7 +26,7 @@
 #include <cstdint>
 #include <limits>
 
-#include "camadacommon.h"
+#include "camadaerrors.h"
 #include "camadafeatures.h"
 
 namespace camada {

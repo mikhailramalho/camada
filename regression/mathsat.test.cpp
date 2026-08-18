@@ -6,7 +6,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <mathsatsolver.h>
+#include <solvers/mathsatsolver.h>
 
 // SolverConfig::Logic drives the MathSAT default-configuration logic.
 // Smoke test only: MathSAT's default configuration differs by logic in

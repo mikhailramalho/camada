@@ -29,9 +29,9 @@ namespace STP {
 #include <stp/c_interface.h>
 }
 
-#include "camadaexpr.h"
-#include "camadaimpl.h"
-#include "camadasort.h"
+#include "../camadaexpr.h"
+#include "../camadasort.h"
+#include "../core/camadaimpl.h"
 
 namespace camada {
 

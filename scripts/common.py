@@ -16,7 +16,7 @@ except:
 
 
 def check_root_dir():
-    if(not os.path.exists('src/camadaimpl.h')):
+    if(not os.path.exists('src/camada.h')):
         print("Please run this script from the camada's root directory")
         exit(0)
 

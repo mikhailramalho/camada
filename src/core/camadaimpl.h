@@ -32,17 +32,32 @@
 #include <utility>
 #include <vector>
 
-#include "camada.h"
-#include "camadaarena.h"
-#include "camadacache.h"
-#include "camadaexpr.h"
-#include "camadasort.h"
+#include "../camada.h"
+#include "../camadaarena.h"
+#include "../camadacache.h"
+#include "../camadaexpr.h"
+#include "../camadasort.h"
 
 namespace camada {
 
 // Model-walk scratch state for the Ackermann array encoding; defined in
 // camadaarray.cpp.
 struct AckClassWalk;
+
+// Renders Value as a Width-bit two's-complement bit-string. Only the
+// backends need it -- each one hands its own API a binary literal -- so it
+// lives here rather than in camadaerrors.h, where it was reachable by every
+// translation unit that wanted fatalErrorIf.
+static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
+  const uint64_t RawBits = static_cast<uint64_t>(Value);
+  // Sign-fill, then overwrite the low min(Width, 64) bits: one allocation
+  // instead of the bitset-to_string/substr/insert sequence.
+  std::string Bits(Width, Value < 0 ? '1' : '0');
+  const unsigned Low = Width < 64 ? Width : 64;
+  for (unsigned I = 0; I < Low; ++I)
+    Bits[Width - 1 - I] = ((RawBits >> I) & 1) != 0 ? '1' : '0';
+  return Bits;
+}
 
 class SMTSolverImpl : public SMTSolver {
 public:
@@ -589,10 +604,10 @@ public:
   SMTExprRef mkFXPSub(const SMTExprRef &LHS,
                       const SMTExprRef &RHS) override final;
   SMTExprRef mkFXPNeg(const SMTExprRef &Exp) override final;
-  SMTExprRef mkFXPMul(const SMTExprRef &LHS,
-                      const SMTExprRef &RHS) override final;
-  SMTExprRef mkFXPDiv(const SMTExprRef &LHS,
-                      const SMTExprRef &RHS) override final;
+  SMTExprRef mkFXPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                      FXPRM Mode) override final;
+  SMTExprRef mkFXPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                      FXPRM Mode) override final;
   SMTExprRef mkFXPShl(const SMTExprRef &Exp, unsigned Amount) override final;
   SMTExprRef mkFXPShr(const SMTExprRef &Exp, unsigned Amount) override final;
   SMTExprRef mkFXPLt(const SMTExprRef &LHS,
@@ -617,20 +632,23 @@ public:
   SMTExprRef mkFXPNegOverflow(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPShlOverflow(const SMTExprRef &Exp,
                               unsigned Amount) override final;
-  SMTExprRef mkFXPToFXP(const SMTExprRef &Exp,
-                        const SMTSortRef &To) override final;
-  SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp,
-                                const SMTSortRef &To) override final;
+  SMTExprRef mkFXPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
+                        FXPRM Mode) override final;
+  SMTExprRef mkFXPToFXPOverflow(const SMTExprRef &Exp, const SMTSortRef &To,
+                                FXPRM Mode) override final;
   SMTExprRef mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
                          const SMTSortRef &To) override final;
-  SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth) override final;
+  SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth,
+                       FXPRM Mode) override final;
   SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,
-                               bool ToSigned) override final;
+                               bool ToSigned, FXPRM Mode) override final;
   SMTExprRef mkFXPAddSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
   SMTExprRef mkFXPSubSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
   SMTExprRef mkFXPNegSat(const SMTExprRef &Exp) override;
-  SMTExprRef mkFXPMulSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
-  SMTExprRef mkFXPDivSat(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+  SMTExprRef mkFXPMulSat(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         FXPRM Mode) override;
+  SMTExprRef mkFXPDivSat(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                         FXPRM Mode) override;
   SMTExprRef mkFXPShlSat(const SMTExprRef &Exp, unsigned Amount) override;
   SMTExprRef mkFXPShlExpr(const SMTExprRef &Exp,
                           const SMTExprRef &Amount) override;
@@ -640,25 +658,25 @@ public:
                                   const SMTExprRef &Amount) override;
   SMTExprRef mkFXPShlSatExpr(const SMTExprRef &Exp,
                              const SMTExprRef &Amount) override;
-  SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp,
-                           const SMTSortRef &To) override;
+  SMTExprRef mkFXPToFXPSat(const SMTExprRef &Exp, const SMTSortRef &To,
+                           FXPRM Mode) override;
   SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
-                          bool ToSigned) override;
+                          bool ToSigned, FXPRM Mode) override;
   SMTExprRef mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
-                        FXPRoundTie Tie) override final;
+                        FXPRM Tie) override final;
   SMTExprRef mkFXPAbs(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPCountls(const SMTExprRef &Exp,
                           unsigned ToWidth) override final;
-  SMTExprRef mkFXPSqrt(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) override final;
   SMTExprRef mkFXPExp(const SMTExprRef &Exp) override final;
   SMTExprRef mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
                        RM R) override final;
-  SMTExprRef mkFPToFXP(const SMTExprRef &Exp,
-                       const SMTSortRef &To) override final;
-  SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
-                               const SMTSortRef &To) override final;
-  SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp,
-                          const SMTSortRef &To) override final;
+  SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
+                       FXPRM Mode) override final;
+  SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp, const SMTSortRef &To,
+                               FXPRM Mode) override final;
+  SMTExprRef mkFPToFXPSat(const SMTExprRef &Exp, const SMTSortRef &To,
+                          FXPRM Mode) override final;
   SMTExprRef mkArraySelect(const SMTExprRef &Array,
                            const SMTExprRef &Index) override final;
   SMTExprRef mkArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,

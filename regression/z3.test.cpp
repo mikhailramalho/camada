@@ -5,7 +5,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <z3solver.h>
+#include <solvers/z3solver.h>
 
 TEST_CASE("Simple Z3 test", "[Z3]") {
   // Create Z3 Solver

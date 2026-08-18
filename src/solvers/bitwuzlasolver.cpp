@@ -22,9 +22,9 @@
 #if SOLVER_BITWUZLA_ENABLED
 
 #include "bitwuzlasolver.h"
-#include "camada.h"
-#include "camadacache.h"
-#include "camadacommon.h"
+#include "../camada.h"
+#include "../camadacache.h"
+#include "../camadaerrors.h"
 
 #include <cstdio>
 #include <cstdlib>

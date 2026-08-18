@@ -19,8 +19,8 @@
  *
  **************************************************************************/
 
-#include "camadacommon.h"
-#include "camadaimpl.h"
+#include "../camadaerrors.h"
+#include "../core/camadaimpl.h"
 
 #include <algorithm>
 #include <bitset>
@@ -633,6 +633,10 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   // else comes the actual multiplication.
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
+  // Normalized. round() renormalizes the significand, but it cannot
+  // recover an exponent that was never right: an unnormalized subnormal
+  // reports an exponent understated by its leading-zero count, and the
+  // a_lz/b_lz subtractions below are what correct it.
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
 
@@ -742,6 +746,8 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
+  // Normalized, for the same reason as multiply: an unnormalized
+  // subnormal reports an understated exponent that round() cannot fix.
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
 
@@ -1350,6 +1356,9 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
   SMTExprRef c_sgn, c_sig, c_exp, c_lz;
+  // Normalized, unlike mul and div: swap_cond below compares the product's
+  // exponent against the addend's, and unnormalized exponents understate a
+  // subnormal by its leading-zero count, misaligning the addend.
   unpack(*this, X, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, Y, b_sgn, b_sig, b_exp, b_lz, true);
   unpack(*this, Z, c_sgn, c_sig, c_exp, c_lz, true);
@@ -1499,7 +1508,12 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
   SMTExprRef sig_abs_h2 =
       mkBVExtract(2 * sbits + too_short + 4, sbits + too_short, sig_abs);
-  SMTExprRef sticky_h2_red = mkBVZeroExt(sbits + 4, mkBVRedOr(sticky_h1));
+  // h2 drops one bit more than h1, so it needs its own sticky over that
+  // wider range. Reusing sticky_h1 loses bit (sbits + too_short - 1): the
+  // rounder then sees an exact tie where the value is actually above the
+  // halfway point and rounds to even instead of up.
+  SMTExprRef sticky_h2 = mkBVExtract(sbits + too_short - 1, 0, sig_abs);
+  SMTExprRef sticky_h2_red = mkBVZeroExt(sbits + 4, mkBVRedOr(sticky_h2));
   SMTExprRef sig_abs_h2_f = mkBVZeroExt(1, mkBVOr(sig_abs_h2, sticky_h2_red));
   SMTExprRef res_sig_2 = mkBVExtract(sbits + 3, 0, sig_abs_h2_f);
   assert(sig_abs_h2->getWidth() == sbits + 5);
@@ -1642,7 +1656,11 @@ SMTExprRef SMTSolverImpl::mkFPtoFPImpl(const SMTExprRef &From,
 
   // otherwise: the actual conversion with rounding.
   SMTExprRef sgn, sig, exp, lz;
-  unpack(*this, From, sgn, sig, exp, lz, true);
+  // Unnormalized: the significand is only padded or collapsed to a sticky
+  // below, neither of which touches its leading zeros, and the exponent
+  // path already subtracts lz explicitly — so round() sees a consistent
+  // pair and renormalizes from its own count.
+  unpack(*this, From, sgn, sig, exp, lz, false);
 
   SMTExprRef res_sgn = sgn;
 
@@ -1806,8 +1824,11 @@ SMTExprRef SMTSolverImpl::mkSBVtoFPImpl(const SMTExprRef &From,
   unsigned exp_worst_case_sz = static_cast<unsigned>(
       (log(static_cast<double>(bv_sz)) / log(static_cast<double>(2))) + 1.0);
 
-  if (exp_sz < exp_worst_case_sz) {
-    // exp_sz < exp_worst_case_sz and exp >= 0.
+  // `<=`, not `<`: round() reads the exponent as signed, so a value
+  // needing the full exp_sz bits is already unrepresentable and must be
+  // clamped before round() consumes it. The boundary case is a binary16
+  // target from a 64-bit operand, where both sides are 7.
+  if (exp_sz <= exp_worst_case_sz) {
     // Take the maximum legal exponent; this
     // allows us to keep the most precision.
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
@@ -1902,8 +1923,11 @@ SMTExprRef SMTSolverImpl::mkUBVtoFPImpl(const SMTExprRef &From,
   unsigned exp_worst_case_sz = static_cast<unsigned>(
       (log(static_cast<double>(bv_sz)) / log(static_cast<double>(2))) + 1.0);
 
-  if (exp_sz < exp_worst_case_sz) {
-    // exp_sz < exp_worst_case_sz and exp >= 0.
+  // `<=`, not `<`: round() reads the exponent as signed, so a value
+  // needing the full exp_sz bits is already unrepresentable and must be
+  // clamped before round() consumes it. The boundary case is a binary16
+  // target from a 64-bit operand, where both sides are 7.
+  if (exp_sz <= exp_worst_case_sz) {
     // Take the maximum legal exponent; this
     // allows us to keep the most precision.
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
@@ -2130,10 +2154,19 @@ SMTExprRef SMTSolverImpl::mkFPtoIntegralImpl(const SMTExprRef &From,
   v4 = mkIte(rm_is_rtn, v4_rtn, v4);
   v4 = mkIte(rm_is_rtz, xzero, v4);
 
-  // exponent >= sbits-1 -> x
-  SMTExprRef exp_is_large = log2(sbits - 1) + 1 <= ebits - 1
-                                ? mkBVSle(mkBVFromDec(sbits - 1, ebits), a_exp)
-                                : mkBool(false);
+  // exponent >= sbits-1 -> x is already an integer, return it unchanged.
+  //
+  // The comparison is signed over ebits bits, so it is only meaningful
+  // when sbits-1 is representable as a positive signed ebits-bit value,
+  // i.e. sbits-1 <= 2^(ebits-1) - 1. Test that exactly: a floating-point
+  // log2 formulation reads 4.17 > 4 for binary16 (ebits 5, sbits 10) and
+  // wrongly disables this branch, leaving every large binary16 value to
+  // fall through the rounding path below and come back wrong.
+  bool exp_fits =
+      ebits >= 2 && ebits - 1 < 63 &&
+      static_cast<uint64_t>(sbits - 1) <= (UINT64_C(1) << (ebits - 1)) - 1;
+  SMTExprRef exp_is_large =
+      exp_fits ? mkBVSle(mkBVFromDec(sbits - 1, ebits), a_exp) : mkBool(false);
   const SMTExprRef &c5 = exp_is_large;
   const SMTExprRef &v5 = From;
 
