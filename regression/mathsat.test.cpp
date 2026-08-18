@@ -6,7 +6,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <mathsatsolver.h>
+#include <solvers/mathsatsolver.h>
 
 TEST_CASE("Ackermann arrays MathSAT test", "[MathSAT]") {
   auto mathsat = camada::createMathSATSolver(camada::ArrayEncoding::Ackermann);

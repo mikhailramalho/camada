@@ -22,8 +22,8 @@
 #if SOLVER_Z3_ENABLED
 
 #include "z3solver.h"
-#include "camada.h"
-#include "camadacommon.h"
+#include "../camada.h"
+#include "../camadaerrors.h"
 
 #include <algorithm>
 #include <cassert>

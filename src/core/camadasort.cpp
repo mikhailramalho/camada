@@ -19,8 +19,8 @@
  *
  **************************************************************************/
 
-#include "camadasort.h"
-#include "camadacommon.h"
+#include "../camadasort.h"
+#include "../camadaerrors.h"
 
 #include <cstdio>
 #include <string>

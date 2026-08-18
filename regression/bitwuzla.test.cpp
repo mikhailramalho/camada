@@ -4,10 +4,10 @@
 #endif
 #include "tests.h"
 
-#include <bitwuzlasolver.h>
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 #include <random>
+#include <solvers/bitwuzlasolver.h>
 
 TEST_CASE("Ackermann arrays Bitwuzla test", "[Bitwuzla]") {
   auto bzla = camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::Off,

@@ -19,32 +19,27 @@
  *
  **************************************************************************/
 
-#ifndef MATHSATSOLVER_H_
-#define MATHSATSOLVER_H_
+#ifndef CVC5SOLVER_H_
+#define CVC5SOLVER_H_
 
-#include <cassert>
-#include <chrono>
 #include <cstdint>
-#include <mathsat.h>
+#include <cvc5/cvc5.h>
 #include <string>
-#include <utility>
-#include <variant>
 
-#include "camadaexpr.h"
-#include "camadaimpl.h"
-#include "camadasort.h"
+#include "../camadaexpr.h"
+#include "../camadasort.h"
+#include "../core/camadaimpl.h"
 
 namespace camada {
 
-using MathSATContextRef = msat_env *;
-using MathSATNode = std::variant<msat_term, msat_decl>;
+using CVC5ContextRef = cvc5::Solver *;
 
-/// Wrapper for MathSAT Sort
-class MathSATSort : public SolverSort<MathSATContextRef, msat_type> {
+/// Wrapper for CVC5 Sort
+class CVC5Sort : public SolverSort<CVC5ContextRef, cvc5::Sort> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
-  using SolverSort<MathSATContextRef, msat_type>::SolverSort;
-  ~MathSATSort() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
+  using SolverSort<CVC5ContextRef, cvc5::Sort>::SolverSort;
+  ~CVC5Sort() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -52,21 +47,13 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
-}; // end class MathSATSort
+}; // end class CVC5Sort
 
-class MathSATExpr : public SolverExpr<MathSATContextRef, MathSATNode> {
+class CVC5Expr : public SolverExpr<CVC5ContextRef, cvc5::Term> {
 public:
-  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::MathSAT;
-  using SolverExpr<MathSATContextRef, MathSATNode>::SolverExpr;
-  MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
-              const msat_term &T)
-      : SolverExpr<MathSATContextRef, MathSATNode>(Kind, C, S, MathSATNode(T)) {
-  }
-  MathSATExpr(SMTExprKind Kind, MathSATContextRef C, const SMTSortRef &S,
-              const msat_decl &D)
-      : SolverExpr<MathSATContextRef, MathSATNode>(Kind, C, S, MathSATNode(D)) {
-  }
-  ~MathSATExpr() override = default;
+  static constexpr SMTBackendKind BackendKindValue = SMTBackendKind::CVC5;
+  using SolverExpr<CVC5ContextRef, cvc5::Term>::SolverExpr;
+  ~CVC5Expr() override = default;
 
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
@@ -75,30 +62,19 @@ public:
 
   void dump() const override;
   void dump(std::string &Out) const override;
+}; // end class CVC5Expr
 
-  bool isDecl() const { return std::holds_alternative<msat_decl>(Expr); }
-  bool isTerm() const { return std::holds_alternative<msat_term>(Expr); }
-  const msat_decl &getDecl() const {
-    assert(isDecl() && "Expected MathSAT declaration");
-    return std::get<msat_decl>(Expr);
-  }
-  const msat_term &getTerm() const {
-    assert(isTerm() && "Expected MathSAT term");
-    return std::get<msat_term>(Expr);
-  }
-}; // end class MathSATExpr
-
-class MathSATSolver : public SMTSolverImpl {
+class CVC5Solver : public SMTSolverImpl {
 public:
-  explicit MathSATSolver(ArrayEncoding Arrays = ArrayEncoding::Native);
-
-  /// Take ownership of a MathSAT configuration and reuse it across resets.
-  explicit MathSATSolver(msat_config Config,
-                         ArrayEncoding Arrays = ArrayEncoding::Native);
-  ~MathSATSolver() override;
+  explicit CVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
+                      ArrayEncoding Arrays = ArrayEncoding::Native);
+  ~CVC5Solver() override;
 
 protected:
-  msat_env context() const { return Context; }
+  cvc5::TermManager &termManager() { return Terms; }
+  const cvc5::TermManager &termManager() const { return Terms; }
+  cvc5::Solver &context() { return Context; }
+  const cvc5::Solver &context() const { return Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -128,6 +104,16 @@ protected:
 
   SMTSortRef mkFunctionSortImpl(const std::vector<SMTSortRef> &DomainSorts,
                                 const SMTSortRef &CodomainSort) override;
+
+  SMTSortRef
+  mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
+
+  // Native datatypes cannot hold an Ackermann-encoded array member (it
+  // has no backend term), so the Ackermann array mode forces the Camada
+  // tuple encoding.
+  bool nativeTupleSupport() const override {
+    return ArrayMode != ArrayEncoding::Ackermann;
+  }
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
@@ -167,17 +153,52 @@ protected:
 
   SMTExprRef mkBVAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVXnorImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNandImpl(const SMTExprRef &LHS,
+                          const SMTExprRef &RHS) override;
+
   SMTExprRef mkBVUltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVSltImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVUgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVSgtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVUleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkBVSleImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkBVUgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVSgeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVAddOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVSubOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVMulOverflowImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 bool IsSigned) override;
+
+  SMTExprRef mkBVSDivOverflowImpl(const SMTExprRef &LHS,
+                                  const SMTExprRef &RHS) override;
+
+  SMTExprRef mkBVNegOverflowImpl(const SMTExprRef &Exp) override;
+
+  SMTExprRef mkImpliesImpl(const SMTExprRef &LHS,
+                           const SMTExprRef &RHS) override;
+
   SMTExprRef mkAndImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkXorImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkArithNegImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkArithAddImpl(const SMTExprRef &LHS,
@@ -226,8 +247,15 @@ protected:
 
   SMTExprRef mkArrayStoreImpl(const SMTExprRef &Array, const SMTExprRef &Index,
                               const SMTExprRef &Element) override;
+  SMTExprRef mkTupleImpl(const std::vector<SMTExprRef> &Elements) override;
+  SMTExprRef mkTupleSelectImpl(const SMTExprRef &Tuple,
+                               unsigned Index) override;
   SMTExprRef mkApplyImpl(const SMTExprRef &Function,
                          const std::vector<SMTExprRef> &Args) override;
+  SMTExprRef mkForallImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
+  SMTExprRef mkExistsImpl(const std::vector<SMTExprRef> &Vars,
+                          const SMTExprRef &Body) override;
 
   SMTExprRef mkFPAbsImpl(const SMTExprRef &Exp) override;
 
@@ -264,7 +292,11 @@ protected:
 
   SMTExprRef mkFPLtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
+  SMTExprRef mkFPGtImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
   SMTExprRef mkFPLeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
+
+  SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
 
   SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
@@ -332,12 +364,6 @@ protected:
 
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;
 
-  /// View a native FP term as a Camada BVFP-encoded expression: the raw
-  /// IEEE bits carrying the BVFP sort, which is what the common-layer FP
-  /// bit-blasts (mkFPRemImpl, mkFPFMAImpl) operate on. Distinct from
-  /// mkIEEEFPToBVImpl, whose public contract is a PLAIN BV bit pattern.
-  SMTExprRef bvfpView(const SMTExprRef &Exp);
-
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 
@@ -352,6 +378,11 @@ protected:
 
   bool supportsImpl(SolverFeature Feature) const override;
 
+  /// Whether the context was created with produce-unsat-assumptions
+  /// (opt-in: tracking assumption participation slows every check, and
+  /// cvc5 only honors the option when set before solving starts).
+  bool ProduceUnsatAssumptions = false;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
@@ -363,30 +394,10 @@ protected:
   void dumpModelImpl(std::string &Out) override;
 
 private:
-  void initializeContext();
-  void destroyContext();
+  cvc5::TermManager Terms;
+  cvc5::Solver Context;
 
-  // Arm CheckDeadline from TimeoutMs; both check paths call it before
-  // querying the solver.
-  void armCheckDeadline();
-
-  msat_config Config{};
-  msat_env Context{};
-
-  // Per-check wall-clock deadline enforced through MathSAT's termination
-  // test (registered in initializeContext, which passes this member's
-  // address as the callback state). The epoch value means "no deadline";
-  // the check paths arm it from TimeoutMs before each query.
-  std::chrono::steady_clock::time_point CheckDeadline{};
-
-  // msat_solve_with_assumptions accepts only (negated) Boolean constants,
-  // so checkSatAssumingImpl assumes fresh activation literals
-  // (`__CAMADA_assume_N`) implying the caller's terms instead. This maps
-  // each literal's term id from the most recent call back to the
-  // assumption it activates, for decoding msat_get_unsat_assumptions.
-  uint64_t NextAssumeId = 0;
-  std::vector<std::pair<size_t, SMTExprRef>> LastAssumptionLits;
-}; // end class MathSATSolver
+}; // end class CVC5Solver
 
 } // namespace camada
 

@@ -19,7 +19,7 @@
  *
  **************************************************************************/
 
-#include "camadaexpr.h"
+#include "../camadaexpr.h"
 
 #include <cstdio>
 

@@ -19,8 +19,8 @@
  *
  **************************************************************************/
 
-#include "camadacommon.h"
-#include "camadaimpl.h"
+#include "../camadaerrors.h"
+#include "../core/camadaimpl.h"
 
 #include <algorithm>
 #include <bitset>

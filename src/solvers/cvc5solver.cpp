@@ -22,8 +22,8 @@
 #if SOLVER_CVC5_ENABLED
 
 #include "cvc5solver.h"
-#include "camada.h"
-#include "camadacommon.h"
+#include "../camada.h"
+#include "../camadaerrors.h"
 
 #include <cassert>
 #include <cstdio>

@@ -22,8 +22,8 @@
 #if SOLVER_STP_ENABLED
 
 #include "stpsolver.h"
-#include "camada.h"
-#include "camadacommon.h"
+#include "../camada.h"
+#include "../camadaerrors.h"
 
 #include <algorithm>
 #include <cstdio>

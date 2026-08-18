@@ -5,7 +5,7 @@
 #include "tests.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <cvc5solver.h>
+#include <solvers/cvc5solver.h>
 
 TEST_CASE("Ackermann arrays CVC5 test", "[CVC5]") {
   auto cvc5 = camada::createCVC5Solver(camada::UnsatAssumptionsMode::Off,

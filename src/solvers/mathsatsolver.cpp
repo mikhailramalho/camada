@@ -22,8 +22,8 @@
 #if SOLVER_MATHSAT_ENABLED
 
 #include "mathsatsolver.h"
-#include "camada.h"
-#include "camadacommon.h"
+#include "../camada.h"
+#include "../camadaerrors.h"
 
 #include <cstdio>
 #include <gmp.h>
