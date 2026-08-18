@@ -40,11 +40,17 @@ Not yet reported upstream.
 
 ### Z3 `fpa2bv` FMA: sticky bit dropped, wrong rounding
 
-Camada's copy of this was fixed in #145; Z3's is still open, and we owe
-the report. Originally recorded here as a camada defect, inherited from
-Z3's `fpa2bv_converter` along with the rest of the FP bit-blast.
+Camada's copy is fixed (#145); Z3's is not, and we owe the report. It was
+originally recorded here as a camada defect, inherited from Z3's
+`fpa2bv_converter` along with the rest of the FP bit-blast.
 
-Counterexample, 32-bit IEEE bit patterns:
+FMA narrows its sum through one of two paths. The wider one discards an
+extra bit but reused the narrower path's sticky, so that bit vanished,
+the rounder saw a false exact tie and rounded to even — one ulp low on
+subnormal operands. Reproduce with an explicit
+`(then fpa2bv simplify bit-blast smt)` tactic; Z3's default pipeline
+hides it because `propagate-values` folds constants before the
+bit-blaster runs.
 
 ```
 x  10000000011110011011111101100111   (subnormal)
@@ -61,13 +67,8 @@ value now; Z3 still returns the wrong one.)
 
 The correct value is confirmed three ways: exact rational arithmetic on
 `x*y + z`, the host CPU's hardware `fmaf()`, and bitwuzla's native FP.
-
-Z3 has the same bug. Running the same query through `z3` with an explicit
-`(then fpa2bv simplify bit-blast smt)` tactic reproduces camada's wrong
-answer bit-for-bit; Z3's *default* pipeline gets it right only because
-`propagate-values` folds the constants and its rewriter evaluates the FMA
-exactly, so the bit-blaster never runs on this input. A genuinely
-symbolic FMA hits the bug there too.
+Z3 reproduces camada's pre-#145 answer bit-for-bit under the tactic
+above.
 
 A second, smaller witness in binary16, from cross-checking camada's BV
 encoding against z3's native FP symbolically. This one is *not*
@@ -93,13 +94,10 @@ This is the second subnormal-triggered defect found in that converter —
 see the `mk_rem` entry above — which suggests those paths are
 systematically under-tested upstream. Both deserve a report.
 
-**Note what did not catch it.** The full 237-test suite passes with FMA's
-operand normalization removed *entirely*, which should be impossible. The
-suite has no symbolic subnormal FP arithmetic coverage; the bug surfaced
-only from cross-checking the BV and native encodings against each other
-over symbolic inputs. Extending the conformance fixtures to arithmetic
-the way they already cover predicates would likely find siblings in add,
-mul, div and the conversions — worth doing before or alongside the fix.
+Report both together with the `mk_rem` entry above: they are the second
+and third defects found in the same converter, which suggests those paths
+are systematically under-tested upstream. What did not catch them is
+recorded under "Extend the conformance fixtures to arithmetic" below.
 
 ### MathSAT macOS packaging
 
@@ -112,6 +110,17 @@ meanwhile — see `CAMADA_MATHSAT_MACOS_VERSION` in
 Not yet reported to FBK.
 
 ## Exploratory, no commitment
+
+### Extend the conformance fixtures to arithmetic
+
+The 237-test suite passes with FMA's operand normalization removed
+*entirely*, which should be impossible. The fixtures cover predicates
+symbolically but not arithmetic, so nothing cross-checks the BV and
+native encodings against each other on subnormal inputs — which is the
+only thing that caught #145.
+
+Doing the same for add, mul, div and the conversions would likely find
+siblings.
 
 ### `fp.rem` fast path for small divisors
 
@@ -143,59 +152,6 @@ the same investigation — a Z3 5.0.0 hang reproduced only through
 `tactic(...).mk_solver()` and never from a file.
 
 Minutes of work, and it decides whether the rest is worth doing.
-
-### Rounder hints for FP addition
-
-Camada's bit-blasted FP addition is far slower than bitwuzla's native
-(SymFPU) one on queries that reason about the operation symbolically. The
-technique SymFPU uses to win is worth recording precisely, because the
-obvious guess is wrong.
-
-**Not** the dual-path split. `add.h` contains `dualPathArithmeticAdd`,
-which splits near and far cases — but bitwuzla never calls it. It calls
-`symfpu::add`, reaching the single-path `arithmeticAdd`. Implementing the
-dual-path version would be copying dead code.
-
-What `arithmeticAdd` actually does is build a case table over the
-exponent difference, predicting where the result exponent can land:
-
-```
-Case      A. max(l,r)+1   B. max(l,r)   C. max(l,r)-1   D. max(l,r)-k   E. zero
-diff = 0      Y               Y
-diff = 1      Y, sticky 0     Y, sticky 0
-```
-
-From that it derives five facts and passes them to the rounder as
-`customRounderInfo`:
-
-```cpp
-prop noOverflow;   prop noUnderflow;   prop exact;
-prop subnormalExact;   prop noSignificandOverflow;
-```
-
-The rounder then skips work it can prove unnecessary:
-
-```cpp
-prop incrementExponent(!known.noSignificandOverflow && incrementExponentNeeded);
-prop overflow(!known.noOverflow && ITE(lateOverflow, true, earlyOverflow));
-```
-
-Camada's `round()` computes all of it unconditionally, with no channel
-for a caller to say a case cannot arise.
-
-**Why this is not being built now.** `round()` is shared by seven call
-sites, so adding a hints parameter obliges every caller to derive its own
-hints — and a wrong hint silently produces a wrong value rather than
-failing loudly. That is the same failure shape as the FMA subnormal bug
-found in this file, which argues for fixing correctness before adding a
-new way to get it wrong. The measurement motivating it is also
-adversarial (proving addition commutative), so the gain on ordinary
-queries is unknown.
-
-If it is built, the gate is ESBMC hard instances, and every hint needs a
-symbolic cross-check against native FP the way the conformance fixtures
-do — deriving a hint incorrectly is indistinguishable from a correct
-encoding until it is wrong.
 
 ### Term introspection, walkers, translation
 
