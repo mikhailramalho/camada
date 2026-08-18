@@ -22,10 +22,8 @@
 #ifndef CAMADACOMMON_H_
 #define CAMADACOMMON_H_
 
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <string>
 
 // Compiler-specific function attributes used to keep small hot helpers (handle
 // liveness checks, etc.) inlined into every call site, and to keep cold error
@@ -60,17 +58,6 @@ static inline void fatalErrorIf(bool Cond, const char *Message) {
   if (!Cond)
     return;
   fatalError(Message);
-}
-
-static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
-  const uint64_t RawBits = static_cast<uint64_t>(Value);
-  // Sign-fill, then overwrite the low min(Width, 64) bits: one allocation
-  // instead of the bitset-to_string/substr/insert sequence.
-  std::string Bits(Width, Value < 0 ? '1' : '0');
-  const unsigned Low = Width < 64 ? Width : 64;
-  for (unsigned I = 0; I < Low; ++I)
-    Bits[Width - 1 - I] = ((RawBits >> I) & 1) != 0 ? '1' : '0';
-  return Bits;
 }
 
 } // namespace camada

@@ -44,6 +44,21 @@ namespace camada {
 // camadaarray.cpp.
 struct AckClassWalk;
 
+// Renders Value as a Width-bit two's-complement bit-string. Only the
+// backends need it -- each one hands its own API a binary literal -- so it
+// lives here rather than in camadacommon.h, where it was reachable by every
+// translation unit that wanted fatalErrorIf.
+static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
+  const uint64_t RawBits = static_cast<uint64_t>(Value);
+  // Sign-fill, then overwrite the low min(Width, 64) bits: one allocation
+  // instead of the bitset-to_string/substr/insert sequence.
+  std::string Bits(Width, Value < 0 ? '1' : '0');
+  const unsigned Low = Width < 64 ? Width : 64;
+  for (unsigned I = 0; I < Low; ++I)
+    Bits[Width - 1 - I] = ((RawBits >> I) & 1) != 0 ? '1' : '0';
+  return Bits;
+}
+
 class SMTSolverImpl : public SMTSolver {
 public:
   SMTSolverImpl() = default;
