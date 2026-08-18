@@ -261,12 +261,12 @@ inline void fxp_exhaustive_semantics(const camada::SMTSolverRef &solver) {
             break;
           case Op::Mul:
             Ref = refMul(F, A, B);
-            Value = solver->mkFXPMul(EA, EB);
+            Value = solver->mkFXPMul(EA, EB, camada::FXPRM::TowardNegative);
             Pred = solver->mkFXPMulOverflow(EA, EB);
             break;
           case Op::Div:
             Ref = refDiv(F, A, B);
-            Value = solver->mkFXPDiv(EA, EB);
+            Value = solver->mkFXPDiv(EA, EB, camada::FXPRM::TowardNegative);
             Pred = solver->mkFXPDivOverflow(EA, EB);
             Conjuncts.push_back(
                 boolIs(solver, solver->mkFXPDivByZero(EB), Ref.DivByZero));
@@ -306,8 +306,9 @@ fxp_boundary_overflow_semantics(const camada::SMTSolverRef &solver) {
     A = mkConst(solver, F, 89);
     B = mkConst(solver, F, 23);
     // ... and the truncated value is exactly the boundary.
-    solver->addConstraint(
-        solver->mkFXPEqual(solver->mkFXPMul(A, B), mkConst(solver, F, 127)));
+    solver->addConstraint(solver->mkFXPEqual(
+        solver->mkFXPMul(A, B, camada::FXPRM::TowardNegative),
+        mkConst(solver, F, 127)));
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
   // 127 * 16 = 2032 = max*16 exactly: representable, NOT an overflow.
@@ -346,21 +347,25 @@ inline void fxp_rounding_semantics(const camada::SMTSolverRef &solver) {
   // (-3/16) / 2.0: exact raw quotient -1.5, not representable; floor
   // gives raw -2 (toward zero would give -1 — Clang floors, per the
   // execution oracle).
-  Conjuncts.push_back(
-      solver->mkFXPEqual(solver->mkFXPDiv(C(-3), C(32)), C(-2)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPDiv(C(-3), C(32), camada::FXPRM::TowardNegative), C(-2)));
   // (3/16) / 2.0: exact raw quotient 1.5 -> raw 1.
-  Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPDiv(C(3), C(32)), C(1)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPDiv(C(3), C(32), camada::FXPRM::TowardNegative), C(1)));
   // (-1/16) * (8/16): exact -0.5 raw; floor -> -1 raw (not 0).
-  Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPMul(C(-1), C(8)), C(-1)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPMul(C(-1), C(8), camada::FXPRM::TowardNegative), C(-1)));
   // ( 1/16) * (8/16): exact 0.5 raw; floor -> 0 raw.
-  Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPMul(C(1), C(8)), C(0)));
+  Conjuncts.push_back(solver->mkFXPEqual(
+      solver->mkFXPMul(C(1), C(8), camada::FXPRM::TowardNegative), C(0)));
   requireAllHold(solver, Conjuncts);
 
   // Fixed -> integer rounds toward zero: -1.5 -> -1 (a plain arithmetic
   // shift would floor to -2).
   solver->reset();
   camada::SMTExprRef MinusOneHalf = mkConst(solver, F, uint64_t(-24) & 0xFF);
-  camada::SMTExprRef AsInt = solver->mkFXPToBV(MinusOneHalf, 8);
+  camada::SMTExprRef AsInt =
+      solver->mkFXPToBV(MinusOneHalf, 8, camada::FXPRM::TowardZero);
   solver->addConstraint(solver->mkEqual(AsInt, solver->mkBVFromDec(-1, 8)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
 
@@ -370,8 +375,8 @@ inline void fxp_rounding_semantics(const camada::SMTSolverRef &solver) {
   solver->reset();
   camada::SMTExprRef MinusOneQ3 = mkConst(solver, F, uint64_t(-28) & 0xFF);
   RefFormat Narrow{8, 1, true};
-  camada::SMTExprRef Converted =
-      solver->mkFXPToFXP(MinusOneQ3, mkSort(solver, Narrow));
+  camada::SMTExprRef Converted = solver->mkFXPToFXP(
+      MinusOneQ3, mkSort(solver, Narrow), camada::FXPRM::TowardNegative);
   solver->addConstraint(solver->mkFXPEqual(
       Converted, mkConst(solver, Narrow, uint64_t(-4) & 0xFF)));
   REQUIRE(solver->check() == camada::checkResult::SAT);
@@ -394,10 +399,12 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
       camada::SMTExprRef V = mkConst(solver, From, Raw);
       camada::SMTSortRef ToSort = mkSort(solver, To);
       // Widening never overflows...
-      Conjuncts.push_back(solver->mkNot(solver->mkFXPToFXPOverflow(V, ToSort)));
+      Conjuncts.push_back(solver->mkNot(solver->mkFXPToFXPOverflow(
+          V, ToSort, camada::FXPRM::TowardNegative)));
       // ...and is exact: converting up compares equal to the original
       // (mkFXPEqual scale-aligns across the two formats).
-      Conjuncts.push_back(solver->mkFXPEqual(solver->mkFXPToFXP(V, ToSort), V));
+      Conjuncts.push_back(solver->mkFXPEqual(
+          solver->mkFXPToFXP(V, ToSort, camada::FXPRM::TowardNegative), V));
     }
     requireAllHold(solver, Conjuncts);
   }
@@ -408,7 +415,8 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     solver->reset();
     RefFormat U{4, 2, false}, S4{4, 2, true};
     camada::SMTExprRef V = mkConst(solver, U, 8);
-    solver->addConstraint(solver->mkFXPToFXPOverflow(V, mkSort(solver, S4)));
+    solver->addConstraint(solver->mkFXPToFXPOverflow(
+        V, mkSort(solver, S4), camada::FXPRM::TowardNegative));
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
 
@@ -417,7 +425,8 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     solver->reset();
     RefFormat S4{4, 2, true}, U{4, 2, false};
     camada::SMTExprRef V = mkConst(solver, S4, uint64_t(-1) & 0xF);
-    solver->addConstraint(solver->mkFXPToFXPOverflow(V, mkSort(solver, U)));
+    solver->addConstraint(solver->mkFXPToFXPOverflow(
+        V, mkSort(solver, U), camada::FXPRM::TowardNegative));
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
 
@@ -428,14 +437,15 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     camada::SMTSortRef WideSrc = solver->mkFXPSort(70, 35, true);
     camada::SMTSortRef WideDst = solver->mkFXPSort(140, 70, true);
     camada::SMTExprRef X = solver->mkSymbol("fxp_wide_x", WideSrc);
-    solver->addConstraint(solver->mkFXPToFXPOverflow(X, WideDst));
+    solver->addConstraint(
+        solver->mkFXPToFXPOverflow(X, WideDst, camada::FXPRM::TowardNegative));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
     solver->reset();
     WideSrc = solver->mkFXPSort(70, 35, true);
     WideDst = solver->mkFXPSort(140, 70, true);
     X = solver->mkSymbol("fxp_wide_x", WideSrc);
-    solver->addConstraint(
-        solver->mkNot(solver->mkFXPEqual(solver->mkFXPToFXP(X, WideDst), X)));
+    solver->addConstraint(solver->mkNot(solver->mkFXPEqual(
+        solver->mkFXPToFXP(X, WideDst, camada::FXPRM::TowardNegative), X)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
 
@@ -447,7 +457,8 @@ inline void fxp_conversion_matrix(const camada::SMTSolverRef &solver) {
     camada::SMTSortRef Fmt = solver->mkFXPSort(16, 4, true);
     camada::SMTExprRef I = solver->mkSymbol("fxp_int_x", solver->mkBVSort(8));
     camada::SMTExprRef AsFXP = solver->mkFXPFromBV(I, SrcSigned, Fmt);
-    camada::SMTExprRef Back = solver->mkFXPToBV(AsFXP, 8);
+    camada::SMTExprRef Back =
+        solver->mkFXPToBV(AsFXP, 8, camada::FXPRM::TowardZero);
     solver->addConstraint(solver->mkNot(solver->mkEqual(Back, I)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
@@ -611,13 +622,13 @@ inline void fxp_sat_exhaustive_semantics(const camada::SMTSolverRef &solver) {
             break;
           case Op::Mul:
             Ref = refMulSat(F, A, B);
-            Value = solver->mkFXPMulSat(EA, EB);
+            Value = solver->mkFXPMulSat(EA, EB, camada::FXPRM::TowardNegative);
             break;
           case Op::Div:
             if (B == 0)
               continue;
             Ref = refDivSat(F, A, B);
-            Value = solver->mkFXPDivSat(EA, EB);
+            Value = solver->mkFXPDivSat(EA, EB, camada::FXPRM::TowardNegative);
             break;
           case Op::Neg:
             Ref = refNegSat(F, A);
@@ -689,9 +700,10 @@ inline void fxp_sat_conversion_semantics(const camada::SMTSolverRef &solver) {
       for (uint64_t RA = 0; RA < Count; ++RA) {
         int64_t A = refDecode(From, RA);
         camada::SMTExprRef EA = mkConst(solver, From, RA);
-        Conjuncts.push_back(
-            solver->mkFXPEqual(solver->mkFXPToFXPSat(EA, mkSort(solver, To)),
-                               mkConst(solver, To, toFXPSatRef(From, To, A))));
+        Conjuncts.push_back(solver->mkFXPEqual(
+            solver->mkFXPToFXPSat(EA, mkSort(solver, To),
+                                  camada::FXPRM::TowardNegative),
+            mkConst(solver, To, toFXPSatRef(From, To, A))));
       }
       requireAllHold(solver, Conjuncts);
     }
@@ -708,7 +720,8 @@ inline void fxp_sat_conversion_semantics(const camada::SMTSolverRef &solver) {
           std::string Bits =
               refBits(IntF, toBVSatRef(From, ToWidth, ToSigned, A));
           Conjuncts.push_back(
-              solver->mkEqual(solver->mkFXPToBVSat(EA, ToWidth, ToSigned),
+              solver->mkEqual(solver->mkFXPToBVSat(EA, ToWidth, ToSigned,
+                                                   camada::FXPRM::TowardZero),
                               solver->mkBVFromBin(Bits, ToWidth)));
         }
         requireAllHold(solver, Conjuncts);
@@ -751,7 +764,7 @@ inline void fxp_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
 // integer per the tie rule, then rescale — rather than mirroring the
 // encoding's bias-and-mask shape, so the fixtures pin that the two agree.
 inline uint64_t refRound(const RefFormat &F, int64_t A, unsigned Digits,
-                         camada::FXPRoundTie Tie) {
+                         camada::FXPRM Tie) {
   if (Digits >= F.FracBits)
     return refWrap(F, A);
   unsigned Shift = F.FracBits - Digits;
@@ -759,21 +772,33 @@ inline uint64_t refRound(const RefFormat &F, int64_t A, unsigned Digits,
   int64_t Q = refFloorDiv(A, Unit); // floor, so Rem is never negative
   int64_t Rem = A - Q * Unit;
   int64_t Half = Unit / 2;
-  if (Rem > Half)
-    ++Q;
-  else if (Rem == Half) {
-    switch (Tie) {
-    case camada::FXPRoundTie::TowardPositive:
+  // The directed modes never look at the halfway point.
+  switch (Tie) {
+  case camada::FXPRM::TowardNegative:
+    break; // Q is already the floor
+  case camada::FXPRM::TowardPositive:
+    if (Rem)
       ++Q;
-      break;
-    case camada::FXPRoundTie::AwayFromZero:
-      if (A >= 0)
+    break;
+  case camada::FXPRM::TowardZero:
+    if (Rem && A < 0)
+      ++Q; // floor is one unit too low for negatives
+    break;
+  case camada::FXPRM::NearestTiesTowardPositive:
+  case camada::FXPRM::NearestTiesAwayFromZero:
+  case camada::FXPRM::NearestTiesToEven:
+    if (Rem > Half)
+      ++Q;
+    else if (Rem == Half) {
+      if (Tie == camada::FXPRM::NearestTiesTowardPositive)
         ++Q;
-      break;
-    case camada::FXPRoundTie::ToEven:
-      Q += Q & 1;
-      break;
+      else if (Tie == camada::FXPRM::NearestTiesAwayFromZero) {
+        if (A >= 0)
+          ++Q;
+      } else
+        Q += Q & 1;
     }
+    break;
   }
   int64_t V = Q * Unit;
   return refWrap(F, V > F.maxRaw() ? F.maxRaw() : V);
@@ -973,8 +998,13 @@ inline void fxp_exp_exhaustive(const camada::SMTSolverRef &solver) {
   }
 }
 
+// Correctly-rounded fixed-point square root: nearest, ties to even.
+// The loop yields the floor and leaves N as the remainder S - R*R, and
+// the true root exceeds the midpoint exactly when that remainder is
+// greater than R, since (R + 1/2)^2 = R*R + R + 1/4.
 inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
-  uint64_t N = Raw << F.FracBits;
+  const uint64_t S = Raw << F.FracBits;
+  uint64_t N = S;
   uint64_t R = 0, Bit = uint64_t(1) << 62;
   while (Bit > N)
     Bit >>= 2;
@@ -986,6 +1016,9 @@ inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
       R >>= 1;
     Bit >>= 2;
   }
+  const uint64_t Rem = S - R * R;
+  if (Rem > R || (Rem == R && (R & 1)))
+    ++R;
   return R;
 }
 
@@ -1000,9 +1033,10 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
         solver->reset();
         camada::SMTExprRef All;
         for (uint64_t Raw = 0; Raw <= uint64_t(F.maxRaw()); ++Raw) {
-          camada::SMTExprRef C =
-              solver->mkFXPEqual(solver->mkFXPSqrt(mkConst(solver, F, Raw)),
-                                 mkConst(solver, F, refSqrt(F, Raw)));
+          camada::SMTExprRef C = solver->mkFXPEqual(
+              solver->mkFXPSqrt(mkConst(solver, F, Raw),
+                                camada::FXPRM::NearestTiesToEven),
+              mkConst(solver, F, refSqrt(F, Raw)));
           All = All ? solver->mkAnd(All, C) : C;
         }
         solver->addConstraint(All);
@@ -1012,24 +1046,42 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
   }
 
   // The defining property, proved over ALL symbolic values rather than
-  // enumerated: r*r <= x < (r+1)*(r+1) at the format's scale. This is
-  // what "correctly rounded" means, and it is checkable precisely
-  // because the operation is exact.
+  // enumerated. Correct rounding to nearest means the true root lies
+  // within half an ulp of r, i.e. between the two midpoints:
+  //
+  //     (2r - 1)^2 <= 4*x + 1   and   4*x <= (2r + 1)^2
+  //
+  // at the format's scale. The `+ 1` on the lower bound matters: a tie
+  // rounded UP sits exactly one below (2r-1)^2, since 4*x is an integer
+  // and the midpoint squared is not. Ties satisfy both bounds either
+  // way, so this admits both directions; the exhaustive loop above is
+  // what pins ties-to-even.
   {
     solver->reset();
-    unsigned W = 12, N = 6, Wide = 2 * (W + N) + 4;
+    unsigned W = 12, N = 6, Wide = 2 * (W + N) + 6;
     camada::SMTSortRef F = solver->mkFXPSort(W, N, true);
     camada::SMTExprRef X = solver->mkSymbol("fxp_sqrt_x", F);
-    camada::SMTExprRef R = solver->mkFXPSqrt(X);
+    camada::SMTExprRef R =
+        solver->mkFXPSqrt(X, camada::FXPRM::NearestTiesToEven);
     auto ext = [&](const camada::SMTExprRef &E) {
       return solver->mkBVZeroExt(Wide - W, solver->mkFXPToRawBV(E));
     };
     camada::SMTExprRef Rx = ext(R), Xx = ext(X);
-    camada::SMTExprRef RR = solver->mkBVMul(Rx, Rx);
-    camada::SMTExprRef R1 = solver->mkBVAdd(Rx, solver->mkBVFromDec(1, Wide));
+    camada::SMTExprRef Two = solver->mkBVFromDec(2, Wide);
+    camada::SMTExprRef One = solver->mkBVFromDec(1, Wide);
     camada::SMTExprRef Xs = solver->mkBVShl(Xx, solver->mkBVFromDec(N, Wide));
-    camada::SMTExprRef Holds = solver->mkAnd(
-        solver->mkBVUle(RR, Xs), solver->mkBVUlt(Xs, solver->mkBVMul(R1, R1)));
+    camada::SMTExprRef FourX = solver->mkBVShl(Xs, Two);
+    camada::SMTExprRef TwoR = solver->mkBVMul(Rx, Two);
+    camada::SMTExprRef Lo = solver->mkBVSub(TwoR, One);
+    camada::SMTExprRef Hi = solver->mkBVAdd(TwoR, One);
+    // r == 0 has no lower midpoint; the lower bound is vacuous there.
+    camada::SMTExprRef RIsZero =
+        solver->mkEqual(Rx, solver->mkBVFromDec(0, Wide));
+    camada::SMTExprRef LoOk =
+        solver->mkOr(RIsZero, solver->mkBVUle(solver->mkBVMul(Lo, Lo),
+                                              solver->mkBVAdd(FourX, One)));
+    camada::SMTExprRef Holds =
+        solver->mkAnd(LoOk, solver->mkBVUle(FourX, solver->mkBVMul(Hi, Hi)));
     camada::SMTExprRef NonNeg = solver->mkNot(solver->mkFXPLt(
         X, solver->mkFXPFromBin(refBits(RefFormat{W, N, true}, 0),
                                 solver->mkFXPSort(W, N, true))));
@@ -1047,7 +1099,9 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
     camada::SMTExprRef All;
     for (uint64_t Raw : {uint64_t(0x80), uint64_t(0xC0), uint64_t(0xFF)}) {
       camada::SMTExprRef C = solver->mkFXPEqual(
-          solver->mkFXPSqrt(mkConst(solver, F, Raw)), mkConst(solver, F, 0));
+          solver->mkFXPSqrt(mkConst(solver, F, Raw),
+                            camada::FXPRM::NearestTiesToEven),
+          mkConst(solver, F, 0));
       All = All ? solver->mkAnd(All, C) : C;
     }
     solver->addConstraint(All);
@@ -1060,9 +1114,9 @@ inline void fxp_round_semantics(const camada::SMTSolverRef &solver) {
   // signednesses, and all three tie rules: small enough to enumerate
   // every raw value, wide enough to exercise saturation, ties, and
   // negative rounding.
-  for (camada::FXPRoundTie Tie :
-       {camada::FXPRoundTie::TowardPositive, camada::FXPRoundTie::AwayFromZero,
-        camada::FXPRoundTie::ToEven}) {
+  for (camada::FXPRM Tie : {camada::FXPRM::NearestTiesTowardPositive,
+                            camada::FXPRM::NearestTiesAwayFromZero,
+                            camada::FXPRM::NearestTiesToEven}) {
     for (unsigned Width : {5u, 6u}) {
       for (unsigned Frac = 0; Frac < Width; ++Frac) {
         for (bool Signed : {true, false}) {
@@ -1095,23 +1149,46 @@ inline void fxp_round_semantics(const camada::SMTSolverRef &solver) {
   {
     solver->reset();
     RefFormat F{6, 4, true};
-    auto R = [&](int64_t Raw, unsigned D, camada::FXPRoundTie T) {
+    auto R = [&](int64_t Raw, unsigned D, camada::FXPRM T) {
       return solver->mkFXPRound(mkConst(solver, F, refWrap(F, Raw)), D, T);
     };
     auto C = [&](int64_t Raw) { return mkConst(solver, F, refWrap(F, Raw)); };
-    using camada::FXPRoundTie;
+    using camada::FXPRM;
     camada::SMTExprRef All = solver->mkAnd(
-        solver->mkFXPEqual(R(-8, 0, FXPRoundTie::TowardPositive), C(0)),
-        solver->mkFXPEqual(R(-8, 0, FXPRoundTie::AwayFromZero), C(-16)));
+        solver->mkFXPEqual(R(-8, 0, FXPRM::NearestTiesTowardPositive), C(0)),
+        solver->mkFXPEqual(R(-8, 0, FXPRM::NearestTiesAwayFromZero), C(-16)));
     All = solver->mkAnd(
-        All, solver->mkFXPEqual(R(-8, 0, FXPRoundTie::ToEven), C(0)));
+        All, solver->mkFXPEqual(R(-8, 0, FXPRM::NearestTiesToEven), C(0)));
     All = solver->mkAnd(
         All,
-        solver->mkAnd(
-            solver->mkFXPEqual(R(8, 0, FXPRoundTie::TowardPositive), C(16)),
-            solver->mkFXPEqual(R(8, 0, FXPRoundTie::AwayFromZero), C(16))));
+        solver->mkAnd(solver->mkFXPEqual(
+                          R(8, 0, FXPRM::NearestTiesTowardPositive), C(16)),
+                      solver->mkFXPEqual(
+                          R(8, 0, FXPRM::NearestTiesAwayFromZero), C(16))));
+    All = solver->mkAnd(
+        All, solver->mkFXPEqual(R(8, 0, FXPRM::NearestTiesToEven), C(0)));
+    // The directed modes never consult the halfway point: 0.5 (raw 8) and
+    // 0.75 (raw 12) round the same way under each, and -0.5 (raw -8)
+    // separates floor from truncate.
+    for (int64_t Raw : {int64_t(8), int64_t(12)}) {
+      All = solver->mkAnd(
+          All, solver->mkFXPEqual(R(Raw, 0, FXPRM::TowardZero), C(0)));
+      All = solver->mkAnd(
+          All, solver->mkFXPEqual(R(Raw, 0, FXPRM::TowardNegative), C(0)));
+      All = solver->mkAnd(
+          All, solver->mkFXPEqual(R(Raw, 0, FXPRM::TowardPositive), C(16)));
+    }
+    // Negative: truncate goes toward zero, floor goes away from it.
     All = solver->mkAnd(All,
-                        solver->mkFXPEqual(R(8, 0, FXPRoundTie::ToEven), C(0)));
+                        solver->mkFXPEqual(R(-8, 0, FXPRM::TowardZero), C(0)));
+    All = solver->mkAnd(
+        All, solver->mkFXPEqual(R(-8, 0, FXPRM::TowardNegative), C(-16)));
+    All = solver->mkAnd(
+        All, solver->mkFXPEqual(R(-8, 0, FXPRM::TowardPositive), C(0)));
+    // Exact values are unchanged by every mode.
+    for (camada::FXPRM M :
+         {FXPRM::TowardZero, FXPRM::TowardNegative, FXPRM::TowardPositive})
+      All = solver->mkAnd(All, solver->mkFXPEqual(R(16, 0, M), C(16)));
     solver->addConstraint(All);
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
@@ -1142,7 +1219,7 @@ inline void fxp_round_semantics(const camada::SMTSolverRef &solver) {
     for (auto &T : V) {
       camada::SMTExprRef C = solver->mkFXPEqual(
           solver->mkFXPRound(mkConst(solver, Fr, T.In), T.Digits,
-                             camada::FXPRoundTie::TowardPositive),
+                             camada::FXPRM::NearestTiesTowardPositive),
           mkConst(solver, Fr, T.Out));
       All = All ? solver->mkAnd(All, C) : C;
     }
@@ -1160,9 +1237,9 @@ inline void fxp_round_semantics(const camada::SMTSolverRef &solver) {
     camada::SMTSortRef Wide = solver->mkFXPSort(48, 31, true);
     camada::SMTExprRef X = solver->mkSymbol("fxp_round_x", Wide);
     camada::SMTExprRef Id = solver->mkFXPEqual(
-        solver->mkFXPRound(X, 31, camada::FXPRoundTie::TowardPositive), X);
+        solver->mkFXPRound(X, 31, camada::FXPRM::NearestTiesTowardPositive), X);
     camada::SMTExprRef R =
-        solver->mkFXPRound(X, 23, camada::FXPRoundTie::TowardPositive);
+        solver->mkFXPRound(X, 23, camada::FXPRM::NearestTiesTowardPositive);
     camada::SMTExprRef Max = solver->mkFXPFromBin(
         refBits(RefFormat{48, 31, true},
                 uint64_t(RefFormat{48, 31, true}.maxRaw())),
@@ -1219,20 +1296,22 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
     // into range.
     camada::SMTExprRef Ok = solver->mkBool(true);
     for (uint32_t Good : {0x3f7ffe00u, 0xbf800000u, 0x3f7ffe01u, 0xbf800001u})
-      Ok = solver->mkAnd(
-          Ok, solver->mkNot(solver->mkFPToFXPOverflow(fp32(Good), To)));
+      Ok = solver->mkAnd(Ok, solver->mkNot(solver->mkFPToFXPOverflow(
+                                 fp32(Good), To, camada::FXPRM::TowardZero)));
     // Undefined: values whose truncation falls outside (1.0 scales to
     // 32768, -1.000030518 to -32769), NaN, and +-infinity.
     for (uint32_t Bad :
          {0x3f800000u, 0xbf800100u, 0x7fc00000u, 0x7f800000u, 0xff800000u})
-      Ok = solver->mkAnd(Ok, solver->mkFPToFXPOverflow(fp32(Bad), To));
+      Ok = solver->mkAnd(Ok, solver->mkFPToFXPOverflow(
+                                 fp32(Bad), To, camada::FXPRM::TowardZero));
     // Toward zero, not floor: -0.7f scales to -22937.6, truncating to
     // -22937 (raw 0xa667); flooring would give -22938.
     Ok = solver->mkAnd(
         Ok,
-        solver->mkFXPEqual(solver->mkFPToFXP(fp32(0xbf333333), To),
-                           solver->mkFXPFromBin(
-                               refBits(RefFormat{16, 15, true}, 0xa667), To)));
+        solver->mkFXPEqual(
+            solver->mkFPToFXP(fp32(0xbf333333), To, camada::FXPRM::TowardZero),
+            solver->mkFXPFromBin(refBits(RefFormat{16, 15, true}, 0xa667),
+                                 To)));
     solver->addConstraint(Ok);
     REQUIRE(solver->check() == camada::checkResult::SAT);
   }
@@ -1290,10 +1369,10 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
       camada::SMTExprRef F =
           solver->mkFPFromBin(refBits(RefFormat{32, 0, false}, Bits), 8, Enc);
       Ok = solver->mkAnd(
-          Ok,
-          solver->mkFXPEqual(solver->mkFPToFXPSat(F, S15),
-                             solver->mkFXPFromBin(
-                                 refBits(RefFormat{16, 15, true}, Raw), S15)));
+          Ok, solver->mkFXPEqual(
+                  solver->mkFPToFXPSat(F, S15, camada::FXPRM::TowardZero),
+                  solver->mkFXPFromBin(refBits(RefFormat{16, 15, true}, Raw),
+                                       S15)));
     }
     solver->addConstraint(Ok);
     REQUIRE(solver->check() == camada::checkResult::SAT);
@@ -1309,8 +1388,9 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
     camada::SMTExprRef X = solver->mkSymbol("fxp_rt_x", Fmt);
     camada::SMTExprRef F = solver->mkFXPToFP(X, F32, camada::RM::ROUND_TO_EVEN);
     solver->addConstraint(solver->mkOr(
-        solver->mkNot(solver->mkFXPEqual(solver->mkFPToFXP(F, Fmt), X)),
-        solver->mkFPToFXPOverflow(F, Fmt)));
+        solver->mkNot(solver->mkFXPEqual(
+            solver->mkFPToFXP(F, Fmt, camada::FXPRM::TowardZero), X)),
+        solver->mkFPToFXPOverflow(F, Fmt, camada::FXPRM::TowardZero)));
     REQUIRE(solver->check() == camada::checkResult::UNSAT);
   }
 }

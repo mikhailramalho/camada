@@ -599,6 +599,104 @@ inline void check_rem_pair_f64(const camada::SMTSolverRef &solver,
   REQUIRE(solver->check() == camada::checkResult::SAT);
 }
 
+// Multiply and divide against the host CPU, on subnormal operands.
+//
+// These are the inputs that caught a regression where multiply and divide
+// stopped normalizing their operands. round() renormalizes the
+// significand, so the change looked safe, but an unnormalized subnormal
+// reports an exponent understated by its leading-zero count and round()
+// cannot recover that: multiply returned a wrong subnormal product and
+// divide returned an infinity where the result is finite.
+inline void fp_muldiv_subnormal_host_oracle(const camada::SMTSolverRef &solver,
+                                            camada::FPEncoding Encoding) {
+  const float Sub = std::numeric_limits<float>::denorm_min();
+  const std::pair<float, float> Pairs[] = {
+      // Ordinary values, as a control.
+      {3.0f, 2.0f},
+      {-7.5f, 0.5f},
+      // Subnormal operands. A subnormal times a large value lands back in
+      // the normal range; a normal over a subnormal overflows the naive
+      // exponent difference.
+      {-128.5f, Sub},
+      {Sub, 1e38f},
+      {Sub * 3.0f, -1.6482427e38f},
+      {4.82425e-07f, -2.93883e-39f},
+      {1.0f, Sub},
+      {Sub, Sub},
+  };
+
+  for (auto [X, Y] : Pairs) {
+    for (bool IsDiv : {false, true}) {
+      solver->reset();
+      // Drive the operands through symbols pinned by equality rather than
+      // passing constants: a constant multiply is folded by the backend's
+      // rewriter and never reaches the bit-blast under test.
+      auto s = solver->mkFP32Sort(Encoding);
+      auto x = solver->mkSymbol("mdx", s);
+      auto y = solver->mkSymbol("mdy", s);
+      solver->addConstraint(solver->mkFPEqual(x, solver->mkFP32(X, Encoding)));
+      solver->addConstraint(solver->mkFPEqual(y, solver->mkFP32(Y, Encoding)));
+      auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+      auto got = IsDiv ? solver->mkFPDiv(x, y, rm) : solver->mkFPMul(x, y, rm);
+      // volatile keeps the reference at float precision.
+      volatile float VX = X, VY = Y;
+      const float Want = IsDiv ? VX / VY : VX * VY;
+      auto want = solver->mkFP32(Want, Encoding);
+      // Compare IEEE bits: a wrong subnormal and an infinity where the
+      // result is finite both show up, and fp.eq would hide -0 vs +0.
+      INFO((IsDiv ? "div(" : "mul(") << X << ", " << Y << ") want " << Want);
+      solver->addConstraint(solver->mkNot(solver->mkEqual(
+          solver->mkIEEEFPToBV(got), solver->mkIEEEFPToBV(want))));
+      REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    }
+  }
+}
+
+// toIntegral on values that are already integers, across formats.
+//
+// The "exponent >= sbits-1, so x is already an integer" branch was gated
+// by a floating-point log2 test that reads 4.17 > 4 for binary16 and
+// disabled the branch outright, so toIntegral(14184.0) returned 0.5.
+// binary32 passed the same gate, which is why nothing here caught it —
+// hence the explicit narrow-format case.
+// The binary16 half runs under the BV encoding only, matching
+// fp_non_standard_widths: narrow formats are camada's own encoding, and
+// backends reject them natively (cvc5 requires --fp-exp, bitwuzla
+// --fpexp).
+inline void fp_tointegral_large_values_bv(const camada::SMTSolverRef &solver) {
+  const camada::FPEncoding Encoding = camada::FPEncoding::BV;
+  // Large binary16 values: every one of these is exactly an integer, so
+  // toIntegral must return it unchanged.
+  const std::string Halfs[] = {
+      "0110100000010000", // 2^11 * 1.0625
+      "0110110000010000", "0111000000010000",
+      "0111010000010000", "0111100000010000", // 14184-scale magnitudes
+  };
+  for (const std::string &Bits : Halfs) {
+    solver->reset();
+    auto x = solver->mkFPFromBin(Bits, 5, Encoding);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+    INFO("binary16 toIntegral(" << Bits << ")");
+    solver->addConstraint(
+        solver->mkNot(solver->mkFPEqual(solver->mkFPtoIntegral(x, rm), x)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
+inline void fp_tointegral_large_values(const camada::SMTSolverRef &solver,
+                                       camada::FPEncoding Encoding) {
+  // binary32, which took the other side of the gate and stayed correct.
+  for (float V : {16777216.0f, 14184.0f, 1e30f, -1e30f, -14184.0f}) {
+    solver->reset();
+    auto x = solver->mkFP32(V, Encoding);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+    INFO("binary32 toIntegral(" << V << ")");
+    solver->addConstraint(
+        solver->mkNot(solver->mkFPEqual(solver->mkFPtoIntegral(x, rm), x)));
+    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  }
+}
+
 // FMA against the host CPU's fused multiply-add, which is exact per
 // IEEE-754: one rounding of x*y+z, never two. The subnormal cases are the
 // point — camada's bit-blast inherited a one-ulp error from Z3's

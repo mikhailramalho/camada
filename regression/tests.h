@@ -156,6 +156,11 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_remainder_semantics, BVFP);
   RESETANDARGTEST(fp_fma_host_oracle, NativeFP);
   RESETANDARGTEST(fp_fma_host_oracle, BVFP);
+  RESETANDARGTEST(fp_muldiv_subnormal_host_oracle, NativeFP);
+  RESETANDARGTEST(fp_muldiv_subnormal_host_oracle, BVFP);
+  RESETANDARGTEST(fp_tointegral_large_values, NativeFP);
+  RESETANDARGTEST(fp_tointegral_large_values, BVFP);
+  RESETANDTEST(fp_tointegral_large_values_bv);
   RESETANDARGTEST(fp_remainder_host_oracle, NativeFP);
   RESETANDARGTEST(fp_remainder_host_oracle, BVFP);
   RESETANDTEST(arena_stress_test);

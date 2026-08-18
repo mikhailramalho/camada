@@ -246,7 +246,8 @@ inline void fxp_gap_conformance(const camada::SMTSolverRef &solver) {
     // toward-zero integer part fits [-2, 1].
     int64_t Trunc = sv(A) >= 0 ? sv(A) / 4 : -((-sv(A)) / 4);
     All = solver->mkAnd(
-        All, solver->mkEqual(solver->mkFXPToBVOverflow(raw(A), 2, true),
+        All, solver->mkEqual(solver->mkFXPToBVOverflow(
+                                 raw(A), 2, true, camada::FXPRM::TowardZero),
                              solver->mkBool(Trunc < -2 || Trunc > 1)));
   }
   solver->addConstraint(All);

@@ -18,11 +18,31 @@ Reproducer: `fp.rem(3.0e38f, 7.0e-39f)` returns the wrong value. Found by
 cross-checking against the host CPU, where `std::remainder` is exact per
 IEEE-754.
 
+A second, smaller witness in binary16, found by cross-checking camada's BV
+encoding against z3's native FP symbolically:
+
+```
+x = 0111100101100010   (44096.0)
+y = 0000001111001100   (5.793571472167969e-05, subnormal)
+
+exact (host remainder) -1.9550323486328125e-05   1000000101001000
+camada BV              -1.9550323486328125e-05   exact
+z3 native              -2.6464462280273438e-05   1000000110111100  (116 ulp out)
+```
+
+**The query must be symbolic.** Passing the operands as constants makes
+every backend agree, because `propagate-values` folds them before
+`fpa2bv` runs and the buggy bit-blaster never executes. Assert the inputs
+through symbols, or use an explicit `(then fpa2bv simplify bit-blast smt)`
+tactic.
+
 Not yet reported upstream.
 
-### Report the Z3 `fpa2bv` FMA sticky-bit bug
+### Z3 `fpa2bv` FMA: sticky bit dropped, wrong rounding
 
-Camada's copy is fixed (#145); Z3's is not, and we owe the report.
+Camada's copy is fixed (#145); Z3's is not, and we owe the report. It was
+originally recorded here as a camada defect, inherited from Z3's
+`fpa2bv_converter` along with the rest of the FP bit-blast.
 
 FMA narrows its sum through one of two paths. The wider one discards an
 extra bit but reused the narrower path's sticky, so that bit vanished,
@@ -32,8 +52,52 @@ subnormal operands. Reproduce with an explicit
 hides it because `propagate-values` folds constants before the
 bit-blaster runs.
 
-This is the second subnormal-triggered defect in that converter (see
-`mk_rem` above), so report both together.
+```
+x  10000000011110011011111101100111   (subnormal)
+y  11111110111110000000000000000000
+z  00111111001001011000111100001011
+
+correct    01000000000111110101010100101111
+camada BV  01000000000111110101010100101110   <- one ulp low, BEFORE #145
+```
+
+(That camada column is the pre-#145 behaviour, kept because it is the
+witness that identified the shared defect. Camada returns the correct
+value now; Z3 still returns the wrong one.)
+
+The correct value is confirmed three ways: exact rational arithmetic on
+`x*y + z`, the host CPU's hardware `fmaf()`, and bitwuzla's native FP.
+Z3 reproduces camada's pre-#145 answer bit-for-bit under the tactic
+above.
+
+A second, smaller witness in binary16, from cross-checking camada's BV
+encoding against z3's native FP symbolically. This one is *not*
+subnormal — it is a plain rounding error, so the defect is wider than the
+subnormal path:
+
+```
+fma(x, y, x)  with  x = 984.0        0110001110110000
+                    y = 3.546875     0100001100011000
+
+exact x*y+x  4474.125
+neighbours   4472 and 4476 (spacing 4), midpoint 4474.0
+             exact is ABOVE the midpoint, so RNE gives 4476
+
+camada BV    4476   0110110001011111   correct
+z3 native    4472   0110110001011110   rounds the wrong way
+```
+
+As with `mk_rem`, the query must be symbolic: constant operands are folded
+by `propagate-values` before `fpa2bv` runs, and z3 then answers correctly.
+
+This is the second subnormal-triggered defect found in that converter —
+see the `mk_rem` entry above — which suggests those paths are
+systematically under-tested upstream. Both deserve a report.
+
+Report both together with the `mk_rem` entry above: they are the second
+and third defects found in the same converter, which suggests those paths
+are systematically under-tested upstream. What did not catch them is
+recorded under "Extend the conformance fixtures to arithmetic" below.
 
 ### MathSAT macOS packaging
 
