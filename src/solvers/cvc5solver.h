@@ -27,8 +27,8 @@
 #include <string>
 
 #include "../camadaexpr.h"
-#include "../core/camadaimpl.h"
 #include "../camadasort.h"
+#include "../core/camadaimpl.h"
 
 namespace camada {
 

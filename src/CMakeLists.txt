@@ -62,8 +62,8 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camadahandle.h
     camadasort.h)
 
-# camadaimpl.h is the base class an out-of-tree backend inherits, not part
-# of the API a consumer calls -- installed under core/ to say so.
+# camadaimpl.h is the base class an out-of-tree backend inherits, not part of
+# the API a consumer calls -- installed under core/ to say so.
 set(${LIBRARY_TARGET_NAME}_CORE_HDR core/camadaimpl.h)
 
 if(CAMADA_SOLVER_SMTLIB_ENABLE)
