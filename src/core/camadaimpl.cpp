@@ -685,6 +685,14 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
     return theExp;                                                             \
   }
 
+// Model-value getter: check the sort, then delegate. The guard is the whole
+// wrapper, so it is the only thing worth not retyping.
+#define CAMADA_DEFINE_MODEL_GETTER(ResultType, Name, SortAssert, ImplName)     \
+  SMTResult<ResultType> SMTSolverImpl::Name(const SMTExprRef &Exp) {           \
+    SortAssert;                                                                \
+    return ImplName(Exp);                                                      \
+  }
+
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
                                     requireBVSameSort(LHS, RHS),
                                     mkBVAddImpl(LHS, RHS),
@@ -1649,15 +1657,13 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkExistsImpl, "Quantifiers",
                                const std::vector<SMTExprRef> &,
                                const SMTExprRef &)
 
-SMTResult<bool> SMTSolverImpl::getBool(const SMTExprRef &Exp) {
-  requireBoolSort(Exp, "Expected boolean expression");
-  return getBoolImpl(Exp);
-}
+CAMADA_DEFINE_MODEL_GETTER(bool, getBool,
+                           requireBoolSort(Exp, "Expected boolean expression"),
+                           getBoolImpl)
 
-SMTResult<int64_t> SMTSolverImpl::getBV(const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  return getBVImpl(Exp);
-}
+CAMADA_DEFINE_MODEL_GETTER(int64_t, getBV,
+                           requireBVSort(Exp, "Expected bit-vector expression"),
+                           getBVImpl)
 
 SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
   requireBVSort(Exp, "Expected bit-vector expression");
@@ -1712,15 +1718,15 @@ SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   return addLeadingZeroes(result.value(), Exp->getWidth());
 }
 
-SMTResult<float> SMTSolverImpl::getFP32(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  return getFP32Impl(Exp);
-}
+CAMADA_DEFINE_MODEL_GETTER(float, getFP32,
+                           requireFPSort(Exp,
+                                         "Expected floating-point expression"),
+                           getFP32Impl)
 
-SMTResult<double> SMTSolverImpl::getFP64(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  return getFP64Impl(Exp);
-}
+CAMADA_DEFINE_MODEL_GETTER(double, getFP64,
+                           requireFPSort(Exp,
+                                         "Expected floating-point expression"),
+                           getFP64Impl)
 
 SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
                                           const SMTExprRef &Index) {
