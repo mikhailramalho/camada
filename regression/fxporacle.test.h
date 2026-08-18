@@ -66,10 +66,12 @@ inline void fxp_oracle_semantics(const camada::SMTSolverRef &solver) {
       R = solver->mkFXPSub(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
       break;
     case OrOp::Mul:
-      R = solver->mkFXPMul(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
+      R = solver->mkFXPMul(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0),
+                           camada::FXPRM::TowardNegative);
       break;
     case OrOp::Div:
-      R = solver->mkFXPDiv(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
+      R = solver->mkFXPDiv(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0),
+                           camada::FXPRM::TowardNegative);
       break;
     case OrOp::Neg:
       R = solver->mkFXPNeg(A);
@@ -87,10 +89,12 @@ inline void fxp_oracle_semantics(const camada::SMTSolverRef &solver) {
       R = solver->mkFXPSubSat(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
       break;
     case OrOp::MulSat:
-      R = solver->mkFXPMulSat(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
+      R = solver->mkFXPMulSat(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0),
+                              camada::FXPRM::TowardNegative);
       break;
     case OrOp::DivSat:
-      R = solver->mkFXPDivSat(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0));
+      R = solver->mkFXPDivSat(A, mkFXP(solver, V.b, V.w, V.n, V.s != 0),
+                              camada::FXPRM::TowardNegative);
       break;
     case OrOp::NegSat:
       R = solver->mkFXPNegSat(A);
@@ -107,8 +111,9 @@ inline void fxp_oracle_semantics(const camada::SMTSolverRef &solver) {
     const OrConv &V = kConvSat[I];
     camada::SMTExprRef A = mkFXP(solver, V.a, V.fw, V.fn, V.fs != 0);
     camada::SMTSortRef To = solver->mkFXPSort(V.tw, V.tn, V.ts != 0);
-    return solver->mkFXPEqual(solver->mkFXPToFXPSat(A, To),
-                              mkFXP(solver, V.r, V.tw, V.tn, V.ts != 0));
+    return solver->mkFXPEqual(
+        solver->mkFXPToFXPSat(A, To, camada::FXPRM::TowardNegative),
+        mkFXP(solver, V.r, V.tw, V.tn, V.ts != 0));
   });
 
   // In-range by generation-time filtering, so the plain conversion is
@@ -118,9 +123,10 @@ inline void fxp_oracle_semantics(const camada::SMTSolverRef &solver) {
   checkVectorsChunked(solver, 2 * NToBV, [&](std::size_t I) {
     const OrToBV &V = kToBV[I / 2];
     camada::SMTExprRef A = mkFXP(solver, V.a, V.fw, V.fn, V.fs != 0);
-    camada::SMTExprRef R = (I % 2) == 0
-                               ? solver->mkFXPToBV(A, V.tw)
-                               : solver->mkFXPToBVSat(A, V.tw, V.ts != 0);
+    camada::SMTExprRef R =
+        (I % 2) == 0 ? solver->mkFXPToBV(A, V.tw, camada::FXPRM::TowardZero)
+                     : solver->mkFXPToBVSat(A, V.tw, V.ts != 0,
+                                            camada::FXPRM::TowardZero);
     return solver->mkEqual(R, solver->mkBVFromBin(rawBits(V.r, V.tw), V.tw));
   });
 }
@@ -146,10 +152,10 @@ inline void fxp_oracle_mixed_semantics(const camada::SMTSolverRef &solver) {
       R = solver->mkFXPSub(A, B);
       break;
     case OrMixOp::Mul:
-      R = solver->mkFXPMul(A, B);
+      R = solver->mkFXPMul(A, B, camada::FXPRM::TowardNegative);
       break;
     case OrMixOp::Div:
-      R = solver->mkFXPDiv(A, B);
+      R = solver->mkFXPDiv(A, B, camada::FXPRM::TowardNegative);
       break;
     case OrMixOp::AddSat:
       R = solver->mkFXPAddSat(A, B);
@@ -160,16 +166,17 @@ inline void fxp_oracle_mixed_semantics(const camada::SMTSolverRef &solver) {
       Sat = true;
       break;
     case OrMixOp::MulSat:
-      R = solver->mkFXPMulSat(A, B);
+      R = solver->mkFXPMulSat(A, B, camada::FXPRM::TowardNegative);
       Sat = true;
       break;
     case OrMixOp::DivSat:
-      R = solver->mkFXPDivSat(A, B);
+      R = solver->mkFXPDivSat(A, B, camada::FXPRM::TowardNegative);
       Sat = true;
       break;
     }
     camada::SMTExprRef C =
-        Sat ? solver->mkFXPToFXPSat(R, To) : solver->mkFXPToFXP(R, To);
+        Sat ? solver->mkFXPToFXPSat(R, To, camada::FXPRM::TowardNegative)
+            : solver->mkFXPToFXP(R, To, camada::FXPRM::TowardNegative);
     return solver->mkFXPEqual(C, mkFXP(solver, V.r, V.rw, V.rn, V.rs != 0));
   });
 }
@@ -199,11 +206,13 @@ inline void fxp_oracle_fp_semantics(const camada::SMTSolverRef &solver,
     camada::SMTExprRef A = solver->mkFPFromBin(rawBits(V.a, V.fpw), EW, Enc);
     camada::SMTSortRef To = solver->mkFXPSort(V.tw, V.tn, V.ts != 0);
     camada::SMTExprRef R =
-        V.sat != 0 ? solver->mkFPToFXPSat(A, To) : solver->mkFPToFXP(A, To);
+        V.sat != 0 ? solver->mkFPToFXPSat(A, To, camada::FXPRM::TowardZero)
+                   : solver->mkFPToFXP(A, To, camada::FXPRM::TowardZero);
     camada::SMTExprRef Eq =
         solver->mkFXPEqual(R, mkFXP(solver, V.r, V.tw, V.tn, V.ts != 0));
     if (V.sat == 0)
-      Eq = solver->mkAnd(Eq, solver->mkNot(solver->mkFPToFXPOverflow(A, To)));
+      Eq = solver->mkAnd(Eq, solver->mkNot(solver->mkFPToFXPOverflow(
+                                 A, To, camada::FXPRM::TowardZero)));
     return Eq;
   });
 }
