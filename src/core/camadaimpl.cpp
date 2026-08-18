@@ -605,6 +605,41 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
     return theExp;                                                             \
   }
 
+#define CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(ReturnType, Name, SortAssert,       \
+                                           ImplCall, ResultAssert)             \
+  ReturnType SMTSolverImpl::Name(const SMTExprRef &Exp) {                      \
+    SortAssert;                                                                \
+    SMTExprRef theExp = ImplCall;                                              \
+    ResultAssert;                                                              \
+    return theExp;                                                             \
+  }
+
+// Floating-point operations dispatch on the operand's encoding: a BV-encoded
+// sort must go to the common layer's bit-blast, because the backend override
+// only understands its own native FP sort. Writing that ternary by hand at
+// every operation is how a backend ends up being handed a sort it cannot
+// represent, so the dispatch lives here instead.
+#define CAMADA_DEFINE_FP_UNARY_WRAPPER(Name, ImplName, SortAssert,             \
+                                       ResultAssert)                           \
+  SMTExprRef SMTSolverImpl::Name(const SMTExprRef &Exp) {                      \
+    SortAssert;                                                                \
+    SMTExprRef theExp =                                                        \
+        usesBVFPEncoding(Exp) ? SMTSolverImpl::ImplName(Exp) : ImplName(Exp);  \
+    ResultAssert;                                                              \
+    return theExp;                                                             \
+  }
+
+// Default *Impl for an operation a backend need not provide natively: build it
+// from operations that already exist, then rewrap so the result still reports
+// its own kind rather than the kind of whatever it was composed from. The
+// rewrap is the part that is easy to forget when writing these by hand.
+#define CAMADA_DEFINE_DERIVED_BINARY_IMPL(Name, Composition, Kind)             \
+  SMTExprRef SMTSolverImpl::Name(const SMTExprRef &LHS,                        \
+                                 const SMTExprRef &RHS) {                      \
+    SMTExprRef theExp = Composition;                                           \
+    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Kind);           \
+  }
+
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
                                     requireBVSameSort(LHS, RHS),
                                     mkBVAddImpl(LHS, RHS),
@@ -706,68 +741,45 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSge,
 // other signed/unsigned BV pairs; the protected *Impl hooks keep a single
 // IsSigned-parameterized entry point per operation, since every backend
 // implements both signednesses in one place.
-SMTExprRef SMTSolverImpl::mkBVSAddOverflow(const SMTExprRef &LHS,
-                                           const SMTExprRef &RHS) {
-  requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVAddOverflowImpl(LHS, RHS, /*IsSigned=*/true);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSAddOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVAddOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/true),
+                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUAddOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVAddOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/false),
+                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSSubOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVSubOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/true),
+                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUSubOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVSubOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/false),
+                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSMulOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVMulOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/true),
+                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUMulOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVMulOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/false),
+                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSDivOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVSDivOverflowImpl(LHS, RHS),
+                                    assert(theExp->Sort->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkBVUAddOverflow(const SMTExprRef &LHS,
-                                           const SMTExprRef &RHS) {
-  requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVAddOverflowImpl(LHS, RHS, /*IsSigned=*/false);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
-
-SMTExprRef SMTSolverImpl::mkBVSSubOverflow(const SMTExprRef &LHS,
-                                           const SMTExprRef &RHS) {
-  requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVSubOverflowImpl(LHS, RHS, /*IsSigned=*/true);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
-
-SMTExprRef SMTSolverImpl::mkBVUSubOverflow(const SMTExprRef &LHS,
-                                           const SMTExprRef &RHS) {
-  requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVSubOverflowImpl(LHS, RHS, /*IsSigned=*/false);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
-
-SMTExprRef SMTSolverImpl::mkBVSMulOverflow(const SMTExprRef &LHS,
-                                           const SMTExprRef &RHS) {
-  requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVMulOverflowImpl(LHS, RHS, /*IsSigned=*/true);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
-
-SMTExprRef SMTSolverImpl::mkBVUMulOverflow(const SMTExprRef &LHS,
-                                           const SMTExprRef &RHS) {
-  requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVMulOverflowImpl(LHS, RHS, /*IsSigned=*/false);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
-
-SMTExprRef SMTSolverImpl::mkBVSDivOverflow(const SMTExprRef &LHS,
-                                           const SMTExprRef &RHS) {
-  requireBVSameSort(LHS, RHS);
-  SMTExprRef theExp = mkBVSDivOverflowImpl(LHS, RHS);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
-
-SMTExprRef SMTSolverImpl::mkBVNegOverflow(const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  SMTExprRef theExp = mkBVNegOverflowImpl(Exp);
-  assert(theExp->Sort->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
+    SMTExprRef, mkBVNegOverflow,
+    requireBVSort(Exp, "Expected bit-vector expression"),
+    mkBVNegOverflowImpl(Exp), assert(theExp->Sort->isBoolSort()))
 
 SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
@@ -891,24 +903,14 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithGe,
                                     mkArithGeImpl(LHS, RHS),
                                     assert(theExp->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkBVXnorImpl(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkBVNotImpl(mkBVXorImpl(LHS, RHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVXnor);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVXnorImpl,
+                                  mkBVNotImpl(mkBVXorImpl(LHS, RHS)), BVXnor)
 
-SMTExprRef SMTSolverImpl::mkBVNandImpl(const SMTExprRef &LHS,
-                                       const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkBVNotImpl(mkBVAndImpl(LHS, RHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNand);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVNandImpl,
+                                  mkBVNotImpl(mkBVAndImpl(LHS, RHS)), BVNand)
 
-SMTExprRef SMTSolverImpl::mkImpliesImpl(const SMTExprRef &LHS,
-                                        const SMTExprRef &RHS) {
-  // This is: logical-or(logical-not(LHS), RHS)
-  SMTExprRef theExp = mkOrImpl(mkNotImpl(LHS), RHS);
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Implies);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkImpliesImpl, mkOrImpl(mkNotImpl(LHS), RHS),
+                                  Implies)
 
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkFPLt,
                                     requireFPSameSort(LHS, RHS),
@@ -943,26 +945,17 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkFPEqual,
 
 #undef CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER
 
-SMTExprRef SMTSolverImpl::mkBVNeg(const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  SMTExprRef theExp = mkBVNegImpl(Exp);
-  assert(theExp->Sort == Exp->Sort);
-  return theExp;
-}
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
+    SMTExprRef, mkBVNeg, requireBVSort(Exp, "Expected bit-vector expression"),
+    mkBVNegImpl(Exp), assert(theExp->Sort == Exp->Sort))
 
-SMTExprRef SMTSolverImpl::mkBVNot(const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  SMTExprRef theExp = mkBVNotImpl(Exp);
-  assert(theExp->Sort == Exp->Sort);
-  return theExp;
-}
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
+    SMTExprRef, mkBVNot, requireBVSort(Exp, "Expected bit-vector expression"),
+    mkBVNotImpl(Exp), assert(theExp->Sort == Exp->Sort))
 
-SMTExprRef SMTSolverImpl::mkNot(const SMTExprRef &Exp) {
-  requireBoolSort(Exp, "Expected boolean expression");
-  SMTExprRef theExp = mkNotImpl(Exp);
-  assert(theExp->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
+    SMTExprRef, mkNot, requireBoolSort(Exp, "Expected boolean expression"),
+    mkNotImpl(Exp), assert(theExp->isBoolSort()))
 
 SMTExprRef SMTSolverImpl::mkArithNeg(const SMTExprRef &Exp) {
   requireArithSort(Exp, "Expected arithmetic expression");
@@ -1099,19 +1092,14 @@ SMTExprRef SMTSolverImpl::mkBVConcat(const SMTExprRef &LHS,
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkBVRedOr(const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  SMTExprRef theExp = mkBVRedOrImpl(Exp);
-  assert(theExp->getWidth() == 1);
-  return theExp;
-}
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
+    SMTExprRef, mkBVRedOr, requireBVSort(Exp, "Expected bit-vector expression"),
+    mkBVRedOrImpl(Exp), assert(theExp->getWidth() == 1))
 
-SMTExprRef SMTSolverImpl::mkBVRedAnd(const SMTExprRef &Exp) {
-  requireBVSort(Exp, "Expected bit-vector expression");
-  SMTExprRef theExp = mkBVRedAndImpl(Exp);
-  assert(theExp->getWidth() == 1);
-  return theExp;
-}
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
+    SMTExprRef, mkBVRedAnd,
+    requireBVSort(Exp, "Expected bit-vector expression"), mkBVRedAndImpl(Exp),
+    assert(theExp->getWidth() == 1))
 
 SMTExprRef SMTSolverImpl::mkFPAbs(const SMTExprRef &Exp) {
   requireFPSort(Exp, "Expected floating-point expression");
@@ -1131,48 +1119,30 @@ SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkFPIsInfinite(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkFPIsInfiniteImpl(Exp)
-                          : mkFPIsInfiniteImpl(Exp);
-  assert(theExp->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_FP_UNARY_WRAPPER(
+    mkFPIsInfinite, mkFPIsInfiniteImpl,
+    requireFPSort(Exp, "Expected floating-point expression"),
+    assert(theExp->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkFPIsNaN(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPIsNaNImpl(Exp)
-                                            : mkFPIsNaNImpl(Exp);
-  assert(theExp->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_FP_UNARY_WRAPPER(
+    mkFPIsNaN, mkFPIsNaNImpl,
+    requireFPSort(Exp, "Expected floating-point expression"),
+    assert(theExp->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkFPIsDenormal(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkFPIsDenormalImpl(Exp)
-                          : mkFPIsDenormalImpl(Exp);
-  assert(theExp->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_FP_UNARY_WRAPPER(
+    mkFPIsDenormal, mkFPIsDenormalImpl,
+    requireFPSort(Exp, "Expected floating-point expression"),
+    assert(theExp->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkFPIsNormal(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkFPIsNormalImpl(Exp)
-                          : mkFPIsNormalImpl(Exp);
-  assert(theExp->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_FP_UNARY_WRAPPER(
+    mkFPIsNormal, mkFPIsNormalImpl,
+    requireFPSort(Exp, "Expected floating-point expression"),
+    assert(theExp->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkFPIsZero(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPIsZeroImpl(Exp)
-                                            : mkFPIsZeroImpl(Exp);
-  assert(theExp->isBoolSort());
-  return theExp;
-}
+CAMADA_DEFINE_FP_UNARY_WRAPPER(
+    mkFPIsZero, mkFPIsZeroImpl,
+    requireFPSort(Exp, "Expected floating-point expression"),
+    assert(theExp->isBoolSort()))
 
 SMTExprRef SMTSolverImpl::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
                                   const SMTExprRef &R) {
@@ -2411,35 +2381,20 @@ SMTSortRef SMTSolverImpl::mkTupleSortImpl(const std::vector<SMTSortRef> &) {
   unsupportedFeature("Tuples");
 }
 
-SMTExprRef SMTSolverImpl::mkBVNorImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkBVNotImpl(mkBVOrImpl(LHS, RHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNor);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVNorImpl,
+                                  mkBVNotImpl(mkBVOrImpl(LHS, RHS)), BVNor)
 
-SMTExprRef SMTSolverImpl::mkBVUgtImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNotImpl(mkBVUleImpl(LHS, RHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUgt);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVUgtImpl, mkNotImpl(mkBVUleImpl(LHS, RHS)),
+                                  BVUgt)
 
-SMTExprRef SMTSolverImpl::mkBVSgtImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNotImpl(mkBVSleImpl(LHS, RHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSgt);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVSgtImpl, mkNotImpl(mkBVSleImpl(LHS, RHS)),
+                                  BVSgt)
 
-SMTExprRef SMTSolverImpl::mkBVUgeImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNotImpl(mkBVUltImpl(LHS, RHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVUge);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVUgeImpl, mkNotImpl(mkBVUltImpl(LHS, RHS)),
+                                  BVUge)
 
-SMTExprRef SMTSolverImpl::mkBVSgeImpl(const SMTExprRef &LHS,
-                                      const SMTExprRef &RHS) {
-  SMTExprRef theExp = mkNotImpl(mkBVSltImpl(LHS, RHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSge);
-}
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVSgeImpl, mkNotImpl(mkBVSltImpl(LHS, RHS)),
+                                  BVSge)
 
 SMTExprRef SMTSolverImpl::mkBVAddOverflowImpl(const SMTExprRef &LHS,
                                               const SMTExprRef &RHS,
