@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "camadaimpl.h"
-#include "../camadacommon.h"
+#include "../camadaerrors.h"
 #include "../theories/camadatuple.h"
 
 #include <algorithm>

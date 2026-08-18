@@ -24,7 +24,7 @@
 #include "bitwuzlasolver.h"
 #include "../camada.h"
 #include "../camadacache.h"
-#include "../camadacommon.h"
+#include "../camadaerrors.h"
 
 #include <cstdio>
 #include <cstdlib>

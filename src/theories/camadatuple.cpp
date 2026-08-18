@@ -21,7 +21,7 @@
 
 #include "camadatuple.h"
 
-#include "../camadacommon.h"
+#include "../camadaerrors.h"
 #include "../core/camadaimpl.h"
 
 #include <algorithm>

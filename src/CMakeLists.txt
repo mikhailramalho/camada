@@ -56,7 +56,7 @@ set(${LIBRARY_TARGET_NAME}_PUB_HDR
     camada.h
     camadaarena.h
     camadacache.h
-    camadacommon.h
+    camadaerrors.h
     camadatypes.h
     camadaexpr.h
     camadahandle.h

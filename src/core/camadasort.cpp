@@ -20,7 +20,7 @@
  **************************************************************************/
 
 #include "../camadasort.h"
-#include "../camadacommon.h"
+#include "../camadaerrors.h"
 
 #include <cstdio>
 #include <string>

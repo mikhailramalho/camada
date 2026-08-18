@@ -56,7 +56,7 @@
 
 #include "../core/camadaimpl.h"
 
-#include "../camadacommon.h"
+#include "../camadaerrors.h"
 
 #include <algorithm>
 #include <cstdint>

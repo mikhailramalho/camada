@@ -28,7 +28,7 @@
 #include <utility>
 #include <vector>
 
-#include "camadacommon.h"
+#include "camadaerrors.h"
 #include "camadaexpr.h"
 #include "camadasort.h"
 #include "camadatypes.h"

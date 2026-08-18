@@ -23,7 +23,7 @@
 
 #include "mathsatsolver.h"
 #include "../camada.h"
-#include "../camadacommon.h"
+#include "../camadaerrors.h"
 
 #include <cstdio>
 #include <gmp.h>

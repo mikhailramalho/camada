@@ -30,7 +30,7 @@
 // congruence), whose selects re-enter this encoding. Sound and complete
 // for quantifier-free formulas only — see the guards in camadaimpl.cpp.
 
-#include "../camadacommon.h"
+#include "../camadaerrors.h"
 #include "../core/camadaimpl.h"
 
 #include <set>

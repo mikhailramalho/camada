@@ -19,8 +19,12 @@
  *
  **************************************************************************/
 
-#ifndef CAMADACOMMON_H_
-#define CAMADACOMMON_H_
+// Camada's fatal-error paths, and the compiler attributes that keep them out
+// of the hot code that calls them. Both live here because they are one
+// concern: an inlined liveness check should not carry the cold abort path
+// inline with it.
+#ifndef CAMADAERRORS_H_
+#define CAMADAERRORS_H_
 
 #include <cstdio>
 #include <cstdlib>

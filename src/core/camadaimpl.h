@@ -46,7 +46,7 @@ struct AckClassWalk;
 
 // Renders Value as a Width-bit two's-complement bit-string. Only the
 // backends need it -- each one hands its own API a binary literal -- so it
-// lives here rather than in camadacommon.h, where it was reachable by every
+// lives here rather than in camadaerrors.h, where it was reachable by every
 // translation unit that wanted fatalErrorIf.
 static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
   const uint64_t RawBits = static_cast<uint64_t>(Value);
