@@ -659,6 +659,32 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
     return theExp;                                                             \
   }
 
+// FP arithmetic taking a rounding mode: same encoding dispatch as the unary
+// FP wrapper, same postcondition that the result keeps the operand's sort.
+#define CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(Name, ImplName)                     \
+  SMTExprRef SMTSolverImpl::Name(const SMTExprRef &LHS, const SMTExprRef &RHS, \
+                                 const SMTExprRef &R) {                        \
+    requireFPSameSortAndRM(LHS, RHS, R);                                       \
+    SMTExprRef theExp = usesBVFPEncoding(LHS)                                  \
+                            ? SMTSolverImpl::ImplName(LHS, RHS, R)             \
+                            : ImplName(LHS, RHS, R);                           \
+    assert(theExp->Sort == LHS->Sort);                                         \
+    return theExp;                                                             \
+  }
+
+// FP to bit-vector conversion: the width check and the postcondition tying
+// the result width to ToWidth are the same for signed and unsigned.
+#define CAMADA_DEFINE_FP_TO_BV_WRAPPER(Name, ImplName)                         \
+  SMTExprRef SMTSolverImpl::Name(const SMTExprRef &From, unsigned ToWidth) {   \
+    requireFPSort(From, "Expected floating-point expression");                 \
+    fatalErrorIf(ToWidth == 0, "Bit-vector target width must be non-zero");    \
+    SMTExprRef theExp = usesBVFPEncoding(From)                                 \
+                            ? SMTSolverImpl::ImplName(From, ToWidth)           \
+                            : ImplName(From, ToWidth);                         \
+    assert(theExp->getWidth() == ToWidth);                                     \
+    return theExp;                                                             \
+  }
+
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
                                     requireBVSameSort(LHS, RHS),
                                     mkBVAddImpl(LHS, RHS),
@@ -1097,13 +1123,10 @@ CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
     requireBVSort(Exp, "Expected bit-vector expression"), mkBVRedAndImpl(Exp),
     assert(theExp->getWidth() == 1))
 
-SMTExprRef SMTSolverImpl::mkFPAbs(const SMTExprRef &Exp) {
-  requireFPSort(Exp, "Expected floating-point expression");
-  SMTExprRef theExp = usesBVFPEncoding(Exp) ? SMTSolverImpl::mkFPAbsImpl(Exp)
-                                            : mkFPAbsImpl(Exp);
-  assert(theExp->Sort == Exp->Sort);
-  return theExp;
-}
+CAMADA_DEFINE_FP_UNARY_WRAPPER(
+    mkFPAbs, mkFPAbsImpl,
+    requireFPSort(Exp, "Expected floating-point expression"),
+    assert(theExp->Sort == Exp->Sort))
 
 SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
                                   FPNegBehavior Behavior) {
@@ -1140,25 +1163,9 @@ CAMADA_DEFINE_FP_UNARY_WRAPPER(
     requireFPSort(Exp, "Expected floating-point expression"),
     assert(theExp->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const SMTExprRef &R) {
-  requireFPSameSortAndRM(LHS, RHS, R);
-  SMTExprRef theExp = usesBVFPEncoding(LHS)
-                          ? SMTSolverImpl::mkFPMulImpl(LHS, RHS, R)
-                          : mkFPMulImpl(LHS, RHS, R);
-  assert(theExp->Sort == LHS->Sort);
-  return theExp;
-}
+CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(mkFPMul, mkFPMulImpl)
 
-SMTExprRef SMTSolverImpl::mkFPDiv(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const SMTExprRef &R) {
-  requireFPSameSortAndRM(LHS, RHS, R);
-  SMTExprRef theExp = usesBVFPEncoding(LHS)
-                          ? SMTSolverImpl::mkFPDivImpl(LHS, RHS, R)
-                          : mkFPDivImpl(LHS, RHS, R);
-  assert(theExp->Sort == LHS->Sort);
-  return theExp;
-}
+CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(mkFPDiv, mkFPDivImpl)
 
 SMTExprRef SMTSolverImpl::mkFPRem(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
@@ -1170,25 +1177,9 @@ SMTExprRef SMTSolverImpl::mkFPRem(const SMTExprRef &LHS,
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkFPAdd(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const SMTExprRef &R) {
-  requireFPSameSortAndRM(LHS, RHS, R);
-  SMTExprRef theExp = usesBVFPEncoding(LHS)
-                          ? SMTSolverImpl::mkFPAddImpl(LHS, RHS, R)
-                          : mkFPAddImpl(LHS, RHS, R);
-  assert(theExp->Sort == LHS->Sort);
-  return theExp;
-}
+CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(mkFPAdd, mkFPAddImpl)
 
-SMTExprRef SMTSolverImpl::mkFPSub(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                  const SMTExprRef &R) {
-  requireFPSameSortAndRM(LHS, RHS, R);
-  SMTExprRef theExp = usesBVFPEncoding(LHS)
-                          ? SMTSolverImpl::mkFPSubImpl(LHS, RHS, R)
-                          : mkFPSubImpl(LHS, RHS, R);
-  assert(theExp->Sort == LHS->Sort);
-  return theExp;
-}
+CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(mkFPSub, mkFPSubImpl)
 
 SMTExprRef SMTSolverImpl::mkFPSqrt(const SMTExprRef &Exp, const SMTExprRef &R) {
   requireFPSort(Exp, "Expected floating-point expression");
@@ -1258,25 +1249,9 @@ SMTExprRef SMTSolverImpl::mkUBVtoFP(const SMTExprRef &From,
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) {
-  requireFPSort(From, "Expected floating-point expression");
-  fatalErrorIf(ToWidth == 0, "Bit-vector target width must be non-zero");
-  SMTExprRef theExp = usesBVFPEncoding(From)
-                          ? SMTSolverImpl::mkFPtoSBVImpl(From, ToWidth)
-                          : mkFPtoSBVImpl(From, ToWidth);
-  assert(theExp->getWidth() == ToWidth);
-  return theExp;
-}
+CAMADA_DEFINE_FP_TO_BV_WRAPPER(mkFPtoSBV, mkFPtoSBVImpl)
 
-SMTExprRef SMTSolverImpl::mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) {
-  requireFPSort(From, "Expected floating-point expression");
-  fatalErrorIf(ToWidth == 0, "Bit-vector target width must be non-zero");
-  SMTExprRef theExp = usesBVFPEncoding(From)
-                          ? SMTSolverImpl::mkFPtoUBVImpl(From, ToWidth)
-                          : mkFPtoUBVImpl(From, ToWidth);
-  assert(theExp->getWidth() == ToWidth);
-  return theExp;
-}
+CAMADA_DEFINE_FP_TO_BV_WRAPPER(mkFPtoUBV, mkFPtoUBVImpl)
 
 SMTExprRef SMTSolverImpl::mkFPtoIntegral(const SMTExprRef &From,
                                          const SMTExprRef &R) {
