@@ -693,6 +693,17 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
     return ImplName(Exp);                                                      \
   }
 
+// Constant constructor: nothing to check on the way in -- there is no operand
+// -- so the wrapper is the impl call plus the postcondition on the result.
+// Params and Args are passed as parenthesised lists so commas inside them do
+// not split the macro's own arguments.
+#define CAMADA_DEFINE_CONST_CTOR(Name, Params, Args, ResultAssert)             \
+  SMTExprRef SMTSolverImpl::Name Params {                                      \
+    SMTExprRef theExp = Name##Impl Args;                                       \
+    ResultAssert;                                                              \
+    return theExp;                                                             \
+  }
+
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
                                     requireBVSameSort(LHS, RHS),
                                     mkBVAddImpl(LHS, RHS),
@@ -1847,35 +1858,18 @@ SMTExprRef SMTSolverImpl::mkBool(const bool b) {
   return CachedExpr;
 }
 
-SMTExprRef SMTSolverImpl::mkInt(int64_t v) {
-  SMTExprRef theExp = mkIntImpl(v);
-  assert(theExp->isIntSort());
-  return theExp;
-}
+CAMADA_DEFINE_CONST_CTOR(mkInt, (int64_t v), (v), assert(theExp->isIntSort()))
 
-SMTExprRef SMTSolverImpl::mkInt(const std::string &v) {
-  SMTExprRef theExp = mkIntImpl(v);
-  assert(theExp->isIntSort());
-  return theExp;
-}
+CAMADA_DEFINE_CONST_CTOR(mkInt, (const std::string &v), (v),
+                         assert(theExp->isIntSort()))
 
-SMTExprRef SMTSolverImpl::mkReal(const std::string &v) {
-  SMTExprRef theExp = mkRealImpl(v);
-  assert(theExp->isRealSort());
-  return theExp;
-}
+CAMADA_DEFINE_CONST_CTOR(mkReal, (const std::string &v), (v),
+                         assert(theExp->isRealSort()))
 
-SMTExprRef SMTSolverImpl::mkReal(int64_t v) {
-  SMTExprRef theExp = mkRealImpl(v);
-  assert(theExp->isRealSort());
-  return theExp;
-}
+CAMADA_DEFINE_CONST_CTOR(mkReal, (int64_t v), (v), assert(theExp->isRealSort()))
 
-SMTExprRef SMTSolverImpl::mkReal(int64_t num, int64_t den) {
-  SMTExprRef theExp = mkRealImpl(num, den);
-  assert(theExp->isRealSort());
-  return theExp;
-}
+CAMADA_DEFINE_CONST_CTOR(mkReal, (int64_t num, int64_t den), (num, den),
+                         assert(theExp->isRealSort()))
 
 SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
@@ -2027,19 +2021,13 @@ SMTExprRef SMTSolverImpl::mkFPFromBin(const std::string &FP, unsigned EWidth,
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkFP32(const float Float, FPEncoding Encoding) {
-  SMTExprRef theExp = mkFP32Impl(Float, Encoding);
-  assert(theExp->isFPSort());
-  assert(theExp->getWidth() == 32);
-  return theExp;
-}
+CAMADA_DEFINE_CONST_CTOR(mkFP32, (const float Float, FPEncoding Encoding),
+                         (Float, Encoding), assert(theExp->isFPSort());
+                         assert(theExp->getWidth() == 32))
 
-SMTExprRef SMTSolverImpl::mkFP64(const double Double, FPEncoding Encoding) {
-  SMTExprRef theExp = mkFP64Impl(Double, Encoding);
-  assert(theExp->isFPSort());
-  assert(theExp->getWidth() == 64);
-  return theExp;
-}
+CAMADA_DEFINE_CONST_CTOR(mkFP64, (const double Double, FPEncoding Encoding),
+                         (Double, Encoding), assert(theExp->isFPSort());
+                         assert(theExp->getWidth() == 64))
 
 SMTExprRef SMTSolverImpl::mkRM(const RM &R, FPEncoding Encoding) {
   SMTExprRef theExp =
