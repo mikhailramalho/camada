@@ -67,16 +67,15 @@ public:
 
 class Z3Solver : public SMTSolverImpl {
 public:
-  explicit Z3Solver(ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit Z3Solver(const SolverConfig &Config = {});
   // z3::context is neither copyable nor movable in Z3 4.13.x, so a
-  // caller-configured context cannot cross this API; the configuration
-  // does instead, and the context is built in place from it. For the
-  // same reason there is no (context, solver) constructor: any solver a
+  // caller-configured context cannot cross this API; a z3::config does
+  // instead, and the context is built in place from it. For the same
+  // reason there is no (context, solver) constructor: any solver a
   // caller could pass would reference a context object outside this
   // class. Subclass and call setSolver() against context() to install a
   // custom solver (see the Override Z3 regression).
-  explicit Z3Solver(z3::config &Config,
-                    ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit Z3Solver(z3::config &Z3Config, const SolverConfig &Config = {});
   ~Z3Solver() override;
 
 protected:
@@ -120,10 +119,8 @@ protected:
 
   // Native datatypes cannot hold an Ackermann-encoded array member (it
   // has no backend term), so the Ackermann array mode forces the Camada
-  // tuple encoding.
-  bool nativeTupleSupport() const override {
-    return ArrayMode != ArrayEncoding::Ackermann;
-  }
+  // tuple encoding regardless of tupleMode().
+  bool nativeDatatypeSupport() const override { return true; }
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 

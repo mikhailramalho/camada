@@ -66,8 +66,7 @@ public:
 
 class CVC5Solver : public SMTSolverImpl {
 public:
-  explicit CVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
-                      ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit CVC5Solver(const SolverConfig &Config = {});
   ~CVC5Solver() override;
 
 protected:
@@ -110,10 +109,8 @@ protected:
 
   // Native datatypes cannot hold an Ackermann-encoded array member (it
   // has no backend term), so the Ackermann array mode forces the Camada
-  // tuple encoding.
-  bool nativeTupleSupport() const override {
-    return ArrayMode != ArrayEncoding::Ackermann;
-  }
+  // tuple encoding regardless of tupleMode().
+  bool nativeDatatypeSupport() const override { return true; }
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
@@ -377,11 +374,6 @@ protected:
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
   bool supportsImpl(SolverFeature Feature) const override;
-
-  /// Whether the context was created with produce-unsat-assumptions
-  /// (opt-in: tracking assumption participation slows every check, and
-  /// cvc5 only honors the option when set before solving starts).
-  bool ProduceUnsatAssumptions = false;
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;

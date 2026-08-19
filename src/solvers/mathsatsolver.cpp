@@ -137,17 +137,17 @@ void MathSATExpr::dump(std::string &Out) const {
   msat_free(ast);
 }
 
-MathSATSolver::MathSATSolver(ArrayEncoding Arrays) {
-  ArrayMode = Arrays;
-  Config = msat_create_default_config("AUFBV");
+MathSATSolver::MathSATSolver(const SolverConfig &SolverCfg)
+    : SMTSolverImpl(SolverCfg) {
+  Config =
+      msat_create_default_config(logic().empty() ? "AUFBV" : logic().c_str());
   msat_set_option(Config, "model_generation", "true");
   initializeContext();
   initializeCommonSingletons();
 }
 
-MathSATSolver::MathSATSolver(msat_config Config, ArrayEncoding Arrays)
-    : Config(Config) {
-  ArrayMode = Arrays;
+MathSATSolver::MathSATSolver(msat_config Config, const SolverConfig &SolverCfg)
+    : SMTSolverImpl(SolverCfg), Config(Config) {
   initializeContext();
   initializeCommonSingletons();
 }

@@ -149,23 +149,6 @@ enum class FXPRM {
 ///   yices) already use.
 enum class TupleEncoding { Native, Camada };
 
-/// Selects whether a solver context is created with unsat-assumption
-/// production enabled. Producing the core is not free: backends whose SAT
-/// engine must track assumption participation (bitwuzla, cvc5) pay a
-/// solve-time cost on *every* check, and the setting is frozen at context
-/// creation — so it is opt-in.
-///
-/// - Off (default): fast contexts. checkSatAssuming() works unchanged;
-///   getUnsatAssumptions() reports UnsupportedOperation and
-///   supports(SolverFeature::UnsatAssumptions) answers false.
-/// - On: the backend tracks assumptions and getUnsatAssumptions() returns
-///   real cores after an UNSAT checkSatAssuming().
-///
-/// Backends that answer cores without a creation-time option (Z3 enables
-/// unsat_core per query, MathSAT and Yices track natively) ignore this
-/// and always support core extraction.
-enum class UnsatAssumptionsMode { Off, On };
-
 /// Selects how arrays are encoded, on the backends that accept it.
 ///
 /// - Native (default): the backend's theory of arrays, unchanged.
@@ -243,6 +226,62 @@ enum class SMTErrorCode {
   /// assumptions after the solver state changed), as opposed to a
   /// backend-originated failure.
   InvalidUsage,
+};
+
+/// Construction-frozen solver options, passed to every create*Solver()
+/// factory (and the corresponding backend constructors). One struct for
+/// all backends: a field a backend does not implement is silently
+/// inapplicable there — the same contract UseUnsatAssumptions always had
+/// (Z3, MathSAT, and Yices answer cores regardless of it). Default
+/// construction gives the historical behavior of every backend.
+///
+/// Options that can change during the solver's lifetime (setTimeout) stay
+/// methods; everything here is frozen because changing it mid-flight
+/// would strand already-built terms or already-configured contexts.
+struct SolverConfig {
+  /// Array encoding (see ArrayEncoding). All backends.
+  ArrayEncoding Arrays = ArrayEncoding::Native;
+
+  /// Tuple lowering (see TupleEncoding). Native applies only where the
+  /// backend has datatypes (Z3, CVC5, SMT-LIB); Camada forces the
+  /// per-field lowering there too — useful to take the datatype engine
+  /// out of the picture. Backends without datatypes always use the
+  /// Camada lowering. Ackermann arrays force Camada tuples regardless.
+  TupleEncoding Tuples = TupleEncoding::Native;
+
+  /// Whether the context is created with unsat-assumption production
+  /// enabled. Producing the core is not free: backends whose SAT engine
+  /// must track assumption participation (Bitwuzla, CVC5) pay a
+  /// solve-time cost on *every* check, and the setting is frozen at
+  /// context creation -- so it is opt-in.
+  ///
+  /// False (the default) gives fast contexts: checkSatAssuming() works
+  /// unchanged, getUnsatAssumptions() reports UnsupportedOperation and
+  /// supports(SolverFeature::UnsatAssumptions) answers false. True makes
+  /// the backend track assumptions so getUnsatAssumptions() returns real
+  /// cores after an UNSAT checkSatAssuming().
+  ///
+  /// Backends that answer cores without a creation-time option (Z3
+  /// enables unsat_core per query, MathSAT and Yices track natively)
+  /// ignore this and always support core extraction.
+  bool UseUnsatAssumptions = false;
+
+  /// Caller-chosen logic. Empty (the default) keeps each backend's
+  /// built-in choice. SMT-LIB: emitted verbatim as `(set-logic ...)`, no
+  /// negotiation, child rejection is fatal (one-shot model children are
+  /// dropped instead). Yices: the context logic (default QF_AUFBV).
+  /// MathSAT: the default-configuration logic (default AUFBV; ignored by
+  /// the constructor taking a caller-built msat_config).
+  std::string Logic;
+
+  /// SMT-LIB one-shot mode only: deadline in milliseconds for each
+  /// protocol ack from the auxiliary model solver. Acks are instantaneous
+  /// for any conforming child; one that stays silent past the deadline
+  /// does not speak the `:print-success` protocol and is dropped, costing
+  /// only counterexample support. Does not apply to the read of the model
+  /// solver's own verdict, which may legitimately take as long as the
+  /// solve.
+  unsigned OneShotModelAckTimeoutMs = 5000;
 };
 
 /// Structured error payload carried by `SMTResult<T>` on failure.

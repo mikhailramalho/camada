@@ -37,14 +37,13 @@ std::size_t readCurrentRSSKiB() {
   return (resident_pages * static_cast<std::size_t>(page_size)) / 1024;
 }
 
-// Array encoding applied to the chosen backend (--ack flag).
-camada::ArrayEncoding arrayMode = camada::ArrayEncoding::Native;
+// Construction options applied to the chosen backend (--ack flag).
+camada::SolverConfig solverConfig;
 
 camada::SMTSolverRef createSolver(const std::string &backend) {
   if (backend == "bitwuzla") {
 #if SOLVER_BITWUZLA_ENABLED
-    return camada::createBitwuzlaSolver(camada::UnsatAssumptionsMode::Off,
-                                        arrayMode);
+    return camada::createBitwuzlaSolver(solverConfig);
 #else
     throw std::runtime_error("Bitwuzla backend is not enabled");
 #endif
@@ -52,8 +51,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "cvc5") {
 #if SOLVER_CVC5_ENABLED
-    return camada::createCVC5Solver(camada::UnsatAssumptionsMode::Off,
-                                    arrayMode);
+    return camada::createCVC5Solver(solverConfig);
 #else
     throw std::runtime_error("CVC5 backend is not enabled");
 #endif
@@ -61,7 +59,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "mathsat") {
 #if SOLVER_MATHSAT_ENABLED
-    return camada::createMathSATSolver(arrayMode);
+    return camada::createMathSATSolver(solverConfig);
 #else
     throw std::runtime_error("MathSAT backend is not enabled");
 #endif
@@ -69,7 +67,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "stp") {
 #if SOLVER_STP_ENABLED
-    return camada::createSTPSolver(arrayMode);
+    return camada::createSTPSolver(solverConfig);
 #else
     throw std::runtime_error("STP backend is not enabled");
 #endif
@@ -77,7 +75,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "yices") {
 #if SOLVER_YICES_ENABLED
-    return camada::createYicesSolver(arrayMode);
+    return camada::createYicesSolver(solverConfig);
 #else
     throw std::runtime_error("Yices backend is not enabled");
 #endif
@@ -85,7 +83,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
 
   if (backend == "z3") {
 #if SOLVER_Z3_ENABLED
-    return camada::createZ3Solver(arrayMode);
+    return camada::createZ3Solver(solverConfig);
 #else
     throw std::runtime_error("Z3 backend is not enabled");
 #endif
@@ -96,8 +94,7 @@ camada::SMTSolverRef createSolver(const std::string &backend) {
     // Write-only mode to /dev/null: measures the text-emission layer without
     // a child solver. The bench cases are construction-only, so the UNKNOWN
     // check() result in this mode is irrelevant.
-    return std::make_unique<camada::SMTLIBSolver>(
-        "/dev/null", camada::TupleEncoding::Native, "", arrayMode);
+    return std::make_unique<camada::SMTLIBSolver>("/dev/null", solverConfig);
 #else
     throw std::runtime_error("SMTLIB backend is not enabled");
 #endif
@@ -668,7 +665,7 @@ int main(int argc, char **argv) {
     std::vector<std::string> args;
     for (int i = 1; i < argc; ++i) {
       if (std::string(argv[i]) == "--ack")
-        arrayMode = camada::ArrayEncoding::Ackermann;
+        solverConfig.Arrays = camada::ArrayEncoding::Ackermann;
       else
         args.emplace_back(argv[i]);
     }

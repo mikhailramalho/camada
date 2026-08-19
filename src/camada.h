@@ -1080,38 +1080,30 @@ public:
 /// Unique pointer for SMTSolvers.
 using SMTSolverRef = std::unique_ptr<SMTSolver>;
 
-/// Convenience method to create a Z3Solver object. `ArrayMode` selects the
-/// array encoding (see ArrayEncoding); the default keeps Z3's native theory
-/// of arrays.
-SMTSolverRef createZ3Solver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
+/// Convenience method to create a Z3Solver object. See SolverConfig for
+/// the construction-frozen options (Arrays, Tuples).
+SMTSolverRef createZ3Solver(const SolverConfig &Config = {});
 
-/// Convenience method to create a MathSATSolver object. `ArrayMode`
-/// selects the array encoding (see ArrayEncoding).
-SMTSolverRef
-createMathSATSolver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
+/// Convenience method to create a MathSATSolver object. See SolverConfig
+/// for the construction-frozen options (Arrays, Logic).
+SMTSolverRef createMathSATSolver(const SolverConfig &Config = {});
 
-/// Convenience method to create a CVC5Solver object. Core extraction via
-/// getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode); `ArrayMode`
-/// selects the array encoding (see ArrayEncoding).
-SMTSolverRef
-createCVC5Solver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
-                 ArrayEncoding ArrayMode = ArrayEncoding::Native);
+/// Convenience method to create a CVC5Solver object. See SolverConfig for
+/// the construction-frozen options (Arrays, Tuples, UnsatAssumptions).
+SMTSolverRef createCVC5Solver(const SolverConfig &Config = {});
 
-/// Convenience method to create a BitwuzlaSolver object. Core extraction
-/// via getUnsatAssumptions() is opt-in (see UnsatAssumptionsMode);
-/// `ArrayMode` selects the array encoding (see ArrayEncoding).
-SMTSolverRef
-createBitwuzlaSolver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
-                     ArrayEncoding ArrayMode = ArrayEncoding::Native);
+/// Convenience method to create a BitwuzlaSolver object. See SolverConfig
+/// for the construction-frozen options (Arrays, UnsatAssumptions).
+SMTSolverRef createBitwuzlaSolver(const SolverConfig &Config = {});
 
-/// Convenience method to create a YicesSolver object. `ArrayMode` selects
-/// the array encoding (see ArrayEncoding).
-SMTSolverRef createYicesSolver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
+/// Convenience method to create a YicesSolver object. See SolverConfig
+/// for the construction-frozen options (Arrays, Logic).
+SMTSolverRef createYicesSolver(const SolverConfig &Config = {});
 
-/// Convenience method to create a STPSolver object. `ArrayMode` selects
-/// the array encoding (see ArrayEncoding); Ackermann mode keeps arrays out
-/// of STP entirely, replacing its non-extensional array theory.
-SMTSolverRef createSTPSolver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
+/// Convenience method to create a STPSolver object. See SolverConfig for
+/// the construction-frozen options (Arrays; Ackermann mode keeps arrays
+/// out of STP entirely, replacing its non-extensional array theory).
+SMTSolverRef createSTPSolver(const SolverConfig &Config = {});
 
 /// Create an SMT-LIB-backed solver that drives an external solver process.
 ///
@@ -1130,19 +1122,15 @@ SMTSolverRef createSTPSolver(ArrayEncoding ArrayMode = ArrayEncoding::Native);
 /// The child must speak standard SMT-LIB on stdin/stdout. Camada sends
 /// `(set-option :print-success true)` to it at startup, so any solver that
 /// honors that contract works.
-SMTSolverRef
-createSMTLIBSolver(const std::vector<std::string> &Argv,
-                   TupleEncoding TupleMode = TupleEncoding::Native,
-                   ArrayEncoding ArrayMode = ArrayEncoding::Native);
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
+                                const SolverConfig &Config = {});
 
 /// Same as `createSMTLIBSolver(Argv)` but also tees the emitted SMT-LIB
 /// script to OutputPath (or stdout if OutputPath is "-") for offline
 /// reproduction.
-SMTSolverRef
-createSMTLIBSolver(const std::vector<std::string> &Argv,
-                   const std::string &OutputPath,
-                   TupleEncoding TupleMode = TupleEncoding::Native,
-                   ArrayEncoding ArrayMode = ArrayEncoding::Native);
+SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
+                                const std::string &OutputPath,
+                                const SolverConfig &Config = {});
 
 } // namespace camada
 

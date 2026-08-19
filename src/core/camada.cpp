@@ -57,80 +57,73 @@ namespace camada {
 
 std::string getCamadaVersion() { return CAMADA_VERSION; }
 
-SMTSolverRef createZ3Solver(ArrayEncoding ArrayMode) {
+SMTSolverRef createZ3Solver(const SolverConfig &Config) {
 #if SOLVER_Z3_ENABLED
-  return std::make_unique<Z3Solver>(ArrayMode);
+  return std::make_unique<Z3Solver>(Config);
 #else
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with Z3 support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_Z3=ON");
 #endif
 }
 
-SMTSolverRef createMathSATSolver(ArrayEncoding ArrayMode) {
+SMTSolverRef createMathSATSolver(const SolverConfig &Config) {
 #if SOLVER_MATHSAT_ENABLED
-  return std::make_unique<MathSATSolver>(ArrayMode);
+  return std::make_unique<MathSATSolver>(Config);
 #else
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with MathSAT support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_MATHSAT=ON");
 #endif
 }
 
-SMTSolverRef createCVC5Solver(UnsatAssumptionsMode Mode,
-                              ArrayEncoding ArrayMode) {
+SMTSolverRef createCVC5Solver(const SolverConfig &Config) {
 #if SOLVER_CVC5_ENABLED
-  return std::make_unique<CVC5Solver>(Mode, ArrayMode);
+  return std::make_unique<CVC5Solver>(Config);
 #else
-  (void)Mode;
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with CVC5 support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_CVC5=ON");
 #endif
 }
 
-SMTSolverRef createBitwuzlaSolver(UnsatAssumptionsMode Mode,
-                                  ArrayEncoding ArrayMode) {
+SMTSolverRef createBitwuzlaSolver(const SolverConfig &Config) {
 #if SOLVER_BITWUZLA_ENABLED
-  return std::make_unique<BitwuzlaSolver>(Mode, ArrayMode);
+  return std::make_unique<BitwuzlaSolver>(Config);
 #else
-  (void)Mode;
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with Bitwuzla support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_BITWUZLA=ON");
 #endif
 }
 
-SMTSolverRef createYicesSolver(ArrayEncoding ArrayMode) {
+SMTSolverRef createYicesSolver(const SolverConfig &Config) {
 #if SOLVER_YICES_ENABLED
-  return std::make_unique<YicesSolver>(ArrayMode);
+  return std::make_unique<YicesSolver>(Config);
 #else
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with YICES support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_YICES=ON");
 #endif
 }
 
-SMTSolverRef createSTPSolver(ArrayEncoding ArrayMode) {
+SMTSolverRef createSTPSolver(const SolverConfig &Config) {
 #if SOLVER_STP_ENABLED
-  return std::make_unique<STPSolver>(ArrayMode);
+  return std::make_unique<STPSolver>(Config);
 #else
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with STP support, rebuild with "
              "-DCAMADA_ENABLE_SOLVER_STP=ON");
 #endif
 }
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                TupleEncoding TupleMode,
-                                ArrayEncoding ArrayMode) {
+                                const SolverConfig &Config) {
 #if SOLVER_SMTLIB_ENABLED
-  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, TupleMode, "",
-                                        ArrayMode);
+  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, Config);
 #else
   (void)Argv;
-  (void)TupleMode;
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
              "(unsupported on this platform)");
 #endif
@@ -138,16 +131,14 @@ SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
 
 SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
                                 const std::string &OutputPath,
-                                TupleEncoding TupleMode,
-                                ArrayEncoding ArrayMode) {
+                                const SolverConfig &Config) {
 #if SOLVER_SMTLIB_ENABLED
   return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, OutputPath,
-                                        TupleMode, "", ArrayMode);
+                                        Config);
 #else
   (void)Argv;
   (void)OutputPath;
-  (void)TupleMode;
-  (void)ArrayMode;
+  (void)Config;
   fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
              "(unsupported on this platform)");
 #endif

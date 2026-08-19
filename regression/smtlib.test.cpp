@@ -62,6 +62,20 @@ std::string readFile(const std::string &Path) {
   return Ss.str();
 }
 
+// C++17: no designated initializers, so tiny builders for the fields these
+// tests flip.
+camada::SolverConfig withTuples(camada::TupleEncoding Tuples) {
+  camada::SolverConfig Cfg;
+  Cfg.Tuples = Tuples;
+  return Cfg;
+}
+
+camada::SolverConfig withLogic(const std::string &Logic) {
+  camada::SolverConfig Cfg;
+  Cfg.Logic = Logic;
+  return Cfg;
+}
+
 } // namespace
 
 TEST_CASE("SMTLIB write-only emits a minimal script", "[SMTLIB]") {
@@ -376,7 +390,7 @@ TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
 
   // Camada tuple lowering flips the native-tuples bit.
   auto camadaTuples = std::make_unique<camada::SMTLIBSolver>(
-      Path, camada::TupleEncoding::Camada);
+      Path, withTuples(camada::TupleEncoding::Camada));
   REQUIRE_FALSE(camadaTuples->supports(SolverFeature::NativeTuples));
 
   solver.reset();
@@ -508,13 +522,10 @@ TEST_CASE("SMTLIB one-shot silent model solver is dropped, not hung",
   // camada blocked reading an ack the child would never send, before the
   // caller ever got control. It must instead be dropped at the first
   // bounded read, costing only counterexample support.
-  // RAII restore: a failing REQUIRE below must not leave the shortened
-  // process-global timeout behind for later tests.
-  struct TimeoutGuard {
-    unsigned Saved = camada::SMTLIBSolver::OneShotModelAckTimeoutMs;
-    ~TimeoutGuard() { camada::SMTLIBSolver::OneShotModelAckTimeoutMs = Saved; }
-  } Guard;
-  camada::SMTLIBSolver::OneShotModelAckTimeoutMs = 200;
+  // The shortened ack deadline is per-instance configuration now — no
+  // process-global state to save and restore around the test.
+  camada::SolverConfig ShortAck;
+  ShortAck.OneShotModelAckTimeoutMs = 200;
 
   // Two shapes of silence: a child that never answers anything, and a
   // mono-style child that answers only (check-sat) and exits.
@@ -530,7 +541,7 @@ TEST_CASE("SMTLIB one-shot silent model solver is dropped, not hung",
     std::string Child = makeScript(Body);
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Verdict + " %f",
-        std::vector<std::string>{Child});
+        std::vector<std::string>{Child}, camada::PgidCallback{}, ShortAck);
     // Dropped during the preamble already.
     REQUIRE_FALSE(solver->oneShotModelSolverLive());
 
@@ -747,8 +758,8 @@ TEST_CASE("SMTLIB caller-chosen logic", "[SMTLIB][logic]") {
   // Write-only: a non-empty Logic is emitted verbatim in place of ALL.
   {
     std::string Path = makeTempPath();
-    auto solver = std::make_unique<camada::SMTLIBSolver>(
-        Path, camada::TupleEncoding::Native, "QF_BV");
+    auto solver =
+        std::make_unique<camada::SMTLIBSolver>(Path, withLogic("QF_BV"));
     solver->addConstraint(solver->mkBool(true));
     (void)solver->check();
     solver.reset();
@@ -773,8 +784,7 @@ TEST_CASE("SMTLIB caller-chosen logic", "[SMTLIB][logic]") {
     std::string Script = makeScript("echo sat\n");
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f",
-        std::vector<std::string>{}, camada::PgidCallback{},
-        camada::TupleEncoding::Native, "QF_BV");
+        std::vector<std::string>{}, camada::PgidCallback{}, withLogic("QF_BV"));
     solver->addConstraint(solver->mkBool(true));
     REQUIRE(solver->check() == camada::checkResult::SAT);
     REQUIRE(readFile(Formula).find("(set-logic QF_BV)") != std::string::npos);
@@ -797,7 +807,7 @@ TEST_CASE("SMTLIB caller-chosen logic", "[SMTLIB][logic]") {
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f",
         std::vector<std::string>{DyingModel}, camada::PgidCallback{},
-        camada::TupleEncoding::Native, "QF_BV");
+        withLogic("QF_BV"));
     REQUIRE_FALSE(solver->oneShotModelSolverLive());
     solver->addConstraint(solver->mkBool(true));
     REQUIRE(solver->check() == camada::checkResult::SAT);
@@ -820,8 +830,7 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
   {
     std::string Path = makeTempPath();
     auto solver = std::make_unique<camada::SMTLIBSolver>(
-        camada::SMTLIBProcessTag{}, ModelArgv, Path,
-        camada::TupleEncoding::Native, "QF_AUFBV");
+        camada::SMTLIBProcessTag{}, ModelArgv, Path, withLogic("QF_AUFBV"));
     auto X = solver->mkSymbol("x", solver->mkBVSort(8));
     solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(7, 8)));
     REQUIRE(solver->check() == camada::checkResult::SAT);
@@ -842,8 +851,7 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
   // A rejected explicit logic is a fatal error, not a silent downgrade.
   requireAborts([&]() {
     auto solver = std::make_unique<camada::SMTLIBSolver>(
-        camada::SMTLIBProcessTag{}, ModelArgv, camada::TupleEncoding::Native,
-        "NOT_A_LOGIC");
+        camada::SMTLIBProcessTag{}, ModelArgv, withLogic("NOT_A_LOGIC"));
     (void)solver->check();
   });
 }

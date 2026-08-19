@@ -66,8 +66,7 @@ public:
 
 class BitwuzlaSolver : public SMTSolverImpl {
 public:
-  explicit BitwuzlaSolver(UnsatAssumptionsMode Mode = UnsatAssumptionsMode::Off,
-                          ArrayEncoding Arrays = ArrayEncoding::Native);
+  explicit BitwuzlaSolver(const SolverConfig &Config = {});
   ~BitwuzlaSolver() override;
 
 protected:
@@ -77,12 +76,6 @@ protected:
 
   void initializeContext();
   void destroyContext();
-
-  /// Whether contexts are created with BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS
-  /// (opt-in: tracking assumption participation slows every check, and the
-  /// option is frozen at context creation). Survives reset(), which recreates
-  /// the context through initializeContext().
-  bool ProduceUnsatAssumptions = false;
 
   // Arm CheckDeadline from TimeoutMs; both check paths call it before
   // querying the solver.

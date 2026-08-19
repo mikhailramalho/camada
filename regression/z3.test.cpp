@@ -62,8 +62,26 @@ TEST_CASE("Tuple-with-Int Z3 test", "[Z3]") {
   tuple_semantics_with_int(z3);
 }
 
+// SolverConfig::Tuples = Camada forces the per-field lowering even though
+// Z3 has native datatypes — the datatype engine stays out of the picture.
+TEST_CASE("Camada tuples via config Z3 test", "[Z3]") {
+  camada::SolverConfig Cfg;
+  Cfg.Tuples = camada::TupleEncoding::Camada;
+  auto z3 = camada::createZ3Solver(Cfg);
+  REQUIRE_FALSE(z3->supports(camada::SolverFeature::NativeTuples));
+  tuple_semantics(z3);
+  z3->reset();
+  tuple_with_array_field(z3);
+  z3->reset();
+  tuple_array_semantics(z3);
+  z3->reset();
+  tuple_update_semantics(z3);
+}
+
 TEST_CASE("Ackermann arrays Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto z3 = camada::createZ3Solver(Cfg);
   ack_array_tests(z3);
 }
 
@@ -72,12 +90,16 @@ TEST_CASE("Ackermann arrays Z3 test", "[Z3]") {
 // arrays, tuples, FP, FXP, push/pop, models) is proven against the
 // encoding, not just the targeted ack_* fixtures.
 TEST_CASE("Ackermann full fixture suite Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto z3 = camada::createZ3Solver(Cfg);
   tests(z3);
 }
 
 TEST_CASE("Ackermann arrays reject quantifiers Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver(camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto z3 = camada::createZ3Solver(Cfg);
   require_abort([&]() {
     auto x = z3->mkSymbol("x", z3->mkBVSort(4));
     (void)z3->mkForall({x}, z3->mkEqual(x, x));

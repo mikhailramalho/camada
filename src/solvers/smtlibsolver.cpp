@@ -697,24 +697,18 @@ const std::string &textOf(const SMTSortRef &S) {
 } // namespace
 
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
-                           TupleEncoding TupleMode, const std::string &Logic,
-                           ArrayEncoding Arrays)
-    : File(std::make_unique<FileEmitter>(OutputPath)), TupleMode(TupleMode),
-      LogicOverride(Logic) {
-  // Before the singletons: constant tracking (AckBVConstBits) must cover
-  // the cached small bit-vectors.
-  ArrayMode = Arrays;
+                           const SolverConfig &Config)
+    : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)) {
+  // The base sets arrayMode() before the singletons are built: constant
+  // tracking (AckBVConstBits) must cover the cached small bit-vectors.
   emitPreamble();
   initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
-                           TupleEncoding TupleMode, const std::string &Logic,
-                           ArrayEncoding Arrays)
-    : Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
-      LogicOverride(Logic) {
-  ArrayMode = Arrays;
+                           const SolverConfig &Config)
+    : SMTSolverImpl(Config), Proc(std::make_unique<ProcessEmitter>(Argv)) {
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -722,12 +716,9 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const std::string &OutputPath,
-                           TupleEncoding TupleMode, const std::string &Logic,
-                           ArrayEncoding Arrays)
-    : File(std::make_unique<FileEmitter>(OutputPath)),
-      Proc(std::make_unique<ProcessEmitter>(Argv)), TupleMode(TupleMode),
-      LogicOverride(Logic) {
-  ArrayMode = Arrays;
+                           const SolverConfig &Config)
+    : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)),
+      Proc(std::make_unique<ProcessEmitter>(Argv)) {
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -735,15 +726,12 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
 SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
                            const std::string &ShellCmd,
                            const std::vector<std::string> &ModelArgv,
-                           PgidCallback OnSpawn, TupleEncoding TupleMode,
-                           const std::string &Logic, ArrayEncoding Arrays)
-    : OneShotMode(true), OneShotFormulaPath(FormulaPath),
+                           PgidCallback OnSpawn, const SolverConfig &Config)
+    : SMTSolverImpl(Config), OneShotMode(true), OneShotFormulaPath(FormulaPath),
       OneShotShellCmd(ShellCmd), OneShotOnSpawn(std::move(OnSpawn)),
       File(std::make_unique<FileEmitter>(FormulaPath)),
       Proc(ModelArgv.empty() ? nullptr
-                             : std::make_unique<ProcessEmitter>(ModelArgv)),
-      TupleMode(TupleMode), LogicOverride(Logic) {
-  ArrayMode = Arrays;
+                             : std::make_unique<ProcessEmitter>(ModelArgv)) {
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -919,11 +907,9 @@ checkResult SMTLIBSolver::oneShotCheck() {
 
 SMTLIBSolver::~SMTLIBSolver() { invalidateGeneratedObjects(); }
 
-unsigned SMTLIBSolver::OneShotModelAckTimeoutMs = 5000;
-
 std::optional<std::string> SMTLIBSolver::oneShotModelReply() {
   std::optional<std::string> Resp =
-      Proc->readResponseWithin(OneShotModelAckTimeoutMs);
+      Proc->readResponseWithin(oneShotModelAckTimeoutMs());
   if (!Resp || Resp->empty()) {
     // Timeout (the child does not speak the ack protocol) or EOF (it
     // died): drop it and continue file-only — the one-shot run is the
@@ -999,12 +985,12 @@ void SMTLIBSolver::emitPreamble() {
   // Children that only accept concrete logic names get one fallback attempt
   // with QF_AUFBV, the broadest quantifier-free fragment such children
   // implement. The tee file records whichever logic the child accepted.
-  if (Proc && !LogicOverride.empty()) {
+  if (Proc && !logic().empty()) {
     // Caller-chosen logic: emitted verbatim, no negotiation. The caller is
     // asserting it knows what the child accepts, so a rejection is a fatal
     // error rather than a silent downgrade (a one-shot model child that
     // died gets the usual drop-and-continue treatment instead).
-    Proc->emitRaw("(set-logic " + LogicOverride + ")\n");
+    Proc->emitRaw("(set-logic " + logic() + ")\n");
     Proc->flush();
     if (OneShotMode) {
       // Auxiliary model child: a rejection (or any unusable reply) drops
@@ -1018,11 +1004,11 @@ void SMTLIBSolver::emitPreamble() {
       fatalErrorIf(Resp != "success",
                    ("SMTLIBSolver: child solver rejected the caller-chosen "
                     "(set-logic " +
-                    LogicOverride + "): " + Resp)
+                    logic() + "): " + Resp)
                        .c_str());
     }
     if (File)
-      File->emitRaw("(set-logic " + LogicOverride + ")\n");
+      File->emitRaw("(set-logic " + logic() + ")\n");
   } else if (Proc) {
     std::string Logic = "ALL";
     Proc->emitRaw("(set-logic ALL)\n");
@@ -1066,8 +1052,7 @@ void SMTLIBSolver::emitPreamble() {
       File->emitRaw("(set-logic " + Logic + ")\n");
   } else if (File) {
     File->emitRaw("(set-logic " +
-                  (LogicOverride.empty() ? std::string("ALL") : LogicOverride) +
-                  ")\n");
+                  (logic().empty() ? std::string("ALL") : logic()) + ")\n");
   }
 }
 

@@ -8,7 +8,9 @@
 #include <solvers/stpsolver.h>
 
 TEST_CASE("Ackermann arrays STP test", "[STP]") {
-  auto stp = camada::createSTPSolver(camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto stp = camada::createSTPSolver(Cfg);
   ack_array_tests(stp);
 }
 

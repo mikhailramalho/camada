@@ -61,7 +61,16 @@ static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
 
 class SMTSolverImpl : public SMTSolver {
 public:
-  SMTSolverImpl() = default;
+  /// Initialises the options the common layer itself consumes, so each
+  /// backend does not re-derive them. Backends still read the fields they
+  /// act on directly from their own SolverConfig argument -- Logic and
+  /// OneShotModelAckTimeoutMs mean nothing here, and holding the whole
+  /// struct would surface them on backends that cannot use them.
+  ///
+  /// There is deliberately no default constructor: a backend that forgot to
+  /// forward its config would silently get ArrayEncoding::Native, so the
+  /// compiler is made to ask for it.
+  explicit SMTSolverImpl(const SolverConfig &Config) : Config(Config) {}
   /// Backend destructors MUST call invalidateGeneratedObjects() before
   /// releasing backend resources (contexts, term managers, etc.). The arena
   /// destructors run during base-class teardown, after derived members are
@@ -250,7 +259,6 @@ protected:
   // Sound and complete for quantifier-free formulas only; the mode also
   // forces the Camada tuple encoding (native tuples cannot hold a
   // no-backend-term array member).
-  ArrayEncoding ArrayMode = ArrayEncoding::Native;
   struct AckArrayRead {
     SMTExprRef Index;
     SMTExprRef Value;
@@ -795,7 +803,49 @@ protected:
   /// override this to true. Other backends (bitwuzla, mathsat, stp,
   /// yices) inherit the default false and route tuple operations through
   /// the Camada-managed lowering in camadatuple.cpp.
-  virtual bool nativeTupleSupport() const { return false; }
+  // --- Creation-time options ---
+  //
+  // The config is stored once and read through these, so no backend keeps
+  // its own copy of a field and none can drift from what the caller asked
+  // for. A backend that must diverge overrides the accessor rather than
+  // shadowing the state.
+
+  /// Array encoding the caller asked for. Read by the common layer itself
+  /// (the Ackermann lowering) as well as by the backends.
+  ArrayEncoding arrayMode() const { return Config.Arrays; }
+
+  /// Tuple lowering the caller asked for. Only reaches a decision on
+  /// backends with datatypes -- see nativeTupleSupport().
+  TupleEncoding tupleMode() const { return Config.Tuples; }
+
+  /// Whether the caller asked for unsat-assumption production. Backends
+  /// whose engine must opt in at creation (Bitwuzla, CVC5) consult this;
+  /// the rest answer cores regardless.
+  bool produceUnsatAssumptions() const { return Config.UseUnsatAssumptions; }
+
+  /// Caller-chosen logic, empty when the backend should keep its default.
+  const std::string &logic() const { return Config.Logic; }
+
+  /// SMT-LIB one-shot ack deadline; meaningless elsewhere.
+  unsigned oneShotModelAckTimeoutMs() const {
+    return Config.OneShotModelAckTimeoutMs;
+  }
+
+  /// True when tuples reach the backend as datatypes rather than being
+  /// lowered per-field by Camada. The rule is the same everywhere -- the
+  /// caller asked for Native, the backend has datatypes, and Ackermann
+  /// arrays are not in play, since a datatype cannot hold an array member
+  /// with no backend term -- so it lives here instead of being repeated
+  /// identically in every backend that has datatypes.
+  virtual bool nativeTupleSupport() const final {
+    return tupleMode() == TupleEncoding::Native &&
+           arrayMode() != ArrayEncoding::Ackermann && nativeDatatypeSupport();
+  }
+
+  /// Whether the backend implements SMT-LIB datatypes at all. A fixed
+  /// property of the backend, unlike nativeTupleSupport() which also
+  /// depends on what the caller asked for.
+  virtual bool nativeDatatypeSupport() const { return false; }
 
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 
@@ -1176,6 +1226,13 @@ protected:
   /// mkBVFPSortImpl; all fixed-point semantics live in camadafxp.cpp.
   virtual SMTSortRef mkFXPSortImpl(unsigned Width, unsigned FracBits,
                                    bool IsSigned) = 0;
+
+private:
+  /// The options this solver was constructed with, frozen for its lifetime.
+  /// Private on purpose: everything reads it through the accessors above,
+  /// so a backend cannot cache a field and drift from the caller's request,
+  /// and a field a backend has no use for simply never gets read.
+  const SolverConfig Config;
 };
 
 } // namespace camada

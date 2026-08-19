@@ -8,8 +8,25 @@
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/mathsatsolver.h>
 
+// SolverConfig::Logic drives the MathSAT default-configuration logic.
+// Smoke test only: MathSAT's default configuration differs by logic in
+// preprocessing/theory tuning, not in which terms a context accepts, so
+// there is no deterministic observable that distinguishes QF_BV from the
+// default AUFBV here — this pins construction and solving, not the
+// specific logic string.
+TEST_CASE("Config logic MathSAT test", "[MathSAT]") {
+  camada::SolverConfig Cfg;
+  Cfg.Logic = "QF_BV";
+  auto mathsat = camada::createMathSATSolver(Cfg);
+  auto x = mathsat->mkSymbol("x", mathsat->mkBVSort(8));
+  mathsat->addConstraint(mathsat->mkEqual(x, mathsat->mkBVFromDec(7, 8)));
+  REQUIRE(mathsat->check() == camada::checkResult::SAT);
+}
+
 TEST_CASE("Ackermann arrays MathSAT test", "[MathSAT]") {
-  auto mathsat = camada::createMathSATSolver(camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  auto mathsat = camada::createMathSATSolver(Cfg);
   ack_array_tests(mathsat);
 }
 

@@ -148,7 +148,9 @@ makeSMTLIBSolver(const std::vector<std::string> &Argv) {
 // datatypes (bitwuzla, mathsat, yices-smt2).
 inline camada::SMTSolverRef
 makeSMTLIBSolverCamadaTuples(const std::vector<std::string> &Argv) {
-  return camada::createSMTLIBSolver(Argv, camada::TupleEncoding::Camada);
+  camada::SolverConfig Cfg;
+  Cfg.Tuples = camada::TupleEncoding::Camada;
+  return camada::createSMTLIBSolver(Argv, Cfg);
 }
 
 // Same, but arrays use the Ackermann encoding: the wire carries no array
@@ -156,8 +158,9 @@ makeSMTLIBSolverCamadaTuples(const std::vector<std::string> &Argv) {
 // their congruence axioms.
 inline camada::SMTSolverRef
 makeSMTLIBSolverAckermannArrays(const std::vector<std::string> &Argv) {
-  return camada::createSMTLIBSolver(Argv, camada::TupleEncoding::Native,
-                                    camada::ArrayEncoding::Ackermann);
+  camada::SolverConfig Cfg;
+  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+  return camada::createSMTLIBSolver(Argv, Cfg);
 }
 
 // Skip the test if the binary isn't reachable.
