@@ -847,6 +847,41 @@ protected:
   /// depends on what the caller asked for.
   virtual bool nativeDatatypeSupport() const { return false; }
 
+  // --- Capability hooks, one per SolverFeature ---
+  //
+  // Each defaults to what a typical SMT backend does, so a backend
+  // overrides only to disable. supports() answers from these, so there is
+  // no per-backend switch to keep in step with the enum: adding a feature
+  // means adding a hook here, and every backend inherits a default.
+
+  /// Int and Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
+  virtual bool intRealArithmeticSupport() const { return true; }
+
+  /// Quantified formulas (mkForall, mkExists).
+  virtual bool quantifierSupport() const { return true; }
+
+  /// Uninterpreted functions (mkFunctionSort, mkApply).
+  virtual bool uninterpretedFunctionSupport() const { return true; }
+
+  /// FPEncoding::Native sorts and operations. FPEncoding::BV works on
+  /// every backend regardless, through the common layer's bit-blast.
+  virtual bool nativeFloatingPointSupport() const { return true; }
+
+  /// Whole-array model values (getArrayValues).
+  virtual bool arrayModelSupport() const { return true; }
+
+  /// A solve-time limit that the backend actually enforces.
+  virtual bool timeoutSupport() const { return true; }
+
+  /// Unsat-assumption extraction after an UNSAT checkSatAssuming(). The
+  /// default follows what the caller asked for, which is right for the
+  /// backends whose engine must opt in at context creation; those that
+  /// track cores natively override to true, and those that cannot report
+  /// them at all override to false.
+  virtual bool unsatAssumptionSupport() const {
+    return produceUnsatAssumptions();
+  }
+
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 
   virtual SMTExprRef mkBVAddImpl(const SMTExprRef &LHS,
@@ -1202,7 +1237,6 @@ protected:
   /// the existing capability hooks (nativeTupleSupport,
   /// nativeConstArraySupport). The default claims nothing; backends
   /// override with a switch over the features they implement.
-  virtual bool supportsImpl(SolverFeature Feature) const;
 
   virtual void resetImpl() = 0;
 

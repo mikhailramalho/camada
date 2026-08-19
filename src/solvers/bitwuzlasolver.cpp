@@ -1010,14 +1010,6 @@ SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   return mkIEEEFPToBVViaUF(Exp);
 }
 
-bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
-  // BV/FP only, and quantifiers only over those sorts. Cores need the
-  // creation-time opt-in the base reports.
-  if (Feature == SolverFeature::IntRealArithmetic)
-    return false;
-  return SMTSolverImpl::supportsImpl(Feature);
-}
-
 void BitwuzlaSolver::armCheckDeadline() {
   CheckDeadline = TimeoutMs == 0 ? std::chrono::steady_clock::time_point{}
                                  : std::chrono::steady_clock::now() +

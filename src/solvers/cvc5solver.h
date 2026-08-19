@@ -373,8 +373,6 @@ protected:
 
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
-  bool supportsImpl(SolverFeature Feature) const override;
-
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;

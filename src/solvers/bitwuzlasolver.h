@@ -256,7 +256,8 @@ protected:
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
-  bool supportsImpl(SolverFeature Feature) const override;
+  // Bit-vectors and floating point only.
+  bool intRealArithmeticSupport() const override { return false; }
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;

@@ -1027,24 +1027,13 @@ bool YicesSolver::setTimeoutImpl(uint64_t) {
 #endif
 }
 
-bool YicesSolver::supportsImpl(SolverFeature Feature) const {
-  switch (Feature) {
-  case SolverFeature::Quantifiers:
-  case SolverFeature::NativeFloatingPoint:
-    return false;
-  case SolverFeature::Timeouts:
-    // Enforced through SIGALRM + yices_stop_search; POSIX only.
+bool YicesSolver::timeoutSupport() const {
+  // Enforced through SIGALRM + yices_stop_search; POSIX only.
 #if defined(_WIN32)
-    return false;
+  return false;
 #else
-    return true;
+  return true;
 #endif
-  case SolverFeature::UnsatAssumptions:
-    // Tracked natively, no creation-time opt-in.
-    return true;
-  default:
-    return SMTSolverImpl::supportsImpl(Feature);
-  }
 }
 
 checkResult YicesSolver::checkImpl() {

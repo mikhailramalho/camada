@@ -1169,18 +1169,6 @@ SMTExprRef MathSATSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                             backend_init));
 }
 
-bool MathSATSolver::supportsImpl(SolverFeature Feature) const {
-  switch (Feature) {
-  case SolverFeature::Quantifiers:
-    return false;
-  case SolverFeature::UnsatAssumptions:
-    // Tracked natively, no creation-time opt-in.
-    return true;
-  default:
-    return SMTSolverImpl::supportsImpl(Feature);
-  }
-}
-
 void MathSATSolver::armCheckDeadline() {
   CheckDeadline = TimeoutMs == 0 ? std::chrono::steady_clock::time_point{}
                                  : std::chrono::steady_clock::now() +

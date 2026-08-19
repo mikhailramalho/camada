@@ -1107,13 +1107,6 @@ SMTExprRef Z3Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                              z3::exists(bound_vars, toZ3Expr(Body)));
 }
 
-bool Z3Solver::supportsImpl(SolverFeature Feature) const {
-  // Z3 enables unsat_core per query, so cores need no creation-time opt-in.
-  if (Feature == SolverFeature::UnsatAssumptions)
-    return true;
-  return SMTSolverImpl::supportsImpl(Feature);
-}
-
 checkResult Z3Solver::checkImpl() {
   z3::check_result res = Solver.check();
   if (res == z3::check_result::sat)

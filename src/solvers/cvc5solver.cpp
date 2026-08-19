@@ -1239,11 +1239,6 @@ SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
       Terms.mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body}));
 }
 
-bool CVC5Solver::supportsImpl(SolverFeature Feature) const {
-  // Everything the base assumes, including the creation-time core opt-in.
-  return SMTSolverImpl::supportsImpl(Feature);
-}
-
 checkResult CVC5Solver::checkImpl() {
   cvc5::Result res = Context.checkSat();
   if (res.isSat())

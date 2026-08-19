@@ -2491,25 +2491,6 @@ SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
   return mkArraySelect(Array, Index);
 }
 
-bool SMTLIBSolver::supportsImpl(SolverFeature Feature) const {
-  switch (Feature) {
-  case SolverFeature::Timeouts:
-  case SolverFeature::ArrayModels:
-    return false;
-  case SolverFeature::UnsatAssumptions:
-    // Not the caller's request but what the child actually accepted: the
-    // preamble already learned whether it took
-    // :produce-unsat-assumptions (false in write-only mode, where there
-    // is no model to query either).
-    return UnsatAssumptionsSupported;
-  default:
-    // The base's defaults describe what the emitter can put on the wire.
-    // A given child may still reject a construct at runtime -- yices-smt2
-    // has no FP, bitwuzla no Int/Real -- which is not knowable here.
-    return SMTSolverImpl::supportsImpl(Feature);
-  }
-}
-
 checkResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
   // Check commands are queries — they do NOT produce a `success` ack even
   // when :print-success is true. Bypass emitLine's resync logic; write the

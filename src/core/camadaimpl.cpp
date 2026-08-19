@@ -2246,44 +2246,31 @@ SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptionsImpl() {
                   "Unsat assumptions are not supported by this backend"};
 }
 
+// One hook per feature, so the enum and the hooks stay in step: a new
+// SolverFeature without a case here is a compile error rather than a
+// silent false.
 bool SMTSolverImpl::supports(SolverFeature Feature) const {
   switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+    return intRealArithmeticSupport();
+  case SolverFeature::Quantifiers:
+    return quantifierSupport();
+  case SolverFeature::UninterpretedFunctions:
+    return uninterpretedFunctionSupport();
+  case SolverFeature::NativeFloatingPoint:
+    return nativeFloatingPointSupport();
   case SolverFeature::NativeTuples:
     return nativeTupleSupport();
   case SolverFeature::NativeConstantArrays:
     return nativeConstArraySupport();
-  default:
-    return supportsImpl(Feature);
-  }
-}
-
-// Defaults for what a typical SMT backend can do, so a backend declares
-// only where it differs. Before this, the base answered false for
-// everything and all seven backends enumerated their yeses -- 30
-// declarations restating the norm, where 12 now mark real gaps.
-//
-// UnsatAssumptions is the one config-dependent answer, so it comes from
-// the accessor: backends whose engine must opt in at creation report what
-// the caller asked for, and those that always track cores override to
-// true.
-bool SMTSolverImpl::supportsImpl(SolverFeature Feature) const {
-  switch (Feature) {
-  case SolverFeature::IntRealArithmetic:
-  case SolverFeature::Quantifiers:
-  case SolverFeature::UninterpretedFunctions:
-  case SolverFeature::NativeFloatingPoint:
-  case SolverFeature::ArrayModels:
-  case SolverFeature::Timeouts:
-    return true;
   case SolverFeature::UnsatAssumptions:
-    return produceUnsatAssumptions();
-  case SolverFeature::NativeTuples:
-  case SolverFeature::NativeConstantArrays:
-    // Answered by supports() before it reaches here, via the
-    // nativeTupleSupport/nativeConstArraySupport hooks.
-    break;
+    return unsatAssumptionSupport();
+  case SolverFeature::Timeouts:
+    return timeoutSupport();
+  case SolverFeature::ArrayModels:
+    return arrayModelSupport();
   }
-  return false;
+  fatalError("Unhandled SolverFeature in supports()");
 }
 
 bool SMTSolverImpl::setTimeout(uint64_t Milliseconds) {
