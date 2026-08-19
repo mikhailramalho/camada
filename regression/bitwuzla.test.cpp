@@ -196,14 +196,17 @@ TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
-  // Core extraction is opt-in at construction: producing unsat
-  // assumptions slows every check, so the default context leaves it off.
-  REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
+  // The capability is present either way; core extraction is opt-in at
+  // construction because producing unsat assumptions slows every check,
+  // so a default context reports the capability but leaves it disabled.
+  REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
+  REQUIRE_FALSE(solver->produceUnsatAssumptions());
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 
   auto withCores = camada::createBitwuzlaSolver(withUnsatAssumptions());
   REQUIRE(withCores->supports(SolverFeature::UnsatAssumptions));
+  REQUIRE(withCores->produceUnsatAssumptions());
 }
 
 TEST_CASE("Unsat-assumption opt-in Bitwuzla test", "[Bitwuzla]") {

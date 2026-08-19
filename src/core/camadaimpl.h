@@ -761,6 +761,31 @@ public:
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() override final;
 
   bool supports(SolverFeature Feature) const override final;
+
+  // --- Creation-time options ---
+  //
+  // The config is stored once and read through these, so no backend keeps
+  // its own copy of a field and none can drift from what the caller asked
+  // for. A backend that must diverge overrides the accessor rather than
+  // shadowing the state.
+
+  /// Array encoding the caller asked for. Read by the common layer itself
+  /// (the Ackermann lowering) as well as by the backends.
+  ArrayEncoding arrayMode() const override { return Config.Arrays; }
+
+  /// Tuple lowering the caller asked for. Only reaches a decision on
+  /// backends with datatypes -- see nativeTupleSupport().
+  TupleEncoding tupleMode() const override { return Config.Tuples; }
+
+  /// Whether the caller asked for unsat-assumption production. Backends
+  /// whose engine must opt in at creation (Bitwuzla, CVC5) consult this;
+  /// the rest answer cores regardless.
+  bool produceUnsatAssumptions() const override {
+    return Config.UseUnsatAssumptions;
+  }
+
+  /// Caller-chosen logic, empty when the backend should keep its default.
+  const std::string &logic() const override { return Config.Logic; }
   void reset() override final;
   void push(unsigned nscopes = 1) override final;
   void pop(unsigned nscopes = 1) override final;
@@ -803,28 +828,6 @@ protected:
   /// override this to true. Other backends (bitwuzla, mathsat, stp,
   /// yices) inherit the default false and route tuple operations through
   /// the Camada-managed lowering in camadatuple.cpp.
-  // --- Creation-time options ---
-  //
-  // The config is stored once and read through these, so no backend keeps
-  // its own copy of a field and none can drift from what the caller asked
-  // for. A backend that must diverge overrides the accessor rather than
-  // shadowing the state.
-
-  /// Array encoding the caller asked for. Read by the common layer itself
-  /// (the Ackermann lowering) as well as by the backends.
-  ArrayEncoding arrayMode() const { return Config.Arrays; }
-
-  /// Tuple lowering the caller asked for. Only reaches a decision on
-  /// backends with datatypes -- see nativeTupleSupport().
-  TupleEncoding tupleMode() const { return Config.Tuples; }
-
-  /// Whether the caller asked for unsat-assumption production. Backends
-  /// whose engine must opt in at creation (Bitwuzla, CVC5) consult this;
-  /// the rest answer cores regardless.
-  bool produceUnsatAssumptions() const { return Config.UseUnsatAssumptions; }
-
-  /// Caller-chosen logic, empty when the backend should keep its default.
-  const std::string &logic() const { return Config.Logic; }
 
   /// SMT-LIB one-shot ack deadline; meaningless elsewhere.
   unsigned oneShotModelAckTimeoutMs() const {
@@ -873,14 +876,15 @@ protected:
   /// A solve-time limit that the backend actually enforces.
   virtual bool timeoutSupport() const { return true; }
 
-  /// Unsat-assumption extraction after an UNSAT checkSatAssuming(). The
-  /// default follows what the caller asked for, which is right for the
-  /// backends whose engine must opt in at context creation; those that
-  /// track cores natively override to true, and those that cannot report
-  /// them at all override to false.
-  virtual bool unsatAssumptionSupport() const {
-    return produceUnsatAssumptions();
-  }
+  /// Whether the backend can report unsat assumptions after an UNSAT
+  /// checkSatAssuming().
+  ///
+  /// A capability, like the hooks above: it says what the backend is able
+  /// to do, not what this context was configured to do. Engines that make
+  /// core tracking opt-in still report true here -- ask
+  /// produceUnsatAssumptions() to find out whether this instance has it
+  /// enabled.
+  virtual bool unsatAssumptionSupport() const { return true; }
 
   virtual void addConstraintImpl(const SMTExprRef &Exp) = 0;
 
