@@ -1011,22 +1011,11 @@ SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 }
 
 bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
-  switch (Feature) {
-  case SolverFeature::Quantifiers: // BV/FP quantifiers only
-  case SolverFeature::UninterpretedFunctions:
-  case SolverFeature::NativeFloatingPoint:
-  case SolverFeature::Timeouts:
-  case SolverFeature::ArrayModels:
-    return true;
-  case SolverFeature::UnsatAssumptions:
-    return produceUnsatAssumptions();
-  case SolverFeature::IntRealArithmetic:
+  // BV/FP only, and quantifiers only over those sorts. Cores need the
+  // creation-time opt-in the base reports.
+  if (Feature == SolverFeature::IntRealArithmetic)
     return false;
-  case SolverFeature::NativeTuples:
-  case SolverFeature::NativeConstantArrays:
-    break; // answered by the common layer's hooks
-  }
-  return false;
+  return SMTSolverImpl::supportsImpl(Feature);
 }
 
 void BitwuzlaSolver::armCheckDeadline() {

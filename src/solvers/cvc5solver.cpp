@@ -1240,21 +1240,8 @@ SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
 }
 
 bool CVC5Solver::supportsImpl(SolverFeature Feature) const {
-  switch (Feature) {
-  case SolverFeature::IntRealArithmetic:
-  case SolverFeature::Quantifiers:
-  case SolverFeature::UninterpretedFunctions:
-  case SolverFeature::NativeFloatingPoint:
-  case SolverFeature::Timeouts:
-  case SolverFeature::ArrayModels:
-    return true;
-  case SolverFeature::UnsatAssumptions:
-    return produceUnsatAssumptions();
-  case SolverFeature::NativeTuples:
-  case SolverFeature::NativeConstantArrays:
-    break; // answered by the common layer's hooks
-  }
-  return false;
+  // Everything the base assumes, including the creation-time core opt-in.
+  return SMTSolverImpl::supportsImpl(Feature);
 }
 
 checkResult CVC5Solver::checkImpl() {

@@ -1029,11 +1029,9 @@ bool YicesSolver::setTimeoutImpl(uint64_t) {
 
 bool YicesSolver::supportsImpl(SolverFeature Feature) const {
   switch (Feature) {
-  case SolverFeature::IntRealArithmetic:
-  case SolverFeature::UninterpretedFunctions:
-  case SolverFeature::UnsatAssumptions:
-  case SolverFeature::ArrayModels:
-    return true;
+  case SolverFeature::Quantifiers:
+  case SolverFeature::NativeFloatingPoint:
+    return false;
   case SolverFeature::Timeouts:
     // Enforced through SIGALRM + yices_stop_search; POSIX only.
 #if defined(_WIN32)
@@ -1041,14 +1039,12 @@ bool YicesSolver::supportsImpl(SolverFeature Feature) const {
 #else
     return true;
 #endif
-  case SolverFeature::Quantifiers:
-  case SolverFeature::NativeFloatingPoint:
-    return false;
-  case SolverFeature::NativeTuples:
-  case SolverFeature::NativeConstantArrays:
-    break; // answered by the common layer's hooks
+  case SolverFeature::UnsatAssumptions:
+    // Tracked natively, no creation-time opt-in.
+    return true;
+  default:
+    return SMTSolverImpl::supportsImpl(Feature);
   }
-  return false;
 }
 
 checkResult YicesSolver::checkImpl() {

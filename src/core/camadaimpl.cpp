@@ -2257,7 +2257,34 @@ bool SMTSolverImpl::supports(SolverFeature Feature) const {
   }
 }
 
-bool SMTSolverImpl::supportsImpl(SolverFeature) const { return false; }
+// Defaults for what a typical SMT backend can do, so a backend declares
+// only where it differs. Before this, the base answered false for
+// everything and all seven backends enumerated their yeses -- 30
+// declarations restating the norm, where 12 now mark real gaps.
+//
+// UnsatAssumptions is the one config-dependent answer, so it comes from
+// the accessor: backends whose engine must opt in at creation report what
+// the caller asked for, and those that always track cores override to
+// true.
+bool SMTSolverImpl::supportsImpl(SolverFeature Feature) const {
+  switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+  case SolverFeature::Quantifiers:
+  case SolverFeature::UninterpretedFunctions:
+  case SolverFeature::NativeFloatingPoint:
+  case SolverFeature::ArrayModels:
+  case SolverFeature::Timeouts:
+    return true;
+  case SolverFeature::UnsatAssumptions:
+    return produceUnsatAssumptions();
+  case SolverFeature::NativeTuples:
+  case SolverFeature::NativeConstantArrays:
+    // Answered by supports() before it reaches here, via the
+    // nativeTupleSupport/nativeConstArraySupport hooks.
+    break;
+  }
+  return false;
+}
 
 bool SMTSolverImpl::setTimeout(uint64_t Milliseconds) {
   const bool Supported = setTimeoutImpl(Milliseconds);

@@ -647,9 +647,11 @@ bool STPSolver::setTimeoutImpl(uint64_t) {
 }
 
 bool STPSolver::supportsImpl(SolverFeature Feature) const {
+  // Bit-vectors and arrays only: no Int/Real, quantifiers, uninterpreted
+  // functions, native FP, array models, or unsat cores.
   if (Feature == SolverFeature::Timeouts)
     return true;
-  return SMTSolverImpl::supportsImpl(Feature);
+  return false;
 }
 
 void STPSolver::resetImpl() {

@@ -2493,28 +2493,21 @@ SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
 
 bool SMTLIBSolver::supportsImpl(SolverFeature Feature) const {
   switch (Feature) {
-  // These bits describe what the emitter can put on the wire; a given
-  // child solver may still reject a construct at runtime (yices-smt2 has
-  // no FP, bitwuzla no Int/Real, ...).
-  case SolverFeature::IntRealArithmetic:
-  case SolverFeature::Quantifiers:
-  case SolverFeature::UninterpretedFunctions:
-  case SolverFeature::NativeFloatingPoint:
-    return true;
-  // Unlike the wire-capability bits above, this one IS known: the
-  // preamble already learned whether the child accepted
-  // :produce-unsat-assumptions (false in write-only mode, where there is
-  // no model to query either).
-  case SolverFeature::UnsatAssumptions:
-    return UnsatAssumptionsSupported;
   case SolverFeature::Timeouts:
   case SolverFeature::ArrayModels:
     return false;
-  case SolverFeature::NativeTuples:
-  case SolverFeature::NativeConstantArrays:
-    break; // answered by the common layer's hooks
+  case SolverFeature::UnsatAssumptions:
+    // Not the caller's request but what the child actually accepted: the
+    // preamble already learned whether it took
+    // :produce-unsat-assumptions (false in write-only mode, where there
+    // is no model to query either).
+    return UnsatAssumptionsSupported;
+  default:
+    // The base's defaults describe what the emitter can put on the wire.
+    // A given child may still reject a construct at runtime -- yices-smt2
+    // has no FP, bitwuzla no Int/Real -- which is not knowable here.
+    return SMTSolverImpl::supportsImpl(Feature);
   }
-  return false;
 }
 
 checkResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
