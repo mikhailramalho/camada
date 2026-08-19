@@ -149,23 +149,6 @@ enum class FXPRM {
 ///   yices) already use.
 enum class TupleEncoding { Native, Camada };
 
-/// Selects whether a solver context is created with unsat-assumption
-/// production enabled. Producing the core is not free: backends whose SAT
-/// engine must track assumption participation (bitwuzla, cvc5) pay a
-/// solve-time cost on *every* check, and the setting is frozen at context
-/// creation — so it is opt-in.
-///
-/// - Off (default): fast contexts. checkSatAssuming() works unchanged;
-///   getUnsatAssumptions() reports UnsupportedOperation and
-///   supports(SolverFeature::UnsatAssumptions) answers false.
-/// - On: the backend tracks assumptions and getUnsatAssumptions() returns
-///   real cores after an UNSAT checkSatAssuming().
-///
-/// Backends that answer cores without a creation-time option (Z3 enables
-/// unsat_core per query, MathSAT and Yices track natively) ignore this
-/// and always support core extraction.
-enum class UnsatAssumptionsMode { Off, On };
-
 /// Selects how arrays are encoded, on the backends that accept it.
 ///
 /// - Native (default): the backend's theory of arrays, unchanged.
@@ -248,7 +231,7 @@ enum class SMTErrorCode {
 /// Construction-frozen solver options, passed to every create*Solver()
 /// factory (and the corresponding backend constructors). One struct for
 /// all backends: a field a backend does not implement is silently
-/// inapplicable there — the same contract UnsatAssumptionsMode always had
+/// inapplicable there — the same contract UseUnsatAssumptions always had
 /// (Z3, MathSAT, and Yices answer cores regardless of it). Default
 /// construction gives the historical behavior of every backend.
 ///
@@ -266,9 +249,22 @@ struct SolverConfig {
   /// Camada lowering. Ackermann arrays force Camada tuples regardless.
   TupleEncoding Tuples = TupleEncoding::Native;
 
-  /// Unsat-assumption production (see UnsatAssumptionsMode). Consumed by
-  /// Bitwuzla and CVC5, whose contexts must opt in at creation.
-  UnsatAssumptionsMode UnsatAssumptions = UnsatAssumptionsMode::Off;
+  /// Whether the context is created with unsat-assumption production
+  /// enabled. Producing the core is not free: backends whose SAT engine
+  /// must track assumption participation (Bitwuzla, CVC5) pay a
+  /// solve-time cost on *every* check, and the setting is frozen at
+  /// context creation -- so it is opt-in.
+  ///
+  /// False (the default) gives fast contexts: checkSatAssuming() works
+  /// unchanged, getUnsatAssumptions() reports UnsupportedOperation and
+  /// supports(SolverFeature::UnsatAssumptions) answers false. True makes
+  /// the backend track assumptions so getUnsatAssumptions() returns real
+  /// cores after an UNSAT checkSatAssuming().
+  ///
+  /// Backends that answer cores without a creation-time option (Z3
+  /// enables unsat_core per query, MathSAT and Yices track natively)
+  /// ignore this and always support core extraction.
+  bool UseUnsatAssumptions = false;
 
   /// Caller-chosen logic. Empty (the default) keeps each backend's
   /// built-in choice. SMT-LIB: emitted verbatim as `(set-logic ...)`, no

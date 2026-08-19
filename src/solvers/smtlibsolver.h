@@ -328,10 +328,7 @@ protected:
 
   // The Ackermann array mode forces the Camada tuple encoding: a native
   // datatype cannot hold an array member that has no backend term.
-  bool nativeTupleSupport() const override {
-    return TupleMode == TupleEncoding::Native &&
-           ArrayMode != ArrayEncoding::Ackermann;
-  }
+  bool nativeDatatypeSupport() const override { return true; }
 
   // --- expressions ---
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
@@ -556,27 +553,6 @@ private:
 
   std::unique_ptr<FileEmitter> File;
   std::unique_ptr<ProcessEmitter> Proc;
-
-  // Tuple lowering mode: Native emits (declare-datatypes ...) on the
-  // wire; Camada decomposes tuples into per-field BV/Bool symbols before
-  // anything reaches the wire. Default is Native.
-  TupleEncoding TupleMode = TupleEncoding::Native;
-
-  // Caller-chosen (set-logic ...) override; empty selects the built-in
-  // ALL-with-QF_AUFBV-fallback behaviour. A member (not a constructor
-  // local) because resetImpl() re-runs emitPreamble() and must re-emit
-  // the same logic.
-  std::string LogicOverride;
-
-  // One-shot mode: deadline in milliseconds for each protocol ack from
-  // the auxiliary model solver (SolverConfig::OneShotModelAckTimeoutMs).
-  // Acks are instantaneous for any conforming child; one that stays
-  // silent past the deadline does not speak the `:print-success` protocol
-  // and is dropped, costing only counterexample support. Does NOT apply
-  // to the read of the model solver's own verdict after a sat one-shot
-  // run — that read can legitimately take as long as the solve and stays
-  // blocking.
-  unsigned OneShotAckTimeoutMs = 5000;
 
   // Counter for fresh tuple-sort names. mkTupleSortImpl declares a fresh
   // datatype per distinct tuple shape (Camada caches sort identity, so the

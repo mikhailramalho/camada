@@ -328,7 +328,7 @@ query; millisecond limits round up to the next second.
 <sup>5</sup> Opt-in at solver creation: producing unsat assumptions slows
 every check on these backends and the option is frozen at context
 creation, so `createBitwuzlaSolver`/`createCVC5Solver` default it off —
-set `SolverConfig::UnsatAssumptions = UnsatAssumptionsMode::On` to
+set `SolverConfig::UseUnsatAssumptions = true` to
 extract cores. `checkSatAssuming` itself works regardless.
 
 The last four rows (and any platform splits) are queryable at runtime via

@@ -117,18 +117,10 @@ protected:
   SMTSortRef
   mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
 
-  /// Tuple lowering chosen at construction (SolverConfig::Tuples):
-  /// Camada forces the per-field lowering even though Z3 has native
-  /// datatypes.
-  TupleEncoding TupleMode = TupleEncoding::Native;
-
   // Native datatypes cannot hold an Ackermann-encoded array member (it
   // has no backend term), so the Ackermann array mode forces the Camada
-  // tuple encoding regardless of TupleMode.
-  bool nativeTupleSupport() const override {
-    return TupleMode == TupleEncoding::Native &&
-           ArrayMode != ArrayEncoding::Ackermann;
-  }
+  // tuple encoding regardless of tupleMode().
+  bool nativeDatatypeSupport() const override { return true; }
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 

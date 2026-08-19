@@ -12,7 +12,7 @@ namespace {
 // these tests flip.
 inline camada::SolverConfig withUnsatAssumptions() {
   camada::SolverConfig Cfg;
-  Cfg.UnsatAssumptions = camada::UnsatAssumptionsMode::On;
+  Cfg.UseUnsatAssumptions = true;
   return Cfg;
 }
 } // namespace

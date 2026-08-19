@@ -139,8 +139,8 @@ void MathSATExpr::dump(std::string &Out) const {
 
 MathSATSolver::MathSATSolver(const SolverConfig &SolverCfg)
     : SMTSolverImpl(SolverCfg) {
-  Config = msat_create_default_config(
-      SolverCfg.Logic.empty() ? "AUFBV" : SolverCfg.Logic.c_str());
+  Config =
+      msat_create_default_config(logic().empty() ? "AUFBV" : logic().c_str());
   msat_set_option(Config, "model_generation", "true");
   initializeContext();
   initializeCommonSingletons();

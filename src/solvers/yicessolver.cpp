@@ -188,7 +188,7 @@ void YicesExpr::dump(std::string &Out) const {
 
 YicesSolver::YicesSolver(const SolverConfig &Config) : SMTSolverImpl(Config) {
   acquireYicesLibrary();
-  recreateContext(Config.Logic.empty() ? "QF_AUFBV" : Config.Logic.c_str());
+  recreateContext(logic().empty() ? "QF_AUFBV" : logic().c_str());
   initializeCommonSingletons();
 }
 

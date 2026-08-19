@@ -378,7 +378,7 @@ void SMTSolverImpl::noteAckBVConstBits(const SMTExprRef &Exp,
                                        const std::string &Bits) {
   // Only the Ackermann array encoding needs build-time constant values
   // (for read canonicalization); keep the default mode overhead-free.
-  if (ArrayMode == ArrayEncoding::Ackermann)
+  if (arrayMode() == ArrayEncoding::Ackermann)
     AckBVConstBits.emplace(&*Exp, Bits);
 }
 
@@ -574,7 +574,7 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
   // (see camadaarray.cpp). Tuple-involving element sorts were dissolved
   // above (the mode forces the Camada tuple encoding), so only scalar
   // element sorts reach this point.
-  if (ArrayMode == ArrayEncoding::Ackermann) {
+  if (arrayMode() == ArrayEncoding::Ackermann) {
     SMTSortRef theSort = mkAckArraySort(IndexSort, ElemSort);
     assert(theSort->isArraySort());
     ArraySortCache.emplace(Key, theSort);
@@ -609,7 +609,7 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
   }
   // Ackermann-mode arrays have no backend term to pass to or return from
   // an uninterpreted function.
-  if (ArrayMode == ArrayEncoding::Ackermann) {
+  if (arrayMode() == ArrayEncoding::Ackermann) {
     fatalErrorIf(CodomainSort->isArraySort(),
                  "Functions returning arrays are not supported with the "
                  "Ackermann array encoding");
@@ -876,7 +876,7 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // Ackermann-mode arrays have no backend term to hand to mkEqualImpl;
     // equality is always the witness + observed-index congruence
     // encoding, whose selects re-enter the Ackermann lowering.
-    if (ArrayMode == ArrayEncoding::Ackermann)
+    if (arrayMode() == ArrayEncoding::Ackermann)
       return mkEncodedArrayEqual(LHS, RHS);
     const bool LazyInvolved = !LazyConstArrayRoots.empty() &&
                               (reachesLazyArray(LHS) || reachesLazyArray(RHS));
@@ -1100,7 +1100,7 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
   if (!nativeTupleSupport() && T->Sort->isArraySort() &&
       sortContainsTuple(T->Sort->getElementSort()))
     return mkCamadaTupleArrayIte(*this, Cond, T, F);
-  if (ArrayMode == ArrayEncoding::Ackermann && T->Sort->isArraySort())
+  if (arrayMode() == ArrayEncoding::Ackermann && T->Sort->isArraySort())
     return mkAckArrayIte(Cond, T, F);
   SMTExprRef theExp = mkIteImpl(Cond, T, F);
   assert(theExp->Sort == F->Sort);
@@ -1309,7 +1309,7 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
     return mkCamadaTupleArraySelect(*this, Array, Index);
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
-  if (ArrayMode == ArrayEncoding::Ackermann) {
+  if (arrayMode() == ArrayEncoding::Ackermann) {
     // Selects built for model evaluation must not mint reads or emit
     // axioms; resolve them against the model instead.
     SMTExprRef theExp = InLazyModelQuery ? resolveAckArrayElement(Array, Index)
@@ -1337,7 +1337,7 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
   fatalErrorIf(!LazyConstArrayRoots.empty() && reachesLazyArray(Element),
                "Storing a lazily lowered constant array inside another array "
                "is not supported");
-  if (ArrayMode == ArrayEncoding::Ackermann) {
+  if (arrayMode() == ArrayEncoding::Ackermann) {
     SMTExprRef theExp = mkAckArrayStore(Array, Index, Element);
     assert(theExp->Sort == Array->Sort);
     return theExp;
@@ -1640,7 +1640,7 @@ SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
   // array terms: a select at a bound index lowers to a nullary read
   // variable, silently losing the dependence on the bound variable, and
   // the body's provenance cannot be inspected here.
-  fatalErrorIf(ArrayMode == ArrayEncoding::Ackermann,
+  fatalErrorIf(arrayMode() == ArrayEncoding::Ackermann,
                "Quantifiers are not supported with the Ackermann array "
                "encoding (quantifier-free formulas only)");
   // Encoded tuple variables would reach the backend's mkForallImpl as a
@@ -1664,7 +1664,7 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkForallImpl, "Quantifiers",
 SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireBoolSort(Body, "Expected boolean quantifier body");
-  fatalErrorIf(ArrayMode == ArrayEncoding::Ackermann,
+  fatalErrorIf(arrayMode() == ArrayEncoding::Ackermann,
                "Quantifiers are not supported with the Ackermann array "
                "encoding (quantifier-free formulas only)");
   if (!nativeTupleSupport())
@@ -1764,7 +1764,7 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     return getCamadaTupleArrayElement(*this, Array, Index);
   // Ackermann-mode arrays have no backend term to evaluate; resolve from
   // the tracked derivation chain and the reads of the equality class.
-  if (ArrayMode == ArrayEncoding::Ackermann)
+  if (arrayMode() == ArrayEncoding::Ackermann)
     return resolveAckArrayElement(Array, Index);
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
@@ -1789,7 +1789,7 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   // tuple-valued model; the per-leaf queries re-enter this wrapper.
   if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
     return getCamadaTupleArrayValues(*this, Array);
-  if (ArrayMode == ArrayEncoding::Ackermann)
+  if (arrayMode() == ArrayEncoding::Ackermann)
     return ackArrayModel(Array);
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     return lazyArrayModel(Array);
@@ -1990,7 +1990,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   }
   // Ackermann mode: array symbols are roots of the read/congruence
   // encoding, never backend terms.
-  if (ArrayMode == ArrayEncoding::Ackermann && Sort->isArraySort()) {
+  if (arrayMode() == ArrayEncoding::Ackermann && Sort->isArraySort()) {
     SMTExprRef theExp = mkAckArraySymbol(Name, Sort);
     SymbolExprCache.emplace(Key, theExp);
     return theExp;
@@ -2089,7 +2089,7 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   // constant arrays.
   fatalErrorIf(Lowering == ConstArrayLowering::Native &&
                    !nativeConstArraySupport() &&
-                   ArrayMode != ArrayEncoding::Ackermann,
+                   arrayMode() != ArrayEncoding::Ackermann,
                "Native constant arrays are not supported by this backend");
   // Tuple-involving initializers decompose into one constant array per
   // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
@@ -2099,7 +2099,7 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   // Ackermann mode: the lowering choice is moot — a Const node's selects
   // return the initializer directly, which is exactly what both Native
   // and Lazy promise.
-  if (ArrayMode == ArrayEncoding::Ackermann) {
+  if (arrayMode() == ArrayEncoding::Ackermann) {
     SMTExprRef theExp = mkAckArrayConst(IndexSort, InitValue);
     assert(theExp->isArraySort());
     assert(theExp->Sort->getIndexSort() == IndexSort);

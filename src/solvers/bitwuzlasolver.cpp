@@ -122,8 +122,7 @@ void BitwExpr::dump(std::string &Out) const {
 }
 
 BitwuzlaSolver::BitwuzlaSolver(const SolverConfig &Config)
-    : SMTSolverImpl(Config), ProduceUnsatAssumptions(Config.UnsatAssumptions ==
-                                                     UnsatAssumptionsMode::On) {
+    : SMTSolverImpl(Config) {
   initializeContext();
   initializeCommonSingletons();
 }
@@ -138,9 +137,9 @@ void BitwuzlaSolver::initializeContext() {
   Options = bitwuzla_options_new();
   bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_MODELS, 1);
   // Tracking which assumptions participate in a refutation slows every
-  // check, so core production is opt-in (UnsatAssumptionsMode::On at
+  // check, so core production is opt-in (true at
   // construction) and the default context stays fast.
-  if (ProduceUnsatAssumptions)
+  if (produceUnsatAssumptions())
     bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
   Context = bitwuzla_new(TermManager, Options);
@@ -1020,7 +1019,7 @@ bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
   case SolverFeature::ArrayModels:
     return true;
   case SolverFeature::UnsatAssumptions:
-    return ProduceUnsatAssumptions;
+    return produceUnsatAssumptions();
   case SolverFeature::IntRealArithmetic:
     return false;
   case SolverFeature::NativeTuples:
@@ -1070,11 +1069,11 @@ checkResult BitwuzlaSolver::checkSatAssumingImpl(
 SMTResult<std::vector<SMTExprRef>> BitwuzlaSolver::getUnsatAssumptionsImpl() {
   // Guard: querying bitwuzla for a core it was not configured to produce
   // trips its abort handler rather than returning an error.
-  if (!ProduceUnsatAssumptions)
+  if (!produceUnsatAssumptions())
     return SMTError{SMTErrorCode::UnsupportedOperation,
                     SMTBackendKind::Bitwuzla,
                     "Unsat-assumption production is off; create the solver "
-                    "with UnsatAssumptionsMode::On to extract cores"};
+                    "with true to extract cores"};
   size_t size = 0;
   const BitwuzlaTerm *core = bitwuzla_get_unsat_assumptions(Context, &size);
   std::vector<SMTExprRef> Result;

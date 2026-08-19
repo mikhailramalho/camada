@@ -107,18 +107,10 @@ protected:
   SMTSortRef
   mkTupleSortImpl(const std::vector<SMTSortRef> &ElementSorts) override;
 
-  /// Tuple lowering chosen at construction (SolverConfig::Tuples):
-  /// Camada forces the per-field lowering even though cvc5 has native
-  /// datatypes.
-  TupleEncoding TupleMode = TupleEncoding::Native;
-
   // Native datatypes cannot hold an Ackermann-encoded array member (it
   // has no backend term), so the Ackermann array mode forces the Camada
-  // tuple encoding regardless of TupleMode.
-  bool nativeTupleSupport() const override {
-    return TupleMode == TupleEncoding::Native &&
-           ArrayMode != ArrayEncoding::Ackermann;
-  }
+  // tuple encoding regardless of tupleMode().
+  bool nativeDatatypeSupport() const override { return true; }
 
   SMTExprRef mkBVNegImpl(const SMTExprRef &Exp) override;
 
@@ -382,11 +374,6 @@ protected:
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
   bool supportsImpl(SolverFeature Feature) const override;
-
-  /// Whether the context was created with produce-unsat-assumptions
-  /// (opt-in: tracking assumption participation slows every check, and
-  /// cvc5 only honors the option when set before solving starts).
-  bool ProduceUnsatAssumptions = false;
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
