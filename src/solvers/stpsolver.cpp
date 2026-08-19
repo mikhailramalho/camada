@@ -79,14 +79,13 @@ void STPExpr::dump(std::string &Out) const {
 }
 
 STPSolver::STPSolver(const SolverConfig &Config)
-    : Context(STP::vc_createValidityChecker()) {
-  ArrayMode = Config.Arrays;
+    : SMTSolverImpl(Config), Context(STP::vc_createValidityChecker()) {
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }
 
-STPSolver::STPSolver(STP::VC C, const SolverConfig &Config) : Context(C) {
-  ArrayMode = Config.Arrays;
+STPSolver::STPSolver(STP::VC C, const SolverConfig &Config)
+    : SMTSolverImpl(Config), Context(C) {
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }

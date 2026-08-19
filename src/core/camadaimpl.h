@@ -61,7 +61,17 @@ static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
 
 class SMTSolverImpl : public SMTSolver {
 public:
-  SMTSolverImpl() = default;
+  /// Initialises the options the common layer itself consumes, so each
+  /// backend does not re-derive them. Backends still read the fields they
+  /// act on directly from their own SolverConfig argument -- Logic and
+  /// OneShotModelAckTimeoutMs mean nothing here, and holding the whole
+  /// struct would surface them on backends that cannot use them.
+  ///
+  /// There is deliberately no default constructor: a backend that forgot to
+  /// forward its config would silently get ArrayEncoding::Native, so the
+  /// compiler is made to ask for it.
+  explicit SMTSolverImpl(const SolverConfig &Config)
+      : ArrayMode(Config.Arrays) {}
   /// Backend destructors MUST call invalidateGeneratedObjects() before
   /// releasing backend resources (contexts, term managers, etc.). The arena
   /// destructors run during base-class teardown, after derived members are

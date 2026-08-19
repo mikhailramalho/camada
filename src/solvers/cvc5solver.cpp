@@ -105,13 +105,9 @@ void CVC5Expr::dump(std::string &Out) const {
 }
 
 CVC5Solver::CVC5Solver(const SolverConfig &Config)
-    : ProduceUnsatAssumptions(Config.UnsatAssumptions ==
-                              UnsatAssumptionsMode::On),
-      Context(Terms) {
-  // Before the singletons: constant tracking (AckBVConstBits) must cover
-  // the cached small bit-vectors.
-  ArrayMode = Config.Arrays;
-  TupleMode = Config.Tuples;
+    : SMTSolverImpl(Config), ProduceUnsatAssumptions(Config.UnsatAssumptions ==
+                                                     UnsatAssumptionsMode::On),
+      TupleMode(Config.Tuples), Context(Terms) {
   Context.setOption("arrays-exp", "true");
   Context.setOption("produce-models", "true");
   Context.setOption("produce-assertions", "true");

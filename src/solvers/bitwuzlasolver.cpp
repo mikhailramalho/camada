@@ -122,9 +122,8 @@ void BitwExpr::dump(std::string &Out) const {
 }
 
 BitwuzlaSolver::BitwuzlaSolver(const SolverConfig &Config)
-    : ProduceUnsatAssumptions(Config.UnsatAssumptions ==
-                              UnsatAssumptionsMode::On) {
-  ArrayMode = Config.Arrays;
+    : SMTSolverImpl(Config), ProduceUnsatAssumptions(Config.UnsatAssumptions ==
+                                                     UnsatAssumptionsMode::On) {
   initializeContext();
   initializeCommonSingletons();
 }
