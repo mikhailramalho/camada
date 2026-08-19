@@ -487,7 +487,19 @@ protected:
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
-  bool supportsImpl(SolverFeature Feature) const override;
+  bool timeoutSupport() const override { return false; }
+  bool arrayModelSupport() const override { return false; }
+  // Not the caller's request but what the child actually accepted: the
+  // preamble already learned whether it took :produce-unsat-assumptions
+  // (false in write-only mode, where there is no model to query either).
+  //
+  // The base's default bits describe what the emitter can put on the
+  // wire; a given child may still reject a construct at runtime --
+  // yices-smt2 has no FP, bitwuzla no Int/Real -- which is not knowable
+  // here.
+  bool unsatAssumptionSupport() const override {
+    return UnsatAssumptionsSupported;
+  }
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;

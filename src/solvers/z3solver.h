@@ -387,7 +387,9 @@ protected:
 
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
-  bool supportsImpl(SolverFeature Feature) const override;
+  // Z3 enables unsat_core per query, so cores need no
+  // creation-time opt-in.
+  bool unsatAssumptionSupport() const override { return true; }
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;

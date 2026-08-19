@@ -352,7 +352,9 @@ protected:
 
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
-  bool supportsImpl(SolverFeature Feature) const override;
+  bool quantifierSupport() const override { return false; }
+  // Tracked natively, no creation-time opt-in.
+  bool unsatAssumptionSupport() const override { return true; }
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;

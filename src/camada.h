@@ -1063,7 +1063,36 @@ public:
 
   /// Returns whether this backend implements the given feature. See the
   /// SolverFeature enumerators for what each bit covers.
+  ///
+  /// This reports what the backend is *capable* of, not how this instance
+  /// was configured. A backend that makes unsat-assumption tracking opt-in
+  /// still reports SolverFeature::UnsatAssumptions; ask
+  /// produceUnsatAssumptions() whether this solver has it enabled.
   virtual bool supports(SolverFeature Feature) const = 0;
+
+  // --- Creation-time options, as this solver was constructed with ---
+  //
+  // The counterpart to supports(): that answers what the backend can do,
+  // these answer what was asked of it. A field the backend cannot act on
+  // is reported back unchanged -- see SolverConfig for which apply where.
+
+  /// Array encoding (SolverConfig::Arrays).
+  virtual ArrayEncoding arrayMode() const = 0;
+
+  /// Tuple lowering (SolverConfig::Tuples). Only reaches a decision on
+  /// backends with native datatypes; supports(NativeTuples) answers what
+  /// this solver will actually do.
+  virtual TupleEncoding tupleMode() const = 0;
+
+  /// Whether core production was requested (SolverConfig::
+  /// UseUnsatAssumptions). Backends whose engine must opt in at creation
+  /// report cores only when this is true, even though
+  /// supports(UnsatAssumptions) reports the capability either way.
+  virtual bool produceUnsatAssumptions() const = 0;
+
+  /// Caller-chosen logic (SolverConfig::Logic); empty when the backend
+  /// keeps its own default.
+  virtual const std::string &logic() const = 0;
 
   /// Returns the solver name and version
   virtual std::string getSolverNameAndVersion() const = 0;

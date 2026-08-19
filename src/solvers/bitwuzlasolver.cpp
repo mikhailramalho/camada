@@ -1010,25 +1010,6 @@ SMTExprRef BitwuzlaSolver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   return mkIEEEFPToBVViaUF(Exp);
 }
 
-bool BitwuzlaSolver::supportsImpl(SolverFeature Feature) const {
-  switch (Feature) {
-  case SolverFeature::Quantifiers: // BV/FP quantifiers only
-  case SolverFeature::UninterpretedFunctions:
-  case SolverFeature::NativeFloatingPoint:
-  case SolverFeature::Timeouts:
-  case SolverFeature::ArrayModels:
-    return true;
-  case SolverFeature::UnsatAssumptions:
-    return produceUnsatAssumptions();
-  case SolverFeature::IntRealArithmetic:
-    return false;
-  case SolverFeature::NativeTuples:
-  case SolverFeature::NativeConstantArrays:
-    break; // answered by the common layer's hooks
-  }
-  return false;
-}
-
 void BitwuzlaSolver::armCheckDeadline() {
   CheckDeadline = TimeoutMs == 0 ? std::chrono::steady_clock::time_point{}
                                  : std::chrono::steady_clock::now() +
@@ -1072,8 +1053,8 @@ SMTResult<std::vector<SMTExprRef>> BitwuzlaSolver::getUnsatAssumptionsImpl() {
   if (!produceUnsatAssumptions())
     return SMTError{SMTErrorCode::UnsupportedOperation,
                     SMTBackendKind::Bitwuzla,
-                    "Unsat-assumption production is off; create the solver "
-                    "with true to extract cores"};
+                    "Unsat-assumption production is off; construct with "
+                    "SolverConfig::UseUnsatAssumptions to extract cores"};
   size_t size = 0;
   const BitwuzlaTerm *core = bitwuzla_get_unsat_assumptions(Context, &size);
   std::vector<SMTExprRef> Result;

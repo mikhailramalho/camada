@@ -230,7 +230,13 @@ protected:
   // its SAT backends); millisecond limits round up to the next second.
   bool setTimeoutImpl(uint64_t Milliseconds) override;
 
-  bool supportsImpl(SolverFeature Feature) const override;
+  // Bit-vectors and arrays only.
+  bool intRealArithmeticSupport() const override { return false; }
+  bool quantifierSupport() const override { return false; }
+  bool uninterpretedFunctionSupport() const override { return false; }
+  bool nativeFloatingPointSupport() const override { return false; }
+  bool arrayModelSupport() const override { return false; }
+  bool unsatAssumptionSupport() const override { return false; }
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;

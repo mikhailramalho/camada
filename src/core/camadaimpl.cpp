@@ -2246,18 +2246,32 @@ SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptionsImpl() {
                   "Unsat assumptions are not supported by this backend"};
 }
 
+// One hook per feature, so the enum and the hooks stay in step: a new
+// SolverFeature without a case here is a compile error rather than a
+// silent false.
 bool SMTSolverImpl::supports(SolverFeature Feature) const {
   switch (Feature) {
+  case SolverFeature::IntRealArithmetic:
+    return intRealArithmeticSupport();
+  case SolverFeature::Quantifiers:
+    return quantifierSupport();
+  case SolverFeature::UninterpretedFunctions:
+    return uninterpretedFunctionSupport();
+  case SolverFeature::NativeFloatingPoint:
+    return nativeFloatingPointSupport();
   case SolverFeature::NativeTuples:
     return nativeTupleSupport();
   case SolverFeature::NativeConstantArrays:
     return nativeConstArraySupport();
-  default:
-    return supportsImpl(Feature);
+  case SolverFeature::UnsatAssumptions:
+    return unsatAssumptionSupport();
+  case SolverFeature::Timeouts:
+    return timeoutSupport();
+  case SolverFeature::ArrayModels:
+    return arrayModelSupport();
   }
+  fatalError("Unhandled SolverFeature in supports()");
 }
-
-bool SMTSolverImpl::supportsImpl(SolverFeature) const { return false; }
 
 bool SMTSolverImpl::setTimeout(uint64_t Milliseconds) {
   const bool Supported = setTimeoutImpl(Milliseconds);

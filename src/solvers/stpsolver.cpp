@@ -646,12 +646,6 @@ bool STPSolver::setTimeoutImpl(uint64_t) {
   return true;
 }
 
-bool STPSolver::supportsImpl(SolverFeature Feature) const {
-  if (Feature == SolverFeature::Timeouts)
-    return true;
-  return SMTSolverImpl::supportsImpl(Feature);
-}
-
 void STPSolver::resetImpl() {
   if (Context)
     STP::vc_Destroy(Context);
