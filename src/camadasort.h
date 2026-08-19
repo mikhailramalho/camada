@@ -23,6 +23,7 @@
 #define CAMADASORT_H_
 
 #include <cassert>
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <variant>
@@ -32,8 +33,16 @@
 
 namespace camada {
 
-enum class SMTBackendKind { Bitwuzla, CVC5, MathSAT, STP, Yices, Z3, SMTLIB };
-enum class SMTSortKind {
+enum class SMTBackendKind : std::uint8_t {
+  Bitwuzla,
+  CVC5,
+  MathSAT,
+  STP,
+  Yices,
+  Z3,
+  SMTLIB
+};
+enum class SMTSortKind : std::uint8_t {
   Bool,
   Int,
   Real,

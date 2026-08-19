@@ -22,13 +22,15 @@
 #ifndef CAMADAEXPR_H_
 #define CAMADAEXPR_H_
 
+#include <cstdint>
+
 #include "camadasort.h"
 
 namespace camada {
 
 class SMTExpr;
 
-enum class SMTExprKind {
+enum class SMTExprKind : std::uint8_t {
   Unknown,
   Symbol,
   BoolConst,

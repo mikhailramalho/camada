@@ -1649,14 +1649,13 @@ SMTExprRef SMTSolverImpl::mkFPToFXPSat(const SMTExprRef &Exp,
 // Model query
 // ---------------------------------------------------------------------------
 
-SMTResult<SMTSolver::FXPValue> SMTSolverImpl::getFXP(const SMTExprRef &Exp) {
+SMTResult<FXPValue> SMTSolverImpl::getFXP(const SMTExprRef &Exp) {
   requireFXP(Exp);
   SMTResult<std::string> Bits = getBVInBin(mkFXPToRawBV(Exp));
   if (!Bits)
     return Bits.error();
-  return SMTSolver::FXPValue{std::move(Bits.value()),
-                             Exp->Sort->getFXPFracBits(),
-                             Exp->Sort->isFXPSignedSort()};
+  return FXPValue{std::move(Bits.value()), Exp->Sort->getFXPFracBits(),
+                  Exp->Sort->isFXPSignedSort()};
 }
 
 } // namespace camada

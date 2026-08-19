@@ -22,6 +22,7 @@
 #ifndef CAMADATYPES_H_
 #define CAMADATYPES_H_
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -53,7 +54,7 @@ namespace camada {
 /// regression pins this), but model values are reported in the encoded
 /// representation — `getFP32` decodes BV back to `float`, `getBV`
 /// returns the raw bits when the sort was Native.
-enum class FPEncoding { Native, BV };
+enum class FPEncoding : bool { Native, BV };
 
 /// Selects how `mkArrayConst` lowers a constant array. Unlike `FPEncoding`
 /// this is not a sort property: lazily and natively lowered constant arrays
@@ -75,7 +76,7 @@ enum class FPEncoding { Native, BV };
 /// quantifier binder is unsupported (defaults are instantiated as ground
 /// constraints only, so a quantified body can observe uninstantiated
 /// indexes).
-enum class ConstArrayLowering { Auto, Native, Lazy };
+enum class ConstArrayLowering : std::uint8_t { Auto, Native, Lazy };
 
 /// Selects how Camada lowers `mkFPNeg` for backends whose native FP
 /// implementation diverges from the IEEE-754 sign-bit-flip semantics
@@ -89,7 +90,7 @@ enum class ConstArrayLowering { Auto, Native, Lazy };
 /// - PreserveNaNPayload: follow the SMT-LIB `fp.neg` definition, which
 ///   leaves NaN payloads (including the sign bit) unchanged. Cheaper to
 ///   emit on backends that natively implement this semantics.
-enum class FPNegBehavior {
+enum class FPNegBehavior : bool {
   FlipSignBit,
   PreserveNaNPayload,
 };
@@ -128,7 +129,7 @@ enum class FPNegBehavior {
 ///
 /// Every nearest mode saturates to the format's maximum when the rounding
 /// would carry past it, which every implementation surveyed agrees on.
-enum class FXPRM {
+enum class FXPRM : std::uint8_t {
   NearestTiesTowardPositive,
   NearestTiesAwayFromZero,
   NearestTiesToEven,
@@ -147,7 +148,7 @@ enum class FXPRM {
 ///   datatype declarations, so any standard SMT-LIB v2 solver can parse
 ///   it. Same encoding the non-native backends (bitwuzla/mathsat/stp/
 ///   yices) already use.
-enum class TupleEncoding { Native, Camada };
+enum class TupleEncoding : bool { Native, Camada };
 
 /// Selects how arrays are encoded, on the backends that accept it.
 ///
@@ -164,9 +165,9 @@ enum class TupleEncoding { Native, Camada };
 /// UF arguments/returns, and model queries need bool/BV index sorts. The
 /// mode forces the Camada tuple encoding — a native datatype cannot hold
 /// an array member that has no backend representation.
-enum class ArrayEncoding { Native, Ackermann };
+enum class ArrayEncoding : bool { Native, Ackermann };
 
-enum class RM {
+enum class RM : std::uint8_t {
   ROUND_TO_EVEN = 0,
   ROUND_TO_AWAY = 1,
   ROUND_TO_PLUS_INF = 2,
@@ -174,7 +175,7 @@ enum class RM {
   ROUND_TO_ZERO = 4,
 };
 
-enum class checkResult { SAT, UNSAT, UNKNOWN };
+enum class checkResult : std::uint8_t { SAT, UNSAT, UNKNOWN };
 
 /// Capabilities a backend may or may not implement, queryable through
 /// SMTSolver::supports() instead of discovering them through aborts or
@@ -185,7 +186,7 @@ enum class checkResult { SAT, UNSAT, UNKNOWN };
 /// through their SMTResult. On the SMT-LIB pipeline backend the bits
 /// describe what Camada emits — a particular child solver may still
 /// reject a construct at runtime.
-enum class SolverFeature {
+enum class SolverFeature : std::uint8_t {
   /// Int/Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
   IntRealArithmetic,
   /// Quantified formulas (mkForall, mkExists).
@@ -217,7 +218,7 @@ enum class SolverFeature {
 ///
 /// These are intended for user-triggerable failures such as unsupported
 /// features or model-query failures, not internal invariant violations.
-enum class SMTErrorCode {
+enum class SMTErrorCode : std::uint8_t {
   None,
   BackendError,
   InvalidModelValue,
@@ -239,6 +240,23 @@ enum class SMTErrorCode {
 /// methods; everything here is frozen because changing it mid-flight
 /// would strand already-built terms or already-configured contexts.
 struct SolverConfig {
+  /// Caller-chosen logic. Empty (the default) keeps each backend's
+  /// built-in choice. SMT-LIB: emitted verbatim as `(set-logic ...)`, no
+  /// negotiation, child rejection is fatal (one-shot model children are
+  /// dropped instead). Yices: the context logic (default QF_AUFBV).
+  /// MathSAT: the default-configuration logic (default AUFBV; ignored by
+  /// the constructor taking a caller-built msat_config).
+  std::string Logic;
+
+  /// SMT-LIB one-shot mode only: deadline in milliseconds for each
+  /// protocol ack from the auxiliary model solver. Acks are instantaneous
+  /// for any conforming child; one that stays silent past the deadline
+  /// does not speak the `:print-success` protocol and is dropped, costing
+  /// only counterexample support. Does not apply to the read of the model
+  /// solver's own verdict, which may legitimately take as long as the
+  /// solve.
+  unsigned OneShotModelAckTimeoutMs = 5000;
+
   /// Array encoding (see ArrayEncoding). All backends.
   ArrayEncoding Arrays = ArrayEncoding::Native;
 
@@ -265,23 +283,6 @@ struct SolverConfig {
   /// enables unsat_core per query, MathSAT and Yices track natively)
   /// ignore this and always support core extraction.
   bool UseUnsatAssumptions = false;
-
-  /// Caller-chosen logic. Empty (the default) keeps each backend's
-  /// built-in choice. SMT-LIB: emitted verbatim as `(set-logic ...)`, no
-  /// negotiation, child rejection is fatal (one-shot model children are
-  /// dropped instead). Yices: the context logic (default QF_AUFBV).
-  /// MathSAT: the default-configuration logic (default AUFBV; ignored by
-  /// the constructor taking a caller-built msat_config).
-  std::string Logic;
-
-  /// SMT-LIB one-shot mode only: deadline in milliseconds for each
-  /// protocol ack from the auxiliary model solver. Acks are instantaneous
-  /// for any conforming child; one that stays silent past the deadline
-  /// does not speak the `:print-success` protocol and is dropped, costing
-  /// only counterexample support. Does not apply to the read of the model
-  /// solver's own verdict, which may legitimately take as long as the
-  /// solve.
-  unsigned OneShotModelAckTimeoutMs = 5000;
 };
 
 /// Structured error payload carried by `SMTResult<T>` on failure.
@@ -354,6 +355,15 @@ private:
 struct ArrayModel {
   SMTExprRef Base;
   std::vector<std::pair<SMTExprRef, SMTExprRef>> Entries;
+};
+
+/// Exact fixed-point model value: the raw two's-complement bits plus the
+/// format needed to interpret them (value = raw / 2^FracBits). Kept as a
+/// binary string so any width round-trips exactly.
+struct FXPValue {
+  std::string RawBits;
+  unsigned FracBits = 0;
+  bool IsSigned = false;
 };
 
 } // namespace camada
