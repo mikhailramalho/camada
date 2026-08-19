@@ -871,15 +871,6 @@ public:
   /// significand and 1 hidden bit in the significand
   virtual SMTResult<double> getFP64(const SMTExprRef &Exp) = 0;
 
-  /// Exact fixed-point model value: the raw two's-complement bits plus the
-  /// format needed to interpret them (value = raw / 2^FracBits). Kept as a
-  /// binary string so any width round-trips exactly.
-  struct FXPValue {
-    std::string RawBits;
-    unsigned FracBits = 0;
-    bool IsSigned = false;
-  };
-
   /// If a model is available, returns the exact value of a given fixed-point
   /// expression.
   virtual SMTResult<FXPValue> getFXP(const SMTExprRef &Exp) = 0;
