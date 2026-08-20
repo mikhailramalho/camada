@@ -569,6 +569,66 @@ inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
+inline void arith_division_semantics(const camada::SMTSolverRef &solver) {
+  // Integer division truncates toward zero for positive operands and rounds
+  // toward negative infinity for a negative dividend, per SMT-LIB `div`.
+  // Real division is exact. A backend that routes Int operands through its
+  // real-division operator answers 7/2 = 7/2 rather than 3, so pin both.
+  auto int_sort = solver->mkIntSort();
+  auto seven = solver->mkInt(7);
+  auto two = solver->mkInt(2);
+  auto q = solver->mkArithDiv(seven, two);
+  REQUIRE(q->getKind() == camada::SMTExprKind::ArithDiv);
+  REQUIRE(q->Sort->isIntSort());
+  solver->addConstraint(solver->mkEqual(q, solver->mkInt(3)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  // 7/2 cannot also be 4: real division would make the equality above
+  // unsatisfiable instead, so this pair fails either way if the operator
+  // is wrong.
+  solver->reset();
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArithDiv(solver->mkInt(7), solver->mkInt(2)),
+                      solver->mkInt(4)));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // SMT-LIB div floors: -7 div 2 = -4, not -3.
+  solver->reset();
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArithDiv(solver->mkInt(-7), solver->mkInt(2)),
+                      solver->mkInt(-4)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  // A symbolic dividend, so the quotient is not constant-folded before it
+  // reaches the backend operator. The divisor stays constant to keep the
+  // formula linear -- some solvers reject symbolic division outright.
+  solver->reset();
+  int_sort = solver->mkIntSort();
+  auto a = solver->mkSymbol("div_a", int_sort);
+  solver->addConstraint(solver->mkEqual(a, solver->mkInt(9)));
+  solver->addConstraint(solver->mkEqual(solver->mkArithDiv(a, solver->mkInt(4)),
+                                        solver->mkInt(2)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  // Real division on the same numbers is exact: 9/4 is 2.25, not 2.
+  solver->reset();
+  auto real_sort = solver->mkRealSort();
+  auto ra = solver->mkSymbol("div_ra", real_sort);
+  solver->addConstraint(solver->mkEqual(ra, solver->mkReal(9)));
+  auto rq = solver->mkArithDiv(ra, solver->mkReal(4));
+  REQUIRE(rq->Sort->isRealSort());
+  solver->addConstraint(solver->mkEqual(rq, solver->mkReal(2)));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  solver->reset();
+  real_sort = solver->mkRealSort();
+  ra = solver->mkSymbol("div_ra", real_sort);
+  solver->addConstraint(solver->mkEqual(ra, solver->mkReal(9)));
+  solver->addConstraint(solver->mkEqual(
+      solver->mkArithDiv(ra, solver->mkReal(4)), solver->mkReal("2.25")));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
 inline void real_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   auto real_sort = solver->mkRealSort();
   auto r = solver->mkSymbol("r", real_sort);

@@ -239,6 +239,9 @@ CAMADA_YICES_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
 CAMADA_YICES_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
                                 real_arithmetic_semantics(solver),
                                 makeSMTLIBSolver)
+CAMADA_YICES_SMTLIB_SHARED_TEST("arith_division_semantics",
+                                arith_division_semantics(solver),
+                                makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("arith_model_queries",
                                 arith_model_queries(solver), makeSMTLIBSolver)
 CAMADA_YICES_SMTLIB_SHARED_TEST("arith_conversion_semantics",

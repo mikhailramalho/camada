@@ -66,6 +66,8 @@ TEST_CASE("Arith MathSAT test", "[MathSAT]") {
   mathsat->reset();
   real_arithmetic_semantics(mathsat);
   mathsat->reset();
+  arith_division_semantics(mathsat);
+  mathsat->reset();
   arith_model_queries(mathsat);
   mathsat->reset();
   arith_conversion_semantics(mathsat);
@@ -222,6 +224,9 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
                                   makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
                                   real_arithmetic_semantics(solver),
+                                  makeSMTLIBSolver)
+CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_division_semantics",
+                                  arith_division_semantics(solver),
                                   makeSMTLIBSolver)
 CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_model_queries",
                                   arith_model_queries(solver), makeSMTLIBSolver)
