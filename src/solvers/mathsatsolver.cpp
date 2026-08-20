@@ -544,7 +544,7 @@ SMTExprRef MathSATSolver::mkIsIntImpl(const SMTExprRef &Exp) {
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::IsInt);
 }
 
-SMTExprRef MathSATSolver::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+SMTExprRef MathSATSolver::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   return makeExprRef<MathSATExpr>(
       SMTExprKind::Int2BV, &Context, mkBVSort(Width),
       msat_make_int_to_bv(Context, Width, toMathSATTerm(Exp)));
@@ -575,16 +575,18 @@ SMTExprRef MathSATSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                          toMathSATTerm(F)));
 }
 
-SMTExprRef MathSATSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef MathSATSolver::mkBVSignExtImpl(const SMTExprRef &Exp,
+                                          unsigned ExtraBits) {
   return makeExprRef<MathSATExpr>(
-      SMTExprKind::BVSignExt, &Context, mkBVSort(i + Exp->getWidth()),
-      msat_make_bv_sext(Context, i, toMathSATTerm(Exp)));
+      SMTExprKind::BVSignExt, &Context, mkBVSort(ExtraBits + Exp->getWidth()),
+      msat_make_bv_sext(Context, ExtraBits, toMathSATTerm(Exp)));
 }
 
-SMTExprRef MathSATSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef MathSATSolver::mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                          unsigned ExtraBits) {
   return makeExprRef<MathSATExpr>(
-      SMTExprKind::BVZeroExt, &Context, mkBVSort(i + Exp->getWidth()),
-      msat_make_bv_zext(Context, i, toMathSATTerm(Exp)));
+      SMTExprKind::BVZeroExt, &Context, mkBVSort(ExtraBits + Exp->getWidth()),
+      msat_make_bv_zext(Context, ExtraBits, toMathSATTerm(Exp)));
 }
 
 SMTExprRef MathSATSolver::mkBVExtractImpl(unsigned High, unsigned Low,
@@ -670,9 +672,9 @@ SMTExprRef MathSATSolver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
       msat_make_fp_isnan(Context, toMathSATTerm(Exp)));
 }
 
-SMTExprRef MathSATSolver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
+SMTExprRef MathSATSolver::mkFPIsSubnormalImpl(const SMTExprRef &Exp) {
   return makeExprRef<MathSATExpr>(
-      SMTExprKind::FPIsDenormal, &Context, mkBoolSort(),
+      SMTExprKind::FPIsSubnormal, &Context, mkBoolSort(),
       msat_make_fp_issubnormal(Context, toMathSATTerm(Exp)));
 }
 
@@ -798,7 +800,7 @@ SMTExprRef MathSATSolver::mkFPEqualImpl(const SMTExprRef &LHS,
       msat_make_fp_equal(Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));
 }
 
-SMTExprRef MathSATSolver::mkFPtoFPImpl(const SMTExprRef &From,
+SMTExprRef MathSATSolver::mkFPToFPImpl(const SMTExprRef &From,
                                        const SMTSortRef &To,
                                        const SMTExprRef &R) {
   return makeExprRef<MathSATExpr>(
@@ -808,7 +810,7 @@ SMTExprRef MathSATSolver::mkFPtoFPImpl(const SMTExprRef &From,
                         toMathSATTerm(From)));
 }
 
-SMTExprRef MathSATSolver::mkSBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef MathSATSolver::mkSBVToFPImpl(const SMTExprRef &From,
                                         const SMTSortRef &To,
                                         const SMTExprRef &R) {
   return makeExprRef<MathSATExpr>(
@@ -818,7 +820,7 @@ SMTExprRef MathSATSolver::mkSBVtoFPImpl(const SMTExprRef &From,
                             toMathSATTerm(From)));
 }
 
-SMTExprRef MathSATSolver::mkUBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef MathSATSolver::mkUBVToFPImpl(const SMTExprRef &From,
                                         const SMTSortRef &To,
                                         const SMTExprRef &R) {
   return makeExprRef<MathSATExpr>(
@@ -828,7 +830,7 @@ SMTExprRef MathSATSolver::mkUBVtoFPImpl(const SMTExprRef &From,
                             toMathSATTerm(From)));
 }
 
-SMTExprRef MathSATSolver::mkFPtoSBVImpl(const SMTExprRef &From,
+SMTExprRef MathSATSolver::mkFPToSBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
@@ -839,7 +841,7 @@ SMTExprRef MathSATSolver::mkFPtoSBVImpl(const SMTExprRef &From,
                          toMathSATTerm(From)));
 }
 
-SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
+SMTExprRef MathSATSolver::mkFPToUBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
@@ -850,7 +852,7 @@ SMTExprRef MathSATSolver::mkFPtoUBVImpl(const SMTExprRef &From,
                           toMathSATTerm(From)));
 }
 
-SMTExprRef MathSATSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
+SMTExprRef MathSATSolver::mkFPToIntegralImpl(const SMTExprRef &From,
                                              const SMTExprRef &R) {
   return makeExprRef<MathSATExpr>(
       SMTExprKind::FPtoIntegral, &Context, From->Sort,
@@ -1175,23 +1177,23 @@ void MathSATSolver::armCheckDeadline() {
                                        std::chrono::milliseconds(TimeoutMs);
 }
 
-checkResult MathSATSolver::checkImpl() {
+CheckResult MathSATSolver::checkImpl() {
   armCheckDeadline();
   msat_result res = msat_solve(Context);
   if (res == MSAT_SAT)
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res == MSAT_UNSAT)
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
 
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
 // The termination test is always registered; arming the deadline per
 // check (above) is all that is needed.
 bool MathSATSolver::setTimeoutImpl(uint64_t) { return true; }
 
-checkResult MathSATSolver::checkSatAssumingImpl(
+CheckResult MathSATSolver::checkSatAssumingImpl(
     const std::vector<SMTExprRef> &Assumptions) {
   // msat_solve_with_assumptions rejects anything but (negated) Boolean
   // constants, so activate each assumption through a fresh literal:
@@ -1215,12 +1217,12 @@ checkResult MathSATSolver::checkSatAssumingImpl(
   msat_result res =
       msat_solve_with_assumptions(Context, lits.data(), lits.size());
   if (res == MSAT_SAT)
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res == MSAT_UNSAT)
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
 
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
 SMTResult<std::vector<SMTExprRef>> MathSATSolver::getUnsatAssumptionsImpl() {

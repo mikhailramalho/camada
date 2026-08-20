@@ -20,7 +20,7 @@ TEST_CASE("Config logic MathSAT test", "[MathSAT]") {
   auto mathsat = camada::createMathSATSolver(Cfg);
   auto x = mathsat->mkSymbol("x", mathsat->mkBVSort(8));
   mathsat->addConstraint(mathsat->mkEqual(x, mathsat->mkBVFromDec(7, 8)));
-  REQUIRE(mathsat->check() == camada::checkResult::SAT);
+  REQUIRE(mathsat->check() == camada::CheckResult::SAT);
 }
 
 TEST_CASE("Ackermann arrays MathSAT test", "[MathSAT]") {
@@ -116,7 +116,7 @@ TEST_CASE("MathSAT reset reuses symbol names across sort changes",
   auto eight = mathsat->mkBVFromDec(8, 8);
   auto x_bv = mathsat->mkSymbol("x", mathsat->mkBVSort(8));
   mathsat->addConstraint(mathsat->mkEqual(x_bv, eight));
-  REQUIRE(mathsat->check() == camada::checkResult::SAT);
+  REQUIRE(mathsat->check() == camada::CheckResult::SAT);
   auto x_bv_res = mathsat->getBV(x_bv);
   REQUIRE(x_bv_res);
   REQUIRE(x_bv_res.value() == 8);
@@ -125,7 +125,7 @@ TEST_CASE("MathSAT reset reuses symbol names across sort changes",
 
   auto x_bool = mathsat->mkSymbol("x", mathsat->mkBoolSort());
   mathsat->addConstraint(x_bool);
-  REQUIRE(mathsat->check() == camada::checkResult::SAT);
+  REQUIRE(mathsat->check() == camada::CheckResult::SAT);
   auto x_bool_res = mathsat->getBool(x_bool);
   REQUIRE(x_bool_res);
   REQUIRE(x_bool_res.value());
@@ -136,7 +136,7 @@ TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
     auto mathsat = camada::createMathSATSolver();
     auto x_bv = mathsat->mkSymbol("x", mathsat->mkBVSort(4));
     mathsat->addConstraint(mathsat->mkEqual(x_bv, mathsat->mkBVFromDec(3, 4)));
-    REQUIRE(mathsat->check() == camada::checkResult::SAT);
+    REQUIRE(mathsat->check() == camada::CheckResult::SAT);
     auto x_bv_res = mathsat->getBV(x_bv);
     REQUIRE(x_bv_res);
     REQUIRE(x_bv_res.value() == 3);
@@ -146,7 +146,7 @@ TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
     auto mathsat = camada::createMathSATSolver();
     auto x_bool = mathsat->mkSymbol("x", mathsat->mkBoolSort());
     mathsat->addConstraint(mathsat->mkNot(x_bool));
-    REQUIRE(mathsat->check() == camada::checkResult::SAT);
+    REQUIRE(mathsat->check() == camada::CheckResult::SAT);
     auto x_bool_res = mathsat->getBool(x_bool);
     REQUIRE(x_bool_res);
     REQUIRE_FALSE(x_bool_res.value());

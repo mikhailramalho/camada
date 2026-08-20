@@ -222,7 +222,7 @@ TEST_CASE("Unsat-assumption opt-in Bitwuzla test", "[Bitwuzla]") {
   REQUIRE(solver->supports(camada::SolverFeature::UnsatAssumptions));
   auto a = solver->mkSymbol("a", solver->mkBoolSort());
   REQUIRE(solver->checkSatAssuming({a, solver->mkNot(a)}) ==
-          camada::checkResult::UNSAT);
+          camada::CheckResult::UNSAT);
   auto core = solver->getUnsatAssumptions();
   REQUIRE(core);
   REQUIRE(!core.value().empty());

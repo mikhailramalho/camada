@@ -388,10 +388,12 @@ TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
 
-  // Camada tuple lowering flips the native-tuples bit.
+  // Camada tuple lowering does not touch the native-tuples bit: that
+  // reports the backend capability, and tupleMode() reports the request.
   auto camadaTuples = std::make_unique<camada::SMTLIBSolver>(
       Path, withTuples(camada::TupleEncoding::Camada));
-  REQUIRE_FALSE(camadaTuples->supports(SolverFeature::NativeTuples));
+  REQUIRE(camadaTuples->supports(SolverFeature::NativeTuples));
+  REQUIRE(camadaTuples->tupleMode() == camada::TupleEncoding::Camada);
 
   solver.reset();
   camadaTuples.reset();
@@ -444,23 +446,23 @@ template <typename Fn> void requireAborts(Fn &&Body) {
 } // namespace
 
 TEST_CASE("SMTLIB one-shot verdict scanner contract", "[SMTLIB][oneshot]") {
-  using camada::checkResult;
+  using camada::CheckResult;
   using camada::parseOneShotVerdictLine;
 
   // Bare SMT-LIB verdicts.
-  REQUIRE(parseOneShotVerdictLine("sat") == checkResult::SAT);
-  REQUIRE(parseOneShotVerdictLine("unsat") == checkResult::UNSAT);
-  REQUIRE(parseOneShotVerdictLine("unknown") == checkResult::UNKNOWN);
+  REQUIRE(parseOneShotVerdictLine("sat") == CheckResult::SAT);
+  REQUIRE(parseOneShotVerdictLine("unsat") == CheckResult::UNSAT);
+  REQUIRE(parseOneShotVerdictLine("unknown") == CheckResult::UNKNOWN);
 
   // SAT-competition style.
-  REQUIRE(parseOneShotVerdictLine("s SATISFIABLE") == checkResult::SAT);
-  REQUIRE(parseOneShotVerdictLine("s UNSATISFIABLE") == checkResult::UNSAT);
-  REQUIRE(parseOneShotVerdictLine("s UNKNOWN") == checkResult::UNKNOWN);
+  REQUIRE(parseOneShotVerdictLine("s SATISFIABLE") == CheckResult::SAT);
+  REQUIRE(parseOneShotVerdictLine("s UNSATISFIABLE") == CheckResult::UNSAT);
+  REQUIRE(parseOneShotVerdictLine("s UNKNOWN") == CheckResult::UNKNOWN);
 
   // Surrounding whitespace tolerated.
-  REQUIRE(parseOneShotVerdictLine("  sat") == checkResult::SAT);
-  REQUIRE(parseOneShotVerdictLine("unsat\r\n") == checkResult::UNSAT);
-  REQUIRE(parseOneShotVerdictLine("\t s SATISFIABLE \n") == checkResult::SAT);
+  REQUIRE(parseOneShotVerdictLine("  sat") == CheckResult::SAT);
+  REQUIRE(parseOneShotVerdictLine("unsat\r\n") == CheckResult::UNSAT);
+  REQUIRE(parseOneShotVerdictLine("\t s SATISFIABLE \n") == CheckResult::SAT);
 
   // Everything else rejected — no substring matching.
   REQUIRE_FALSE(parseOneShotVerdictLine("").has_value());
@@ -492,7 +494,7 @@ TEST_CASE("SMTLIB one-shot sat with model solver", "[SMTLIB][oneshot]") {
 
   auto X = solver->mkSymbol("x", solver->mkBVSort(8));
   solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Pgid handed out at spawn; the formula file is complete.
   REQUIRE(SeenPgid > 0);
@@ -501,7 +503,7 @@ TEST_CASE("SMTLIB one-shot sat with model solver", "[SMTLIB][oneshot]") {
   REQUIRE(Written.find("(assert") != std::string::npos);
 
   // The parallel model solver agrees and serves the model.
-  REQUIRE(solver->oneShotModelVerdict() == camada::checkResult::SAT);
+  REQUIRE(solver->oneShotModelVerdict() == camada::CheckResult::SAT);
   REQUIRE(solver->oneShotModelSolverLive());
   auto Val = solver->getBV(X);
   REQUIRE(Val);
@@ -547,7 +549,7 @@ TEST_CASE("SMTLIB one-shot silent model solver is dropped, not hung",
 
     auto X = solver->mkSymbol("x", solver->mkBVSort(8));
     solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     REQUIRE_FALSE(solver->oneShotModelVerdict().has_value());
 
     solver.reset();
@@ -572,7 +574,7 @@ TEST_CASE("SMTLIB one-shot garbled model solver is dropped, not fatal",
 
   auto X = solver->mkSymbol("x", solver->mkBVSort(8));
   solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   REQUIRE_FALSE(solver->oneShotModelVerdict().has_value());
 
   solver.reset();
@@ -589,7 +591,7 @@ TEST_CASE("SMTLIB one-shot verdict handling", "[SMTLIB][oneshot]") {
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
     solver.reset();
     std::remove(Formula.c_str());
     std::remove(Script.c_str());
@@ -603,7 +605,7 @@ TEST_CASE("SMTLIB one-shot verdict handling", "[SMTLIB][oneshot]") {
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::UNKNOWN);
+    REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
     const camada::OneShotDiagnostics &D = solver->oneShotDiagnostics();
     REQUIRE(D.Command.find(Formula) != std::string::npos);
     REQUIRE(D.ExitStatus == "exit code 3");
@@ -621,7 +623,7 @@ TEST_CASE("SMTLIB one-shot verdict handling", "[SMTLIB][oneshot]") {
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::UNKNOWN);
+    REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
     REQUIRE(solver->oneShotDiagnostics().ExitStatus == "signal 9");
     solver.reset();
     std::remove(Formula.c_str());
@@ -638,7 +640,7 @@ TEST_CASE("SMTLIB one-shot %f substitution", "[SMTLIB][oneshot]") {
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f %f");
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     solver.reset();
     std::remove(Formula.c_str());
     std::remove(Script.c_str());
@@ -654,7 +656,7 @@ TEST_CASE("SMTLIB one-shot %f substitution", "[SMTLIB][oneshot]") {
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script);
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     solver.reset();
     std::remove(Formula.c_str());
     ::rmdir(Dir);
@@ -678,8 +680,8 @@ TEST_CASE("SMTLIB one-shot diverging and dying model solvers",
     auto A = solver->mkSymbol("a", solver->mkBoolSort());
     solver->addConstraint(A);
     solver->addConstraint(solver->mkNot(A));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
-    REQUIRE(solver->oneShotModelVerdict() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    REQUIRE(solver->oneShotModelVerdict() == camada::CheckResult::UNSAT);
     REQUIRE_FALSE(solver->oneShotModelSolverLive());
     solver.reset();
     std::remove(Formula.c_str());
@@ -695,7 +697,7 @@ TEST_CASE("SMTLIB one-shot diverging and dying model solvers",
         std::vector<std::string>{"false"});
     auto X = solver->mkSymbol("x", solver->mkBVSort(8));
     solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(5, 8)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     REQUIRE_FALSE(solver->oneShotModelSolverLive());
     REQUIRE_FALSE(solver->oneShotModelVerdict().has_value());
     REQUIRE_FALSE(solver->getBV(X));
@@ -716,7 +718,7 @@ TEST_CASE("SMTLIB one-shot assumption checks and mid-negotiation death",
     auto solver = std::make_unique<camada::SMTLIBSolver>(
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f");
     auto A = solver->mkSymbol("a", solver->mkBoolSort());
-    REQUIRE(solver->checkSatAssuming({A}) == camada::checkResult::SAT);
+    REQUIRE(solver->checkSatAssuming({A}) == camada::CheckResult::SAT);
     std::string Written = readFile(Formula);
     REQUIRE(Written.find("(check-sat)") != std::string::npos);
     REQUIRE(Written.find("(push 1)") != std::string::npos);
@@ -746,7 +748,7 @@ TEST_CASE("SMTLIB one-shot assumption checks and mid-negotiation death",
         std::vector<std::string>{DyingModel});
     REQUIRE_FALSE(solver->oneShotModelSolverLive());
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     solver.reset();
     std::remove(Formula.c_str());
     std::remove(Script.c_str());
@@ -786,7 +788,7 @@ TEST_CASE("SMTLIB caller-chosen logic", "[SMTLIB][logic]") {
         camada::SMTLIBOneShotTag{}, Formula, Script + " %f",
         std::vector<std::string>{}, camada::PgidCallback{}, withLogic("QF_BV"));
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     REQUIRE(readFile(Formula).find("(set-logic QF_BV)") != std::string::npos);
     solver.reset();
     std::remove(Formula.c_str());
@@ -810,7 +812,7 @@ TEST_CASE("SMTLIB caller-chosen logic", "[SMTLIB][logic]") {
         withLogic("QF_BV"));
     REQUIRE_FALSE(solver->oneShotModelSolverLive());
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     REQUIRE(readFile(Formula).find("(set-logic QF_BV)") != std::string::npos);
     solver.reset();
     std::remove(Formula.c_str());
@@ -833,11 +835,11 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
         camada::SMTLIBProcessTag{}, ModelArgv, Path, withLogic("QF_AUFBV"));
     auto X = solver->mkSymbol("x", solver->mkBVSort(8));
     solver->addConstraint(solver->mkEqual(X, solver->mkBVFromDec(7, 8)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     solver->reset();
     auto Y = solver->mkSymbol("y", solver->mkBVSort(8));
     solver->addConstraint(solver->mkEqual(Y, solver->mkBVFromDec(9, 8)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     solver.reset();
     std::string Written = readFile(Path);
     REQUIRE(Written.find("(set-logic QF_AUFBV)") != std::string::npos);

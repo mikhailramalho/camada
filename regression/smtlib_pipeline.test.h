@@ -200,7 +200,7 @@ inline void runSMTLIBPublicFactory(const std::vector<std::string> &Argv) {
   auto BV8 = Solver->mkBVSort(8);
   auto X = Solver->mkSymbol("x", BV8);
   Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(1, BV8)));
-  REQUIRE(Solver->check() == camada::checkResult::SAT);
+  REQUIRE(Solver->check() == camada::CheckResult::SAT);
 }
 
 // The dual-emitter form (Argv + path) must drive the child AND tee the script
@@ -212,7 +212,7 @@ inline void runSMTLIBDualEmitter(const std::vector<std::string> &Argv) {
     auto BV8 = Solver->mkBVSort(8);
     auto X = Solver->mkSymbol("x", BV8);
     Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(3, BV8)));
-    REQUIRE(Solver->check() == camada::checkResult::SAT);
+    REQUIRE(Solver->check() == camada::CheckResult::SAT);
   }
   std::string Got = readFile(Path);
   std::remove(Path.c_str());

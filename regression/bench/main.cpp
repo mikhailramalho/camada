@@ -323,7 +323,7 @@ void benchmarkArraySolve(camada::SMTSolver &solver, std::size_t iterations) {
           solver.mkBVFromDec(static_cast<int64_t>(40 + r), elem_sort)));
     }
 
-    sink += solver.check() == camada::checkResult::SAT;
+    sink += solver.check() == camada::CheckResult::SAT;
     solver.reset();
   }
 
@@ -371,12 +371,12 @@ void benchmarkFPConstruct(camada::SMTSolver &solver, std::size_t iterations) {
     auto a_bv = solver.mkBVFromDec(static_cast<int64_t>((i & 0xffff) + 1), 32);
     auto b_bv =
         solver.mkBVFromDec(static_cast<int64_t>(((i + 3) & 0xffff) + 1), 32);
-    auto a = solver.mkSBVtoFP(a_bv, fp32, rm);
-    auto b = solver.mkUBVtoFP(b_bv, fp32, rm);
+    auto a = solver.mkSBVToFP(a_bv, fp32, rm);
+    auto b = solver.mkUBVToFP(b_bv, fp32, rm);
     auto sum = solver.mkFPAdd(a, b, rm);
     auto div =
         solver.mkFPDiv(sum, solver.mkFP32(3.5f, camada::FPEncoding::BV), rm);
-    auto integral = solver.mkFPtoIntegral(div, rm);
+    auto integral = solver.mkFPToIntegral(div, rm);
     sink += solver.mkIEEEFPToBV(integral)->getWidth();
   }
 
@@ -392,8 +392,8 @@ void benchmarkFPFromBV(camada::SMTSolver &solver, std::size_t iterations) {
     auto a_bv = solver.mkBVFromDec(static_cast<int64_t>((i & 0xffff) + 1), 32);
     auto b_bv =
         solver.mkBVFromDec(static_cast<int64_t>(((i + 3) & 0xffff) + 1), 32);
-    auto a = solver.mkSBVtoFP(a_bv, fp32, rm);
-    auto b = solver.mkUBVtoFP(b_bv, fp32, rm);
+    auto a = solver.mkSBVToFP(a_bv, fp32, rm);
+    auto b = solver.mkUBVToFP(b_bv, fp32, rm);
     sink += a->getWidth() + b->getWidth();
   }
 
@@ -403,8 +403,8 @@ void benchmarkFPFromBV(camada::SMTSolver &solver, std::size_t iterations) {
 void benchmarkFPAddOnly(camada::SMTSolver &solver, std::size_t iterations) {
   auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
   auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
-  auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
-  auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto a = solver.mkSBVToFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto b = solver.mkUBVToFP(solver.mkBVFromDec(456, 32), fp32, rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
@@ -416,8 +416,8 @@ void benchmarkFPAddOnly(camada::SMTSolver &solver, std::size_t iterations) {
 void benchmarkFPDivOnly(camada::SMTSolver &solver, std::size_t iterations) {
   auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
   auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
-  auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
-  auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto a = solver.mkSBVToFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto b = solver.mkUBVToFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
   auto denom = solver.mkFP32(3.5f, camada::FPEncoding::BV);
   volatile std::size_t sink = 0;
@@ -432,15 +432,15 @@ void benchmarkFPIntegralOnly(camada::SMTSolver &solver,
                              std::size_t iterations) {
   auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
   auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
-  auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
-  auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto a = solver.mkSBVToFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto b = solver.mkUBVToFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
   auto div =
       solver.mkFPDiv(sum, solver.mkFP32(3.5f, camada::FPEncoding::BV), rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
-    sink += solver.mkFPtoIntegral(div, rm)->getWidth();
+    sink += solver.mkFPToIntegral(div, rm)->getWidth();
 
   (void)sink;
 }
@@ -449,12 +449,12 @@ void benchmarkFPIEEEToBVOnly(camada::SMTSolver &solver,
                              std::size_t iterations) {
   auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
   auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
-  auto a = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
-  auto b = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto a = solver.mkSBVToFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto b = solver.mkUBVToFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto sum = solver.mkFPAdd(a, b, rm);
   auto div =
       solver.mkFPDiv(sum, solver.mkFP32(3.5f, camada::FPEncoding::BV), rm);
-  auto integral = solver.mkFPtoIntegral(div, rm);
+  auto integral = solver.mkFPToIntegral(div, rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
@@ -466,7 +466,7 @@ void benchmarkFPIEEEToBVOnly(camada::SMTSolver &solver,
 void benchmarkFPSqrtOnly(camada::SMTSolver &solver, std::size_t iterations) {
   auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
   auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
-  auto a = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto a = solver.mkUBVToFP(solver.mkBVFromDec(456, 32), fp32, rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
@@ -478,8 +478,8 @@ void benchmarkFPSqrtOnly(camada::SMTSolver &solver, std::size_t iterations) {
 void benchmarkFPFMAOnly(camada::SMTSolver &solver, std::size_t iterations) {
   auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
   auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
-  auto x = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
-  auto y = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto x = solver.mkSBVToFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto y = solver.mkUBVToFP(solver.mkBVFromDec(456, 32), fp32, rm);
   auto z = solver.mkFP32(1.25f, camada::FPEncoding::BV);
   volatile std::size_t sink = 0;
 
@@ -492,8 +492,8 @@ void benchmarkFPFMAOnly(camada::SMTSolver &solver, std::size_t iterations) {
 void benchmarkFPRemOnly(camada::SMTSolver &solver, std::size_t iterations) {
   auto fp32 = solver.mkFP32Sort(camada::FPEncoding::BV);
   auto rm = solver.mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::BV);
-  auto x = solver.mkSBVtoFP(solver.mkBVFromDec(123, 32), fp32, rm);
-  auto y = solver.mkUBVtoFP(solver.mkBVFromDec(456, 32), fp32, rm);
+  auto x = solver.mkSBVToFP(solver.mkBVFromDec(123, 32), fp32, rm);
+  auto y = solver.mkUBVToFP(solver.mkBVFromDec(456, 32), fp32, rm);
   volatile std::size_t sink = 0;
 
   for (std::size_t i = 0; i < iterations; ++i)
@@ -521,7 +521,7 @@ void benchmarkFPSolveAdd(camada::SMTSolver &solver, std::size_t iterations) {
     auto lhs = solver.mkFPAdd(x, y, rm);
     auto rhs = solver.mkFPAdd(y, x, rm);
     solver.addConstraint(solver.mkNot(solver.mkEqual(lhs, rhs)));
-    sink += solver.check() == camada::checkResult::UNSAT;
+    sink += solver.check() == camada::CheckResult::UNSAT;
     solver.reset();
   }
 
@@ -543,7 +543,7 @@ void benchmarkFPSolveFMA(camada::SMTSolver &solver, std::size_t iterations) {
     auto lhs = solver.mkFPFMA(x, y, z, rm);
     auto rhs = solver.mkFPFMA(y, x, z, rm);
     solver.addConstraint(solver.mkNot(solver.mkEqual(lhs, rhs)));
-    sink += solver.check() == camada::checkResult::UNSAT;
+    sink += solver.check() == camada::CheckResult::UNSAT;
     solver.reset();
   }
 
@@ -567,7 +567,7 @@ void benchmarkFPSolveSqrt(camada::SMTSolver &solver, std::size_t iterations) {
     solver.addConstraint(solver.mkFPLe(x, y));
     solver.addConstraint(solver.mkNot(
         solver.mkFPLe(solver.mkFPSqrt(x, rm), solver.mkFPSqrt(y, rm))));
-    sink += solver.check() == camada::checkResult::UNSAT;
+    sink += solver.check() == camada::CheckResult::UNSAT;
     solver.reset();
   }
 
@@ -586,7 +586,7 @@ void benchmarkFPSolveRem(camada::SMTSolver &solver, std::size_t iterations) {
     auto lhs = solver.mkFPRem(x, y);
     auto rhs = solver.mkFPRem(x, solver.mkFPNeg(y));
     solver.addConstraint(solver.mkNot(solver.mkEqual(lhs, rhs)));
-    sink += solver.check() == camada::checkResult::UNSAT;
+    sink += solver.check() == camada::CheckResult::UNSAT;
     solver.reset();
   }
 

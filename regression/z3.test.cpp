@@ -68,7 +68,11 @@ TEST_CASE("Camada tuples via config Z3 test", "[Z3]") {
   camada::SolverConfig Cfg;
   Cfg.Tuples = camada::TupleEncoding::Camada;
   auto z3 = camada::createZ3Solver(Cfg);
-  REQUIRE_FALSE(z3->supports(camada::SolverFeature::NativeTuples));
+  // supports() reports the backend capability, so Z3 still claims native
+  // datatypes here; tupleMode() is what says this instance will not use
+  // them.
+  REQUIRE(z3->supports(camada::SolverFeature::NativeTuples));
+  REQUIRE(z3->tupleMode() == camada::TupleEncoding::Camada);
   tuple_semantics(z3);
   z3->reset();
   tuple_with_array_field(z3);

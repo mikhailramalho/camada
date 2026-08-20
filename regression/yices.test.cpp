@@ -15,11 +15,11 @@ TEST_CASE("Config logic Yices test", "[YICES]") {
   auto yices = camada::createYicesSolver(Cfg);
   auto x = yices->mkSymbol("x", yices->mkBVSort(8));
   yices->addConstraint(yices->mkEqual(x, yices->mkBVFromDec(7, 8)));
-  REQUIRE(yices->check() == camada::checkResult::SAT);
+  REQUIRE(yices->check() == camada::CheckResult::SAT);
   yices->reset();
   auto y = yices->mkSymbol("y", yices->mkBVSort(8));
   yices->addConstraint(yices->mkEqual(y, yices->mkBVFromDec(9, 8)));
-  REQUIRE(yices->check() == camada::checkResult::SAT);
+  REQUIRE(yices->check() == camada::CheckResult::SAT);
 
   // Pin that the logic actually reached the context: a QF_BV context has
   // no array solver, so asserting an array constraint aborts — under the
@@ -88,7 +88,7 @@ TEST_CASE("Arith Yices test", "[YICES]") {
 
     yices->addConstraint(yices->mkEqual(x_plus_one, three));
     yices->addConstraint(yices->mkArithGt(x, one));
-    REQUIRE(yices->check() == camada::checkResult::SAT);
+    REQUIRE(yices->check() == camada::CheckResult::SAT);
   }
 
   {
@@ -102,7 +102,7 @@ TEST_CASE("Arith Yices test", "[YICES]") {
 
     yices->addConstraint(yices->mkEqual(r_plus_one, three));
     yices->addConstraint(yices->mkArithGt(r, one));
-    REQUIRE(yices->check() == camada::checkResult::SAT);
+    REQUIRE(yices->check() == camada::CheckResult::SAT);
   }
 
   {
@@ -166,11 +166,11 @@ TEST_CASE("Yices multi-instance lifecycle edge case", "[YICES]") {
   auto y = yices2->mkSymbol("y", yices2->mkBVSort(8));
   yices2->addConstraint(yices2->mkEqual(y, yices2->mkBVFromDec(100, 8)));
 
-  REQUIRE(yices1->check() == camada::checkResult::SAT);
-  REQUIRE(yices2->check() == camada::checkResult::SAT);
+  REQUIRE(yices1->check() == camada::CheckResult::SAT);
+  REQUIRE(yices2->check() == camada::CheckResult::SAT);
 
   yices1->reset();
-  REQUIRE(yices2->check() == camada::checkResult::SAT); // Still SAT
+  REQUIRE(yices2->check() == camada::CheckResult::SAT); // Still SAT
 }
 
 #if SOLVER_SMTLIB_ENABLED

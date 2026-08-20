@@ -34,6 +34,10 @@ __pycache__/
 
 # Build directories
 build*/
+.build-release/
+
+# Extracted release tarball (scripts/release-consumer smoke test)
+release/
 
 # clangd/editor index
 .cache/

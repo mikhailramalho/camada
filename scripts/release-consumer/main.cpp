@@ -23,7 +23,7 @@ int run(const camada::SMTSolverRef &solver, const std::string &name) {
   auto seven = solver->mkBVFromDec(7, 32);
   solver->addConstraint(solver->mkEqual(x, seven));
 
-  if (solver->check() != camada::checkResult::SAT) {
+  if (solver->check() != camada::CheckResult::SAT) {
     std::cerr << name << ": expected SAT\n";
     return 1;
   }

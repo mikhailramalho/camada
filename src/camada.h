@@ -49,11 +49,14 @@ std::string getCamadaVersion();
 ///     must be serialized by the caller; a single solver is intended for use
 ///     from one thread at a time. Concurrent solving should be done with one
 ///     solver per thread.
-///   * SMTExprRef and SMTSortRef handles are nullable, copyable, and safe to
-///     read concurrently from any thread as long as the owning solver
-///     outlives the read. The handle's liveness check is race-free against
-///     reset()/destruction on another thread: a stale handle deterministically
-///     aborts via fatalError() rather than reading freed memory.
+///   * SMTExprRef and SMTSortRef handles are nullable and copyable, and may
+///     be read concurrently from any thread as long as no thread calls
+///     reset() or destroys the solver meanwhile. The liveness check catches
+///     a handle left stale by an *earlier* reset() -- it aborts via
+///     fatalError() instead of reading freed memory -- but it does not
+///     synchronize against a reset() running concurrently: the check can
+///     pass and the arena be cleared before the dereference. Serialize
+///     reset() and destruction against handle reads.
 class SMTSolver {
 public:
   SMTSolver() = default;
@@ -311,7 +314,7 @@ public:
   /// that constraint lives at the current (push)/(pop) level — unlike
   /// mkIEEEFPToBV's tie, which is journalled and re-asserted after a pop
   /// because it states a definitional fact rather than an assumption.
-  virtual SMTExprRef mkInt2BV(unsigned Width, const SMTExprRef &Exp) = 0;
+  virtual SMTExprRef mkInt2BV(const SMTExprRef &Exp, unsigned Width) = 0;
 
   /// Converts a bit-vector to the integer it denotes: two's complement
   /// when IsSigned, the unsigned value in [0, 2^N) otherwise. Together
@@ -323,11 +326,13 @@ public:
   virtual SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                            const SMTExprRef &F) = 0;
 
-  /// Creates a bitvector sign extension operation
-  virtual SMTExprRef mkBVSignExt(unsigned i, const SMTExprRef &Exp) = 0;
+  /// Creates a bitvector sign extension operation, widening Exp by
+  /// ExtraBits copies of its sign bit.
+  virtual SMTExprRef mkBVSignExt(const SMTExprRef &Exp, unsigned ExtraBits) = 0;
 
-  /// Creates a bitvector zero extension operation
-  virtual SMTExprRef mkBVZeroExt(unsigned i, const SMTExprRef &Exp) = 0;
+  /// Creates a bitvector zero extension operation, widening Exp by
+  /// ExtraBits leading zeroes.
+  virtual SMTExprRef mkBVZeroExt(const SMTExprRef &Exp, unsigned ExtraBits) = 0;
 
   /// Creates a bitvector extract operation
   virtual SMTExprRef mkBVExtract(unsigned High, unsigned Low,
@@ -367,7 +372,7 @@ public:
   virtual SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) = 0;
 
   /// Creates a floating-point isSubnormal operation
-  virtual SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) = 0;
+  virtual SMTExprRef mkFPIsSubnormal(const SMTExprRef &Exp) = 0;
 
   /// Creates a floating-point isNormal operation
   virtual SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) = 0;
@@ -419,30 +424,30 @@ public:
 
   /// Creates a floating-point conversion from floating-point to floating-point
   /// operation
-  virtual SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
+  virtual SMTExprRef mkFPToFP(const SMTExprRef &From, const SMTSortRef &To,
                               const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from signed bitvector to
   /// floating-point operation
-  virtual SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
+  virtual SMTExprRef mkSBVToFP(const SMTExprRef &From, const SMTSortRef &To,
                                const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from unsigned bitvector to
   /// floating-point operation
-  virtual SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
+  virtual SMTExprRef mkUBVToFP(const SMTExprRef &From, const SMTSortRef &To,
                                const SMTExprRef &R) = 0;
 
   /// Creates a floating-point conversion from floating-point to signed
   /// bitvector operation
-  virtual SMTExprRef mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) = 0;
+  virtual SMTExprRef mkFPToSBV(const SMTExprRef &From, unsigned ToWidth) = 0;
 
   /// Creates a floating-point conversion from floating-point to unsigned
   /// bitvector operation
-  virtual SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) = 0;
+  virtual SMTExprRef mkFPToUBV(const SMTExprRef &From, unsigned ToWidth) = 0;
 
   /// Creates a floating-point conversion from floating-point to the closest
   /// integer, considering the rounding mode.
-  virtual SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
+  virtual SMTExprRef mkFPToIntegral(const SMTExprRef &From,
                                     const SMTExprRef &R) = 0;
 
   // --- Fixed-point arithmetic (TR 18037-shaped, Camada-encoded over BV) ---
@@ -1015,11 +1020,11 @@ public:
   virtual SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) = 0;
 
   /// Check if the constraints are satisfiable
-  virtual checkResult check() = 0;
+  virtual CheckResult check() = 0;
 
   /// Set a wall-clock time limit, in milliseconds, applied to each
   /// subsequent check() or checkSatAssuming() individually; 0 removes the
-  /// limit. A check that hits the limit returns checkResult::UNKNOWN and
+  /// limit. A check that hits the limit returns CheckResult::UNKNOWN and
   /// leaves the solver usable. The limit persists across reset(). Returns
   /// false when the backend cannot enforce time limits — the limit is
   /// then ignored. Equivalently queryable up front as
@@ -1031,7 +1036,7 @@ public:
   /// have no effect on the satisfiability of later checks. (Backends whose
   /// native API only accepts literals lower compound assumptions through
   /// fresh activation literals, which is observable in dump() output.)
-  virtual checkResult
+  virtual CheckResult
   checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) = 0;
 
   /// Returns the subset of the assumptions the solver used to derive
@@ -1059,6 +1064,7 @@ public:
   /// was configured. A backend that makes unsat-assumption tracking opt-in
   /// still reports SolverFeature::UnsatAssumptions; ask
   /// produceUnsatAssumptions() whether this solver has it enabled.
+
   virtual bool supports(SolverFeature Feature) const = 0;
 
   // --- Creation-time options, as this solver was constructed with ---
@@ -1071,8 +1077,9 @@ public:
   virtual ArrayEncoding arrayMode() const = 0;
 
   /// Tuple lowering (SolverConfig::Tuples). Only reaches a decision on
-  /// backends with native datatypes; supports(NativeTuples) answers what
-  /// this solver will actually do.
+  /// backends with native datatypes -- ask supports(NativeTuples) whether
+  /// this backend has them. Ackermann arrays also force the Camada
+  /// lowering regardless of this setting.
   virtual TupleEncoding tupleMode() const = 0;
 
   /// Whether core production was requested (SolverConfig::

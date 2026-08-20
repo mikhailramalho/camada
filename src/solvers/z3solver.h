@@ -231,7 +231,7 @@ protected:
   SMTExprRef mkInt2RealImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkReal2IntImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkIsIntImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) override;
+  SMTExprRef mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) override;
   SMTExprRef mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) override;
 
   SMTExprRef mkEqualImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
@@ -239,9 +239,11 @@ protected:
   SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                        const SMTExprRef &F) override;
 
-  SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVSignExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
 
-  SMTExprRef mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVZeroExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
 
   SMTExprRef mkBVExtractImpl(unsigned High, unsigned Low,
                              const SMTExprRef &Exp) override;
@@ -276,7 +278,7 @@ protected:
 
   SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsSubnormalImpl(const SMTExprRef &Exp) override;
 
   SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
 
@@ -312,20 +314,20 @@ protected:
   SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
 
-  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkFPToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                           const SMTExprRef &R) override;
 
-  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkSBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                            const SMTExprRef &R) override;
 
-  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkUBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                            const SMTExprRef &R) override;
 
-  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPToSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
 
-  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPToUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
 
-  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
+  SMTExprRef mkFPToIntegralImpl(const SMTExprRef &From,
                                 const SMTExprRef &R) override;
 
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
@@ -378,11 +380,11 @@ protected:
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 
-  checkResult checkImpl() override;
+  CheckResult checkImpl() override;
 
   bool setTimeoutImpl(uint64_t Milliseconds) override;
 
-  checkResult
+  CheckResult
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
 
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;

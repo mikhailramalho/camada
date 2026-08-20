@@ -210,9 +210,11 @@ protected:
   SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                        const SMTExprRef &F) override;
 
-  SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVSignExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
 
-  SMTExprRef mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVZeroExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
 
   SMTExprRef mkBVExtractImpl(unsigned High, unsigned Low,
                              const SMTExprRef &Exp) override;
@@ -272,11 +274,11 @@ protected:
 
   bool nativeConstArraySupport() const override { return false; }
 
-  checkResult checkImpl() override;
+  CheckResult checkImpl() override;
 
   bool setTimeoutImpl(uint64_t Milliseconds) override;
 
-  checkResult
+  CheckResult
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
 
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;

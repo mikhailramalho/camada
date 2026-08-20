@@ -736,7 +736,7 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
   initializeCommonSingletons();
 }
 
-std::optional<checkResult> parseOneShotVerdictLine(const std::string &Raw) {
+std::optional<CheckResult> parseOneShotVerdictLine(const std::string &Raw) {
   const std::size_t Start = Raw.find_first_not_of(" \t\r\n");
   if (Start == std::string::npos)
     return std::nullopt;
@@ -744,11 +744,11 @@ std::optional<checkResult> parseOneShotVerdictLine(const std::string &Raw) {
   const std::string Line = Raw.substr(Start, End - Start + 1);
 
   if (Line == "sat" || Line == "s SATISFIABLE")
-    return checkResult::SAT;
+    return CheckResult::SAT;
   if (Line == "unsat" || Line == "s UNSATISFIABLE")
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
   if (Line == "unknown" || Line == "s UNKNOWN")
-    return checkResult::UNKNOWN;
+    return CheckResult::UNKNOWN;
   return std::nullopt;
 }
 
@@ -775,7 +775,7 @@ std::string shellQuotePath(const std::string &Path) {
 
 } // namespace
 
-checkResult SMTLIBSolver::runOneShotCommand() {
+CheckResult SMTLIBSolver::runOneShotCommand() {
   // Substitute the formula file for every %f, or append it, quoting the
   // path for the shell the command runs under.
   const std::string Quoted = shellQuotePath(OneShotFormulaPath);
@@ -823,7 +823,7 @@ checkResult SMTLIBSolver::runOneShotCommand() {
 
   // Scan the output for verdict lines; the LAST one wins. Keep a tail of
   // the output for the caller's diagnostics.
-  std::optional<checkResult> Verdict;
+  std::optional<CheckResult> Verdict;
   std::deque<std::string> Tail;
   char Buf[4096];
   while (std::fgets(Buf, sizeof(Buf), ChildOut)) {
@@ -835,7 +835,7 @@ checkResult SMTLIBSolver::runOneShotCommand() {
     if (Start != std::string::npos)
       Line.erase(0, Start);
 
-    if (std::optional<checkResult> V = parseOneShotVerdictLine(Line))
+    if (std::optional<CheckResult> V = parseOneShotVerdictLine(Line))
       Verdict = V;
 
     Tail.push_back(std::move(Line));
@@ -857,13 +857,13 @@ checkResult SMTLIBSolver::runOneShotCommand() {
   // not become a verification verdict. Non-zero *exit codes* stay
   // accepted — SAT-competition-style solvers exit 10/20.
   if (Verdict && WIFSIGNALED(Status))
-    return checkResult::UNKNOWN;
+    return CheckResult::UNKNOWN;
   if (!Verdict)
-    return checkResult::UNKNOWN;
+    return CheckResult::UNKNOWN;
   return *Verdict;
 }
 
-checkResult SMTLIBSolver::oneShotCheck() {
+CheckResult SMTLIBSolver::oneShotCheck() {
   fatalErrorIf(OneShotCheckDone,
                "SMTLIBSolver: one-shot mode supports a single (check-sat) "
                "query per run; incremental strategies are not supported");
@@ -881,21 +881,21 @@ checkResult SMTLIBSolver::oneShotCheck() {
     Proc->flush();
   }
 
-  const checkResult Verdict = runOneShotCommand();
+  const CheckResult Verdict = runOneShotCommand();
 
-  if (Verdict == checkResult::SAT && Proc) {
+  if (Verdict == CheckResult::SAT && Proc) {
     const std::string Resp = Proc->readResponse();
     if (Resp.empty()) {
       // The model solver died mid-solve; continue without counterexample
       // support. The caller sees oneShotModelSolverLive() == false.
       Proc.reset();
     } else {
-      OneShotModelVerdictValue = Resp == "sat"     ? checkResult::SAT
-                                 : Resp == "unsat" ? checkResult::UNSAT
-                                                   : checkResult::UNKNOWN;
+      OneShotModelVerdictValue = Resp == "sat"     ? CheckResult::SAT
+                                 : Resp == "unsat" ? CheckResult::UNSAT
+                                                   : CheckResult::UNKNOWN;
       // A disagreeing model solver has no model to serve; the caller
       // compares the two verdicts and decides how to report it.
-      if (*OneShotModelVerdictValue != checkResult::SAT)
+      if (*OneShotModelVerdictValue != CheckResult::SAT)
         Proc.reset();
     }
   } else if (Proc) {
@@ -1279,16 +1279,18 @@ SMTExprRef SMTLIBSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
   return makeSMTLIBExpr(SMTExprKind::Ite, T->Sort, "ite", {Cond, T, F});
 }
 
-SMTExprRef SMTLIBSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
-  unsigned NewWidth = Exp->getWidth() + i;
+SMTExprRef SMTLIBSolver::mkBVSignExtImpl(const SMTExprRef &Exp,
+                                         unsigned ExtraBits) {
+  unsigned NewWidth = Exp->getWidth() + ExtraBits;
   return makeSMTLIBExpr(SMTExprKind::BVSignExt, mkBVSort(NewWidth),
-                        "(_ sign_extend " + utoa(i) + ")", {Exp});
+                        "(_ sign_extend " + utoa(ExtraBits) + ")", {Exp});
 }
 
-SMTExprRef SMTLIBSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
-  unsigned NewWidth = Exp->getWidth() + i;
+SMTExprRef SMTLIBSolver::mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                         unsigned ExtraBits) {
+  unsigned NewWidth = Exp->getWidth() + ExtraBits;
   return makeSMTLIBExpr(SMTExprKind::BVZeroExt, mkBVSort(NewWidth),
-                        "(_ zero_extend " + utoa(i) + ")", {Exp});
+                        "(_ zero_extend " + utoa(ExtraBits) + ")", {Exp});
 }
 
 SMTExprRef SMTLIBSolver::mkBVExtractImpl(unsigned High, unsigned Low,
@@ -1488,7 +1490,7 @@ SMTExprRef SMTLIBSolver::mkFPNegImpl(const SMTExprRef &Exp,
 CAMADA_SMTLIB_UNARY(mkFPIsInfiniteImpl, "fp.isInfinite", FPIsInfinite,
                     mkBoolSort())
 CAMADA_SMTLIB_UNARY(mkFPIsNaNImpl, "fp.isNaN", FPIsNaN, mkBoolSort())
-CAMADA_SMTLIB_UNARY(mkFPIsDenormalImpl, "fp.isSubnormal", FPIsDenormal,
+CAMADA_SMTLIB_UNARY(mkFPIsSubnormalImpl, "fp.isSubnormal", FPIsSubnormal,
                     mkBoolSort())
 CAMADA_SMTLIB_UNARY(mkFPIsNormalImpl, "fp.isNormal", FPIsNormal, mkBoolSort())
 CAMADA_SMTLIB_UNARY(mkFPIsZeroImpl, "fp.isZero", FPIsZero, mkBoolSort())
@@ -1520,7 +1522,7 @@ CAMADA_SMTLIB_BINARY(mkFPEqualImpl, "fp.eq", FPEqual, mkBoolSort())
 #undef CAMADA_SMTLIB_BINARY
 #undef CAMADA_SMTLIB_RM_BINARY
 
-SMTExprRef SMTLIBSolver::mkFPtoFPImpl(const SMTExprRef &From,
+SMTExprRef SMTLIBSolver::mkFPToFPImpl(const SMTExprRef &From,
                                       const SMTSortRef &To,
                                       const SMTExprRef &R) {
   std::string Head = "(_ to_fp " + utoa(To->getFPExponentWidth()) + " " +
@@ -1528,7 +1530,7 @@ SMTExprRef SMTLIBSolver::mkFPtoFPImpl(const SMTExprRef &From,
   return makeSMTLIBExpr(SMTExprKind::FPtoFP, To, std::move(Head), {R, From});
 }
 
-SMTExprRef SMTLIBSolver::mkSBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef SMTLIBSolver::mkSBVToFPImpl(const SMTExprRef &From,
                                        const SMTSortRef &To,
                                        const SMTExprRef &R) {
   // Same opcode as fp→fp; SMT-LIB disambiguates by argument sort.
@@ -1537,7 +1539,7 @@ SMTExprRef SMTLIBSolver::mkSBVtoFPImpl(const SMTExprRef &From,
   return makeSMTLIBExpr(SMTExprKind::SBVtoFP, To, std::move(Head), {R, From});
 }
 
-SMTExprRef SMTLIBSolver::mkUBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef SMTLIBSolver::mkUBVToFPImpl(const SMTExprRef &From,
                                        const SMTSortRef &To,
                                        const SMTExprRef &R) {
   std::string Head = "(_ to_fp_unsigned " + utoa(To->getFPExponentWidth()) +
@@ -1545,21 +1547,21 @@ SMTExprRef SMTLIBSolver::mkUBVtoFPImpl(const SMTExprRef &From,
   return makeSMTLIBExpr(SMTExprKind::UBVtoFP, To, std::move(Head), {R, From});
 }
 
-SMTExprRef SMTLIBSolver::mkFPtoSBVImpl(const SMTExprRef &From,
+SMTExprRef SMTLIBSolver::mkFPToSBVImpl(const SMTExprRef &From,
                                        unsigned ToWidth) {
   const SMTExprRef &R = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return makeSMTLIBExpr(SMTExprKind::FPtoSBV, mkBVSort(ToWidth),
                         "(_ fp.to_sbv " + utoa(ToWidth) + ")", {R, From});
 }
 
-SMTExprRef SMTLIBSolver::mkFPtoUBVImpl(const SMTExprRef &From,
+SMTExprRef SMTLIBSolver::mkFPToUBVImpl(const SMTExprRef &From,
                                        unsigned ToWidth) {
   const SMTExprRef &R = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return makeSMTLIBExpr(SMTExprKind::FPtoUBV, mkBVSort(ToWidth),
                         "(_ fp.to_ubv " + utoa(ToWidth) + ")", {R, From});
 }
 
-SMTExprRef SMTLIBSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
+SMTExprRef SMTLIBSolver::mkFPToIntegralImpl(const SMTExprRef &From,
                                             const SMTExprRef &R) {
   return makeSMTLIBExpr(SMTExprKind::FPtoIntegral, From->Sort,
                         "fp.roundToIntegral", {R, From});
@@ -2491,7 +2493,7 @@ SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
   return mkArraySelect(Array, Index);
 }
 
-checkResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
+CheckResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
   // Check commands are queries — they do NOT produce a `success` ack even
   // when :print-success is true. Bypass emitLine's resync logic; write the
   // command directly and read the sat/unsat/unknown line ourselves. In
@@ -2502,22 +2504,22 @@ checkResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
     Proc->emitRaw(Cmd);
     Proc->flush();
     const std::string Resp = Proc->readResponse();
-    return Resp == "sat"     ? checkResult::SAT
-           : Resp == "unsat" ? checkResult::UNSAT
-                             : checkResult::UNKNOWN;
+    return Resp == "sat"     ? CheckResult::SAT
+           : Resp == "unsat" ? CheckResult::UNSAT
+                             : CheckResult::UNKNOWN;
   }
   if (File)
     File->flush();
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
-checkResult SMTLIBSolver::checkImpl() {
+CheckResult SMTLIBSolver::checkImpl() {
   if (OneShotMode)
     return oneShotCheck();
   return emitCheckCommand("(check-sat)\n");
 }
 
-checkResult
+CheckResult
 SMTLIBSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   // A child that rejected :produce-unsat-assumptions may not implement
   // (check-sat-assuming ...) at all (stp answers `unsupported`), and without

@@ -124,7 +124,7 @@ inline void bv_conformance_semantics(const camada::SMTSolverRef &solver) {
       }
     }
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Comparisons, over every operand pair.
@@ -147,7 +147,7 @@ inline void bv_conformance_semantics(const camada::SMTSolverRef &solver) {
       }
     }
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Unary operations and the width-changing ones, over every value.
@@ -172,11 +172,11 @@ inline void bv_conformance_semantics(const camada::SMTSolverRef &solver) {
       // Extensions preserve the value under their own signedness.
       All = solver->mkAnd(
           All, solver->mkEqual(
-                   solver->mkBVZeroExt(4, C(A)),
+                   solver->mkBVZeroExt(C(A), 4),
                    solver->mkBVFromBin(bvBits(A, 8), solver->mkBVSort(8))));
       All = solver->mkAnd(
           All, solver->mkEqual(
-                   solver->mkBVSignExt(4, C(A)),
+                   solver->mkBVSignExt(C(A), 4),
                    solver->mkBVFromBin(bvBits((uint64_t)sval(A) & 0xff, 8),
                                        solver->mkBVSort(8))));
       // Extract of the whole width is the identity; concat doubles it.
@@ -188,7 +188,7 @@ inline void bv_conformance_semantics(const camada::SMTSolverRef &solver) {
                                                    solver->mkBVSort(8))));
     }
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Overflow predicates, over every operand pair. Each is true exactly
@@ -220,7 +220,7 @@ inline void bv_conformance_semantics(const camada::SMTSolverRef &solver) {
                                                B(sval(A) == SMin)));
     }
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 }
 
@@ -251,7 +251,7 @@ inline void fxp_gap_conformance(const camada::SMTSolverRef &solver) {
                              solver->mkBool(Trunc < -2 || Trunc > 1)));
   }
   solver->addConstraint(All);
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 } // namespace camada_bv_conformance

@@ -292,9 +292,9 @@ SMTExprRef BitwuzlaSolver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
       mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_NAN, Exp));
 }
 
-SMTExprRef BitwuzlaSolver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
+SMTExprRef BitwuzlaSolver::mkFPIsSubnormalImpl(const SMTExprRef &Exp) {
   return makeExprRef<BitwExpr>(
-      SMTExprKind::FPIsDenormal, Context, mkBoolSort(),
+      SMTExprKind::FPIsSubnormal, Context, mkBoolSort(),
       mkTerm1(TermManager, BITWUZLA_KIND_FP_IS_SUBNORMAL, Exp));
 }
 
@@ -616,18 +616,20 @@ SMTExprRef BitwuzlaSolver::mkIteImpl(const SMTExprRef &Cond,
       mkTerm3(TermManager, BITWUZLA_KIND_ITE, Cond, T, F));
 }
 
-SMTExprRef BitwuzlaSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef BitwuzlaSolver::mkBVSignExtImpl(const SMTExprRef &Exp,
+                                           unsigned ExtraBits) {
   return makeExprRef<BitwExpr>(
-      SMTExprKind::BVSignExt, Context, mkBVSort(i + Exp->getWidth()),
+      SMTExprKind::BVSignExt, Context, mkBVSort(ExtraBits + Exp->getWidth()),
       bitwuzla_mk_term1_indexed1(TermManager, BITWUZLA_KIND_BV_SIGN_EXTEND,
-                                 toSolverExpr<BitwExpr>(*Exp).Expr, i));
+                                 toSolverExpr<BitwExpr>(*Exp).Expr, ExtraBits));
 }
 
-SMTExprRef BitwuzlaSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef BitwuzlaSolver::mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                           unsigned ExtraBits) {
   return makeExprRef<BitwExpr>(
-      SMTExprKind::BVZeroExt, Context, mkBVSort(i + Exp->getWidth()),
+      SMTExprKind::BVZeroExt, Context, mkBVSort(ExtraBits + Exp->getWidth()),
       bitwuzla_mk_term1_indexed1(TermManager, BITWUZLA_KIND_BV_ZERO_EXTEND,
-                                 toSolverExpr<BitwExpr>(*Exp).Expr, i));
+                                 toSolverExpr<BitwExpr>(*Exp).Expr, ExtraBits));
 }
 
 SMTExprRef BitwuzlaSolver::mkBVExtractImpl(unsigned High, unsigned Low,
@@ -685,7 +687,7 @@ SMTExprRef BitwuzlaSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
       mkTerm4(TermManager, BITWUZLA_KIND_FP_FMA, R, X, Y, Z));
 }
 
-SMTExprRef BitwuzlaSolver::mkFPtoFPImpl(const SMTExprRef &From,
+SMTExprRef BitwuzlaSolver::mkFPToFPImpl(const SMTExprRef &From,
                                         const SMTSortRef &To,
                                         const SMTExprRef &R) {
   return makeExprRef<BitwExpr>(
@@ -696,7 +698,7 @@ SMTExprRef BitwuzlaSolver::mkFPtoFPImpl(const SMTExprRef &From,
           To->getFPExponentWidth(), To->getFPSignificandWidth() + 1));
 }
 
-SMTExprRef BitwuzlaSolver::mkSBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef BitwuzlaSolver::mkSBVToFPImpl(const SMTExprRef &From,
                                          const SMTSortRef &To,
                                          const SMTExprRef &R) {
   return makeExprRef<BitwExpr>(
@@ -707,7 +709,7 @@ SMTExprRef BitwuzlaSolver::mkSBVtoFPImpl(const SMTExprRef &From,
           To->getFPExponentWidth(), To->getFPSignificandWidth() + 1));
 }
 
-SMTExprRef BitwuzlaSolver::mkUBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef BitwuzlaSolver::mkUBVToFPImpl(const SMTExprRef &From,
                                          const SMTSortRef &To,
                                          const SMTExprRef &R) {
   return makeExprRef<BitwExpr>(
@@ -718,7 +720,7 @@ SMTExprRef BitwuzlaSolver::mkUBVtoFPImpl(const SMTExprRef &From,
           To->getFPExponentWidth(), To->getFPSignificandWidth() + 1));
 }
 
-SMTExprRef BitwuzlaSolver::mkFPtoSBVImpl(const SMTExprRef &From,
+SMTExprRef BitwuzlaSolver::mkFPToSBVImpl(const SMTExprRef &From,
                                          unsigned ToWidth) {
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return makeExprRef<BitwExpr>(
@@ -728,7 +730,7 @@ SMTExprRef BitwuzlaSolver::mkFPtoSBVImpl(const SMTExprRef &From,
                                  toSolverExpr<BitwExpr>(*From).Expr, ToWidth));
 }
 
-SMTExprRef BitwuzlaSolver::mkFPtoUBVImpl(const SMTExprRef &From,
+SMTExprRef BitwuzlaSolver::mkFPToUBVImpl(const SMTExprRef &From,
                                          unsigned ToWidth) {
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return makeExprRef<BitwExpr>(
@@ -738,7 +740,7 @@ SMTExprRef BitwuzlaSolver::mkFPtoUBVImpl(const SMTExprRef &From,
                                  toSolverExpr<BitwExpr>(*From).Expr, ToWidth));
 }
 
-SMTExprRef BitwuzlaSolver::mkFPtoIntegralImpl(const SMTExprRef &From,
+SMTExprRef BitwuzlaSolver::mkFPToIntegralImpl(const SMTExprRef &From,
                                               const SMTExprRef &R) {
   return makeExprRef<BitwExpr>(
       SMTExprKind::FPtoIntegral, Context, From->Sort,
@@ -1016,21 +1018,21 @@ void BitwuzlaSolver::armCheckDeadline() {
                                        std::chrono::milliseconds(TimeoutMs);
 }
 
-checkResult BitwuzlaSolver::checkImpl() {
+CheckResult BitwuzlaSolver::checkImpl() {
   armCheckDeadline();
   BitwuzlaResult res = bitwuzla_check_sat(Context);
   if (res == BITWUZLA_SAT)
-    return checkResult::SAT;
+    return CheckResult::SAT;
   if (res == BITWUZLA_UNSAT)
-    return checkResult::UNSAT;
-  return checkResult::UNKNOWN;
+    return CheckResult::UNSAT;
+  return CheckResult::UNKNOWN;
 }
 
 // The termination callback is always registered; arming the deadline per
 // check (above) is all that is needed.
 bool BitwuzlaSolver::setTimeoutImpl(uint64_t) { return true; }
 
-checkResult BitwuzlaSolver::checkSatAssumingImpl(
+CheckResult BitwuzlaSolver::checkSatAssumingImpl(
     const std::vector<SMTExprRef> &Assumptions) {
   std::vector<BitwuzlaTerm> assumptions;
   assumptions.reserve(Assumptions.size());
@@ -1041,10 +1043,10 @@ checkResult BitwuzlaSolver::checkSatAssumingImpl(
   BitwuzlaResult res = bitwuzla_check_sat_assuming(
       Context, static_cast<uint32_t>(assumptions.size()), assumptions.data());
   if (res == BITWUZLA_SAT)
-    return checkResult::SAT;
+    return CheckResult::SAT;
   if (res == BITWUZLA_UNSAT)
-    return checkResult::UNSAT;
-  return checkResult::UNKNOWN;
+    return CheckResult::UNSAT;
+  return CheckResult::UNKNOWN;
 }
 
 SMTResult<std::vector<SMTExprRef>> BitwuzlaSolver::getUnsatAssumptionsImpl() {
