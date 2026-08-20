@@ -49,11 +49,14 @@ std::string getCamadaVersion();
 ///     must be serialized by the caller; a single solver is intended for use
 ///     from one thread at a time. Concurrent solving should be done with one
 ///     solver per thread.
-///   * SMTExprRef and SMTSortRef handles are nullable, copyable, and safe to
-///     read concurrently from any thread as long as the owning solver
-///     outlives the read. The handle's liveness check is race-free against
-///     reset()/destruction on another thread: a stale handle deterministically
-///     aborts via fatalError() rather than reading freed memory.
+///   * SMTExprRef and SMTSortRef handles are nullable and copyable, and may
+///     be read concurrently from any thread as long as no thread calls
+///     reset() or destroys the solver meanwhile. The liveness check catches
+///     a handle left stale by an *earlier* reset() -- it aborts via
+///     fatalError() instead of reading freed memory -- but it does not
+///     synchronize against a reset() running concurrently: the check can
+///     pass and the arena be cleared before the dereference. Serialize
+///     reset() and destruction against handle reads.
 class SMTSolver {
 public:
   SMTSolver() = default;
