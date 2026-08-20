@@ -550,17 +550,17 @@ int main() {
   camada::SMTExprRef notEq = solver->mkNot(eq);
 
   solver->addConstraint(notEq);
-  camada::checkResult result = solver->check();
+  camada::CheckResult result = solver->check();
 
-  if (result == camada::checkResult::SAT) {
+  if (result == camada::CheckResult::SAT) {
     /* Query the model for the value of the exprs */
 
     /* Dump the model */
     solver->dumpModel();
 
-  } else if (result == camada::checkResult::UNSAT) {
+  } else if (result == camada::CheckResult::UNSAT) {
     /* The formula is unsatisfiable */
-  } else if (result == camada::checkResult::UNKNOWN) {
+  } else if (result == camada::CheckResult::UNKNOWN) {
     /* Timeout (see setTimeout) or the solver gave up on the formula */
   }
 }

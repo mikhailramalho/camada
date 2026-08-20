@@ -675,16 +675,18 @@ SMTExprRef YicesSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                           toSolverExpr<YicesExpr>(*F).Expr));
 }
 
-SMTExprRef YicesSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef YicesSolver::mkBVSignExtImpl(const SMTExprRef &Exp,
+                                        unsigned ExtraBits) {
   return makeExprRef<YicesExpr>(
-      SMTExprKind::BVSignExt, Context, mkBVSort(i + Exp->getWidth()),
-      yices_sign_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i));
+      SMTExprKind::BVSignExt, Context, mkBVSort(ExtraBits + Exp->getWidth()),
+      yices_sign_extend(toSolverExpr<YicesExpr>(*Exp).Expr, ExtraBits));
 }
 
-SMTExprRef YicesSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef YicesSolver::mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                        unsigned ExtraBits) {
   return makeExprRef<YicesExpr>(
-      SMTExprKind::BVZeroExt, Context, mkBVSort(i + Exp->getWidth()),
-      yices_zero_extend(toSolverExpr<YicesExpr>(*Exp).Expr, i));
+      SMTExprKind::BVZeroExt, Context, mkBVSort(ExtraBits + Exp->getWidth()),
+      yices_zero_extend(toSolverExpr<YicesExpr>(*Exp).Expr, ExtraBits));
 }
 
 SMTExprRef YicesSolver::mkBVExtractImpl(unsigned High, unsigned Low,
@@ -1036,20 +1038,20 @@ bool YicesSolver::timeoutSupport() const {
 #endif
 }
 
-checkResult YicesSolver::checkImpl() {
+CheckResult YicesSolver::checkImpl() {
   armTimeout();
   smt_status_t res = yices_check_context(Context, nullptr);
   disarmTimeout();
   if (res == YICES_STATUS_SAT)
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res == YICES_STATUS_UNSAT)
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
 
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
-checkResult
+CheckResult
 YicesSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   std::vector<term_t> assumptions;
   assumptions.reserve(Assumptions.size());
@@ -1062,12 +1064,12 @@ YicesSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
       assumptions.data());
   disarmTimeout();
   if (res == YICES_STATUS_SAT)
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res == YICES_STATUS_UNSAT)
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
 
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
 SMTResult<std::vector<SMTExprRef>> YicesSolver::getUnsatAssumptionsImpl() {

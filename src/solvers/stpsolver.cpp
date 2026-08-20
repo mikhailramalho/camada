@@ -446,19 +446,21 @@ SMTExprRef STPSolver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                               toSolverExpr<STPExpr>(*F).Expr));
 }
 
-SMTExprRef STPSolver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef STPSolver::mkBVSignExtImpl(const SMTExprRef &Exp,
+                                      unsigned ExtraBits) {
   return makeExprRef<STPExpr>(
-      SMTExprKind::BVSignExt, &Context, mkBVSort(i + Exp->getWidth()),
+      SMTExprKind::BVSignExt, &Context, mkBVSort(ExtraBits + Exp->getWidth()),
       STP::vc_bvSignExtend(Context, toSolverExpr<STPExpr>(*Exp).Expr,
-                           i + Exp->getWidth()));
+                           ExtraBits + Exp->getWidth()));
 }
 
-SMTExprRef STPSolver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef STPSolver::mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                      unsigned ExtraBits) {
   // Extending by nothing is the identity; the concat below would ask for
   // a zero-width constant, which is not a valid sort.
-  if (i == 0)
+  if (ExtraBits == 0)
     return Exp;
-  const SMTExprRef &z = SMTSolverImpl::mkBVFromDec(0, i);
+  const SMTExprRef &z = SMTSolverImpl::mkBVFromDec(0, ExtraBits);
   return mkBVConcat(z, Exp);
 }
 
@@ -615,7 +617,7 @@ SMTExprRef STPSolver::mkArrayConstImpl(const SMTSortRef &, const SMTExprRef &) {
   fatalError("STP constant arrays are lowered lazily by the common layer");
 }
 
-checkResult STPSolver::checkImpl() {
+CheckResult STPSolver::checkImpl() {
   STP::Expr query = STP::vc_falseExpr(Context);
   // -1 disables the budget. The time budget is whole seconds for the
   // entire query, so the millisecond deadline rounds up; the CryptoMiniSat
@@ -631,13 +633,13 @@ checkResult STPSolver::checkImpl() {
                                  /*timeout_max_conflicts=*/-1, MaxTimeSecs);
   STP::vc_DeleteExpr(query);
   if (!res)
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res == 1)
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
 
   // 2 is an error, 3 a timeout.
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
 bool STPSolver::setTimeoutImpl(uint64_t) {

@@ -175,7 +175,7 @@ enum class RM : std::uint8_t {
   ROUND_TO_ZERO = 4,
 };
 
-enum class checkResult : std::uint8_t { SAT, UNSAT, UNKNOWN };
+enum class CheckResult : std::uint8_t { SAT, UNSAT, UNKNOWN };
 
 /// Capabilities a backend may or may not implement, queryable through
 /// SMTSolver::supports() instead of discovering them through aborts or

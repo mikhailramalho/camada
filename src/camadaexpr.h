@@ -103,7 +103,7 @@ enum class SMTExprKind : std::uint8_t {
   FPNeg,
   FPIsInfinite,
   FPIsNaN,
-  FPIsDenormal,
+  FPIsSubnormal,
   FPIsNormal,
   FPIsZero,
   FPMul,

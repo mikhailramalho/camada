@@ -226,7 +226,7 @@ TEST_CASE("Unsat-assumption opt-in CVC5 test", "[CVC5]") {
   REQUIRE(solver->supports(camada::SolverFeature::UnsatAssumptions));
   auto a = solver->mkSymbol("a", solver->mkBoolSort());
   REQUIRE(solver->checkSatAssuming({a, solver->mkNot(a)}) ==
-          camada::checkResult::UNSAT);
+          camada::CheckResult::UNSAT);
   auto core = solver->getUnsatAssumptions();
   REQUIRE(core);
   REQUIRE(!core.value().empty());

@@ -178,9 +178,11 @@ protected:
   SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                        const SMTExprRef &F) override;
 
-  SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVSignExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
 
-  SMTExprRef mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVZeroExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
 
   SMTExprRef mkBVExtractImpl(unsigned High, unsigned Low,
                              const SMTExprRef &Exp) override;
@@ -223,7 +225,7 @@ protected:
   // array-sorted operands.
   bool nativeArrayExtensionality() const override { return false; }
 
-  checkResult checkImpl() override;
+  CheckResult checkImpl() override;
 
   // Per-check wall-clock limit enforced through vc_query_with_timeout's
   // whole-second time budget (STP >= 2.4.0 gives it one meaning across

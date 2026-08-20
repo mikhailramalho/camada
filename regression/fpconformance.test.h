@@ -93,7 +93,7 @@ inline void fp_conformance_semantics(const camada::SMTSolverRef &solver,
       }
     }
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // The properties that make those semantics distinctive, asserted
@@ -113,7 +113,7 @@ inline void fp_conformance_semantics(const camada::SMTSolverRef &solver,
     All = solver->mkAnd(All, solver->mkFPLe(PZero, NZero));
     All = solver->mkAnd(All, solver->mkNot(solver->mkFPLt(PZero, NZero)));
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Absolute value clears the sign, including on infinities; on NaN the
@@ -130,7 +130,7 @@ inline void fp_conformance_semantics(const camada::SMTSolverRef &solver,
         All = solver->mkAnd(All, solver->mkFPEqual(Abs, C(std::fabs(A))));
     }
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // The NaN and infinity constructors agree with the same values built
@@ -151,7 +151,7 @@ inline void fp_conformance_semantics(const camada::SMTSolverRef &solver,
     All =
         solver->mkAnd(All, solver->mkFPIsInfinite(solver->mkInf64(true, Enc)));
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Widening float to double is exact, so converting and comparing
@@ -162,7 +162,7 @@ inline void fp_conformance_semantics(const camada::SMTSolverRef &solver,
     camada::SMTExprRef RNE = solver->mkRM(camada::RM::ROUND_TO_EVEN, Enc);
     camada::SMTExprRef All = solver->mkBool(true);
     for (float A : Vals) {
-      camada::SMTExprRef Wide = solver->mkFPtoFP(C(A), F64, RNE);
+      camada::SMTExprRef Wide = solver->mkFPToFP(C(A), F64, RNE);
       if (std::isnan(A)) {
         All = solver->mkAnd(All, solver->mkFPIsNaN(Wide));
         continue;
@@ -171,7 +171,7 @@ inline void fp_conformance_semantics(const camada::SMTSolverRef &solver,
       All = solver->mkAnd(All, solver->mkFPEqual(Wide, Want));
     }
     solver->addConstraint(All);
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 }
 

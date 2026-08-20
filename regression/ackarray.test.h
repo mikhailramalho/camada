@@ -24,7 +24,7 @@ inline void ack_read_congruence(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(i, c3));
   solver->addConstraint(solver->mkNot(solver->mkEqual(
       solver->mkArraySelect(a, i), solver->mkArraySelect(a, c3))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Distinct index terms are free to hold different values — and forced
@@ -40,13 +40,13 @@ inline void ack_distinct_index_reads(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkArraySelect(a, i), solver->mkBVFromDec(1, 8)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(a, j), solver->mkBVFromDec(2, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   solver->push();
   solver->addConstraint(solver->mkEqual(i, j));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   solver->pop();
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Store/select semantics: a store is visible at its own index and
@@ -63,14 +63,14 @@ inline void ack_store_select_semantics(const camada::SMTSolverRef &solver) {
   solver->push();
   solver->addConstraint(
       solver->mkNot(solver->mkEqual(solver->mkArraySelect(b, i), v)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   solver->pop();
 
   solver->push();
   solver->addConstraint(solver->mkNot(solver->mkEqual(i, j)));
   solver->addConstraint(solver->mkNot(solver->mkEqual(
       solver->mkArraySelect(b, j), solver->mkArraySelect(a, j))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   solver->pop();
 }
 
@@ -88,7 +88,7 @@ inline void ack_equality_before_reads(const camada::SMTSolverRef &solver) {
   auto k = solver->mkSymbol("k", idxsort);
   solver->addConstraint(solver->mkNot(solver->mkEqual(
       solver->mkArraySelect(a, k), solver->mkArraySelect(b, k))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Prototype bug 3: `a != b` with no other constraints must be
@@ -101,7 +101,7 @@ inline void ack_disequality_witness(const camada::SMTSolverRef &solver) {
   auto b = solver->mkSymbol("b", arrsort);
 
   solver->addConstraint(solver->mkNot(solver->mkEqual(a, b)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Prototype bug 7: equality over ite-arrays must decide the condition,
@@ -119,7 +119,7 @@ inline void ack_ite_array_semantics(const camada::SMTSolverRef &solver) {
 
   solver->push();
   solver->addConstraint(solver->mkEqual(solver->mkArraySelect(x, i), one));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto cval = solver->getBool(c);
   REQUIRE(cval);
   REQUIRE(cval.value());
@@ -127,7 +127,7 @@ inline void ack_ite_array_semantics(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkNot(c));
   solver->addConstraint(solver->mkEqual(solver->mkArraySelect(x, i), one));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Prototype bug 5: model queries must not poison the assertion set — a
@@ -139,7 +139,7 @@ inline void ack_model_query_stability(const camada::SMTSolverRef &solver) {
   auto v = solver->mkBVFromDec(9, 8);
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(a, solver->mkBVFromDec(1, 8)), v));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Constrained index: exact value. Unconstrained index: some stable
   // value, the same on a repeated query against the same model.
@@ -155,7 +155,7 @@ inline void ack_model_query_stability(const camada::SMTSolverRef &solver) {
   REQUIRE(at5bval);
   REQUIRE(at5aval.value() == at5bval.value());
 
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Prototype bug 6: a user symbol shaped like an internal leaf name must
@@ -169,7 +169,7 @@ inline void ack_internal_name_no_alias(const camada::SMTSolverRef &solver) {
   auto read = solver->mkArraySelect(a, solver->mkBVFromDec(3, 8));
 
   solver->addConstraint(solver->mkNot(solver->mkEqual(user, read)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Constant arrays: every index reads the initializer; stores layer on
@@ -187,7 +187,7 @@ inline void ack_const_array_semantics(const camada::SMTSolverRef &solver) {
     auto k = solver->mkSymbol("k", idxsort);
     solver->addConstraint(
         solver->mkNot(solver->mkEqual(solver->mkArraySelect(arr, k), init)));
-    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
     solver->pop();
   }
 
@@ -197,7 +197,7 @@ inline void ack_const_array_semantics(const camada::SMTSolverRef &solver) {
   auto b = solver->mkArrayStore(arr, i, v);
   solver->addConstraint(solver->mkNot(solver->mkEqual(
       solver->mkArraySelect(b, solver->mkBVFromDec(4, 8)), init)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // getArrayValues: stored indexes appear with their values; a constant
@@ -213,7 +213,7 @@ inline void ack_array_model_values(const camada::SMTSolverRef &solver) {
   auto k = solver->mkBVFromDec(1, 8);
   auto w = solver->mkBVFromDec(9, 8);
   solver->addConstraint(solver->mkEqual(solver->mkArraySelect(a, k), w));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto model = solver->getArrayValues(b);
   REQUIRE(model);
@@ -256,7 +256,7 @@ inline void ack_fp_element_semantics(const camada::SMTSolverRef &solver) {
   auto v = solver->mkFP32(1.5f, camada::FPEncoding::BV);
 
   solver->addConstraint(solver->mkEqual(solver->mkArraySelect(a, i), v));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto at3 = solver->getArrayElement(a, solver->mkBVFromDec(3, 8));
   auto fpval = solver->getFP32(at3);
   REQUIRE(fpval);
@@ -281,10 +281,10 @@ inline void ack_check_sat_assuming(const camada::SMTSolverRef &solver) {
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(a, j), solver->mkBVFromDec(2, 8)));
   REQUIRE(solver->checkSatAssuming({solver->mkEqual(i, j)}) ==
-          camada::checkResult::UNSAT);
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+          camada::CheckResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   REQUIRE(solver->checkSatAssuming({solver->mkNot(solver->mkEqual(i, j))}) ==
-          camada::checkResult::SAT);
+          camada::CheckResult::SAT);
 }
 
 // The fixtures that never mint a read variable inside a (push) scope.

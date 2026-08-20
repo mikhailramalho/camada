@@ -138,7 +138,7 @@ SMTExprRef extendRaw(SMTSolverImpl &S, const SMTExprRef &Raw, bool IsSigned,
                      unsigned Extra) {
   if (Extra == 0)
     return Raw;
-  return IsSigned ? S.mkBVSignExt(Extra, Raw) : S.mkBVZeroExt(Extra, Raw);
+  return IsSigned ? S.mkBVSignExt(Raw, Extra) : S.mkBVZeroExt(Raw, Extra);
 }
 
 // Aligns a fixed-point operand into format C as a plain-BV raw view,
@@ -246,8 +246,8 @@ SMTExprRef roundQuotient(SMTSolverImpl &S, const SMTExprRef &Quot,
   }
   // Nearest: compare twice the remainder against the divisor. Both are
   // taken as magnitudes, and the doubling needs one extra bit.
-  SMTExprRef AR = S.mkBVZeroExt(1, absOf(Rem));
-  SMTExprRef AD = S.mkBVZeroExt(1, absOf(R));
+  SMTExprRef AR = S.mkBVZeroExt(absOf(Rem), 1);
+  SMTExprRef AD = S.mkBVZeroExt(absOf(R), 1);
   SMTExprRef Twice = S.mkBVShl(AR, S.mkBVFromDec(1, W + 1));
   SMTExprRef Above = S.mkBVUgt(Twice, AD);
   SMTExprRef Tie = S.mkEqual(Twice, AD);
@@ -279,7 +279,7 @@ SMTExprRef roundQuotient(SMTSolverImpl &S, const SMTExprRef &Quot,
 SMTExprRef roundFPToIntegral(SMTSolverImpl &S, const SMTExprRef &V,
                              FXPRM Mode) {
   FPEncoding E = V->Sort->isBVFPSort() ? FPEncoding::BV : FPEncoding::Native;
-  auto integral = [&](RM R) { return S.mkFPtoIntegral(V, S.mkRM(R, E)); };
+  auto integral = [&](RM R) { return S.mkFPToIntegral(V, S.mkRM(R, E)); };
   switch (Mode) {
   case FXPRM::TowardZero:
     return integral(RM::ROUND_TO_ZERO);
@@ -1043,7 +1043,7 @@ SMTExprRef SMTSolverImpl::mkFXPRound(const SMTExprRef &Exp, unsigned Digits,
   case FXPRM::NearestTiesToEven:
     // half - 1 + (lowest kept bit): a tie lands on the even neighbour.
     Bias = mkBVAdd(mkBVSub(Bias, One),
-                   mkBVZeroExt(W - 1, mkBVExtract(Shift, Shift, Raw)));
+                   mkBVZeroExt(mkBVExtract(Shift, Shift, Raw), W - 1));
     break;
   case FXPRM::TowardNegative:
     // Masking alone floors, for both signednesses.
@@ -1121,7 +1121,7 @@ SMTExprRef SMTSolverImpl::mkFXPCountls(const SMTExprRef &Exp,
   unsigned P = 1;
   while (P < Counted)
     P *= 2;
-  SMTExprRef Rest = mkBVZeroExt(P - Counted, Payload);
+  SMTExprRef Rest = mkBVZeroExt(Payload, P - Counted);
   if (P != Counted) {
     Rest = mkBVShl(Rest, mkBVFromDec(P - Counted, P));
     Rest = mkBVOr(Rest, mkBVFromBin(std::string(Counted, '0') +
@@ -1273,11 +1273,11 @@ SMTExprRef SMTSolverImpl::mkFXPExp(const SMTExprRef &Exp) {
   // them before the shift brings it back: the multiply is done at twice
   // the width and narrowed only once the low bits have been discarded.
   const unsigned W2 = 2 * W;
-  SMTExprRef RWide = mkBVZeroExt(W, R);
+  SMTExprRef RWide = mkBVZeroExt(R, W);
   for (unsigned I = NTerms; I >= 1; --I) {
     // acc = 1 + (r * acc >> P) / I
     SMTExprRef Prod =
-        mkBVLshr(mkBVMul(RWide, mkBVZeroExt(W, Acc)), mkBVFromDec(P, W2));
+        mkBVLshr(mkBVMul(RWide, mkBVZeroExt(Acc, W)), mkBVFromDec(P, W2));
     if (I > 1)
       Prod = mkBVUDiv(Prod, mkBVFromDec(I, W2));
     Acc = mkBVAdd(One, mkBVExtract(W - 1, 0, Prod));
@@ -1336,7 +1336,7 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
   SMTExprRef Raw = mkFXPToRawBV(Exp);
   // A negative operand has no real square root; zero-extending
   // gives its bits a defined reading rather than a trapping one.
-  SMTExprRef Rad = mkBVZeroExt(RadWidth - F.Width, Raw);
+  SMTExprRef Rad = mkBVZeroExt(Raw, RadWidth - F.Width);
   if (F.FracBits != 0)
     Rad = mkBVShl(Rad, mkBVFromDec(F.FracBits, RadWidth));
   // Restoring square root, most significant digit first. Root and
@@ -1351,7 +1351,7 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
   SMTExprRef One = mkBVFromDec(1, RadWidth);
   for (unsigned I = Digits; I-- > 0;) {
     SMTExprRef Pair =
-        mkBVZeroExt(RadWidth - 2, mkBVExtract(2 * I + 1, 2 * I, Rad));
+        mkBVZeroExt(mkBVExtract(2 * I + 1, 2 * I, Rad), RadWidth - 2);
     Rem = mkBVOr(mkBVShl(Rem, Two), Pair);
     SMTExprRef Trial = mkBVOr(mkBVShl(Root, Two), One);
     SMTExprRef Fits = mkBVUge(Rem, Trial);
@@ -1512,7 +1512,7 @@ FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
   unsigned WE = Wide->getFPExponentWidth();
   unsigned WS = Wide->getWidth() - 1 - WE;
   SMTExprRef RNE = S.mkRM(RM::ROUND_TO_EVEN, Enc);
-  SMTExprRef Scaled = S.mkFPtoFP(Val, Wide, RNE); // exact: Wide covers Src
+  SMTExprRef Scaled = S.mkFPToFP(Val, Wide, RNE); // exact: Wide covers Src
   if (To.FracBits != 0)
     Scaled = S.mkFPMul(
         Scaled,
@@ -1556,7 +1556,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
   uint64_t MaxExp = uint64_t(std::max(From.Width, From.FracBits)) + 2;
   // The raw integer converts exactly (wide significand covers the raw
   // width), the 2^-FracBits scale is an exact power-of-two multiply
-  // inside the wide range, and the final mkFPtoFP performs the
+  // inside the wide range, and the final mkFPToFP performs the
   // conversion's only rounding, per R. When the target is native but no
   // universal native format holds the intermediate, the whole conversion
   // runs in the BV encoder — including the final rounding, into a
@@ -1578,7 +1578,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
   SMTExprRef Rm = mkRM(R, Enc);
   SMTExprRef Raw = mkFXPToRawBV(Exp);
   SMTExprRef Val =
-      From.IsSigned ? mkSBVtoFP(Raw, Wide, Rm) : mkUBVtoFP(Raw, Wide, Rm);
+      From.IsSigned ? mkSBVToFP(Raw, Wide, Rm) : mkUBVToFP(Raw, Wide, Rm);
   if (From.FracBits != 0) {
     unsigned WE = Wide->getFPExponentWidth();
     unsigned WS = Wide->getWidth() - 1 - WE;
@@ -1588,7 +1588,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
                     Enc),
         Rm);
   }
-  SMTExprRef Res = mkFPtoFP(Val, RoundTo, Rm);
+  SMTExprRef Res = mkFPToFP(Val, RoundTo, Rm);
   if (RoundTo != To)
     Res = mkBVToIEEEFP(mkIEEEFPToBV(Res), To);
   return rewrapExprImpl(*Res, To, SMTExprKind::FXPToFP);
@@ -1607,8 +1607,8 @@ SMTExprRef SMTSolverImpl::mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
   // result is solver-chosen, matching C's UB; gate with
   // mkFPToFXPOverflow.
   FPFXPParts P = fpToFXPParts(*this, Exp, Target, Mode);
-  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(P.Scaled, Target.Width)
-                                   : mkFPtoUBV(P.Scaled, Target.Width);
+  SMTExprRef Raw = Target.IsSigned ? mkFPToSBV(P.Scaled, Target.Width)
+                                   : mkFPToUBV(P.Scaled, Target.Width);
   return rewrapExprImpl(*Raw, To, SMTExprKind::FPToFXP);
 }
 
@@ -1630,8 +1630,8 @@ SMTExprRef SMTSolverImpl::mkFPToFXPSat(const SMTExprRef &Exp,
   FXPFormat Target = formatOf(To);
   FPFXPParts P = fpToFXPParts(*this, Exp, Target, Mode);
   // P.Scaled is already rounded per Mode, so the conversion is exact.
-  SMTExprRef Raw = Target.IsSigned ? mkFPtoSBV(P.Scaled, Target.Width)
-                                   : mkFPtoUBV(P.Scaled, Target.Width);
+  SMTExprRef Raw = Target.IsSigned ? mkFPToSBV(P.Scaled, Target.Width)
+                                   : mkFPToUBV(P.Scaled, Target.Width);
   // NaN -> 0 (Clang's _Sat choice; the TR leaves it undefined), rails for
   // out-of-range and +-infinity, rounded per Mode otherwise. NaN first:
   // it fails both comparisons, so TooHi and TooLo both hold for it.

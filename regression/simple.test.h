@@ -20,7 +20,7 @@ inline void equal_ten(const camada::SMTSolverRef &solver) {
   solver->addConstraint(eq);
 
   // And check for satisfiability
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto f_res = solver->getBV(f);
   REQUIRE(f_res);
@@ -51,7 +51,7 @@ inline void fp_equal(const camada::SMTSolverRef &solver,
   solver->addConstraint(eqx);
 
   // And check for satisfiability
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto fx_res = solver->getFP32(fx);
   auto fy_res = solver->getFP64(fy);
   REQUIRE(fx_res);
@@ -66,7 +66,7 @@ inline void implies_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(f1->getKind() == camada::SMTExprKind::BoolConst);
   REQUIRE(implication->getKind() == camada::SMTExprKind::Implies);
   solver->addConstraint(solver->mkNot(implication));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
@@ -77,21 +77,21 @@ inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
   auto implication = solver->mkImplies(t, f);
   REQUIRE(implication->getKind() == camada::SMTExprKind::Implies);
   solver->addConstraint(implication);
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   if (!solver->setTimeout(150)) {
     // Backends without enforceable limits must report so and stay usable.
     solver->addConstraint(solver->mkBool(true));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
     return;
   }
 
   // A generous limit must not affect an easy query.
   auto x = solver->mkSymbol("x", solver->mkBVSort(8));
   solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(7, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Factoring a 64-bit semiprime exactly (the 128-bit extension rules out
   // wrap-around shortcuts) is far beyond a 150ms budget on every backend,
@@ -103,16 +103,16 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
     auto b = solver->mkSymbol("b", solver->mkBVSort(64));
     constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
     auto prod =
-        solver->mkBVMul(solver->mkBVZeroExt(64, a), solver->mkBVZeroExt(64, b));
+        solver->mkBVMul(solver->mkBVZeroExt(a, 64), solver->mkBVZeroExt(b, 64));
     auto k = solver->mkBVZeroExt(
-        64, solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64));
+        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
     solver->addConstraint(solver->mkEqual(prod, k));
     auto one = solver->mkBVFromDec(1, 64);
     solver->addConstraint(solver->mkBVUgt(a, one));
     solver->addConstraint(solver->mkBVUgt(b, one));
   };
   assertSemiprimeFactoring();
-  REQUIRE(solver->check() == camada::checkResult::UNKNOWN);
+  REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
 
   // The limit applies to assumption-based checks too. Rebuild the problem
   // from scratch first: an incremental solver resumes the interrupted
@@ -121,7 +121,7 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   // bitwuzla), turning this deterministic UNKNOWN into a flaky SAT.
   assertSemiprimeFactoring();
   auto t = solver->mkSymbol("t", solver->mkBoolSort());
-  REQUIRE(solver->checkSatAssuming({t}) == camada::checkResult::UNKNOWN);
+  REQUIRE(solver->checkSatAssuming({t}) == camada::CheckResult::UNKNOWN);
 
   // Clearing the limit must work from the just-timed-out state.
   REQUIRE(solver->setTimeout(0));
@@ -132,14 +132,14 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   // and answer instantly from the poisoned state instead of UNSAT.
   solver->push();
   solver->addConstraint(solver->mkBool(false));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   solver->pop();
 
   // Normal solving works again after the limit is cleared.
   solver->reset();
   auto y = solver->mkSymbol("y", solver->mkBVSort(8));
   solver->addConstraint(solver->mkEqual(y, solver->mkBVFromDec(9, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
@@ -150,7 +150,7 @@ inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
   // Assuming both false contradicts (or a b).
   const std::vector<camada::SMTExprRef> negBoth = {solver->mkNot(a),
                                                    solver->mkNot(b)};
-  REQUIRE(solver->checkSatAssuming(negBoth) == camada::checkResult::UNSAT);
+  REQUIRE(solver->checkSatAssuming(negBoth) == camada::CheckResult::UNSAT);
 
   auto core = solver->getUnsatAssumptions();
   if (core) {
@@ -158,7 +158,7 @@ inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
     // re-checking under only the returned assumptions stays UNSAT.
     REQUIRE(!core.value().empty());
     REQUIRE(solver->checkSatAssuming(core.value()) ==
-            camada::checkResult::UNSAT);
+            camada::CheckResult::UNSAT);
   } else {
     REQUIRE(core.error().Code == camada::SMTErrorCode::UnsupportedOperation);
   }
@@ -166,11 +166,11 @@ inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
   // A compound (non-literal) assumption must work too — backends whose
   // native API only accepts literals lower it through activation literals.
   REQUIRE(solver->checkSatAssuming({solver->mkNot(solver->mkOr(a, b))}) ==
-          camada::checkResult::UNSAT);
+          camada::CheckResult::UNSAT);
 
   // Assumptions are per-query: they do not persist into later checks.
-  REQUIRE(solver->checkSatAssuming({a}) == camada::checkResult::SAT);
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->checkSatAssuming({a}) == camada::CheckResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // After a check that was not an UNSAT checkSatAssuming, the unsat
   // assumptions are stale and querying them is an error.
@@ -178,13 +178,13 @@ inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
 
   // Mutating the solver state after an UNSAT checkSatAssuming also
   // invalidates the unsat assumptions.
-  REQUIRE(solver->checkSatAssuming(negBoth) == camada::checkResult::UNSAT);
+  REQUIRE(solver->checkSatAssuming(negBoth) == camada::CheckResult::UNSAT);
   solver->push();
   REQUIRE(!solver->getUnsatAssumptions());
   solver->pop();
 
   // An empty assumption set degenerates to a plain check.
-  REQUIRE(solver->checkSatAssuming({}) == camada::checkResult::SAT);
+  REQUIRE(solver->checkSatAssuming({}) == camada::CheckResult::SAT);
 }
 
 // Extending by zero bits is a no-op, not an error: callers compute the
@@ -192,13 +192,13 @@ inline void check_sat_assuming_semantics(const camada::SMTSolverRef &solver) {
 // backend used to build a zero-width constant here and abort.
 inline void bv_extend_by_zero_semantics(const camada::SMTSolverRef &solver) {
   auto v = solver->mkBVFromBin("1010", 4);
-  auto z = solver->mkBVZeroExt(0, v);
-  auto s = solver->mkBVSignExt(0, v);
+  auto z = solver->mkBVZeroExt(v, 0);
+  auto s = solver->mkBVSignExt(v, 0);
   REQUIRE(z->getWidth() == 4);
   REQUIRE(s->getWidth() == 4);
   solver->addConstraint(
       solver->mkAnd(solver->mkEqual(z, v), solver->mkEqual(s, v)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // bvsrem takes the sign of the DIVIDEND and bvsdiv truncates toward zero
@@ -219,7 +219,7 @@ inline void bv_signed_div_rem_semantics(const camada::SMTSolverRef &solver) {
                  solver->mkEqual(solver->mkBVSDiv(d(C.A), d(C.B)), d(C.SDiv)),
                  solver->mkEqual(solver->mkBVSRem(d(C.A), d(C.B)), d(C.SRem))));
   solver->addConstraint(All);
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
@@ -232,7 +232,7 @@ inline void bv_lshr_semantics(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(
       solver->mkEqual(result, solver->mkBVFromBin("0100", 4)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Prove each overflow predicate equivalent to an independent reference
@@ -252,7 +252,7 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
                                   const camada::SMTExprRef &Ref) {
       INFO("width " << W << " " << Name);
       solver->addConstraint(solver->mkNot(solver->mkEqual(P, Ref)));
-      REQUIRE(solver->check() == camada::checkResult::UNSAT);
+      REQUIRE(solver->check() == camada::CheckResult::UNSAT);
       solver->reset();
     };
     const auto symbols = [&]() {
@@ -275,21 +275,21 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
     {
       auto [x, y] = symbols();
       auto Exact =
-          solver->mkBVAdd(solver->mkBVSignExt(1, x), solver->mkBVSignExt(1, y));
+          solver->mkBVAdd(solver->mkBVSignExt(x, 1), solver->mkBVSignExt(y, 1));
       requireEquiv("saddo", solver->mkBVSAddOverflow(x, y),
                    signedOutOfRange(Exact, W + 1));
     }
     {
       auto [x, y] = symbols();
       auto Exact =
-          solver->mkBVAdd(solver->mkBVZeroExt(1, x), solver->mkBVZeroExt(1, y));
+          solver->mkBVAdd(solver->mkBVZeroExt(x, 1), solver->mkBVZeroExt(y, 1));
       requireEquiv("uaddo", solver->mkBVUAddOverflow(x, y),
                    unsignedOutOfRange(Exact, W + 1));
     }
     {
       auto [x, y] = symbols();
       auto Exact =
-          solver->mkBVSub(solver->mkBVSignExt(1, x), solver->mkBVSignExt(1, y));
+          solver->mkBVSub(solver->mkBVSignExt(x, 1), solver->mkBVSignExt(y, 1));
       requireEquiv("ssubo", solver->mkBVSSubOverflow(x, y),
                    signedOutOfRange(Exact, W + 1));
     }
@@ -298,7 +298,7 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
       // iff the subtraction borrows.
       auto [x, y] = symbols();
       auto Exact =
-          solver->mkBVSub(solver->mkBVZeroExt(1, x), solver->mkBVZeroExt(1, y));
+          solver->mkBVSub(solver->mkBVZeroExt(x, 1), solver->mkBVZeroExt(y, 1));
       requireEquiv("usubo", solver->mkBVUSubOverflow(x, y),
                    solver->mkEqual(solver->mkBVExtract(W, W, Exact),
                                    solver->mkBVFromDec(1, 1)));
@@ -306,14 +306,14 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
     {
       auto [x, y] = symbols();
       auto Exact =
-          solver->mkBVMul(solver->mkBVSignExt(W, x), solver->mkBVSignExt(W, y));
+          solver->mkBVMul(solver->mkBVSignExt(x, W), solver->mkBVSignExt(y, W));
       requireEquiv("smulo", solver->mkBVSMulOverflow(x, y),
                    signedOutOfRange(Exact, 2 * W));
     }
     {
       auto [x, y] = symbols();
       auto Exact =
-          solver->mkBVMul(solver->mkBVZeroExt(W, x), solver->mkBVZeroExt(W, y));
+          solver->mkBVMul(solver->mkBVZeroExt(x, W), solver->mkBVZeroExt(y, W));
       requireEquiv("umulo", solver->mkBVUMulOverflow(x, y),
                    unsignedOutOfRange(Exact, 2 * W));
     }
@@ -323,8 +323,8 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
       // it is never an overflow, but SMT-LIB defines bvsdiv(x<0, 0) = +1,
       // which falls outside [SMin, SMax] when W == 1.
       auto [x, y] = symbols();
-      auto Exact = solver->mkBVSDiv(solver->mkBVSignExt(1, x),
-                                    solver->mkBVSignExt(1, y));
+      auto Exact = solver->mkBVSDiv(solver->mkBVSignExt(x, 1),
+                                    solver->mkBVSignExt(y, 1));
       auto NonZeroY =
           solver->mkNot(solver->mkEqual(y, solver->mkBVFromDec(0, W)));
       requireEquiv("sdivo", solver->mkBVSDivOverflow(x, y),
@@ -332,7 +332,7 @@ inline void bv_overflow_semantics(const camada::SMTSolverRef &solver) {
     }
     {
       auto x = solver->mkSymbol("ovf_x", solver->mkBVSort(W));
-      auto Exact = solver->mkBVNeg(solver->mkBVSignExt(1, x));
+      auto Exact = solver->mkBVNeg(solver->mkBVSignExt(x, 1));
       requireEquiv("nego", solver->mkBVNegOverflow(x),
                    signedOutOfRange(Exact, W + 1));
     }
@@ -346,7 +346,7 @@ inline void narrow_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
   auto bv32 = solver->mkBVSort(32);
   auto x = solver->mkSymbol("x", bv32);
   solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(-42, bv32)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto bin = solver->getBVInBin(x);
   REQUIRE(bin);
@@ -357,7 +357,7 @@ inline void narrow_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
   auto bv3 = solver->mkBVSort(3);
   auto y = solver->mkSymbol("y", bv3);
   solver->addConstraint(solver->mkEqual(y, solver->mkBVFromDec(-1, bv3)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto bin3 = solver->getBVInBin(y);
   REQUIRE(bin3);
@@ -373,7 +373,7 @@ inline void wide_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
   auto bv128 = solver->mkBVSort(128);
   auto x = solver->mkSymbol("x", bv128);
   solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(42, bv128)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto bin = solver->getBVInBin(x);
   REQUIRE(bin);
@@ -389,14 +389,14 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   auto two = solver->mkBVFromDec(2, 8);
 
   solver->addConstraint(solver->mkEqual(x, one));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   solver->push();
   solver->addConstraint(solver->mkEqual(x, two));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   solver->pop();
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto x_res = solver->getBV(x);
   REQUIRE(x_res);
   REQUIRE(x_res.value() == 1);
@@ -427,7 +427,7 @@ inline void symbol_cache_survives_push_pop(const camada::SMTSolverRef &solver) {
   // Confirm the cached symbol still participates in solving correctly after
   // the pop discarded the in-scope assertion.
   solver->addConstraint(solver->mkEqual(x_after, solver->mkBVFromDec(7, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto v = solver->getBV(x_before);
   REQUIRE(v);
   REQUIRE(v.value() == 7);
@@ -469,19 +469,19 @@ static_assert(sizeof(camada::SMTSortRef) == (CAMADA_CHECKED_HANDLES ? 24 : 8),
 inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   auto x = solver->mkSymbol("x", solver->mkBVSort(4));
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, x)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   solver->reset();
   x = solver->mkSymbol("x", solver->mkBVSort(4));
   auto three = solver->mkBVFromDec(3, 4);
   solver->addConstraint(solver->mkExists({x}, solver->mkEqual(x, three)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   solver->reset();
   x = solver->mkSymbol("x", solver->mkBVSort(4));
   three = solver->mkBVFromDec(3, 4);
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, three)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void uf_semantics(const camada::SMTSolverRef &solver) {
@@ -498,7 +498,7 @@ inline void uf_semantics(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkEqual(x, y));
   solver->addConstraint(solver->mkNot(solver->mkEqual(fx, fy)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void dump_string_semantics(const camada::SMTSolverRef &solver) {
@@ -506,7 +506,7 @@ inline void dump_string_semantics(const camada::SMTSolverRef &solver) {
   auto x = solver->mkSymbol("x", bv8);
   auto five = solver->mkBVFromDec(5, 8);
   solver->addConstraint(solver->mkEqual(x, five));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   std::string sort_dump = "seed";
   bv8->dump(sort_dump);
@@ -537,7 +537,7 @@ inline void dump_string_semantics(const camada::SMTSolverRef &solver) {
       "dmt", solver->mkTupleSort({solver->mkBVSort(8), solver->mkBoolSort()}));
   solver->addConstraint(solver->mkEqual(solver->mkTupleSelect(tup, 0),
                                         solver->mkBVFromDec(7, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   std::string tuple_model_dump = "seed";
   solver->dumpModel(tuple_model_dump);
   REQUIRE(tuple_model_dump != "seed");
@@ -555,7 +555,7 @@ inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkEqual(x_plus_one, three));
   solver->addConstraint(solver->mkArithGt(x, two));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   solver->reset();
   int_sort = solver->mkIntSort();
@@ -566,7 +566,7 @@ inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   x_plus_one = solver->mkArithAdd(x, one);
   solver->addConstraint(solver->mkEqual(x_plus_one, three));
   solver->addConstraint(solver->mkArithGt(x, one));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 inline void real_arithmetic_semantics(const camada::SMTSolverRef &solver) {
@@ -581,7 +581,7 @@ inline void real_arithmetic_semantics(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkEqual(r_plus_one, three));
   solver->addConstraint(solver->mkArithGt(r, one));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   solver->reset();
   real_sort = solver->mkRealSort();
@@ -593,7 +593,7 @@ inline void real_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   (void)three;
   solver->addConstraint(solver->mkEqual(r, one));
   solver->addConstraint(solver->mkArithLt(r, one));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void arith_model_queries(const camada::SMTSolverRef &solver) {
@@ -607,7 +607,7 @@ inline void arith_model_queries(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkEqual(x, solver->mkInt(5)));
   solver->addConstraint(solver->mkEqual(r, solver->mkReal(3, 2)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto x_res = solver->getInt(x);
   auto x_plus_two_res = solver->getInt(x_plus_two);
@@ -640,15 +640,15 @@ inline void arith_model_queries(const camada::SMTSolverRef &solver) {
 inline void int_bv_conversion_semantics(const camada::SMTSolverRef &solver) {
   // int2bv wraps modulo 2^w: 300 -> 44 at 8 bits, -1 -> 0xFF.
   {
-    auto bv = solver->mkInt2BV(8, solver->mkInt(300));
+    auto bv = solver->mkInt2BV(solver->mkInt(300), 8);
     solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(44, 8)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
   solver->reset();
   {
-    auto bv = solver->mkInt2BV(8, solver->mkInt(-1));
+    auto bv = solver->mkInt2BV(solver->mkInt(-1), 8);
     solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(255, 8)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // bv2int on 0xFF: 255 unsigned, -1 signed.
@@ -659,7 +659,7 @@ inline void int_bv_conversion_semantics(const camada::SMTSolverRef &solver) {
         solver->mkEqual(solver->mkBV2Int(bv, false), solver->mkInt(255)));
     solver->addConstraint(
         solver->mkEqual(solver->mkBV2Int(bv, true), solver->mkInt(-1)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Signed round trip is the identity on every in-range integer. The
@@ -672,18 +672,18 @@ inline void int_bv_conversion_semantics(const camada::SMTSolverRef &solver) {
     auto x = solver->mkSymbol("i2b_x", solver->mkIntSort());
     solver->addConstraint(solver->mkArithGe(x, solver->mkInt(-8)));
     solver->addConstraint(solver->mkArithLe(x, solver->mkInt(7)));
-    auto rt = solver->mkBV2Int(solver->mkInt2BV(4, x), true);
+    auto rt = solver->mkBV2Int(solver->mkInt2BV(x, 4), true);
     solver->addConstraint(solver->mkNot(solver->mkEqual(rt, x)));
-    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 
   // ... and the other way: int2bv(bv2int_u(y)) == y for every bit-vector.
   solver->reset();
   {
     auto y = solver->mkSymbol("i2b_y", solver->mkBVSort(4));
-    auto rt = solver->mkInt2BV(4, solver->mkBV2Int(y, false));
+    auto rt = solver->mkInt2BV(solver->mkBV2Int(y, false), 4);
     solver->addConstraint(solver->mkNot(solver->mkEqual(rt, y)));
-    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 
   // The use case the bridge exists for: bitwise AND on integers
@@ -691,11 +691,11 @@ inline void int_bv_conversion_semantics(const camada::SMTSolverRef &solver) {
   solver->reset();
   {
     auto r = solver->mkBV2Int(
-        solver->mkBVAnd(solver->mkInt2BV(8, solver->mkInt(12)),
-                        solver->mkInt2BV(8, solver->mkInt(10))),
+        solver->mkBVAnd(solver->mkInt2BV(solver->mkInt(12), 8),
+                        solver->mkInt2BV(solver->mkInt(10), 8)),
         true);
     solver->addConstraint(solver->mkEqual(r, solver->mkInt(8)));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Signed composition: ~x == -x-1 must hold for all in-range x when
@@ -705,11 +705,11 @@ inline void int_bv_conversion_semantics(const camada::SMTSolverRef &solver) {
     auto x = solver->mkSymbol("i2b_x", solver->mkIntSort());
     solver->addConstraint(solver->mkArithGe(x, solver->mkInt(-8)));
     solver->addConstraint(solver->mkArithLe(x, solver->mkInt(7)));
-    auto NotX = solver->mkBV2Int(solver->mkBVNot(solver->mkInt2BV(4, x)), true);
+    auto NotX = solver->mkBV2Int(solver->mkBVNot(solver->mkInt2BV(x, 4)), true);
     auto MinusXMinusOne =
         solver->mkArithSub(solver->mkArithNeg(x), solver->mkInt(1));
     solver->addConstraint(solver->mkNot(solver->mkEqual(NotX, MinusXMinusOne)));
-    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 }
 
@@ -741,7 +741,7 @@ inline void arith_conversion_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(x_real_is_int);
   solver->addConstraint(solver->mkEqual(mod_expr, solver->mkInt("2")));
   solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 inline void arith_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
@@ -755,7 +755,7 @@ inline void arith_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(x, solver->mkInt("5")));
   solver->addConstraint(solver->mkEqual(k, solver->mkInt("3")));
   solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 inline void arena_stress_test(const camada::SMTSolverRef &solver) {
@@ -771,7 +771,7 @@ inline void arena_stress_test(const camada::SMTSolverRef &solver) {
   }
 
   solver->addConstraint(solver->mkEqual(acc, acc));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   solver->reset();
 
@@ -784,7 +784,7 @@ inline void arena_stress_test(const camada::SMTSolverRef &solver) {
   }
 
   solver->addConstraint(solver->mkEqual(expr, expr));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Model query over a term with a shared subterm. On the SMT-LIB backend the
@@ -796,7 +796,7 @@ inline void shared_subterm_model_value(const camada::SMTSolverRef &solver) {
   auto sum = solver->mkBVAdd(x, x);
   auto prod = solver->mkBVMul(sum, sum);
   solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(3, bv8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto val = solver->getBV(prod);
   REQUIRE(val);

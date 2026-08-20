@@ -30,7 +30,7 @@ array(const camada::SMTSolverRef &solver,
 
   // Add the constraint to the solver, And check for satisfiability
   solver->addConstraint(eq);
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto selected = solver->getArrayElement(arr11, solver->mkBVFromDec(1, 2));
   REQUIRE(selected->Sort == elemsort);
   auto selected_res = solver->getBVInBin(selected);
@@ -57,7 +57,7 @@ inline void array_const_store_semantics(
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(updated, idx_other), init));
 
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto read_written = solver->getArrayElement(updated, idx_written);
   auto read_other = solver->getArrayElement(updated, idx_other);
@@ -96,7 +96,7 @@ inline void bool_array_const_store_semantics(
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(updated, idx_other), init));
 
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto read_written = solver->getArrayElement(updated, idx_written);
   auto read_other = solver->getArrayElement(updated, idx_other);
@@ -135,7 +135,7 @@ inline void array_const_survives_push_pop(
     auto sample_idx = solver->mkBVFromDec(3, idx);
     solver->addConstraint(
         solver->mkEqual(solver->mkArraySelect(a, sample_idx), fill));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
   // Reset and re-establish every handle from scratch — handles created
@@ -156,7 +156,7 @@ inline void array_const_survives_push_pop(
     // confirms the const-array binding is still in force after the pop.
     solver->addConstraint(solver->mkNot(
         solver->mkEqual(solver->mkArraySelect(a, sample_idx), fill)));
-    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 }
 
@@ -184,7 +184,7 @@ inline void wide_index_const_array_semantics(
     auto x = solver->mkArraySelect(updated, i);
     solver->addConstraint(solver->mkNot(solver->mkEqual(x, init)));
     solver->addConstraint(solver->mkNot(solver->mkEqual(x, stored)));
-    REQUIRE(solver->check() == camada::checkResult::UNSAT);
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 
   solver->reset();
@@ -202,7 +202,7 @@ inline void wide_index_const_array_semantics(
 
     solver->addConstraint(
         solver->mkEqual(solver->mkArraySelect(updated, idx_written), stored));
-    REQUIRE(solver->check() == camada::checkResult::SAT);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
 
     // The model query at an index the formula never touched must still
     // report the default, resolved from the tracked derivation chain.
@@ -238,7 +238,7 @@ inline void const_array_select_survives_pop(
 
   // The handle outlives the pop; the default must still bind it.
   solver->addConstraint(solver->mkNot(solver->mkEqual(sel, init)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // The lowerings interoperate: lazily and natively (or Auto-) lowered
@@ -272,7 +272,7 @@ inline void array_model_values(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkArraySelect(arr, idx(1)), idx(10)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(arr, idx(2)), idx(20)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto Model = solver->getArrayValues(arr);
   if (!Model) {
@@ -294,7 +294,7 @@ inline void const_array_model_values(
   // Touch the array so every backend has it in the formula.
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(arr, idx(0)), idx(7)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   auto Model = solver->getArrayValues(arr);
   if (!Model) {
@@ -332,7 +332,7 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkArraySelect(a, idx(0)), idx(1)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(b, idx(0)), idx(2)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Same, with the selects observed BEFORE the equality is built — pins
   // the replay of already-observed indexes.
@@ -343,13 +343,13 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(d, idx(0)), idx(2)));
   solver->addConstraint(solver->mkEqual(c, d));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Negative direction stays satisfiable: a difference can be exhibited.
   solver->reset();
   auto [e, f] = mk("e", "f");
   solver->addConstraint(solver->mkNot(solver->mkEqual(e, f)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Agreeing constraints under asserted equality are satisfiable.
   solver->reset();
@@ -359,7 +359,7 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkArraySelect(g, idx(0)), idx(5)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(h, idx(0)), idx(5)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Equality must be visible through store-derived terms: reading
   // store(a, j, v) at i != j reads a at i.
@@ -370,7 +370,7 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
   auto qs = solver->mkArrayStore(q, idx(1), idx(42));
   solver->addConstraint(solver->mkNot(solver->mkEqual(
       solver->mkArraySelect(ps, idx(0)), solver->mkArraySelect(qs, idx(0)))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // ... and through ite-derived terms.
   solver->reset();
@@ -382,7 +382,7 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkNot(
       solver->mkEqual(solver->mkArraySelect(i1, solver->mkBVFromDec(0, 8)),
                       solver->mkArraySelect(i2, solver->mkBVFromDec(0, 8)))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Transitive chains close through observed-index congruence.
   solver->reset();
@@ -394,7 +394,7 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkArraySelect(t, idx(0)), idx(1)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(v, idx(0)), idx(2)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Polarity safety: the equality literal used under boolean structure.
   solver->reset();
@@ -407,7 +407,7 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkArraySelect(w, idx(0)), idx(1)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(x, idx(0)), idx(2)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Equality between an array symbol and a constant array — ESBMC's
@@ -428,7 +428,7 @@ inline void const_array_equality_semantics(
       solver->mkEqual(a, solver->mkArrayConst(indexsort, idx(7), Lowering)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(a, idx(3)), idx(7)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // reset() invalidates every handle; rebuild the sorts for the
   // contradiction direction.
@@ -440,7 +440,7 @@ inline void const_array_equality_semantics(
       solver->mkEqual(b, solver->mkArrayConst(indexsort, idx(7), Lowering)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(b, idx(3)), idx(9)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Derived-before-equality: a store built over the symbol BEFORE the
   // constant-array equality exists must still see the default at indexes
@@ -454,7 +454,7 @@ inline void const_array_equality_semantics(
       solver->mkEqual(c, solver->mkArrayConst(indexsort, idx(7), Lowering)));
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(cs, idx(3)), idx(9)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // A symbol array equated to one lazy const array, then disequated from a
@@ -478,7 +478,7 @@ inline void lazy_array_transitive_equality(
   solver->addConstraint(
       solver->mkEqual(c, solver->mkArrayConst(bv8, idx(9), Lowering)));
   solver->addConstraint(solver->mkNot(solver->mkEqual(b, c)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // But B's value is still pinned: reading B at any index must be 7, even
   // though B != C let the solver pick a witness where B and C differ.
@@ -495,7 +495,7 @@ inline void lazy_array_transitive_equality(
   auto m = solver->mkSymbol("lat_m", bv8);
   solver->addConstraint(
       solver->mkNot(solver->mkEqual(solver->mkArraySelect(b2, m), idx(7))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Regression for the reverted #103: cross-equality congruence at a
@@ -515,7 +515,7 @@ array_equality_witness_congruence(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(a, b));
   solver->addConstraint(solver->mkEqual(a, c));
   solver->addConstraint(solver->mkNot(solver->mkEqual(b, c)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Regression for the reverted #103: a lazy root reached only through an
@@ -535,7 +535,7 @@ inline void lazy_array_equality_reached_defaults(
   auto b = solver->mkSymbol("erd_b", solver->mkArraySort(bv8, bv8));
   solver->addConstraint(solver->mkEqual(a, b));
   solver->addConstraint(solver->mkNot(solver->mkEqual(b, c)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Constant array whose initializer is itself a constant array —
@@ -561,7 +561,7 @@ inline void nested_const_array_semantics(
   auto j = solver->mkSymbol("j", bv8);
   auto deep = solver->mkArraySelect(solver->mkArraySelect(outer, i), j);
   solver->addConstraint(solver->mkNot(solver->mkEqual(deep, idx(7))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Store into the inner array at a concrete index, read elsewhere: the
   // written cell holds the stored value, every other cell the default.
@@ -575,7 +575,7 @@ inline void nested_const_array_semantics(
       solver->mkEqual(solver->mkArraySelect(innerStored, idx(2)), idx(99)),
       solver->mkEqual(solver->mkArraySelect(innerStored, k), idx(7)));
   solver->addConstraint(solver->mkNot(ok));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Negative direction must stay satisfiable: a deep read equal to a
   // value different from the default is impossible, but equal to the
@@ -588,7 +588,7 @@ inline void nested_const_array_semantics(
   j = solver->mkSymbol("j2", bv8);
   deep = solver->mkArraySelect(solver->mkArraySelect(outer, i), j);
   solver->addConstraint(solver->mkEqual(deep, idx(7)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   solver->reset();
   bv8 = solver->mkBVSort(8);
   inner = solver->mkArrayConst(bv8, idx(7), Lowering);
@@ -597,7 +597,7 @@ inline void nested_const_array_semantics(
   j = solver->mkSymbol("j3", bv8);
   deep = solver->mkArraySelect(solver->mkArraySelect(outer, i), j);
   solver->addConstraint(solver->mkEqual(deep, idx(8))); // != default 7
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Equality propagation: two equal nested const arrays agree on a deep
   // read even when one side was derived before the equality.
@@ -613,7 +613,7 @@ inline void nested_const_array_semantics(
       a, solver->mkArrayConst(bv8, solver->mkArrayConst(bv8, idx(5), Lowering),
                               Lowering)));
   solver->addConstraint(solver->mkNot(solver->mkEqual(aDeep, idx(5))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Model round-trip: getArrayElement on the outer returns an inner
   // array whose deep read matches the default.
@@ -625,7 +625,7 @@ inline void nested_const_array_semantics(
   solver->addConstraint(solver->mkEqual(
       solver->mkArraySelect(solver->mkArraySelect(outer, idx(0)), idx(0)),
       idx(7)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto innerModel = solver->getArrayElement(outer, idx(1));
   REQUIRE(innerModel->Sort == solver->mkArraySort(bv8, bv8));
   auto cell = solver->getBV(solver->getArrayElement(innerModel, idx(3)));
@@ -645,7 +645,7 @@ inline void nested_const_array_semantics(
   auto n2 = solver->mkSymbol("n2", innerSort);
   solver->addConstraint(solver->mkNot(solver->mkEqual(m1, n1)));
   solver->addConstraint(solver->mkNot(solver->mkEqual(m2, n2)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Adversarial negative direction with a lazy const array: a difference
   // claimed against the default must be a real one. select(outer,i) is the
@@ -665,7 +665,7 @@ inline void nested_const_array_semantics(
   auto j5 = solver->mkSymbol("j5", bv8);
   solver->addConstraint(
       solver->mkNot(solver->mkEqual(solver->mkArraySelect(sym, j5), idx(7))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // nested_const_array_semantics inside a pushed scope: the deep default
@@ -685,7 +685,7 @@ inline void nested_const_array_survives_pop(
   solver->pop();
 
   solver->addConstraint(solver->mkNot(solver->mkEqual(deep, idx(7))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void const_array_lowering_interop(const camada::SMTSolverRef &solver) {
@@ -704,5 +704,5 @@ inline void const_array_lowering_interop(const camada::SMTSolverRef &solver) {
   auto sum = solver->mkBVAdd(solver->mkArraySelect(lazy, i),
                              solver->mkArraySelect(other, i));
   solver->addConstraint(solver->mkNot(solver->mkEqual(sum, one)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }

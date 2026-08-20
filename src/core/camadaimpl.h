@@ -544,12 +544,14 @@ public:
   SMTExprRef mkInt2Real(const SMTExprRef &Exp) override final;
   SMTExprRef mkReal2Int(const SMTExprRef &Exp) override final;
   SMTExprRef mkIsInt(const SMTExprRef &Exp) override final;
-  SMTExprRef mkInt2BV(unsigned Width, const SMTExprRef &Exp) override final;
+  SMTExprRef mkInt2BV(const SMTExprRef &Exp, unsigned Width) override final;
   SMTExprRef mkBV2Int(const SMTExprRef &Exp, bool IsSigned) override final;
   SMTExprRef mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
                    const SMTExprRef &F) override final;
-  SMTExprRef mkBVSignExt(unsigned i, const SMTExprRef &Exp) override final;
-  SMTExprRef mkBVZeroExt(unsigned i, const SMTExprRef &Exp) override final;
+  SMTExprRef mkBVSignExt(const SMTExprRef &Exp,
+                         unsigned ExtraBits) override final;
+  SMTExprRef mkBVZeroExt(const SMTExprRef &Exp,
+                         unsigned ExtraBits) override final;
   SMTExprRef mkBVExtract(unsigned High, unsigned Low,
                          const SMTExprRef &Exp) override final;
   SMTExprRef mkBVConcat(const SMTExprRef &LHS,
@@ -563,7 +565,7 @@ public:
   SMTExprRef mkFPIsInfinite(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPIsNaN(const SMTExprRef &Exp) override final;
 
-  SMTExprRef mkFPIsDenormal(const SMTExprRef &Exp) override final;
+  SMTExprRef mkFPIsSubnormal(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPIsNormal(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPIsZero(const SMTExprRef &Exp) override final;
   SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -590,15 +592,15 @@ public:
                     const SMTExprRef &RHS) override final;
   SMTExprRef mkFPEqual(const SMTExprRef &LHS,
                        const SMTExprRef &RHS) override final;
-  SMTExprRef mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkFPToFP(const SMTExprRef &From, const SMTSortRef &To,
                       const SMTExprRef &R) override final;
-  SMTExprRef mkSBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkSBVToFP(const SMTExprRef &From, const SMTSortRef &To,
                        const SMTExprRef &R) override final;
-  SMTExprRef mkUBVtoFP(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkUBVToFP(const SMTExprRef &From, const SMTSortRef &To,
                        const SMTExprRef &R) override final;
-  SMTExprRef mkFPtoSBV(const SMTExprRef &From, unsigned ToWidth) override final;
-  SMTExprRef mkFPtoUBV(const SMTExprRef &From, unsigned ToWidth) override final;
-  SMTExprRef mkFPtoIntegral(const SMTExprRef &From,
+  SMTExprRef mkFPToSBV(const SMTExprRef &From, unsigned ToWidth) override final;
+  SMTExprRef mkFPToUBV(const SMTExprRef &From, unsigned ToWidth) override final;
+  SMTExprRef mkFPToIntegral(const SMTExprRef &From,
                             const SMTExprRef &R) override final;
   // Fixed-point operations (all implemented once, in camadafxp.cpp, on top
   // of the public BV surface — no backend hooks).
@@ -753,10 +755,10 @@ public:
   SMTExprRef mkBVToIEEEFP(const SMTExprRef &Exp,
                           const SMTSortRef &To) override final;
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final;
-  checkResult check() override final;
+  CheckResult check() override final;
   bool setTimeout(uint64_t Milliseconds) override final;
 
-  checkResult
+  CheckResult
   checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) override final;
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptions() override final;
 
@@ -1024,7 +1026,7 @@ protected:
   /// Int -> BV conversion. The default lowers through a fresh BV symbol
   /// constrained via mkBV2IntImpl (no portable SMT-LIB operator exists);
   /// backends with a native conversion (Z3, cvc5, MathSAT) override.
-  virtual SMTExprRef mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp);
+  virtual SMTExprRef mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width);
 
   /// BV -> Int conversion. The default composes the value as a sum of
   /// bit-tests, which works on any backend with both theories.
@@ -1036,9 +1038,11 @@ protected:
   virtual SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                const SMTExprRef &F) = 0;
 
-  virtual SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) = 0;
+  virtual SMTExprRef mkBVSignExtImpl(const SMTExprRef &Exp,
+                                     unsigned ExtraBits) = 0;
 
-  virtual SMTExprRef mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) = 0;
+  virtual SMTExprRef mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                     unsigned ExtraBits) = 0;
 
   virtual SMTExprRef mkBVExtractImpl(unsigned High, unsigned Low,
                                      const SMTExprRef &Exp) = 0;
@@ -1058,7 +1062,7 @@ protected:
 
   virtual SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp);
 
-  virtual SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp);
+  virtual SMTExprRef mkFPIsSubnormalImpl(const SMTExprRef &Exp);
 
   virtual SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp);
 
@@ -1094,20 +1098,20 @@ protected:
   virtual SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
                                    const SMTExprRef &RHS);
 
-  virtual SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  virtual SMTExprRef mkFPToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                   const SMTExprRef &R);
 
-  virtual SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  virtual SMTExprRef mkSBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const SMTExprRef &R);
 
-  virtual SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  virtual SMTExprRef mkUBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const SMTExprRef &R);
 
-  virtual SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth);
+  virtual SMTExprRef mkFPToSBVImpl(const SMTExprRef &From, unsigned ToWidth);
 
-  virtual SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth);
+  virtual SMTExprRef mkFPToUBVImpl(const SMTExprRef &From, unsigned ToWidth);
 
-  virtual SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
+  virtual SMTExprRef mkFPToIntegralImpl(const SMTExprRef &From,
                                         const SMTExprRef &R);
 
   virtual SMTExprRef mkArraySelectImpl(const SMTExprRef &Array,
@@ -1217,7 +1221,7 @@ protected:
                            SMTExprRef &Sig, SMTExprRef &Exp, unsigned EWidth,
                            unsigned SWidth);
 
-  virtual checkResult checkImpl() = 0;
+  virtual CheckResult checkImpl() = 0;
 
   /// Apply a per-check wall-clock limit (milliseconds; 0 disables) to the
   /// backend. Returns false when the backend cannot enforce it — the
@@ -1230,7 +1234,7 @@ protected:
   /// push a scope, assert each assumption, check, pop. Goes through the
   /// public push/pop/addConstraint so the lazy constant-array journal
   /// stays consistent.
-  virtual checkResult
+  virtual CheckResult
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions);
 
   /// Only dispatched right after checkSatAssumingImpl returned UNSAT for a

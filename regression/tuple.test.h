@@ -28,7 +28,7 @@ inline void tuple_semantics(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkEqual(b, solver->mkBool(true)));
   solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(42, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto b_res = solver->getBool(b);
   auto bv_res = solver->getBV(bv);
   REQUIRE(b_res);
@@ -55,7 +55,7 @@ inline void tuple_semantics_with_int(const camada::SMTSolverRef &solver) {
   auto i = solver->mkTupleSelect(tupleSymbol, 2);
   REQUIRE(i->Sort == intSort);
   solver->addConstraint(solver->mkEqual(i, solver->mkInt(7)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Tuple whose second field is an array. Exercises the encoded path's
@@ -89,7 +89,7 @@ inline void tuple_with_array_field(const camada::SMTSolverRef &solver) {
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(arrField, idx), fortyTwo));
 
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto bv_res = solver->getBV(bvField);
   REQUIRE(bv_res);
   REQUIRE(bv_res.value() == 7);
@@ -123,7 +123,7 @@ inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
       solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(9, 8),
                        solver->mkBVFromDec(2, 8)});
   solver->addConstraint(solver->mkNot(solver->mkEqual(u, expected)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Symbol tuple: non-updated fields stay tied to the original symbol's
   // fields, and the updated field equals the new value.
@@ -140,7 +140,7 @@ inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
   auto updated =
       solver->mkEqual(solver->mkTupleSelect(v, 2), solver->mkBVFromDec(7, 8));
   solver->addConstraint(solver->mkNot(solver->mkAnd(preserved, updated)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Chained updates of the same field — ESBMC's pointer-arithmetic hot
   // pattern — collapse to the last value with the other fields preserved.
@@ -157,7 +157,7 @@ inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
                                solver->mkEqual(solver->mkTupleSelect(twice, 2),
                                                solver->mkTupleSelect(base, 2)));
   solver->addConstraint(solver->mkNot(chainOk));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Update of an ite-shaped tuple distributes through both branches.
   solver->reset();
@@ -176,7 +176,7 @@ inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
                       solver->mkIte(cond, solver->mkTupleSelect(ta, 2),
                                     solver->mkTupleSelect(tb, 2))));
   solver->addConstraint(solver->mkNot(iteOk));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Updating the scalar field of a tuple that carries an array field
   // composes with the verbatim array storage in the Camada lowering.
@@ -195,7 +195,7 @@ inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
                                        solver->mkBVFromDec(6, 8));
   solver->addConstraint(
       solver->mkNot(solver->mkAnd(arrPreserved, scalarUpdated)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Nested tuples: updating an inner tuple through an outer update.
   solver->reset();
@@ -218,7 +218,7 @@ inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkTupleSelect(newOuter, 0),
                       solver->mkTupleSelect(outer, 0)));
   solver->addConstraint(solver->mkNot(ok));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Model extraction through an update.
   solver->reset();
@@ -228,7 +228,7 @@ inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
   auto q = solver->mkTupleUpdate(p, 0, solver->mkBVFromDec(11, 8));
   solver->addConstraint(
       solver->mkEqual(solver->mkTupleSelect(p, 1), solver->mkBVFromDec(5, 8)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto f0 = solver->getBV(solver->mkTupleSelect(q, 0));
   REQUIRE(f0);
   REQUIRE(f0.value() == 11);
@@ -281,7 +281,7 @@ inline void tuple_array_semantics(const camada::SMTSolverRef &solver) {
   auto a1 = solver->mkArrayStore(a, idx(3), t);
   auto rd = solver->mkArraySelect(a1, idx(3));
   solver->addConstraint(solver->mkNot(solver->mkEqual(rd, t)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Reads at other indexes stay tied to the original array.
   solver->reset();
@@ -294,7 +294,7 @@ inline void tuple_array_semantics(const camada::SMTSolverRef &solver) {
   auto preserved = solver->mkEqual(solver->mkArraySelect(b1, idx(5)),
                                    solver->mkArraySelect(b, idx(5)));
   solver->addConstraint(solver->mkNot(preserved));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Homogeneous fields pin leaf-order identity solver-side: a leaf
   // transposition between flatten and assemble would swap 1 and 2
@@ -311,7 +311,7 @@ inline void tuple_array_semantics(const camada::SMTSolverRef &solver) {
       solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(hRead, 0), idx(1)),
                     solver->mkEqual(solver->mkTupleSelect(hRead, 1), idx(2)));
   solver->addConstraint(solver->mkNot(fieldsOk));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Read-over-write at a distinct symbolic index.
   solver->reset();
@@ -327,7 +327,7 @@ inline void tuple_array_semantics(const camada::SMTSolverRef &solver) {
   auto rd2 = solver->mkArraySelect(c1, j);
   solver->addConstraint(
       solver->mkNot(solver->mkEqual(rd2, solver->mkArraySelect(c, j))));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void tuple_array_equality_ite(const camada::SMTSolverRef &solver) {
@@ -343,7 +343,7 @@ inline void tuple_array_equality_ite(const camada::SMTSolverRef &solver) {
   auto fa = solver->mkTupleSelect(solver->mkArraySelect(a, idx(0)), 1);
   auto fb = solver->mkTupleSelect(solver->mkArraySelect(b, idx(0)), 1);
   solver->addConstraint(solver->mkNot(solver->mkEqual(fa, fb)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Ite distributes; selecting from the chosen branch agrees.
   solver->reset();
@@ -358,7 +358,7 @@ inline void tuple_array_equality_ite(const camada::SMTSolverRef &solver) {
   auto expected = solver->mkIte(cond, solver->mkArraySelect(c, idx(2)),
                                 solver->mkArraySelect(d, idx(2)));
   solver->addConstraint(solver->mkNot(solver->mkEqual(sel, expected)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Constant arrays of tuples: on backends without native datatypes the
@@ -378,7 +378,7 @@ inline void tuple_array_const(
   auto i = solver->mkSymbol("i", bv8);
   solver->addConstraint(
       solver->mkNot(solver->mkEqual(solver->mkArraySelect(arr, i), init)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Store over the constant array: the stored tuple at the written
   // index, the default elsewhere.
@@ -392,7 +392,7 @@ inline void tuple_array_const(
       solver->mkAnd(solver->mkEqual(solver->mkArraySelect(upd, idx(3)), stored),
                     solver->mkEqual(solver->mkArraySelect(upd, idx(5)), init));
   solver->addConstraint(solver->mkNot(ok));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // The default survives a store made inside a pushed scope: after pop,
   // reads at the previously written index see the default again.
@@ -405,11 +405,11 @@ inline void tuple_array_const(
   auto inPush = solver->mkArrayStore(arr3, idx(2), scratch);
   solver->addConstraint(
       solver->mkEqual(solver->mkArraySelect(inPush, idx(2)), scratch));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   solver->pop();
   solver->addConstraint(solver->mkNot(
       solver->mkEqual(solver->mkArraySelect(arr3, idx(2)), init)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // Homogeneous fields pin per-leaf default order semantically: a leaf
   // transposition would hand 22 to field 0 with no sort mismatch.
@@ -423,7 +423,7 @@ inline void tuple_array_const(
       solver->mkAnd(solver->mkEqual(solver->mkTupleSelect(homoRd, 0), idx(11)),
                     solver->mkEqual(solver->mkTupleSelect(homoRd, 1), idx(22)));
   solver->addConstraint(solver->mkNot(fieldsOk));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Nested constant arrays of tuples: array_of(array_of(tuple)). On the
@@ -443,9 +443,9 @@ inline void tuple_array_const_nested(const camada::SMTSolverRef &solver) {
   auto rd = solver->mkArraySelect(solver->mkArraySelect(outerConst, i), j);
   // Guard against a vacuously UNSAT context (e.g. contradictory default
   // axioms) before pinning the property itself.
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   solver->addConstraint(solver->mkNot(solver->mkEqual(rd, init)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 // Model extraction for decomposed tuple arrays: getArrayElement returns
@@ -469,7 +469,7 @@ inline void tuple_array_model_values(
   // Touch an untouched index so every backend has the array in the formula.
   solver->addConstraint(solver->mkEqual(
       solver->mkTupleSelect(solver->mkArraySelect(arr, idx(0)), 1), idx(7)));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Exact single-index recovery: getArrayElement at a written and an
   // untouched index, read each tuple field back.
@@ -545,7 +545,7 @@ inline void tuple_array_model_values(
   auto sym = solver->mkSymbol("sym_ta", solver->mkArraySort(bv8, tupSort));
   auto stored = solver->mkTuple({solver->mkBool(true), idx(33)});
   auto sym1 = solver->mkArrayStore(sym, idx(4), stored);
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto e = solver->getArrayElement(sym1, idx(4));
   auto eb = solver->getBool(solver->mkTupleSelect(e, 0));
   auto en = solver->getBV(solver->mkTupleSelect(e, 1));
@@ -594,7 +594,7 @@ inline void tuple_array_deep_nesting(const camada::SMTSolverRef &solver) {
           solver->mkArraySelect(solver->mkTupleSelect(o1, 1), idx4(2)), 1),
       idx4(1));
   solver->addConstraint(solver->mkNot(solver->mkEqual(back, innerT)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
   // An untouched path stays tied to the original.
   solver->reset();
@@ -612,7 +612,7 @@ inline void tuple_array_deep_nesting(const camada::SMTSolverRef &solver) {
   auto deepQ = solver->mkArraySelect(
       solver->mkTupleSelect(solver->mkArraySelect(q, idx4(0)), 1), idx4(3));
   solver->addConstraint(solver->mkNot(solver->mkEqual(deepP, deepQ)));
-  REQUIRE(solver->check() == camada::checkResult::UNSAT);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void empty_tuple_semantics(const camada::SMTSolverRef &solver) {
@@ -627,5 +627,5 @@ inline void empty_tuple_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(tupleSymbol->Sort == tupleSort);
 
   solver->addConstraint(solver->mkEqual(tupleSymbol, tupleValue));
-  REQUIRE(solver->check() == camada::checkResult::SAT);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }

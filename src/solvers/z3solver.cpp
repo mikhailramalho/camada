@@ -273,7 +273,7 @@ SMTExprRef Z3Solver::mkIsIntImpl(const SMTExprRef &Exp) {
                              z3::is_int(toZ3Expr(Exp)));
 }
 
-SMTExprRef Z3Solver::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   return makeExprRef<Z3Expr>(SMTExprKind::Int2BV, &Context, mkBVSort(Width),
                              z3::int2bv(Width, toZ3Expr(Exp)));
 }
@@ -303,8 +303,8 @@ SMTExprRef Z3Solver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
                              toZ3Expr(Exp).mk_is_nan());
 }
 
-SMTExprRef Z3Solver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
-  return makeExprRef<Z3Expr>(SMTExprKind::FPIsDenormal, &Context, mkBoolSort(),
+SMTExprRef Z3Solver::mkFPIsSubnormalImpl(const SMTExprRef &Exp) {
+  return makeExprRef<Z3Expr>(SMTExprKind::FPIsSubnormal, &Context, mkBoolSort(),
                              toZ3Expr(Exp).mk_is_subnormal());
 }
 
@@ -635,16 +635,18 @@ SMTExprRef Z3Solver::mkReal2IntImpl(const SMTExprRef &Exp) {
       z3::to_expr(Context, Z3_mk_real2int(Context, toZ3Expr(Exp))));
 }
 
-SMTExprRef Z3Solver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVSignExtImpl(const SMTExprRef &Exp,
+                                     unsigned ExtraBits) {
   return makeExprRef<Z3Expr>(SMTExprKind::BVSignExt, &Context,
-                             mkBVSort(i + Exp->getWidth()),
-                             z3::sext(toZ3Expr(Exp), i));
+                             mkBVSort(ExtraBits + Exp->getWidth()),
+                             z3::sext(toZ3Expr(Exp), ExtraBits));
 }
 
-SMTExprRef Z3Solver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef Z3Solver::mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                     unsigned ExtraBits) {
   return makeExprRef<Z3Expr>(SMTExprKind::BVZeroExt, &Context,
-                             mkBVSort(i + Exp->getWidth()),
-                             z3::zext(toZ3Expr(Exp), i));
+                             mkBVSort(ExtraBits + Exp->getWidth()),
+                             z3::zext(toZ3Expr(Exp), ExtraBits));
 }
 
 SMTExprRef Z3Solver::mkBVExtractImpl(unsigned High, unsigned Low,
@@ -754,7 +756,7 @@ SMTExprRef Z3Solver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
       z3::fma(toZ3Expr(X), toZ3Expr(Y), toZ3Expr(Z), toZ3Expr(R)));
 }
 
-SMTExprRef Z3Solver::mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+SMTExprRef Z3Solver::mkFPToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                   const SMTExprRef &R) {
   return makeExprRef<Z3Expr>(
       SMTExprKind::FPtoFP, &Context, To,
@@ -763,7 +765,7 @@ SMTExprRef Z3Solver::mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                         toSolverSort<Z3Sort>(*To).Sort)));
 }
 
-SMTExprRef Z3Solver::mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+SMTExprRef Z3Solver::mkSBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const SMTExprRef &R) {
   return makeExprRef<Z3Expr>(
       SMTExprKind::SBVtoFP, &Context, To,
@@ -772,7 +774,7 @@ SMTExprRef Z3Solver::mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                          toSolverSort<Z3Sort>(*To).Sort)));
 }
 
-SMTExprRef Z3Solver::mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+SMTExprRef Z3Solver::mkUBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const SMTExprRef &R) {
   return makeExprRef<Z3Expr>(
       SMTExprKind::UBVtoFP, &Context, To,
@@ -781,7 +783,7 @@ SMTExprRef Z3Solver::mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                            toSolverSort<Z3Sort>(*To).Sort)));
 }
 
-SMTExprRef Z3Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
+SMTExprRef Z3Solver::mkFPToSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return makeExprRef<Z3Expr>(
       SMTExprKind::FPtoSBV, &Context, mkBVSort(ToWidth),
@@ -789,7 +791,7 @@ SMTExprRef Z3Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
                                             toZ3Expr(From), ToWidth)));
 }
 
-SMTExprRef Z3Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
+SMTExprRef Z3Solver::mkFPToUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
   return makeExprRef<Z3Expr>(
       SMTExprKind::FPtoUBV, &Context, mkBVSort(ToWidth),
@@ -797,7 +799,7 @@ SMTExprRef Z3Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
                                             toZ3Expr(From), ToWidth)));
 }
 
-SMTExprRef Z3Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
+SMTExprRef Z3Solver::mkFPToIntegralImpl(const SMTExprRef &From,
                                         const SMTExprRef &R) {
   return makeExprRef<Z3Expr>(
       SMTExprKind::FPtoIntegral, &Context, From->Sort,
@@ -1107,15 +1109,15 @@ SMTExprRef Z3Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
                              z3::exists(bound_vars, toZ3Expr(Body)));
 }
 
-checkResult Z3Solver::checkImpl() {
+CheckResult Z3Solver::checkImpl() {
   z3::check_result res = Solver.check();
   if (res == z3::check_result::sat)
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res == z3::check_result::unsat)
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
 
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
 bool Z3Solver::setTimeoutImpl(uint64_t Milliseconds) {
@@ -1131,7 +1133,7 @@ bool Z3Solver::setTimeoutImpl(uint64_t Milliseconds) {
   return true;
 }
 
-checkResult
+CheckResult
 Z3Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   // Tactic-built solvers (see setSolver) do not track assumption cores
   // unless asked: they answer UNSAT with an empty unsat_core(). The plain
@@ -1148,12 +1150,12 @@ Z3Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
 
   z3::check_result res = Solver.check(assumptions);
   if (res == z3::check_result::sat)
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res == z3::check_result::unsat)
-    return checkResult::UNSAT;
+    return CheckResult::UNSAT;
 
-  return checkResult::UNKNOWN;
+  return CheckResult::UNKNOWN;
 }
 
 SMTResult<std::vector<SMTExprRef>> Z3Solver::getUnsatAssumptionsImpl() {

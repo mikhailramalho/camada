@@ -270,7 +270,7 @@ SMTExprRef CVC5Solver::mkIsIntImpl(const SMTExprRef &Exp) {
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+SMTExprRef CVC5Solver::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   return makeExprRef<CVC5Expr>(
       SMTExprKind::Int2BV, &Context, mkBVSort(Width),
       Terms.mkTerm(Terms.mkOp(cvc5::Kind::INT_TO_BITVECTOR, {Width}),
@@ -680,17 +680,19 @@ SMTExprRef CVC5Solver::mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                                      toSolverExpr<CVC5Expr>(*F).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef CVC5Solver::mkBVSignExtImpl(const SMTExprRef &Exp,
+                                       unsigned ExtraBits) {
   return makeExprRef<CVC5Expr>(
-      SMTExprKind::BVSignExt, &Context, mkBVSort(i + Exp->getWidth()),
-      Terms.mkTerm(Terms.mkOp(cvc5::Kind::BITVECTOR_SIGN_EXTEND, {i}),
+      SMTExprKind::BVSignExt, &Context, mkBVSort(ExtraBits + Exp->getWidth()),
+      Terms.mkTerm(Terms.mkOp(cvc5::Kind::BITVECTOR_SIGN_EXTEND, {ExtraBits}),
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) {
+SMTExprRef CVC5Solver::mkBVZeroExtImpl(const SMTExprRef &Exp,
+                                       unsigned ExtraBits) {
   return makeExprRef<CVC5Expr>(
-      SMTExprKind::BVZeroExt, &Context, mkBVSort(i + Exp->getWidth()),
-      Terms.mkTerm(Terms.mkOp(cvc5::Kind::BITVECTOR_ZERO_EXTEND, {i}),
+      SMTExprKind::BVZeroExt, &Context, mkBVSort(ExtraBits + Exp->getWidth()),
+      Terms.mkTerm(Terms.mkOp(cvc5::Kind::BITVECTOR_ZERO_EXTEND, {ExtraBits}),
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
@@ -795,9 +797,9 @@ SMTExprRef CVC5Solver::mkFPIsNaNImpl(const SMTExprRef &Exp) {
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkFPIsDenormalImpl(const SMTExprRef &Exp) {
+SMTExprRef CVC5Solver::mkFPIsSubnormalImpl(const SMTExprRef &Exp) {
   return makeExprRef<CVC5Expr>(
-      SMTExprKind::FPIsDenormal, &Context, mkBoolSort(),
+      SMTExprKind::FPIsSubnormal, &Context, mkBoolSort(),
       Terms.mkTerm(cvc5::Kind::FLOATINGPOINT_IS_SUBNORMAL,
                    {toSolverExpr<CVC5Expr>(*Exp).Expr}));
 }
@@ -929,7 +931,7 @@ SMTExprRef CVC5Solver::mkFPEqualImpl(const SMTExprRef &LHS,
                     toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkFPtoFPImpl(const SMTExprRef &From,
+SMTExprRef CVC5Solver::mkFPToFPImpl(const SMTExprRef &From,
                                     const SMTSortRef &To, const SMTExprRef &R) {
   return makeExprRef<CVC5Expr>(
       SMTExprKind::FPtoFP, &Context, To,
@@ -940,7 +942,7 @@ SMTExprRef CVC5Solver::mkFPtoFPImpl(const SMTExprRef &From,
                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkSBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef CVC5Solver::mkSBVToFPImpl(const SMTExprRef &From,
                                      const SMTSortRef &To,
                                      const SMTExprRef &R) {
   return makeExprRef<CVC5Expr>(
@@ -952,7 +954,7 @@ SMTExprRef CVC5Solver::mkSBVtoFPImpl(const SMTExprRef &From,
                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
+SMTExprRef CVC5Solver::mkUBVToFPImpl(const SMTExprRef &From,
                                      const SMTSortRef &To,
                                      const SMTExprRef &R) {
   return makeExprRef<CVC5Expr>(
@@ -964,7 +966,7 @@ SMTExprRef CVC5Solver::mkUBVtoFPImpl(const SMTExprRef &From,
                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
+SMTExprRef CVC5Solver::mkFPToSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
@@ -975,7 +977,7 @@ SMTExprRef CVC5Solver::mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) {
                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
+SMTExprRef CVC5Solver::mkFPToUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
   // Conversion from float to integers always truncate, so we assume
   // the round mode to be toward zero
   const SMTExprRef &roundingMode = mkRM(RM::ROUND_TO_ZERO, FPEncoding::Native);
@@ -986,7 +988,7 @@ SMTExprRef CVC5Solver::mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) {
                     toSolverExpr<CVC5Expr>(*From).Expr}));
 }
 
-SMTExprRef CVC5Solver::mkFPtoIntegralImpl(const SMTExprRef &From,
+SMTExprRef CVC5Solver::mkFPToIntegralImpl(const SMTExprRef &From,
                                           const SMTExprRef &R) {
   return makeExprRef<CVC5Expr>(
       SMTExprKind::FPtoIntegral, &Context, From->Sort,
@@ -1239,15 +1241,15 @@ SMTExprRef CVC5Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
       Terms.mkTerm(cvc5::Kind::EXISTS, {bound_list, substituted_body}));
 }
 
-checkResult CVC5Solver::checkImpl() {
+CheckResult CVC5Solver::checkImpl() {
   cvc5::Result res = Context.checkSat();
   if (res.isSat())
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res.isUnknown())
-    return checkResult::UNKNOWN;
+    return CheckResult::UNKNOWN;
 
-  return checkResult::UNSAT;
+  return CheckResult::UNSAT;
 }
 
 bool CVC5Solver::setTimeoutImpl(uint64_t Milliseconds) {
@@ -1257,7 +1259,7 @@ bool CVC5Solver::setTimeoutImpl(uint64_t Milliseconds) {
   return true;
 }
 
-checkResult
+CheckResult
 CVC5Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   std::vector<cvc5::Term> assumptions;
   assumptions.reserve(Assumptions.size());
@@ -1266,12 +1268,12 @@ CVC5Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
 
   cvc5::Result res = Context.checkSatAssuming(assumptions);
   if (res.isSat())
-    return checkResult::SAT;
+    return CheckResult::SAT;
 
   if (res.isUnknown())
-    return checkResult::UNKNOWN;
+    return CheckResult::UNKNOWN;
 
-  return checkResult::UNSAT;
+  return CheckResult::UNSAT;
 }
 
 SMTResult<std::vector<SMTExprRef>> CVC5Solver::getUnsatAssumptionsImpl() {

@@ -87,15 +87,16 @@ namespace camada {
 #define CAMADA_DEFINE_UNSUPPORTED_IMPL(ReturnType, Name, Feature, ...)         \
   ReturnType SMTSolverImpl::Name(__VA_ARGS__) { unsupportedFeature(Feature); }
 // Width-extension wrapper: same guard and postcondition for sign- and
-// zero-extension. The guard is what stops i + width wrapping unsigned, so it
+// zero-extension. The guard is what stops ExtraBits + width wrapping, so it
 // belongs with the operation rather than being retyped per extension.
 #define CAMADA_DEFINE_BV_EXTEND_WRAPPER(Name, ImplName, What)                  \
-  SMTExprRef SMTSolverImpl::Name(unsigned i, const SMTExprRef &Exp) {          \
+  SMTExprRef SMTSolverImpl::Name(const SMTExprRef &Exp, unsigned ExtraBits) {  \
     requireBVSort(Exp, "Expected bit-vector expression");                      \
-    fatalErrorIf(i > std::numeric_limits<unsigned>::max() - Exp->getWidth(),   \
+    fatalErrorIf(ExtraBits >                                                   \
+                     std::numeric_limits<unsigned>::max() - Exp->getWidth(),   \
                  "Bit-vector " What " extension width overflow");              \
-    SMTExprRef theExp = ImplName(i, Exp);                                      \
-    assert(theExp->getWidth() == Exp->getWidth() + i);                         \
+    SMTExprRef theExp = ImplName(Exp, ExtraBits);                              \
+    assert(theExp->getWidth() == Exp->getWidth() + ExtraBits);                 \
     return theExp;                                                             \
   }
 // FP arithmetic taking a rounding mode: same encoding dispatch as the unary
@@ -1070,10 +1071,10 @@ CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
     requireArithSort(Exp, "Expected arithmetic expression"), mkIsIntImpl(Exp),
     assert(theExp->isBoolSort()))
 
-SMTExprRef SMTSolverImpl::mkInt2BV(unsigned Width, const SMTExprRef &Exp) {
+SMTExprRef SMTSolverImpl::mkInt2BV(const SMTExprRef &Exp, unsigned Width) {
   fatalErrorIf(Width == 0, "Bit-vector width must be non-zero");
   requireIntSort(Exp, "Expected integer expression");
-  SMTExprRef theExp = mkInt2BVImpl(Width, Exp);
+  SMTExprRef theExp = mkInt2BVImpl(Exp, Width);
   assert(theExp->isBVSort());
   assert(theExp->getWidth() == Width);
   return theExp;
@@ -1182,7 +1183,7 @@ CAMADA_DEFINE_FP_UNARY_WRAPPER(
     assert(theExp->isBoolSort()))
 
 CAMADA_DEFINE_FP_UNARY_WRAPPER(
-    mkFPIsDenormal, mkFPIsDenormalImpl,
+    mkFPIsSubnormal, mkFPIsSubnormalImpl,
     requireFPSort(Exp, "Expected floating-point expression"),
     assert(theExp->isBoolSort()))
 
@@ -1235,7 +1236,7 @@ SMTExprRef SMTSolverImpl::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
+SMTExprRef SMTSolverImpl::mkFPToFP(const SMTExprRef &From, const SMTSortRef &To,
                                    const SMTExprRef &R) {
   requireFPSort(From, "Expected floating-point expression");
   requireFPSort(To, "Expected floating-point target sort");
@@ -1246,13 +1247,13 @@ SMTExprRef SMTSolverImpl::mkFPtoFP(const SMTExprRef &From, const SMTSortRef &To,
       usesBVFPEncoding(To) != usesBVRMEncoding(R),
       "Floating-point target and rounding mode use different encodings");
   SMTExprRef theExp = usesBVFPEncoding(To)
-                          ? SMTSolverImpl::mkFPtoFPImpl(From, To, R)
-                          : mkFPtoFPImpl(From, To, R);
+                          ? SMTSolverImpl::mkFPToFPImpl(From, To, R)
+                          : mkFPToFPImpl(From, To, R);
   assert(theExp->Sort == To);
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkSBVtoFP(const SMTExprRef &From,
+SMTExprRef SMTSolverImpl::mkSBVToFP(const SMTExprRef &From,
                                     const SMTSortRef &To, const SMTExprRef &R) {
   requireBVSort(From, "Expected bit-vector expression");
   requireFPSort(To, "Expected floating-point target sort");
@@ -1261,13 +1262,13 @@ SMTExprRef SMTSolverImpl::mkSBVtoFP(const SMTExprRef &From,
       usesBVFPEncoding(To) != usesBVRMEncoding(R),
       "Floating-point target and rounding mode use different encodings");
   SMTExprRef theExp = usesBVFPEncoding(To)
-                          ? SMTSolverImpl::mkSBVtoFPImpl(From, To, R)
-                          : mkSBVtoFPImpl(From, To, R);
+                          ? SMTSolverImpl::mkSBVToFPImpl(From, To, R)
+                          : mkSBVToFPImpl(From, To, R);
   assert(theExp->Sort == To);
   return theExp;
 }
 
-SMTExprRef SMTSolverImpl::mkUBVtoFP(const SMTExprRef &From,
+SMTExprRef SMTSolverImpl::mkUBVToFP(const SMTExprRef &From,
                                     const SMTSortRef &To, const SMTExprRef &R) {
   requireBVSort(From, "Expected bit-vector expression");
   requireFPSort(To, "Expected floating-point target sort");
@@ -1276,23 +1277,23 @@ SMTExprRef SMTSolverImpl::mkUBVtoFP(const SMTExprRef &From,
       usesBVFPEncoding(To) != usesBVRMEncoding(R),
       "Floating-point target and rounding mode use different encodings");
   SMTExprRef theExp = usesBVFPEncoding(To)
-                          ? SMTSolverImpl::mkUBVtoFPImpl(From, To, R)
-                          : mkUBVtoFPImpl(From, To, R);
+                          ? SMTSolverImpl::mkUBVToFPImpl(From, To, R)
+                          : mkUBVToFPImpl(From, To, R);
   assert(theExp->Sort == To);
   return theExp;
 }
 
-CAMADA_DEFINE_FP_TO_BV_WRAPPER(mkFPtoSBV, mkFPtoSBVImpl)
+CAMADA_DEFINE_FP_TO_BV_WRAPPER(mkFPToSBV, mkFPToSBVImpl)
 
-CAMADA_DEFINE_FP_TO_BV_WRAPPER(mkFPtoUBV, mkFPtoUBVImpl)
+CAMADA_DEFINE_FP_TO_BV_WRAPPER(mkFPToUBV, mkFPToUBVImpl)
 
-SMTExprRef SMTSolverImpl::mkFPtoIntegral(const SMTExprRef &From,
+SMTExprRef SMTSolverImpl::mkFPToIntegral(const SMTExprRef &From,
                                          const SMTExprRef &R) {
   requireFPSort(From, "Expected floating-point expression");
   requireMatchingFPAndRMEncoding(From, R);
   SMTExprRef theExp = usesBVFPEncoding(From)
-                          ? SMTSolverImpl::mkFPtoIntegralImpl(From, R)
-                          : mkFPtoIntegralImpl(From, R);
+                          ? SMTSolverImpl::mkFPToIntegralImpl(From, R)
+                          : mkFPToIntegralImpl(From, R);
   assert(theExp->isFPSort());
   return theExp;
 }
@@ -2180,12 +2181,12 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   return theExp;
 }
 
-checkResult SMTSolverImpl::check() {
+CheckResult SMTSolverImpl::check() {
   invalidateUnsatAssumptions();
   return checkImpl();
 }
 
-checkResult
+CheckResult
 SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
   for (const SMTExprRef &Assumption : Assumptions)
     requireBoolSort(Assumption, "Expected boolean assumption");
@@ -2193,20 +2194,20 @@ SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
   // addConstraint/push/pop (the default fallback and the activation-literal
   // lowerings do), all of which invalidate the unsat-assumption state, so
   // record it only after the check completes.
-  const checkResult Result =
+  const CheckResult Result =
       Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions);
-  UnsatAssumptionsValid = Result == checkResult::UNSAT;
+  UnsatAssumptionsValid = Result == CheckResult::UNSAT;
   LastAssumptions =
       UnsatAssumptionsValid ? Assumptions : std::vector<SMTExprRef>{};
   return Result;
 }
 
-checkResult SMTSolverImpl::checkSatAssumingImpl(
+CheckResult SMTSolverImpl::checkSatAssumingImpl(
     const std::vector<SMTExprRef> &Assumptions) {
   push();
   for (const SMTExprRef &Assumption : Assumptions)
     addConstraint(Assumption);
-  const checkResult Result = checkImpl();
+  const CheckResult Result = checkImpl();
   pop();
   return Result;
 }
@@ -2368,7 +2369,7 @@ SMTExprRef SMTSolverImpl::mkBVAddOverflowImpl(const SMTExprRef &LHS,
     theExp = mkAnd(mkEqual(LSign, RSign), mkNot(mkEqual(LSign, SumSign)));
   } else {
     // Unsigned addition overflows iff the (Width+1)-bit sum carries out.
-    SMTExprRef Sum = mkBVAdd(mkBVZeroExt(1, LHS), mkBVZeroExt(1, RHS));
+    SMTExprRef Sum = mkBVAdd(mkBVZeroExt(LHS, 1), mkBVZeroExt(RHS, 1));
     theExp = mkEqual(mkBVExtract(Width, Width, Sum), getBVOne1Expr());
   }
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVAddOverflow);
@@ -2403,14 +2404,14 @@ SMTExprRef SMTSolverImpl::mkBVMulOverflowImpl(const SMTExprRef &LHS,
   if (IsSigned) {
     // Multiply at double width; the product is representable iff its top
     // Width+1 bits all equal the result's sign bit.
-    SMTExprRef Prod = mkBVMul(mkBVSignExt(Width, LHS), mkBVSignExt(Width, RHS));
+    SMTExprRef Prod = mkBVMul(mkBVSignExt(LHS, Width), mkBVSignExt(RHS, Width));
     SMTExprRef Top = mkBVExtract(2 * Width - 1, Width - 1, Prod);
     SMTExprRef Zeros = mkBVFromDec(0, Width + 1);
     SMTExprRef Ones = mkBVNot(Zeros);
     theExp = mkNot(mkOr(mkEqual(Top, Zeros), mkEqual(Top, Ones)));
   } else {
     // Unsigned: any set bit in the product's top half is an overflow.
-    SMTExprRef Prod = mkBVMul(mkBVZeroExt(Width, LHS), mkBVZeroExt(Width, RHS));
+    SMTExprRef Prod = mkBVMul(mkBVZeroExt(LHS, Width), mkBVZeroExt(RHS, Width));
     SMTExprRef Top = mkBVExtract(2 * Width - 1, Width, Prod);
     theExp = mkNot(mkEqual(Top, mkBVFromDec(0, Width)));
   }
@@ -2512,7 +2513,7 @@ SMTExprRef SMTSolverImpl::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
   return rewrapExprImpl(*Sum, Sum->Sort, SMTExprKind::BV2Int);
 }
 
-SMTExprRef SMTSolverImpl::mkInt2BVImpl(unsigned Width, const SMTExprRef &Exp) {
+SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   // No native conversion and no portable operator to compose one from: a
   // bit-vector value tied to an integer can only be introduced through a
   // fresh symbol constrained via the inverse direction (the mkIEEEFPToBV

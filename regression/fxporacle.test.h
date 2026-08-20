@@ -48,7 +48,7 @@ inline void checkVectorsChunked(const camada::SMTSolverRef &S,
       All = All ? S->mkAnd(All, C) : C;
     }
     S->addConstraint(All);
-    REQUIRE(S->check() == camada::checkResult::SAT);
+    REQUIRE(S->check() == camada::CheckResult::SAT);
   }
 }
 

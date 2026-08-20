@@ -189,10 +189,10 @@ using PgidCallback = std::function<void(long Pgid)>;
 /// Accepts exactly the bare SMT-LIB verdicts (`sat`, `unsat`, `unknown`)
 /// and the SAT-competition forms (`s SATISFIABLE`, `s UNSATISFIABLE`,
 /// `s UNKNOWN`), with surrounding whitespace tolerated; `unknown` maps to
-/// checkResult::UNKNOWN. Everything else is rejected — deliberately no
+/// CheckResult::UNKNOWN. Everything else is rejected — deliberately no
 /// substring matching, or a log line mentioning "unsat core" would become
 /// a verification verdict.
-std::optional<checkResult> parseOneShotVerdictLine(const std::string &Line);
+std::optional<CheckResult> parseOneShotVerdictLine(const std::string &Line);
 
 /// Facts about the last one-shot run, for the caller's diagnostics: the
 /// command after %f substitution, a decoded exit status ("exit code N" /
@@ -287,7 +287,7 @@ public:
   /// One-shot mode: the model solver's own answer to the shared query,
   /// read only after a sat verdict from the one-shot run. Unset when no
   /// model solver was configured, it died, or the verdict was not sat.
-  std::optional<checkResult> oneShotModelVerdict() const {
+  std::optional<CheckResult> oneShotModelVerdict() const {
     return OneShotModelVerdictValue;
   }
 
@@ -362,8 +362,10 @@ protected:
   SMTExprRef mkOrImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
   SMTExprRef mkIteImpl(const SMTExprRef &Cond, const SMTExprRef &T,
                        const SMTExprRef &F) override;
-  SMTExprRef mkBVSignExtImpl(unsigned i, const SMTExprRef &Exp) override;
-  SMTExprRef mkBVZeroExtImpl(unsigned i, const SMTExprRef &Exp) override;
+  SMTExprRef mkBVSignExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
+  SMTExprRef mkBVZeroExtImpl(const SMTExprRef &Exp,
+                             unsigned ExtraBits) override;
   SMTExprRef mkBVExtractImpl(unsigned High, unsigned Low,
                              const SMTExprRef &Exp) override;
   SMTExprRef mkBVConcatImpl(const SMTExprRef &LHS,
@@ -394,7 +396,7 @@ protected:
                          FPNegBehavior Behavior) override;
   SMTExprRef mkFPIsInfiniteImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPIsNaNImpl(const SMTExprRef &Exp) override;
-  SMTExprRef mkFPIsDenormalImpl(const SMTExprRef &Exp) override;
+  SMTExprRef mkFPIsSubnormalImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPIsNormalImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPIsZeroImpl(const SMTExprRef &Exp) override;
   SMTExprRef mkFPMulImpl(const SMTExprRef &LHS, const SMTExprRef &RHS,
@@ -415,15 +417,15 @@ protected:
   SMTExprRef mkFPGeImpl(const SMTExprRef &LHS, const SMTExprRef &RHS) override;
   SMTExprRef mkFPEqualImpl(const SMTExprRef &LHS,
                            const SMTExprRef &RHS) override;
-  SMTExprRef mkFPtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkFPToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                           const SMTExprRef &R) override;
-  SMTExprRef mkSBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkSBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                            const SMTExprRef &R) override;
-  SMTExprRef mkUBVtoFPImpl(const SMTExprRef &From, const SMTSortRef &To,
+  SMTExprRef mkUBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                            const SMTExprRef &R) override;
-  SMTExprRef mkFPtoSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
-  SMTExprRef mkFPtoUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
-  SMTExprRef mkFPtoIntegralImpl(const SMTExprRef &From,
+  SMTExprRef mkFPToSBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPToUBVImpl(const SMTExprRef &From, unsigned ToWidth) override;
+  SMTExprRef mkFPToIntegralImpl(const SMTExprRef &From,
                                 const SMTExprRef &R) override;
   SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                               const SMTSortRef &To) override;
@@ -482,8 +484,8 @@ protected:
                                  const SMTExprRef &Index) override;
 
   // --- check / push / pop / reset ---
-  checkResult checkImpl() override;
-  checkResult
+  CheckResult checkImpl() override;
+  CheckResult
   checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) override;
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
@@ -541,7 +543,7 @@ private:
 
   // Emit a check command (a query: no `success` ack) and read the
   // sat/unsat/unknown verdict; UNKNOWN in write-only mode.
-  checkResult emitCheckCommand(const std::string &Cmd);
+  CheckResult emitCheckCommand(const std::string &Cmd);
 
   // Send (get-value (Exp)) to the child solver and extract the value text
   // from its response. Fails in write-only mode (no child process). Resp
@@ -552,15 +554,15 @@ private:
   void emitPreamble();
 
   // One-shot mode plumbing (see the SMTLIBOneShotTag constructor).
-  checkResult oneShotCheck();
-  checkResult runOneShotCommand();
+  CheckResult oneShotCheck();
+  CheckResult runOneShotCommand();
 
   bool OneShotMode = false;
   bool OneShotCheckDone = false;
   std::string OneShotFormulaPath;
   std::string OneShotShellCmd;
   PgidCallback OneShotOnSpawn;
-  std::optional<checkResult> OneShotModelVerdictValue;
+  std::optional<CheckResult> OneShotModelVerdictValue;
   OneShotDiagnostics Diags;
 
   std::unique_ptr<FileEmitter> File;
