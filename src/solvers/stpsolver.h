@@ -200,8 +200,8 @@ protected:
 
   SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
-                                 const SMTExprRef &Index) override;
+  SMTResult<SMTExprRef> getArrayElementImpl(const SMTExprRef &Array,
+                                            const SMTExprRef &Index) override;
 
   SMTExprRef mkBoolImpl(const bool b) override;
   SMTExprRef mkBVFromDecImpl(const int64_t Int,

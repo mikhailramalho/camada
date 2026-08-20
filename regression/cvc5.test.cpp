@@ -203,6 +203,7 @@ TEST_CASE("CVC5 feature capabilities", "[CVC5]") {
   REQUIRE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE(solver->supports(SolverFeature::NativeRoundToAway));
   REQUIRE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
   // The capability is present either way; core extraction is opt-in at

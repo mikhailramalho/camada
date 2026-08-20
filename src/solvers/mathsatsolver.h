@@ -300,8 +300,8 @@ protected:
 
   SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
 
-  SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
-                                 const SMTExprRef &Index) override;
+  SMTResult<SMTExprRef> getArrayElementImpl(const SMTExprRef &Array,
+                                            const SMTExprRef &Index) override;
 
   SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array) override;
 
@@ -357,6 +357,8 @@ protected:
   bool quantifierSupport() const override { return false; }
   // Tracked natively, no creation-time opt-in.
   bool unsatAssumptionSupport() const override { return true; }
+  // No msat_make_fp_roundingmode_* for round-to-away; FPEncoding::BV has it.
+  bool nativeRoundToAwaySupport() const override { return false; }
 
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;

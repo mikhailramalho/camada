@@ -802,8 +802,9 @@ SMTResult<std::string> BitwuzlaSolver::getFPInBinImpl(const SMTExprRef &Exp) {
   return result ? std::string(result) : std::string();
 }
 
-SMTExprRef BitwuzlaSolver::getArrayElementImpl(const SMTExprRef &Array,
-                                               const SMTExprRef &Index) {
+SMTResult<SMTExprRef>
+BitwuzlaSolver::getArrayElementImpl(const SMTExprRef &Array,
+                                    const SMTExprRef &Index) {
   const SMTExprRef &select = mkArraySelect(Array, Index);
   return makeExprRef<BitwExpr>(
       select->getKind(), Context, select->Sort,
@@ -824,7 +825,9 @@ BitwuzlaSolver::getArrayValuesImpl(const SMTExprRef &Array) {
   while (bitwuzla_term_get_kind(Val) == BITWUZLA_KIND_ARRAY_STORE) {
     size_t Size = 0;
     BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
-    fatalErrorIf(Size != 3, "Malformed bitwuzla array store in model");
+    if (Size != 3)
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Bitwuzla,
+                      "Malformed array store in model"};
     Result.Entries.emplace_back(wrap(Children[1], IndexSort),
                                 wrap(Children[2], ElemSort));
     Val = Children[0];
@@ -832,7 +835,9 @@ BitwuzlaSolver::getArrayValuesImpl(const SMTExprRef &Array) {
   if (bitwuzla_term_get_kind(Val) == BITWUZLA_KIND_CONST_ARRAY) {
     size_t Size = 0;
     BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
-    fatalErrorIf(Size != 1, "Malformed bitwuzla constant array in model");
+    if (Size != 1)
+      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Bitwuzla,
+                      "Malformed constant array in model"};
     Result.Base = wrap(Children[0], ElemSort);
   }
   return Result;

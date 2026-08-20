@@ -814,26 +814,30 @@ YicesSolver::getRationalImpl(const SMTExprRef &Exp) {
   return std::make_pair(Num, Den);
 }
 
-SMTExprRef YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
-                                            const SMTExprRef &Index) {
+SMTResult<SMTExprRef>
+YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
+                                 const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
 
   const SMTSortRef &elementSort = Array->Sort->getElementSort();
   if (elementSort->isBoolSort()) {
     SMTResult<bool> result = getBool(sel);
-    fatalErrorIf(!result, "Failed to get Yices boolean array element");
+    if (!result)
+      return result.error();
     return mkBool(result.value());
   }
 
   if (elementSort->isBVSort()) {
     SMTResult<std::string> result = getBVInBin(sel);
-    fatalErrorIf(!result, "Failed to get Yices bit-vector array element");
+    if (!result)
+      return result.error();
     return SMTSolverImpl::mkBVFromBin(result.value());
   }
 
   fatalErrorIf(!elementSort->isFPSort(), "Unknown Yices array element type");
   SMTResult<std::string> result = getFPInBin(sel);
-  fatalErrorIf(!result, "Failed to get Yices FP array element");
+  if (!result)
+    return result.error();
   return SMTSolverImpl::mkFPFromBin(
       result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
 }

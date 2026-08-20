@@ -1774,8 +1774,8 @@ CAMADA_DEFINE_MODEL_GETTER(double, getFP64,
                                          "Expected floating-point expression"),
                            getFP64Impl)
 
-SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
-                                          const SMTExprRef &Index) {
+SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
+                                                     const SMTExprRef &Index) {
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
@@ -1799,8 +1799,8 @@ SMTExprRef SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     explicit ModelQueryGuard(bool &F) : Flag(F), Saved(F) { F = true; }
     ~ModelQueryGuard() { Flag = Saved; }
   } Guard(InLazyModelQuery);
-  SMTExprRef theExp = getArrayElementImpl(Array, Index);
-  assert(theExp->Sort == Array->Sort->getElementSort());
+  SMTResult<SMTExprRef> theExp = getArrayElementImpl(Array, Index);
+  assert(!theExp || theExp.value()->Sort == Array->Sort->getElementSort());
   return theExp;
 }
 
@@ -2281,6 +2281,8 @@ bool SMTSolverImpl::supports(SolverFeature Feature) const {
     return uninterpretedFunctionSupport();
   case SolverFeature::NativeFloatingPoint:
     return nativeFloatingPointSupport();
+  case SolverFeature::NativeRoundToAway:
+    return nativeRoundToAwaySupport();
   case SolverFeature::NativeTuples:
     return nativeDatatypeSupport();
   case SolverFeature::NativeConstantArrays:
@@ -2322,6 +2324,15 @@ void SMTSolverImpl::push(unsigned nscopes) {
 }
 
 void SMTSolverImpl::pop(unsigned nscopes) {
+  // LazyConstraintLevels always holds the root scope plus one entry per
+  // push, so its size minus one is the number of scopes that can be
+  // popped. Reject an over-pop here: the journal loops below stop at the
+  // root either way, but popImpl() would still be handed the unclamped
+  // count and take the backend below its own root -- Z3 throws
+  // "index out of bounds" and the process dies -- leaving the common and
+  // backend scope states permanently out of step.
+  fatalErrorIf(nscopes > LazyConstraintLevels.size() - 1,
+               "Cannot pop more scopes than were pushed");
   invalidateUnsatAssumptions();
   // Lazy default axioms and extensionality lemmas asserted inside the
   // popped scopes are scope-independent facts about expressions that

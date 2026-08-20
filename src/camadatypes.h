@@ -196,6 +196,11 @@ enum class SolverFeature : std::uint8_t {
   /// FPEncoding::Native sorts and operations; FPEncoding::BV works on
   /// every backend regardless.
   NativeFloatingPoint,
+  /// RM::ROUND_TO_AWAY as a native rounding mode. Separate from
+  /// NativeFloatingPoint because MathSAT implements native FP but has no
+  /// term for this mode, and mkRM() has nothing to return in that case.
+  /// FPEncoding::BV supplies all five modes on every backend.
+  NativeRoundToAway,
   /// Backend-native tuple/datatype sorts; other backends route tuples
   /// through the Camada per-field lowering. Like every bit here this is a
   /// property of the backend, not of this instance: it stays true on a

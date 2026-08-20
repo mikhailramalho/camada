@@ -9,6 +9,7 @@
 // select/store/const/ite semantics and model queries.
 
 #include "camada.h"
+#include "modelhelpers.test.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -143,12 +144,12 @@ inline void ack_model_query_stability(const camada::SMTSolverRef &solver) {
 
   // Constrained index: exact value. Unconstrained index: some stable
   // value, the same on a repeated query against the same model.
-  auto at1 = solver->getArrayElement(a, solver->mkBVFromDec(1, 8));
+  auto at1 = arrayElement(solver, a, solver->mkBVFromDec(1, 8));
   auto at1val = solver->getBVInBin(at1);
   REQUIRE(at1val);
   REQUIRE(at1val.value() == "00001001");
-  auto at5a = solver->getArrayElement(a, solver->mkBVFromDec(5, 8));
-  auto at5b = solver->getArrayElement(a, solver->mkBVFromDec(5, 8));
+  auto at5a = arrayElement(solver, a, solver->mkBVFromDec(5, 8));
+  auto at5b = arrayElement(solver, a, solver->mkBVFromDec(5, 8));
   auto at5aval = solver->getBVInBin(at5a);
   auto at5bval = solver->getBVInBin(at5b);
   REQUIRE(at5aval);
@@ -257,12 +258,12 @@ inline void ack_fp_element_semantics(const camada::SMTSolverRef &solver) {
 
   solver->addConstraint(solver->mkEqual(solver->mkArraySelect(a, i), v));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
-  auto at3 = solver->getArrayElement(a, solver->mkBVFromDec(3, 8));
+  auto at3 = arrayElement(solver, a, solver->mkBVFromDec(3, 8));
   auto fpval = solver->getFP32(at3);
   REQUIRE(fpval);
   REQUIRE(fpval.value() == 1.5f);
   // Unconstrained index: the synthesized default must evaluate too.
-  auto at9 = solver->getArrayElement(a, solver->mkBVFromDec(9, 8));
+  auto at9 = arrayElement(solver, a, solver->mkBVFromDec(9, 8));
   REQUIRE(solver->getFP32(at9));
 }
 

@@ -546,16 +546,20 @@ SMTExprRef mkCamadaTupleArrayIte(SMTSolverImpl &Solver, const SMTExprRef &Cond,
       SMTExprKind::Ite, T->getBackendKind(), T->Sort, std::move(Leaves));
 }
 
-SMTExprRef getCamadaTupleArrayElement(SMTSolverImpl &Solver,
-                                      const SMTExprRef &Array,
-                                      const SMTExprRef &Index) {
+SMTResult<SMTExprRef> getCamadaTupleArrayElement(SMTSolverImpl &Solver,
+                                                 const SMTExprRef &Array,
+                                                 const SMTExprRef &Index) {
   const CamadaTupleArrayExpr *AE = toCamadaTupleArrayExpr(Array);
   fatalErrorIf(AE == nullptr,
                "getCamadaTupleArrayElement on a non-bundle expression");
   std::vector<SMTExprRef> ElementLeaves;
   ElementLeaves.reserve(AE->LeafArrays.size());
-  for (const auto &Leaf : AE->LeafArrays)
-    ElementLeaves.push_back(Solver.getArrayElement(Leaf, Index));
+  for (const auto &Leaf : AE->LeafArrays) {
+    SMTResult<SMTExprRef> LeafValue = Solver.getArrayElement(Leaf, Index);
+    if (!LeafValue)
+      return LeafValue.error();
+    ElementLeaves.push_back(LeafValue.value());
+  }
   std::size_t Pos = 0;
   SMTExprRef Element = assembleFromLeaves(Solver, Array->Sort->getElementSort(),
                                           ElementLeaves, Pos);

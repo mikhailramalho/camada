@@ -971,8 +971,9 @@ SMTResult<std::string> MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {
   return getGMPVal(t);
 }
 
-SMTExprRef MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
-                                              const SMTExprRef &Index) {
+SMTResult<SMTExprRef>
+MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
+                                   const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
   return makeExprRef<MathSATExpr>(
       sel->getKind(), &Context, sel->Sort,
@@ -1103,7 +1104,9 @@ SMTExprRef MathSATSolver::mkRMImpl(const RM &R) {
     e = msat_make_fp_roundingmode_nearest_even(Context);
     break;
   case RM::ROUND_TO_AWAY:
-    fatalError("MathSAT Error ROUND_TO_AWAY is not supported.");
+    fatalError("MathSAT has no native round-to-away rounding mode; check "
+               "supports(SolverFeature::NativeRoundToAway) first, or build "
+               "the mode with FPEncoding::BV");
   case RM::ROUND_TO_PLUS_INF:
     e = msat_make_fp_roundingmode_plus_inf(Context);
     break;

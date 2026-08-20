@@ -880,9 +880,11 @@ public:
   /// expression.
   virtual SMTResult<FXPValue> getFXP(const SMTExprRef &Exp) = 0;
 
-  /// If a model is available, returns the Expr in position Index of Array
-  virtual SMTExprRef getArrayElement(const SMTExprRef &Array,
-                                     const SMTExprRef &Index) = 0;
+  /// If a model is available, returns the Expr in position Index of Array.
+  /// Reports SMTError when the backend cannot answer the underlying model
+  /// query, like the other model getters.
+  virtual SMTResult<SMTExprRef> getArrayElement(const SMTExprRef &Array,
+                                                const SMTExprRef &Index) = 0;
 
   /// If a model is available, returns the model's sparse representation of
   /// an array expression: the finite set of (index, element) entries the

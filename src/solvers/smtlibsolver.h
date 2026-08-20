@@ -480,8 +480,8 @@ protected:
   SMTResult<std::string> getIntImpl(const SMTExprRef &Exp) override;
   SMTResult<std::pair<std::string, std::string>>
   getRationalImpl(const SMTExprRef &Exp) override;
-  SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
-                                 const SMTExprRef &Index) override;
+  SMTResult<SMTExprRef> getArrayElementImpl(const SMTExprRef &Array,
+                                            const SMTExprRef &Index) override;
 
   // --- check / push / pop / reset ---
   CheckResult checkImpl() override;

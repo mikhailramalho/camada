@@ -570,6 +570,16 @@ inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
+inline void pop_underflow_rejected(const camada::SMTSolverRef &solver) {
+  // Popping past the root would take the backend below its own scope
+  // floor while the common layer's journals stop at theirs, leaving the
+  // two permanently out of step (Z3 threw "index out of bounds").
+  solver->push(1);
+  solver->pop(1);
+  solver->push(2);
+  solver->pop(2);
+}
+
 inline void null_sort_handle_equality(const camada::SMTSolverRef &solver) {
   // Sort handles are nullable, so comparison has to answer instead of
   // aborting inside the dereference.

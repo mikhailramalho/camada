@@ -272,6 +272,9 @@ TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  // Native FP without a native round-to-away term: mkRM aborts for that
+  // mode, so callers need the separate bit to know before they build it.
+  REQUIRE_FALSE(solver->supports(SolverFeature::NativeRoundToAway));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
