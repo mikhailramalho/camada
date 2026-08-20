@@ -263,3 +263,9 @@ TEST_CASE("Nested constant arrays CVC5 test", "[CVC5]") {
   solver->reset();
   nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }
+
+TEST_CASE("Foreign handle rejection CVC5 test", "[CVC5]") {
+  auto a = camada::createCVC5Solver();
+  auto b = camada::createCVC5Solver();
+  foreign_handle_rejected(a, b);
+}

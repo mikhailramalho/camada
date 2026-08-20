@@ -141,6 +141,15 @@ protected:
   }
 #endif
 
+  /// The solver whose arena owns the pointed-to object, or null for an
+  /// absent handle. Handles are only meaningful to that solver: passing one
+  /// to another instance would reach a backend that static_casts it to its
+  /// own type. Exposed for SMTSolverImpl's ownership check, which is why it
+  /// is protected rather than public.
+#if CAMADA_CHECKED_HANDLES
+  CAMADA_ALWAYS_INLINE const SMTHandleState *owner() const { return State; }
+#endif
+
 private:
   CAMADA_ALWAYS_INLINE void validate() const {
 #if CAMADA_CHECKED_HANDLES

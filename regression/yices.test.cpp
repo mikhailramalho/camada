@@ -317,3 +317,9 @@ TEST_CASE("Nested constant arrays Yices test", "[Yices]") {
   solver->reset();
   nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }
+
+TEST_CASE("Foreign handle rejection YICES test", "[YICES]") {
+  auto a = camada::createYicesSolver();
+  auto b = camada::createYicesSolver();
+  foreign_handle_rejected(a, b);
+}

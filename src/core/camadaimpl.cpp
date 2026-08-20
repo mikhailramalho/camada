@@ -44,6 +44,8 @@ namespace camada {
                                             ImplCall, ResultAssert)            \
   ReturnType SMTSolverImpl::Name(const SMTExprRef &LHS,                        \
                                  const SMTExprRef &RHS) {                      \
+    requireOwned(LHS);                                                         \
+    requireOwned(RHS);                                                         \
     SortAssert;                                                                \
     SMTExprRef theExp = ImplCall;                                              \
     ResultAssert;                                                              \
@@ -52,6 +54,7 @@ namespace camada {
 #define CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(ReturnType, Name, SortAssert,       \
                                            ImplCall, ResultAssert)             \
   ReturnType SMTSolverImpl::Name(const SMTExprRef &Exp) {                      \
+    requireOwned(Exp);                                                         \
     SortAssert;                                                                \
     SMTExprRef theExp = ImplCall;                                              \
     ResultAssert;                                                              \
@@ -65,6 +68,7 @@ namespace camada {
 #define CAMADA_DEFINE_FP_UNARY_WRAPPER(Name, ImplName, SortAssert,             \
                                        ResultAssert)                           \
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &Exp) {                      \
+    requireOwned(Exp);                                                         \
     SortAssert;                                                                \
     SMTExprRef theExp =                                                        \
         usesBVFPEncoding(Exp) ? SMTSolverImpl::ImplName(Exp) : ImplName(Exp);  \
@@ -91,6 +95,7 @@ namespace camada {
 // belongs with the operation rather than being retyped per extension.
 #define CAMADA_DEFINE_BV_EXTEND_WRAPPER(Name, ImplName, What)                  \
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &Exp, unsigned ExtraBits) {  \
+    requireOwned(Exp);                                                         \
     requireBVSort(Exp, "Expected bit-vector expression");                      \
     fatalErrorIf(ExtraBits >                                                   \
                      std::numeric_limits<unsigned>::max() - Exp->getWidth(),   \
@@ -104,6 +109,9 @@ namespace camada {
 #define CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(Name, ImplName)                     \
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &LHS, const SMTExprRef &RHS, \
                                  const SMTExprRef &R) {                        \
+    requireOwned(LHS);                                                         \
+    requireOwned(RHS);                                                         \
+    requireOwned(R);                                                           \
     requireFPSameSortAndRM(LHS, RHS, R);                                       \
     SMTExprRef theExp = usesBVFPEncoding(LHS)                                  \
                             ? SMTSolverImpl::ImplName(LHS, RHS, R)             \
@@ -115,6 +123,7 @@ namespace camada {
 // the result width to ToWidth are the same for signed and unsigned.
 #define CAMADA_DEFINE_FP_TO_BV_WRAPPER(Name, ImplName)                         \
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &From, unsigned ToWidth) {   \
+    requireOwned(From);                                                        \
     requireFPSort(From, "Expected floating-point expression");                 \
     fatalErrorIf(ToWidth == 0, "Bit-vector target width must be non-zero");    \
     SMTExprRef theExp = usesBVFPEncoding(From)                                 \
@@ -127,6 +136,7 @@ namespace camada {
 // wrapper, so it is the only thing worth not retyping.
 #define CAMADA_DEFINE_MODEL_GETTER(ResultType, Name, SortAssert, ImplName)     \
   SMTResult<ResultType> SMTSolverImpl::Name(const SMTExprRef &Exp) {           \
+    requireOwned(Exp);                                                         \
     SortAssert;                                                                \
     return ImplName(Exp);                                                      \
   }
@@ -548,6 +558,8 @@ SMTSortRef SMTSolverImpl::mkFP64Sort(FPEncoding Encoding) {
 
 SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
+  requireOwned(IndexSort);
+  requireOwned(ElemSort);
   // Tuple-typed array components on backends without native datatype
   // support would route the encoded tuple's CamadaTupleSort (which has
   // no backend sort handle) through mkArraySortImpl, where the backend
@@ -593,6 +605,9 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
 SMTSortRef
 SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
                               const SMTSortRef &CodomainSort) {
+  requireOwned(CodomainSort);
+  for (const SMTSortRef &D : DomainSorts)
+    requireOwned(D);
   fatalErrorIf(DomainSorts.empty(),
                "Function sort must have at least one domain sort");
   // Tuple-typed function components on backends without native datatype
@@ -657,6 +672,8 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
 
 SMTSortRef
 SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
+  for (const SMTSortRef &E : ElementSorts)
+    requireOwned(E);
   // Route to the Camada-managed lowering for backends without native
   // datatype support; the caches still serve identity for these (the
   // CamadaTupleSort sits in the same SortArena as backend sorts).
@@ -703,6 +720,7 @@ SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
 }
 
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   requireBoolSort(Exp, "Expected boolean constraint");
   invalidateUnsatAssumptions();
   commitShadowLink(Exp);
@@ -862,6 +880,8 @@ CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
 
 SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
+  requireOwned(LHS);
+  requireOwned(RHS);
   requireSameSort(LHS, RHS, "Expected expressions with same sort");
   // Tuple-sorted operands on backends without native datatype support
   // route through the Camada lowering, which fans out to per-field
@@ -1957,6 +1977,7 @@ SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int) {
 
 SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
                                    const SMTSortRef &Sort) {
+  requireOwned(Sort);
   // The `__CAMADA_` prefix is reserved for the symbols Camada's own
   // encodings introduce — tuple fields, lazy and Ackermann arrays, array
   // equality witnesses, FP-to-BV shadowing, int-to-BV, assumption
