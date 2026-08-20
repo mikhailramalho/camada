@@ -73,6 +73,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
 
   RESETANDTEST(equal_ten);
   RESETANDTEST(symbol_name_punctuation_distinct);
+  RESETANDTEST(null_sort_handle_equality);
   RESETANDTEST(implies_semantics);
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
