@@ -72,6 +72,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   constexpr auto BVFP = camada::FPEncoding::BV;
 
   RESETANDTEST(equal_ten);
+  RESETANDTEST(symbol_name_punctuation_distinct);
   RESETANDTEST(implies_semantics);
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);
