@@ -570,6 +570,24 @@ inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
+inline void null_sort_handle_equality(const camada::SMTSolverRef &solver) {
+  // Sort handles are nullable, so comparison has to answer instead of
+  // aborting inside the dereference.
+  camada::SMTSortRef null_a, null_b;
+  REQUIRE(null_a == null_b);
+  REQUIRE_FALSE(null_a != null_b);
+
+  auto live = solver->mkBVSort(8);
+  REQUIRE(live != null_a);
+  REQUIRE(null_a != live);
+  REQUIRE_FALSE(live == null_a);
+
+  // Two handles to the same sort still compare equal, and a different sort
+  // still compares unequal -- the null check must not short-circuit those.
+  REQUIRE(live == solver->mkBVSort(8));
+  REQUIRE(live != solver->mkBVSort(16));
+}
+
 inline void
 symbol_name_punctuation_distinct(const camada::SMTSolverRef &solver) {
   // Names differing only in punctuation are different symbols. A backend

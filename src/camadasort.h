@@ -264,6 +264,13 @@ protected:
 };
 
 inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {
+  // Handles are nullable, so comparing one that is null (or stale) must
+  // answer rather than abort in the dereference: two absent sorts are
+  // equal, and an absent one differs from any live sort.
+  const bool LHSValid = static_cast<bool>(LHS),
+             RHSValid = static_cast<bool>(RHS);
+  if (!LHSValid || !RHSValid)
+    return LHSValid == RHSValid;
   return (*LHS == *RHS);
 }
 
