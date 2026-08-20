@@ -601,15 +601,13 @@ SMTExprRef STPSolver::mkBVFromBinImpl(const std::string &Int,
 
 SMTExprRef STPSolver::mkSymbolImpl(const std::string &Name,
                                    const SMTSortRef &Sort) {
-
-  std::string new_name = Name;
-  for (char &c : new_name)
-    if (c == '@' || c == '!' || c == '&' || c == '#' || c == '$' || c == ':')
-      c = '_';
-
+  // Pass the name through unchanged, like every other backend. This used to
+  // rewrite each of `@!&#$:` to `_`, which made `a@b`, `a!b` and `a_b` the
+  // same STP variable and silently changed satisfiability. STP accepts and
+  // prints those characters verbatim, so there was nothing to sanitize.
   return makeExprRef<STPExpr>(
       SMTExprKind::Symbol, &Context, Sort,
-      STP::vc_varExpr(Context, new_name.c_str(),
+      STP::vc_varExpr(Context, Name.c_str(),
                       toSolverSort<STPSort>(*Sort).Sort));
 }
 

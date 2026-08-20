@@ -4,6 +4,7 @@
 #include <bitset>
 #include <catch2/catch_test_macros.hpp>
 #include <string>
+#include <vector>
 
 inline void equal_ten(const camada::SMTSolverRef &solver) {
   // A free variable
@@ -567,6 +568,36 @@ inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(x_plus_one, three));
   solver->addConstraint(solver->mkArithGt(x, one));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
+inline void
+symbol_name_punctuation_distinct(const camada::SMTSolverRef &solver) {
+  // Names differing only in punctuation are different symbols. A backend
+  // that rewrites those characters to a common replacement aliases them,
+  // which silently changes satisfiability: the conjunction below is
+  // trivially satisfiable for distinct symbols and unsatisfiable if any
+  // pair collapses into one variable. ESBMC generates all of these
+  // (`main::1::x`, `x!0`, `&y`, `#tmp`).
+  const char *Names[] = {"n@x", "n!x", "n&x", "n#x", "n$x", "n:x", "n_x"};
+  auto sort = solver->mkBVSort(4);
+  std::vector<camada::SMTExprRef> syms;
+  for (const char *N : Names)
+    syms.push_back(solver->mkSymbol(N, sort));
+
+  // Pin each symbol to a distinct value. Seven names, sixteen values, so
+  // this is satisfiable exactly when all seven are independent.
+  for (std::size_t I = 0; I < syms.size(); ++I)
+    solver->addConstraint(solver->mkEqual(
+        syms[I], solver->mkBVFromDec(static_cast<int64_t>(I), 4)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  // And each really holds the value it was pinned to, so the names did not
+  // merely survive but map to the right terms.
+  for (std::size_t I = 0; I < syms.size(); ++I) {
+    auto v = solver->getBV(syms[I]);
+    REQUIRE(v);
+    REQUIRE(v.value() == static_cast<int64_t>(I));
+  }
 }
 
 inline void arith_division_semantics(const camada::SMTSolverRef &solver) {
