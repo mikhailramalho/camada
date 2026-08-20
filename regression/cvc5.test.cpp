@@ -23,7 +23,11 @@ TEST_CASE("Camada tuples via config CVC5 test", "[CVC5]") {
   camada::SolverConfig Cfg;
   Cfg.Tuples = camada::TupleEncoding::Camada;
   auto cvc5 = camada::createCVC5Solver(Cfg);
-  REQUIRE_FALSE(cvc5->supports(camada::SolverFeature::NativeTuples));
+  // supports() reports the backend capability, so cvc5 still claims native
+  // datatypes here; tupleMode() is what says this instance will not use
+  // them.
+  REQUIRE(cvc5->supports(camada::SolverFeature::NativeTuples));
+  REQUIRE(cvc5->tupleMode() == camada::TupleEncoding::Camada);
   tuple_semantics(cvc5);
   cvc5->reset();
   tuple_with_array_field(cvc5);

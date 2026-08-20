@@ -388,10 +388,12 @@ TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
 
-  // Camada tuple lowering flips the native-tuples bit.
+  // Camada tuple lowering does not touch the native-tuples bit: that
+  // reports the backend capability, and tupleMode() reports the request.
   auto camadaTuples = std::make_unique<camada::SMTLIBSolver>(
       Path, withTuples(camada::TupleEncoding::Camada));
-  REQUIRE_FALSE(camadaTuples->supports(SolverFeature::NativeTuples));
+  REQUIRE(camadaTuples->supports(SolverFeature::NativeTuples));
+  REQUIRE(camadaTuples->tupleMode() == camada::TupleEncoding::Camada);
 
   solver.reset();
   camadaTuples.reset();

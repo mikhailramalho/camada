@@ -2260,7 +2260,7 @@ bool SMTSolverImpl::supports(SolverFeature Feature) const {
   case SolverFeature::NativeFloatingPoint:
     return nativeFloatingPointSupport();
   case SolverFeature::NativeTuples:
-    return nativeTupleSupport();
+    return nativeDatatypeSupport();
   case SolverFeature::NativeConstantArrays:
     return nativeConstArraySupport();
   case SolverFeature::UnsatAssumptions:

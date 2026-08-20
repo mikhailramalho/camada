@@ -197,7 +197,12 @@ enum class SolverFeature : std::uint8_t {
   /// every backend regardless.
   NativeFloatingPoint,
   /// Backend-native tuple/datatype sorts; other backends route tuples
-  /// through the Camada per-field lowering.
+  /// through the Camada per-field lowering. Like every bit here this is a
+  /// property of the backend, not of this instance: it stays true on a
+  /// solver configured for TupleEncoding::Camada, or for Ackermann arrays
+  /// (which force the lowering because a datatype cannot hold an array
+  /// member with no backend term). To ask what this solver will actually
+  /// do, compose with tupleMode() and arrayMode().
   NativeTuples,
   /// Backend-native `((as const ...) v)` constant arrays; other backends
   /// lower them lazily (see ConstArrayLowering).
@@ -274,8 +279,9 @@ struct SolverConfig {
   /// context creation -- so it is opt-in.
   ///
   /// False (the default) gives fast contexts: checkSatAssuming() works
-  /// unchanged, getUnsatAssumptions() reports UnsupportedOperation and
-  /// supports(SolverFeature::UnsatAssumptions) answers false. True makes
+  /// unchanged and getUnsatAssumptions() reports UnsupportedOperation.
+  /// supports(SolverFeature::UnsatAssumptions) still answers true: it
+  /// reports the backend's capability, not this setting. True makes
   /// the backend track assumptions so getUnsatAssumptions() returns real
   /// cores after an UNSAT checkSatAssuming().
   ///

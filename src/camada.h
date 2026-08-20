@@ -1074,8 +1074,9 @@ public:
   virtual ArrayEncoding arrayMode() const = 0;
 
   /// Tuple lowering (SolverConfig::Tuples). Only reaches a decision on
-  /// backends with native datatypes; supports(NativeTuples) answers what
-  /// this solver will actually do.
+  /// backends with native datatypes -- ask supports(NativeTuples) whether
+  /// this backend has them. Ackermann arrays also force the Camada
+  /// lowering regardless of this setting.
   virtual TupleEncoding tupleMode() const = 0;
 
   /// Whether core production was requested (SolverConfig::

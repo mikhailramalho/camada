@@ -839,7 +839,9 @@ protected:
   /// caller asked for Native, the backend has datatypes, and Ackermann
   /// arrays are not in play, since a datatype cannot hold an array member
   /// with no backend term -- so it lives here instead of being repeated
-  /// identically in every backend that has datatypes.
+  /// identically in every backend that has datatypes. This is the internal
+  /// routing predicate; supports(NativeTuples) reports the backend
+  /// capability and ignores the configuration.
   virtual bool nativeTupleSupport() const final {
     return tupleMode() == TupleEncoding::Native &&
            arrayMode() != ArrayEncoding::Ackermann && nativeDatatypeSupport();
