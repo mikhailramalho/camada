@@ -605,10 +605,15 @@ SMTExprRef CVC5Solver::mkArithMulImpl(const SMTExprRef &LHS,
 
 SMTExprRef CVC5Solver::mkArithDivImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
+  // cvc5 splits division by operand type: DIVISION is Real-only, and Int
+  // operands need INTS_DIVISION. Both leave division by zero undefined,
+  // matching SMT-LIB `/` and `div`.
+  const cvc5::Kind Op =
+      LHS->Sort->isIntSort() ? cvc5::Kind::INTS_DIVISION : cvc5::Kind::DIVISION;
   return makeExprRef<CVC5Expr>(
       SMTExprKind::ArithDiv, &Context, LHS->Sort,
-      Terms.mkTerm(cvc5::Kind::DIVISION, {toSolverExpr<CVC5Expr>(*LHS).Expr,
-                                          toSolverExpr<CVC5Expr>(*RHS).Expr}));
+      Terms.mkTerm(Op, {toSolverExpr<CVC5Expr>(*LHS).Expr,
+                        toSolverExpr<CVC5Expr>(*RHS).Expr}));
 }
 
 SMTExprRef CVC5Solver::mkArithLtImpl(const SMTExprRef &LHS,

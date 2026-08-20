@@ -48,6 +48,8 @@ TEST_CASE("Arith Z3 test", "[Z3]") {
   z3->reset();
   real_arithmetic_semantics(z3);
   z3->reset();
+  arith_division_semantics(z3);
+  z3->reset();
   arith_model_queries(z3);
   z3->reset();
   arith_conversion_semantics(z3);
@@ -212,6 +214,8 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
 CAMADA_Z3_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
                              real_arithmetic_semantics(solver),
                              makeSMTLIBSolver)
+CAMADA_Z3_SMTLIB_SHARED_TEST("arith_division_semantics",
+                             arith_division_semantics(solver), makeSMTLIBSolver)
 CAMADA_Z3_SMTLIB_SHARED_TEST("arith_model_queries", arith_model_queries(solver),
                              makeSMTLIBSolver)
 CAMADA_Z3_SMTLIB_SHARED_TEST("arith_conversion_semantics",

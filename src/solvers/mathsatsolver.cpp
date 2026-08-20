@@ -478,6 +478,15 @@ SMTExprRef MathSATSolver::mkArithMulImpl(const SMTExprRef &LHS,
 
 SMTExprRef MathSATSolver::mkArithDivImpl(const SMTExprRef &LHS,
                                          const SMTExprRef &RHS) {
+  // msat_make_divide is exact rational division whatever the operand type,
+  // so on integers it answers 7/2 = 7/2 rather than SMT-LIB div's 3. Floor
+  // the rational quotient, the same way mkArithModImpl derives its
+  // remainder.
+  if (LHS->Sort->isIntSort()) {
+    SMTExprRef theExp =
+        mkReal2Int(mkArithDiv(mkInt2Real(LHS), mkInt2Real(RHS)));
+    return rewrapExprImpl(*theExp, LHS->Sort, SMTExprKind::ArithDiv);
+  }
   return makeExprRef<MathSATExpr>(
       SMTExprKind::ArithDiv, &Context, LHS->Sort,
       msat_make_divide(Context, toMathSATTerm(LHS), toMathSATTerm(RHS)));

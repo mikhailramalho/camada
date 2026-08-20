@@ -66,6 +66,8 @@ TEST_CASE("Arith CVC5 test", "[CVC5]") {
   cvc5->reset();
   real_arithmetic_semantics(cvc5);
   cvc5->reset();
+  arith_division_semantics(cvc5);
+  cvc5->reset();
   arith_model_queries(cvc5);
   cvc5->reset();
   arith_conversion_semantics(cvc5);
@@ -150,6 +152,9 @@ CAMADA_CVC5_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
                                makeSMTLIBSolver)
 CAMADA_CVC5_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
                                real_arithmetic_semantics(solver),
+                               makeSMTLIBSolver)
+CAMADA_CVC5_SMTLIB_SHARED_TEST("arith_division_semantics",
+                               arith_division_semantics(solver),
                                makeSMTLIBSolver)
 CAMADA_CVC5_SMTLIB_SHARED_TEST("arith_conversion_semantics",
                                arith_conversion_semantics(solver),

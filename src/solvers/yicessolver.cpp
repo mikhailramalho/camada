@@ -599,10 +599,16 @@ SMTExprRef YicesSolver::mkArithMulImpl(const SMTExprRef &LHS,
 
 SMTExprRef YicesSolver::mkArithDivImpl(const SMTExprRef &LHS,
                                        const SMTExprRef &RHS) {
+  // yices_division is rational division, so on integers it answers
+  // 7/2 = 7/2 rather than SMT-LIB div's 3. yices_idiv implements the
+  // Ints-theory semantics.
+  const bool IsInt = LHS->Sort->isIntSort();
   return makeExprRef<YicesExpr>(
       SMTExprKind::ArithDiv, Context, LHS->Sort,
-      yices_division(toSolverExpr<YicesExpr>(*LHS).Expr,
-                     toSolverExpr<YicesExpr>(*RHS).Expr));
+      IsInt ? yices_idiv(toSolverExpr<YicesExpr>(*LHS).Expr,
+                         toSolverExpr<YicesExpr>(*RHS).Expr)
+            : yices_division(toSolverExpr<YicesExpr>(*LHS).Expr,
+                             toSolverExpr<YicesExpr>(*RHS).Expr));
 }
 
 SMTExprRef YicesSolver::mkArithLtImpl(const SMTExprRef &LHS,
