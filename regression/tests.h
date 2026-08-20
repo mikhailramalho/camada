@@ -59,6 +59,48 @@ fxp_countls_narrow_target_rejected(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->mkFXPCountls(x, 6)->getWidth() == 6);
 }
 
+// A handle only means anything to the solver that made it: passing one to
+// another instance used to reach the backend, where it was static_cast to
+// that backend's type. Observed in release builds as an uncaught
+// z3::exception between two Z3 instances and a segfault when a Yices term
+// reached Z3. Lives here because it needs require_abort.
+inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
+                                    const camada::SMTSolverRef &other) {
+#if !CAMADA_CHECKED_HANDLES
+  // Unchecked handles carry no owner, so a foreign one cannot be detected
+  // and its use stays undefined behavior by contract.
+  (void)solver;
+  (void)other;
+  SKIP("foreign-handle detection is compiled out (CAMADA_CHECKED_HANDLES=OFF)");
+#else
+  auto mine = solver->mkSymbol("own", solver->mkBVSort(8));
+  auto theirs = other->mkSymbol("foreign", other->mkBVSort(8));
+
+  // As an operand, on either side of the operation.
+  require_abort([&]() { (void)solver->mkBVAdd(theirs, mine); });
+  require_abort([&]() { (void)solver->mkBVAdd(mine, theirs); });
+  require_abort([&]() { (void)solver->mkBVNot(theirs); });
+  require_abort([&]() { (void)solver->mkEqual(theirs, mine); });
+
+  // As a constraint, and as the subject of a model query.
+  require_abort(
+      [&]() { solver->addConstraint(other->mkEqual(theirs, theirs)); });
+
+  // Sort parameters route through no operand guard, so check one.
+  require_abort([&]() { (void)solver->mkSymbol("s", other->mkBVSort(4)); });
+  require_abort([&]() {
+    (void)solver->mkArraySort(other->mkBVSort(4), solver->mkBVSort(4));
+  });
+
+  // The solver's own handles keep working after all that.
+  solver->addConstraint(solver->mkEqual(mine, solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto v = solver->getBV(mine);
+  REQUIRE(v);
+  REQUIRE(v.value() == 7);
+#endif
+}
+
 inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
   require_abort(
       [&]() { (void)solver->mkFPSort(2, 10, camada::FPEncoding::BV); });

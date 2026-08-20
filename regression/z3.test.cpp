@@ -302,3 +302,9 @@ TEST_CASE("Nested constant arrays Z3 test", "[Z3]") {
   solver->reset();
   nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }
+
+TEST_CASE("Foreign handle rejection Z3 test", "[Z3]") {
+  auto a = camada::createZ3Solver();
+  auto b = camada::createZ3Solver();
+  foreign_handle_rejected(a, b);
+}

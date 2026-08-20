@@ -254,3 +254,9 @@ TEST_CASE("Nested constant arrays Bitwuzla test", "[Bitwuzla]") {
   solver->reset();
   nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }
+
+TEST_CASE("Foreign handle rejection Bitwuzla test", "[Bitwuzla]") {
+  auto a = camada::createBitwuzlaSolver();
+  auto b = camada::createBitwuzlaSolver();
+  foreign_handle_rejected(a, b);
+}

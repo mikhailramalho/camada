@@ -146,3 +146,9 @@ TEST_CASE("Unsupported nested constant arrays STP test", "[STP]") {
   auto stp = camada::createSTPSolver();
   require_abort([&]() { nested_const_array_semantics(stp); });
 }
+
+TEST_CASE("Foreign handle rejection STP test", "[STP]") {
+  auto a = camada::createSTPSolver();
+  auto b = camada::createSTPSolver();
+  foreign_handle_rejected(a, b);
+}

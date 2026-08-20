@@ -417,6 +417,30 @@ protected:
   /// raw pointer to it, so it must stay readable after this solver dies.
   SMTHandleState *HandleState = makeProcessLifetimeHandleState();
 
+protected:
+  /// Reject a handle minted by a different solver. Sort and expression
+  /// handles only mean something to the instance that created them: the
+  /// backends static_cast them to their own type, so a foreign one reads
+  /// the wrong member (or an integer term id as a pointer) instead of
+  /// being diagnosed. The backend kind alone cannot catch it -- two
+  /// solvers of the same backend are indistinguishable that way.
+  ///
+  /// Handles built by Camada's own lowering carry this solver's state, so
+  /// internal re-entry into the public API passes this unchanged.
+  /// Unchecked handles carry no owner, so there is nothing to compare and
+  /// a foreign handle stays undefined behaviour -- the same trade the mode
+  /// already makes for stale ones.
+  template <typename Ref>
+  CAMADA_ALWAYS_INLINE void requireOwned(const Ref &R) const {
+#if CAMADA_CHECKED_HANDLES
+    fatalErrorIf(R.owner() != HandleState,
+                 "Handle belongs to a different solver instance");
+#else
+    (void)R;
+#endif
+  }
+
+private:
 public:
   SMTExprRef getBVZero1Expr() const;
   SMTExprRef getBVOne1Expr() const;
