@@ -101,6 +101,18 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
 #endif
 }
 
+inline void pop_past_root_rejected(const camada::SMTSolverRef &solver) {
+  // Each check runs in a forked child, so the abort does not take the
+  // test process with it and the parent's scope depth is untouched.
+  require_abort([&]() { solver->pop(1); });
+  solver->push(1);
+  require_abort([&]() { solver->pop(2); });
+  solver->pop(1);
+  auto x = solver->mkSymbol("pop_x", solver->mkBVSort(4));
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(1, 4)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
 inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
   require_abort(
       [&]() { (void)solver->mkFPSort(2, 10, camada::FPEncoding::BV); });
@@ -116,6 +128,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(equal_ten);
   RESETANDTEST(symbol_name_punctuation_distinct);
   RESETANDTEST(null_sort_handle_equality);
+  RESETANDTEST(pop_underflow_rejected);
+  RESETANDTEST(pop_past_root_rejected);
   RESETANDTEST(implies_semantics);
   RESETANDTEST(implies_true_implies_false);
   RESETANDTEST(bv_lshr_semantics);

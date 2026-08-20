@@ -218,8 +218,8 @@ protected:
   SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) override;
   SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) override;
   SMTResult<std::string> getFPInBinImpl(const SMTExprRef &Exp) override;
-  SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
-                                 const SMTExprRef &Index) override;
+  SMTResult<SMTExprRef> getArrayElementImpl(const SMTExprRef &Array,
+                                            const SMTExprRef &Index) override;
 
   SMTResult<ArrayModel> getArrayValuesImpl(const SMTExprRef &Array) override;
 

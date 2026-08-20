@@ -269,6 +269,7 @@ TEST_CASE("Z3 feature capabilities", "[Z3]") {
   REQUIRE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE(solver->supports(SolverFeature::NativeRoundToAway));
   REQUIRE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));

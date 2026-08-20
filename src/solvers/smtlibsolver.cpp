@@ -2483,8 +2483,9 @@ SMTLIBSolver::getRationalImpl(const SMTExprRef &Exp) {
   return std::make_pair(Num, Den);
 }
 
-SMTExprRef SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
-                                             const SMTExprRef &Index) {
+SMTResult<SMTExprRef>
+SMTLIBSolver::getArrayElementImpl(const SMTExprRef &Array,
+                                  const SMTExprRef &Index) {
   // The native backends evaluate (select Array Index) against their cached
   // model. Over the SMT-LIB pipe we don't have a cached model — but the
   // child solver does, so building a (select ...) expression and letting the

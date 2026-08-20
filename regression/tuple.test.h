@@ -474,7 +474,7 @@ inline void tuple_array_model_values(
   // Exact single-index recovery: getArrayElement at a written and an
   // untouched index, read each tuple field back.
   auto fieldsAt = [&](int64_t Index, bool &Flag, int64_t &Num) {
-    auto e = solver->getArrayElement(arr, idx(Index));
+    auto e = arrayElement(solver, arr, idx(Index));
     REQUIRE(e->Sort->isTupleSort());
     auto b = solver->getBool(solver->mkTupleSelect(e, 0));
     auto n = solver->getBV(solver->mkTupleSelect(e, 1));
@@ -546,7 +546,7 @@ inline void tuple_array_model_values(
   auto stored = solver->mkTuple({solver->mkBool(true), idx(33)});
   auto sym1 = solver->mkArrayStore(sym, idx(4), stored);
   REQUIRE(solver->check() == camada::CheckResult::SAT);
-  auto e = solver->getArrayElement(sym1, idx(4));
+  auto e = arrayElement(solver, sym1, idx(4));
   auto eb = solver->getBool(solver->mkTupleSelect(e, 0));
   auto en = solver->getBV(solver->mkTupleSelect(e, 1));
   REQUIRE(eb);

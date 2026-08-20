@@ -107,9 +107,9 @@ SMTExprRef mkCamadaTupleArrayIte(SMTSolverImpl &Solver, const SMTExprRef &Cond,
 /// into one tuple-valued ArrayModel: indexes are unioned by model value,
 /// and the Base is a tuple of the per-leaf bases only when every leaf
 /// reports one (otherwise null — no fabricated partial default).
-SMTExprRef getCamadaTupleArrayElement(SMTSolverImpl &Solver,
-                                      const SMTExprRef &Array,
-                                      const SMTExprRef &Index);
+SMTResult<SMTExprRef> getCamadaTupleArrayElement(SMTSolverImpl &Solver,
+                                                 const SMTExprRef &Array,
+                                                 const SMTExprRef &Index);
 
 SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
                                                 const SMTExprRef &Array);

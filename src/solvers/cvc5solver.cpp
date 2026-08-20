@@ -1047,8 +1047,8 @@ SMTResult<std::string> CVC5Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   return std::get<2>(fp).getBitVectorValue();
 }
 
-SMTExprRef CVC5Solver::getArrayElementImpl(const SMTExprRef &Array,
-                                           const SMTExprRef &Index) {
+SMTResult<SMTExprRef> CVC5Solver::getArrayElementImpl(const SMTExprRef &Array,
+                                                      const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
   return makeExprRef<CVC5Expr>(
       sel->getKind(), &Context, sel->Sort,

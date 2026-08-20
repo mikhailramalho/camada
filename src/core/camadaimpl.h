@@ -739,8 +739,8 @@ public:
   SMTResult<float> getFP32(const SMTExprRef &Exp) override final;
   SMTResult<double> getFP64(const SMTExprRef &Exp) override final;
   SMTResult<FXPValue> getFXP(const SMTExprRef &Exp) override final;
-  SMTExprRef getArrayElement(const SMTExprRef &Array,
-                             const SMTExprRef &Index) override final;
+  SMTResult<SMTExprRef> getArrayElement(const SMTExprRef &Array,
+                                        const SMTExprRef &Index) override final;
   SMTResult<ArrayModel> getArrayValues(const SMTExprRef &Array) override final;
   SMTExprRef mkBool(const bool b) override final;
   SMTExprRef mkInt(int64_t v) override final;
@@ -893,6 +893,9 @@ protected:
 
   /// Uninterpreted functions (mkFunctionSort, mkApply).
   virtual bool uninterpretedFunctionSupport() const { return true; }
+
+  /// RM::ROUND_TO_AWAY as a native rounding mode.
+  virtual bool nativeRoundToAwaySupport() const { return true; }
 
   /// FPEncoding::Native sorts and operations. FPEncoding::BV works on
   /// every backend regardless, through the common layer's bit-blast.
@@ -1182,8 +1185,8 @@ protected:
 
   SMTResult<double> getFP64Impl(const SMTExprRef &Exp);
 
-  virtual SMTExprRef getArrayElementImpl(const SMTExprRef &Array,
-                                         const SMTExprRef &Index) = 0;
+  virtual SMTResult<SMTExprRef>
+  getArrayElementImpl(const SMTExprRef &Array, const SMTExprRef &Index) = 0;
 
   /// Walk the backend model's representation of Array (store chains over a
   /// constant array, function interpretations, ...) into an ArrayModel.

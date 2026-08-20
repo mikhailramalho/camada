@@ -194,6 +194,7 @@ TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   REQUIRE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
+  REQUIRE(solver->supports(SolverFeature::NativeRoundToAway));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
   // The capability is present either way; core extraction is opt-in at

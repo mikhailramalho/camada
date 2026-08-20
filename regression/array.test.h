@@ -1,5 +1,6 @@
 
 #include "camada.h"
+#include "modelhelpers.test.h"
 
 #include <bitset>
 #include <catch2/catch_test_macros.hpp>
@@ -31,7 +32,7 @@ array(const camada::SMTSolverRef &solver,
   // Add the constraint to the solver, And check for satisfiability
   solver->addConstraint(eq);
   REQUIRE(solver->check() == camada::CheckResult::SAT);
-  auto selected = solver->getArrayElement(arr11, solver->mkBVFromDec(1, 2));
+  auto selected = arrayElement(solver, arr11, solver->mkBVFromDec(1, 2));
   REQUIRE(selected->Sort == elemsort);
   auto selected_res = solver->getBVInBin(selected);
   REQUIRE(selected_res);
@@ -59,8 +60,8 @@ inline void array_const_store_semantics(
 
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 
-  auto read_written = solver->getArrayElement(updated, idx_written);
-  auto read_other = solver->getArrayElement(updated, idx_other);
+  auto read_written = arrayElement(solver, updated, idx_written);
+  auto read_other = arrayElement(solver, updated, idx_other);
 
   REQUIRE(read_written->Sort == elemsort);
   REQUIRE(read_other->Sort == elemsort);
@@ -98,8 +99,8 @@ inline void bool_array_const_store_semantics(
 
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 
-  auto read_written = solver->getArrayElement(updated, idx_written);
-  auto read_other = solver->getArrayElement(updated, idx_other);
+  auto read_written = arrayElement(solver, updated, idx_written);
+  auto read_other = arrayElement(solver, updated, idx_other);
 
   REQUIRE(read_written->Sort == boolsort);
   REQUIRE(read_other->Sort == boolsort);
@@ -206,8 +207,8 @@ inline void wide_index_const_array_semantics(
 
     // The model query at an index the formula never touched must still
     // report the default, resolved from the tracked derivation chain.
-    auto read_written = solver->getArrayElement(updated, idx_written);
-    auto read_untouched = solver->getArrayElement(updated, idx_untouched);
+    auto read_written = arrayElement(solver, updated, idx_written);
+    auto read_untouched = arrayElement(solver, updated, idx_untouched);
     auto read_written_res = solver->getBVInBin(read_written);
     auto read_untouched_res = solver->getBVInBin(read_untouched);
     REQUIRE(read_written_res);
@@ -307,7 +308,7 @@ inline void const_array_model_values(
   // through the base or an explicit entry.
   REQUIRE(array_model_value_at(solver, Model.value(), 200) == 7);
   // The sparse model must agree with the per-index query API.
-  auto Probe = solver->getBV(solver->getArrayElement(arr, idx(200)));
+  auto Probe = solver->getBV(arrayElement(solver, arr, idx(200)));
   REQUIRE(Probe);
   REQUIRE(Probe.value() == 7);
 }
@@ -626,9 +627,9 @@ inline void nested_const_array_semantics(
       solver->mkArraySelect(solver->mkArraySelect(outer, idx(0)), idx(0)),
       idx(7)));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
-  auto innerModel = solver->getArrayElement(outer, idx(1));
+  auto innerModel = arrayElement(solver, outer, idx(1));
   REQUIRE(innerModel->Sort == solver->mkArraySort(bv8, bv8));
-  auto cell = solver->getBV(solver->getArrayElement(innerModel, idx(3)));
+  auto cell = solver->getBV(arrayElement(solver, innerModel, idx(3)));
   REQUIRE(cell);
   REQUIRE(cell.value() == 7);
 

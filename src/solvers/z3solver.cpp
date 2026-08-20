@@ -897,8 +897,8 @@ SMTResult<std::string> Z3Solver::getFPInBinImpl(const SMTExprRef &Exp) {
   return bv;
 }
 
-SMTExprRef Z3Solver::getArrayElementImpl(const SMTExprRef &Array,
-                                         const SMTExprRef &Index) {
+SMTResult<SMTExprRef> Z3Solver::getArrayElementImpl(const SMTExprRef &Array,
+                                                    const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
   return makeExprRef<Z3Expr>(sel->getKind(), &Context, sel->Sort,
                              Solver.get_model().eval(toZ3Expr(sel), true));
