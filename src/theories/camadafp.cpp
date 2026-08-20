@@ -2518,17 +2518,40 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
 }
 
 SMTResult<int64_t> SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
+  const unsigned Width = Exp->getWidth();
+  if (Width > 64)
+    return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
+                    "Bit-vector is wider than 64 bits; use getBVInBin"};
   SMTResult<std::string> result = getBVInBin(Exp);
   if (!result)
     return result.error();
-  const std::string &bv = result.value();
-  uint64_t res = std::strtoull(bv.c_str(), nullptr, 2);
-  if (res & (1ULL << (Exp->getWidth() - 1)))
-    res |= ~((1ULL << Exp->getWidth()) - 1);
-  return res;
+  uint64_t res = std::strtoull(result.value().c_str(), nullptr, 2);
+  // Sign-extend from the top bit. Both shifts are undefined at width 64
+  // (1ULL << 64), which used to collapse every negative 64-bit value to
+  // -1, so a full-width value is already in its final form.
+  if (Width < 64 && (res & (1ULL << (Width - 1))))
+    res |= ~((1ULL << Width) - 1);
+  return static_cast<int64_t>(res);
+}
+
+SMTResult<uint64_t> SMTSolverImpl::getBVUnsignedImpl(const SMTExprRef &Exp) {
+  if (Exp->getWidth() > 64)
+    return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
+                    "Bit-vector is wider than 64 bits; use getBVInBin"};
+  SMTResult<std::string> result = getBVInBin(Exp);
+  if (!result)
+    return result.error();
+  return std::strtoull(result.value().c_str(), nullptr, 2);
 }
 
 SMTResult<float> SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
+  // Match on exponent width plus total width: getFPSignificandWidth()
+  // counts the hidden bit under the BV encoding but not the native one
+  // (see issue #184), while the total is 32 either way.
+  if (Exp->Sort->getFPExponentWidth() != 8 || Exp->getWidth() != 32)
+    return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
+                    "Expected an IEEE-754 binary32 expression; use "
+                    "getFPInBin for other formats"};
   SMTResult<std::string> result = getFPInBin(Exp);
   if (!result)
     return result.error();
@@ -2537,6 +2560,11 @@ SMTResult<float> SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
 }
 
 SMTResult<double> SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
+  // See getFP32Impl: the total width is the encoding-independent check.
+  if (Exp->Sort->getFPExponentWidth() != 11 || Exp->getWidth() != 64)
+    return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
+                    "Expected an IEEE-754 binary64 expression; use "
+                    "getFPInBin for other formats"};
   SMTResult<std::string> result = getFPInBin(Exp);
   if (!result)
     return result.error();

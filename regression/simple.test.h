@@ -570,6 +570,73 @@ inline void int_arithmetic_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
+inline void bv_typed_getter_domain(const camada::SMTSolverRef &solver) {
+  // getBV interprets the top bit as a sign, so its domain is exactly
+  // int64_t: widths up to 64 signed, and anything wider (or an unsigned
+  // value that does not fit) has to be reported rather than truncated.
+  auto pin = [&](unsigned Width, const std::string &Bits) {
+    auto x = solver->mkSymbol("g" + std::to_string(Width) + Bits,
+                              solver->mkBVSort(Width));
+    solver->addConstraint(solver->mkEqual(x, solver->mkBVFromBin(Bits)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    return x;
+  };
+
+  // Width 64 with the top bit set: every such value used to come back as
+  // -1, because the sign-extension mask shifted by the full width.
+  {
+    auto x = pin(64, "1" + std::string(63, '0'));
+    auto v = solver->getBV(x);
+    REQUIRE(v);
+    REQUIRE(v.value() == INT64_MIN);
+    auto u = solver->getBVUnsigned(x);
+    REQUIRE(u);
+    REQUIRE(u.value() == (1ULL << 63));
+  }
+  solver->reset();
+  {
+    auto x = pin(64, std::string(64, '1'));
+    auto v = solver->getBV(x);
+    REQUIRE(v);
+    REQUIRE(v.value() == -1);
+    auto u = solver->getBVUnsigned(x);
+    REQUIRE(u);
+    REQUIRE(u.value() == UINT64_MAX);
+  }
+  solver->reset();
+  // A positive 64-bit value is unaffected, signed or unsigned.
+  {
+    auto x = pin(64, "0" + std::string(63, '1'));
+    auto v = solver->getBV(x);
+    REQUIRE(v);
+    REQUIRE(v.value() == INT64_MAX);
+    auto u = solver->getBVUnsigned(x);
+    REQUIRE(u);
+    REQUIRE(u.value() == static_cast<uint64_t>(INT64_MAX));
+  }
+  solver->reset();
+  // Narrow widths keep working, both signs.
+  {
+    auto x = pin(8, "11111111");
+    REQUIRE(solver->getBV(x).value() == -1);
+    REQUIRE(solver->getBVUnsigned(x).value() == 255u);
+  }
+  solver->reset();
+  // Wider than 64 bits fits in neither getter: report, do not truncate.
+  {
+    auto x = pin(72, std::string(72, '1'));
+    auto v = solver->getBV(x);
+    REQUIRE_FALSE(v);
+    REQUIRE(v.error().Code == camada::SMTErrorCode::InvalidUsage);
+    auto u = solver->getBVUnsigned(x);
+    REQUIRE_FALSE(u);
+    // getBVInBin stays the exact path for any width.
+    auto bits = solver->getBVInBin(x);
+    REQUIRE(bits);
+    REQUIRE(bits.value() == std::string(72, '1'));
+  }
+}
+
 inline void pop_underflow_rejected(const camada::SMTSolverRef &solver) {
   // Popping past the root would take the backend below its own scope
   // floor while the common layer's journals stop at theirs, leaving the

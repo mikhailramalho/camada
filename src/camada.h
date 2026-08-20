@@ -837,8 +837,16 @@ public:
   virtual SMTResult<bool> getBool(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given bitvector
-  /// symbol as a 64-bits int.
+  /// symbol as a signed 64-bit int, interpreting the top bit as the sign.
+  /// Widths above 64 do not fit and report InvalidUsage; getBVInBin is the
+  /// exact path for any width.
   virtual SMTResult<int64_t> getBV(const SMTExprRef &Exp) = 0;
+
+  /// If a model is available, returns the value of a given bitvector
+  /// symbol as an unsigned 64-bit int. The counterpart to getBV for
+  /// values whose top bit is set but which are not meant as negative;
+  /// widths above 64 report InvalidUsage.
+  virtual SMTResult<uint64_t> getBVUnsigned(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given bitvector
   /// symbol as a 2-complement form binary string.
@@ -865,15 +873,17 @@ public:
   virtual SMTResult<std::string> getFPInBin(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given floating-point
-  /// symbol as float. We assume the floating-point is using the IEEE-754
-  /// format: 1 bit for the sign + 8 bits for the exponent + 23 bits for the
-  /// significand and 1 hidden bit in the significand
+  /// symbol as float. Requires the IEEE-754 binary32 format: 1 sign bit +
+  /// 8 exponent bits + 23 stored significand bits. Any other format
+  /// reports InvalidUsage rather than reinterpreting the bits; use
+  /// getFPInBin for arbitrary formats.
   virtual SMTResult<float> getFP32(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the value of a given floating-point
-  /// symbol as double. We assume the floating-point is using the IEEE-754
-  /// format: 1 bit for the sign + 11 bits for the exponent + 52 bits for the
-  /// significand and 1 hidden bit in the significand
+  /// symbol as double. Requires the IEEE-754 binary64 format: 1 sign bit +
+  /// 11 exponent bits + 52 stored significand bits. Any other format
+  /// reports InvalidUsage rather than reinterpreting the bits; use
+  /// getFPInBin for arbitrary formats.
   virtual SMTResult<double> getFP64(const SMTExprRef &Exp) = 0;
 
   /// If a model is available, returns the exact value of a given fixed-point

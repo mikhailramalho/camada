@@ -728,6 +728,7 @@ public:
                       const SMTExprRef &Body) override final;
   SMTResult<bool> getBool(const SMTExprRef &Exp) override final;
   SMTResult<int64_t> getBV(const SMTExprRef &Exp) override final;
+  SMTResult<uint64_t> getBVUnsigned(const SMTExprRef &Exp) override final;
   SMTResult<std::string> getBVInBin(const SMTExprRef &Exp) override final;
   SMTResult<std::string> getInt(const SMTExprRef &Exp) override final;
   SMTResult<std::pair<std::string, std::string>>
@@ -1171,6 +1172,7 @@ protected:
   virtual SMTResult<bool> getBoolImpl(const SMTExprRef &Exp) = 0;
 
   SMTResult<int64_t> getBVImpl(const SMTExprRef &Exp);
+  SMTResult<uint64_t> getBVUnsignedImpl(const SMTExprRef &Exp);
 
   virtual SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) = 0;
 

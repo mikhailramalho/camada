@@ -863,3 +863,48 @@ inline void fp_wide_format_semantics(const camada::SMTSolverRef &solver) {
     REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 }
+
+inline void fp_typed_getter_format(const camada::SMTSolverRef &solver,
+                                   camada::FPEncoding Encoding) {
+  // getFP32 and getFP64 name a specific IEEE format. Handed a term of a
+  // different one they used to parse whatever bitstring came back, so a
+  // binary64 1.5 read through getFP32 answered 0 instead of reporting.
+  auto f32 = solver->mkFPSort(8, 23, Encoding);
+  auto f64 = solver->mkFPSort(11, 52, Encoding);
+
+  auto d = solver->mkSymbol("tg_d", f64);
+  solver->addConstraint(solver->mkEqual(d, solver->mkFP64(1.5, Encoding)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto asDouble = solver->getFP64(d);
+  REQUIRE(asDouble);
+  REQUIRE(asDouble.value() == 1.5);
+  auto asFloat = solver->getFP32(d);
+  REQUIRE_FALSE(asFloat);
+  REQUIRE(asFloat.error().Code == camada::SMTErrorCode::InvalidUsage);
+
+  solver->reset();
+  f32 = solver->mkFPSort(8, 23, Encoding);
+  auto f = solver->mkSymbol("tg_f", f32);
+  solver->addConstraint(solver->mkEqual(f, solver->mkFP32(1.5f, Encoding)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto backAsFloat = solver->getFP32(f);
+  REQUIRE(backAsFloat);
+  REQUIRE(backAsFloat.value() == 1.5f);
+  REQUIRE_FALSE(solver->getFP64(f));
+
+  // A format that is neither binary32 nor binary64 matches neither
+  // getter. Uses the BV encoding explicitly: cvc5 rejects non-standard
+  // native FP formats without --fp-exp, and the getters' format check is
+  // encoding-independent anyway.
+  solver->reset();
+  auto f16 = solver->mkFPSort(5, 10, camada::FPEncoding::BV);
+  auto h = solver->mkSymbol("tg_h", f16);
+  solver->addConstraint(solver->mkEqual(
+      h, solver->mkFPFromBin("0011110000000000", 5, camada::FPEncoding::BV)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE_FALSE(solver->getFP32(h));
+  REQUIRE_FALSE(solver->getFP64(h));
+  auto bits = solver->getFPInBin(h);
+  REQUIRE(bits);
+  REQUIRE(bits.value() == "0011110000000000");
+}
