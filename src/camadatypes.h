@@ -177,6 +177,27 @@ enum class RM : std::uint8_t {
 
 enum class CheckResult : std::uint8_t { SAT, UNSAT, UNKNOWN };
 
+/// Why a check returned CheckResult::UNKNOWN. Query through
+/// SMTSolver::reasonUnknown(); meaningful only for the check that just
+/// answered UNKNOWN.
+enum class UnknownReason : std::uint8_t {
+  /// The check hit the limit set by setTimeout().
+  Timeout,
+  /// The solver terminated the search without deciding: an incomplete
+  /// fragment (quantifiers, non-linear arithmetic), a resource limit of
+  /// its own, or a deliberate give-up.
+  Incomplete,
+  /// The backend reported an error rather than a result. The formula's
+  /// satisfiability is unknown because the query did not run.
+  BackendError,
+  /// The SMT-LIB child answered with something other than a result --
+  /// an `(error ...)` reply, a malformed line, or end-of-stream because
+  /// it died. Also reported in write-only mode, where no solver ran.
+  ProtocolError,
+  /// No check has answered UNKNOWN yet, or the state has moved on.
+  NotApplicable,
+};
+
 /// Capabilities a backend may or may not implement, queryable through
 /// SMTSolver::supports() instead of discovering them through aborts or
 /// UnsupportedOperation errors.

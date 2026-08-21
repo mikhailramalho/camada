@@ -87,7 +87,11 @@ TEST_CASE("SMTLIB write-only emits a minimal script", "[SMTLIB]") {
     auto X = Solver->mkSymbol("x", BV8);
     auto Five = Solver->mkBVFromBin("00000101", BV8);
     Solver->addConstraint(Solver->mkEqual(X, Five));
-    Solver->check();
+    // Write-only mode emits the script but nothing solves it, so the
+    // UNKNOWN is the absence of an answer rather than a solver declining
+    // to give one.
+    REQUIRE(Solver->check() == camada::CheckResult::UNKNOWN);
+    REQUIRE(Solver->reasonUnknown() == camada::UnknownReason::ProtocolError);
   } // Solver dtor flushes via FileEmitter dtor.
 
   const std::string Expected = "(set-option :print-success false)\n"

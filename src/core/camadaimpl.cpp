@@ -2208,7 +2208,22 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
 
 CheckResult SMTSolverImpl::check() {
   invalidateUnsatAssumptions();
-  return checkImpl();
+  LastUnknownReason = UnknownReason::NotApplicable;
+  return finishCheck(checkImpl());
+}
+
+CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
+  if (Result != CheckResult::UNKNOWN) {
+    LastUnknownReason = UnknownReason::NotApplicable;
+    return Result;
+  }
+  // A backend that recognised the cause already recorded it. Otherwise
+  // attribute the UNKNOWN to the limit Camada set, if there was one:
+  // several backends report a deadline stop as a bare "unknown".
+  if (LastUnknownReason == UnknownReason::NotApplicable)
+    LastUnknownReason =
+        TimeoutMs ? UnknownReason::Timeout : UnknownReason::Incomplete;
+  return Result;
 }
 
 CheckResult
@@ -2219,8 +2234,9 @@ SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
   // addConstraint/push/pop (the default fallback and the activation-literal
   // lowerings do), all of which invalidate the unsat-assumption state, so
   // record it only after the check completes.
-  const CheckResult Result =
-      Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions);
+  LastUnknownReason = UnknownReason::NotApplicable;
+  const CheckResult Result = finishCheck(
+      Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions));
   UnsatAssumptionsValid = Result == CheckResult::UNSAT;
   LastAssumptions =
       UnsatAssumptionsValid ? Assumptions : std::vector<SMTExprRef>{};
