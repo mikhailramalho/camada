@@ -2131,9 +2131,9 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
   SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
   SMTExprRef pzero = mkFPZero(*this, ebits, sbits, false);
 
-  // (x is NaN) -> NaN
+  // (x is NaN) -> that NaN, quieted (see quietNaNOf).
   SMTExprRef c1 = mkFPIsNaN(From);
-  const SMTExprRef &v1 = From;
+  SMTExprRef v1 = quietNaNOf(*this, From);
 
   // (x is +-oo) -> x
   SMTExprRef c2 = mkFPIsInfinite(From);

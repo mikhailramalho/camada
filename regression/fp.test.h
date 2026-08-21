@@ -1072,6 +1072,33 @@ inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
     REQUIRE(solver->getBVInBin(rb).value() == SNq);
   }
 
+  // toIntegral propagates and quiets, like the arithmetic operations.
+  solver->reset();
+  {
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Enc);
+    auto rb = solver->mkSymbol("ti_bits", solver->mkBVSort(32));
+    solver->addConstraint(
+        solver->mkEqual(rb, solver->mkIEEEFPToBV(solver->mkFPToIntegral(
+                                solver->mkFPFromBin(SN, 8, Enc), rm))));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    REQUIRE(solver->getBVInBin(rb).value() == SNq);
+  }
+
+  // fp.abs keeps the payload and clears the sign, and does NOT quiet: it
+  // is a bit-manipulation operation, not an arithmetic one, so IEEE-754
+  // treats it as non-computational. Matches fabs() on the host.
+  solver->reset();
+  {
+    auto rb = solver->mkSymbol("abs_bits", solver->mkBVSort(32));
+    solver->addConstraint(
+        solver->mkEqual(rb, solver->mkIEEEFPToBV(solver->mkFPAbs(
+                                solver->mkFPFromBin(SN, 8, Enc)))));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    // SN with the sign bit cleared, quiet bit still clear.
+    REQUIRE(solver->getBVInBin(rb).value() ==
+            "01111111101010101010101010101010");
+  }
+
   // An invalid operation on non-NaN operands still builds a fresh NaN:
   // there is no input payload to carry.
   solver->reset();
