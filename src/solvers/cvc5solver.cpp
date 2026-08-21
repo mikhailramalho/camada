@@ -175,7 +175,7 @@ SMTSortRef CVC5Solver::mkBVFPSortImpl(const unsigned ExpWidth,
   return makeSortRef<CVC5Sort>(CVC5Sort(
       SMTSortKind::BVFP, &Context,
       Terms.mkBitVectorSort(ExpWidth + SigWidth + 1),
-      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
+      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
 }
 
 SMTSortRef CVC5Solver::mkFXPSortImpl(unsigned Width, unsigned FracBits,

@@ -203,7 +203,7 @@ SMTSortRef BitwuzlaSolver::mkBVFPSortImpl(const unsigned ExpWidth,
   return makeSortRef<BitwSort>(BitwSort(
       SMTSortKind::BVFP, Context,
       bitwuzla_mk_bv_sort(TermManager, ExpWidth + SigWidth + 1),
-      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
+      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
 }
 
 SMTSortRef BitwuzlaSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,

@@ -910,3 +910,36 @@ inline void fp_typed_getter_format(const camada::SMTSolverRef &solver,
   REQUIRE(bits);
   REQUIRE(bits.value() == "0011110000000000");
 }
+
+inline void fp_sort_width_accessors(const camada::SMTSolverRef &solver) {
+  // getFPSignificandWidth() is the inverse of what mkFPSort was given, so
+  // both encodings must answer the same for the same arguments. The BV
+  // encoding used to report one more (the hidden bit), which made the
+  // accessor's meaning depend on the encoding.
+  // The BV encoding takes any format, so check the accessors there for a
+  // spread including binary16 and bfloat16.
+  const unsigned Formats[][2] = {{8, 23}, {11, 52}, {5, 10}, {8, 7}};
+  for (const auto &F : Formats) {
+    auto BV = solver->mkFPSort(F[0], F[1], camada::FPEncoding::BV);
+    REQUIRE(BV->getFPExponentWidth() == F[0]);
+    REQUIRE(BV->getFPSignificandWidth() == F[1]);
+    REQUIRE(BV->getFPSignificandBits() == F[1] + 1);
+    REQUIRE(BV->getWidth() == 1 + F[0] + F[1]);
+  }
+
+  // Native parity only for binary32 and binary64: every backend with
+  // native FP takes those, while the wider formats are gated per backend
+  // (see the format table in the README and issue #186).
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+  const unsigned Standard[][2] = {{8, 23}, {11, 52}};
+  for (const auto &F : Standard) {
+    auto Native = solver->mkFPSort(F[0], F[1], camada::FPEncoding::Native);
+    auto BV = solver->mkFPSort(F[0], F[1], camada::FPEncoding::BV);
+    REQUIRE(Native->getFPExponentWidth() == BV->getFPExponentWidth());
+    REQUIRE(Native->getFPSignificandWidth() == BV->getFPSignificandWidth());
+    REQUIRE(Native->getFPSignificandBits() == BV->getFPSignificandBits());
+    REQUIRE(Native->getWidth() == BV->getWidth());
+    REQUIRE(Native->getFPSignificandWidth() == F[1]);
+  }
+}

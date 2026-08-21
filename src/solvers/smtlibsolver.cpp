@@ -1128,7 +1128,7 @@ SMTSortRef SMTLIBSolver::mkBVFPSortImpl(unsigned ExpWidth, unsigned SigWidth) {
   unsigned Width = ExpWidth + SigWidth + 1;
   return makeSortRef<SMTLIBSort>(
       SMTLIBSort(SMTSortKind::BVFP, this, "(_ BitVec " + utoa(Width) + ")",
-                 SMTSort::FPSortData{Width, ExpWidth, SigWidth + 1}));
+                 SMTSort::FPSortData{Width, ExpWidth, SigWidth}));
 }
 
 SMTSortRef SMTLIBSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,

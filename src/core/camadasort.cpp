@@ -157,6 +157,10 @@ unsigned SMTSort::getFPSignificandWidth() const {
   return std::get<FPSortData>(Data).SigWidth;
 }
 
+unsigned SMTSort::getFPSignificandBits() const {
+  return getFPSignificandWidth() + 1;
+}
+
 unsigned SMTSort::getFPExponentWidth() const {
   fatalErrorIf(!isFPSort(), "Exponent width is only defined for FP sorts");
   return std::get<FPSortData>(Data).ExpWidth;

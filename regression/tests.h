@@ -189,6 +189,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
+  RESETANDTEST(fp_sort_width_accessors);
   RESETANDARGTEST(fp_typed_getter_format, NativeFP);
   RESETANDARGTEST(fp_typed_getter_format, BVFP);
   RESETANDARGTEST(fp_equal, NativeFP);
