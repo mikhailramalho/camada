@@ -259,7 +259,7 @@ SMTSortRef MathSATSolver::mkBVFPSortImpl(const unsigned ExpWidth,
   return makeSortRef<MathSATSort>(MathSATSort(
       SMTSortKind::BVFP, &Context,
       msat_get_bv_type(Context, ExpWidth + SigWidth + 1),
-      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
+      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
 }
 
 SMTSortRef MathSATSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,

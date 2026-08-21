@@ -206,9 +206,19 @@ public:
   /// Returns the sort width from the Solver.
   virtual unsigned getWidthFromSolver() const;
 
-  /// Returns the floating-point significand width, fails if the sort is not a
-  /// floating-point.
+  /// Returns the number of *stored* significand bits, the same value
+  /// mkFPSort was given: binary32 answers 23, binary64 answers 52. The
+  /// hidden leading bit is not counted, so this is the inverse of the
+  /// constructor on every backend and under either encoding. Encodings
+  /// that need the significand including the hidden bit use
+  /// getFPSignificandBits().
   unsigned getFPSignificandWidth() const;
+
+  /// Returns the significand width including the hidden leading bit --
+  /// getFPSignificandWidth() + 1, `sbits` in the bit-blasting literature.
+  /// This is what the FP-over-BV encoding and the native backend APIs
+  /// take.
+  unsigned getFPSignificandBits() const;
 
   /// Returns the floating-point exponent width, fails if the sort is not a
   /// floating-point.

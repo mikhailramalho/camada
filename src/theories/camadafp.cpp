@@ -111,12 +111,12 @@ static inline SMTExprRef extractSgn(SMTSolver &S, const SMTExprRef &Exp) {
 
 static inline SMTExprRef extractExp(SMTSolver &S, const SMTExprRef &Exp) {
   unsigned int expTop = Exp->getWidth() - 2;
-  unsigned int expBot = Exp->Sort->getFPSignificandWidth() - 2;
+  unsigned int expBot = Exp->Sort->getFPSignificandBits() - 2;
   return S.mkBVExtract(expTop, expBot + 1, Exp);
 }
 
 static inline SMTExprRef extractSig(SMTSolver &S, const SMTExprRef &Exp) {
-  return S.mkBVExtract(Exp->Sort->getFPSignificandWidth() - 2, 0, Exp);
+  return S.mkBVExtract(Exp->Sort->getFPSignificandBits() - 2, 0, Exp);
 }
 
 static inline SMTExprRef extractExpSig(SMTSolver &S, const SMTExprRef &Exp) {
@@ -402,7 +402,7 @@ mkRoundingDecision(SMTSolver &S, const SMTExprRef &R, const SMTExprRef &RMNeg,
 static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
                           SMTExprRef &Sig, SMTExprRef &Exp, SMTExprRef &LZ,
                           bool Normalize) {
-  unsigned SWidth = Src->Sort->getFPSignificandWidth();
+  unsigned SWidth = Src->Sort->getFPSignificandBits();
   unsigned EWidth = Src->Sort->getFPExponentWidth();
 
   // Extract parts
@@ -511,7 +511,7 @@ SMTExprRef SMTSolverImpl::mkFPNegImpl(const SMTExprRef &Exp,
 
 SMTExprRef SMTSolverImpl::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
   unsigned eWidth = Exp->Sort->getFPExponentWidth();
-  unsigned sWidth = Exp->Sort->getFPSignificandWidth();
+  unsigned sWidth = Exp->Sort->getFPSignificandBits();
   SMTExprRef pInf = mkFPInf(*this, eWidth, sWidth, false);
   SMTExprRef nInf = mkFPInf(*this, eWidth, sWidth, true);
   SMTExprRef result = mkOr(mkEqual(Exp, pInf), mkEqual(Exp, nInf));
@@ -581,7 +581,7 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
   std::size_t ebits = LHS->Sort->getFPExponentWidth();
-  std::size_t sbits = LHS->Sort->getFPSignificandWidth();
+  std::size_t sbits = LHS->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, static_cast<unsigned>(ebits),
                            static_cast<unsigned>(sbits), false);
@@ -690,7 +690,7 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
   unsigned ebits = LHS->Sort->getFPExponentWidth();
-  unsigned sbits = LHS->Sort->getFPSignificandWidth();
+  unsigned sbits = LHS->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
   SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
@@ -811,7 +811,7 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
 SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS) {
   unsigned ebits = LHS->Sort->getFPExponentWidth();
-  unsigned sbits = LHS->Sort->getFPSignificandWidth();
+  unsigned sbits = LHS->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
   SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
@@ -1077,7 +1077,7 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
   std::size_t ebits = LHS->Sort->getFPExponentWidth();
-  std::size_t sbits = LHS->Sort->getFPSignificandWidth();
+  std::size_t sbits = LHS->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, static_cast<unsigned>(ebits),
                            static_cast<unsigned>(sbits), false);
@@ -1173,7 +1173,7 @@ SMTExprRef SMTSolverImpl::mkFPSubImpl(const SMTExprRef &LHS,
 SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp,
                                        const SMTExprRef &RM) {
   unsigned ebits = Exp->Sort->getFPExponentWidth();
-  unsigned sbits = Exp->Sort->getFPSignificandWidth();
+  unsigned sbits = Exp->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
 
@@ -1279,7 +1279,7 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   assert(X->Sort->getFPExponentWidth() == Y->Sort->getFPExponentWidth());
 
   unsigned ebits = X->Sort->getFPExponentWidth();
-  unsigned sbits = X->Sort->getFPSignificandWidth();
+  unsigned sbits = X->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
   SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
@@ -1620,9 +1620,9 @@ SMTExprRef SMTSolverImpl::mkFPEqualImpl(const SMTExprRef &LHS,
 SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
                                        const SMTSortRef &To,
                                        const SMTExprRef &R) {
-  unsigned from_sbits = From->Sort->getFPSignificandWidth();
+  unsigned from_sbits = From->Sort->getFPSignificandBits();
   unsigned from_ebits = From->Sort->getFPExponentWidth();
-  unsigned to_sbits = To->getFPSignificandWidth();
+  unsigned to_sbits = To->getFPSignificandBits();
   unsigned to_ebits = To->getFPExponentWidth();
 
   if (from_sbits == to_sbits && from_ebits == to_ebits)
@@ -1765,7 +1765,7 @@ SMTExprRef SMTSolverImpl::mkSBVToFPImpl(const SMTExprRef &From,
   //    mode r.
 
   unsigned ebits = To->getFPExponentWidth();
-  unsigned sbits = To->getFPSignificandWidth();
+  unsigned sbits = To->getFPSignificandBits();
   unsigned bv_sz = From->getWidth();
 
   SMTExprRef bv1_1 = mkBVOne1(*this);
@@ -1869,7 +1869,7 @@ SMTExprRef SMTSolverImpl::mkUBVToFPImpl(const SMTExprRef &From,
   //    mode r.
 
   unsigned ebits = To->getFPExponentWidth();
-  unsigned sbits = To->getFPSignificandWidth();
+  unsigned sbits = To->getFPSignificandBits();
   unsigned bv_sz = From->getWidth();
 
   SMTExprRef bv0_1 = mkBVZero1(*this);
@@ -1959,7 +1959,7 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
   SMTSortRef xs = Exp->Sort;
 
   unsigned ebits = xs->getFPExponentWidth();
-  unsigned sbits = xs->getFPSignificandWidth();
+  unsigned sbits = xs->getFPSignificandBits();
   unsigned bv_sz = ToWidth;
 
   SMTExprRef bv0 = mkBVZero1(*this);
@@ -2089,7 +2089,7 @@ SMTExprRef SMTSolverImpl::mkFPToUBVImpl(const SMTExprRef &From,
 SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
                                              const SMTExprRef &R) {
   unsigned ebits = From->Sort->getFPExponentWidth();
-  unsigned sbits = From->Sort->getFPSignificandWidth();
+  unsigned sbits = From->Sort->getFPSignificandBits();
   SMTExprRef rm_is_rta = mkIsRM(*this, R, RM::ROUND_TO_AWAY);
   SMTExprRef rm_is_rte = mkIsRM(*this, R, RM::ROUND_TO_EVEN);
   SMTExprRef rm_is_rtp = mkIsRM(*this, R, RM::ROUND_TO_PLUS_INF);
@@ -2545,10 +2545,8 @@ SMTResult<uint64_t> SMTSolverImpl::getBVUnsignedImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<float> SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
-  // Match on exponent width plus total width: getFPSignificandWidth()
-  // counts the hidden bit under the BV encoding but not the native one
-  // (see issue #184), while the total is 32 either way.
-  if (Exp->Sort->getFPExponentWidth() != 8 || Exp->getWidth() != 32)
+  if (Exp->Sort->getFPExponentWidth() != 8 ||
+      Exp->Sort->getFPSignificandWidth() != 23)
     return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
                     "Expected an IEEE-754 binary32 expression; use "
                     "getFPInBin for other formats"};
@@ -2560,8 +2558,8 @@ SMTResult<float> SMTSolverImpl::getFP32Impl(const SMTExprRef &Exp) {
 }
 
 SMTResult<double> SMTSolverImpl::getFP64Impl(const SMTExprRef &Exp) {
-  // See getFP32Impl: the total width is the encoding-independent check.
-  if (Exp->Sort->getFPExponentWidth() != 11 || Exp->getWidth() != 64)
+  if (Exp->Sort->getFPExponentWidth() != 11 ||
+      Exp->Sort->getFPSignificandWidth() != 52)
     return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
                     "Expected an IEEE-754 binary64 expression; use "
                     "getFPInBin for other formats"};

@@ -283,7 +283,7 @@ SMTSortRef YicesSolver::mkBVFPSortImpl(const unsigned ExpWidth,
                                        const unsigned SigWidth) {
   return makeSortRef<YicesSort>(YicesSort(
       SMTSortKind::BVFP, Context, yices_bv_type(ExpWidth + SigWidth + 1),
-      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth + 1}));
+      SMTSort::FPSortData{ExpWidth + SigWidth + 1, ExpWidth, SigWidth}));
 }
 
 SMTSortRef YicesSolver::mkFXPSortImpl(unsigned Width, unsigned FracBits,
