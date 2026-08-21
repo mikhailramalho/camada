@@ -360,6 +360,8 @@ protected:
   // No msat_make_fp_roundingmode_* for round-to-away; FPEncoding::BV has it.
   bool nativeRoundToAwaySupport() const override { return false; }
 
+  SMTResult<RM> getRMImpl(const SMTExprRef &Exp) override;
+
   void resetImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;

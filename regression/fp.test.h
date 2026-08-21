@@ -943,3 +943,49 @@ inline void fp_sort_width_accessors(const camada::SMTSolverRef &solver) {
     REQUIRE(Native->getFPSignificandWidth() == F[1]);
   }
 }
+
+inline void rm_model_value(const camada::SMTSolverRef &solver,
+                           camada::FPEncoding Encoding) {
+  // A rounding mode can be a symbol, so its model value has to be
+  // readable: mkRMSort is public, and without getRM there was no way to
+  // learn which mode the solver picked.
+  const camada::RM Modes[] = {
+      camada::RM::ROUND_TO_EVEN, camada::RM::ROUND_TO_AWAY,
+      camada::RM::ROUND_TO_PLUS_INF, camada::RM::ROUND_TO_MINUS_INF,
+      camada::RM::ROUND_TO_ZERO};
+
+  for (camada::RM Mode : Modes) {
+    // MathSAT has no native round-to-away term; the BV encoding has all
+    // five on every backend.
+    if (Encoding == camada::FPEncoding::Native &&
+        Mode == camada::RM::ROUND_TO_AWAY &&
+        !solver->supports(camada::SolverFeature::NativeRoundToAway))
+      continue;
+
+    solver->reset();
+    auto r = solver->mkSymbol("rm", solver->mkRMSort(Encoding));
+    solver->addConstraint(solver->mkEqual(r, solver->mkRM(Mode, Encoding)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto Got = solver->getRM(r);
+    REQUIRE(Got);
+    REQUIRE(Got.value() == Mode);
+  }
+
+  // The mode the solver chose for an unconstrained rounding mode is
+  // whatever it likes, but it must be one of the five and must be
+  // reported consistently with what the addition rounded to.
+  solver->reset();
+  auto free_rm = solver->mkSymbol("free_rm", solver->mkRMSort(Encoding));
+  auto sum = solver->mkFPAdd(solver->mkFP32(1.0f, Encoding),
+                             solver->mkFP32(0.5f, Encoding), free_rm);
+  auto out = solver->mkSymbol("free_sum", solver->mkFPSort(8, 23, Encoding));
+  solver->addConstraint(solver->mkEqual(out, sum));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Any = solver->getRM(free_rm);
+  REQUIRE(Any);
+  REQUIRE((Any.value() == camada::RM::ROUND_TO_EVEN ||
+           Any.value() == camada::RM::ROUND_TO_AWAY ||
+           Any.value() == camada::RM::ROUND_TO_PLUS_INF ||
+           Any.value() == camada::RM::ROUND_TO_MINUS_INF ||
+           Any.value() == camada::RM::ROUND_TO_ZERO));
+}

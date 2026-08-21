@@ -1715,6 +1715,11 @@ CAMADA_DEFINE_MODEL_GETTER(uint64_t, getBVUnsigned,
                            requireBVSort(Exp, "Expected bit-vector expression"),
                            getBVUnsignedImpl)
 
+CAMADA_DEFINE_MODEL_GETTER(RM, getRM,
+                           requireRMSort(Exp,
+                                         "Expected rounding-mode expression"),
+                           getRMImpl)
+
 SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
   requireBVSort(Exp, "Expected bit-vector expression");
   SMTResult<std::string> result = getBVInBinImpl(Exp);

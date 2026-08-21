@@ -869,6 +869,32 @@ SMTExprRef MathSATSolver::mkFPToIntegralImpl(const SMTExprRef &From,
                                 toMathSATTerm(From)));
 }
 
+SMTResult<RM> MathSATSolver::getRMImpl(const SMTExprRef &Exp) {
+  if (Exp->Sort->isBVRMSort())
+    return SMTSolverImpl::getRMImpl(Exp);
+
+  // MathSAT cannot evaluate a term that was not part of the solved
+  // formula, so the equality-comparison route the common layer uses
+  // crashes here. Read the model value and test it with the native
+  // predicates instead. There is no round-to-away predicate because
+  // MathSAT has no such term (see nativeRoundToAwaySupport).
+  const msat_term Value = msat_get_model_value(Context, toMathSATTerm(Exp));
+  if (MSAT_ERROR_TERM(Value))
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                    "Failed to get rounding-mode model value from MathSAT"};
+  if (msat_term_is_fp_roundingmode_nearest_even(Context, Value))
+    return RM::ROUND_TO_EVEN;
+  if (msat_term_is_fp_roundingmode_plus_inf(Context, Value))
+    return RM::ROUND_TO_PLUS_INF;
+  if (msat_term_is_fp_roundingmode_minus_inf(Context, Value))
+    return RM::ROUND_TO_MINUS_INF;
+  if (msat_term_is_fp_roundingmode_zero(Context, Value))
+    return RM::ROUND_TO_ZERO;
+  return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                  "Rounding-mode model value matched none of the four modes "
+                  "MathSAT represents"};
+}
+
 SMTResult<bool> MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
   const SMTExprRef &Value = makeExprRef<MathSATExpr>(
       SMTExprKind::BoolConst, &Context, mkBoolSort(),
