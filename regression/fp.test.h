@@ -660,9 +660,11 @@ inline void fp_muldiv_subnormal_host_oracle(const camada::SMTSolverRef &solver,
 // binary32 passed the same gate, which is why nothing here caught it —
 // hence the explicit narrow-format case.
 // The binary16 half runs under the BV encoding only, matching
-// fp_non_standard_widths: narrow formats are camada's own encoding, and
-// backends reject them natively (cvc5 requires --fp-exp, bitwuzla
-// --fpexp).
+// fp_non_standard_widths. Native support for formats outside binary32 and
+// binary64 is uneven: Z3 and MathSAT take any format, Bitwuzla whitelists
+// the four IEEE interchange formats (so binary16 is fine there), and cvc5
+// takes only binary32 and binary64 without --fp-exp. The BV encoding is
+// the one path that works everywhere; see issue #186.
 inline void fp_tointegral_large_values_bv(const camada::SMTSolverRef &solver) {
   const camada::FPEncoding Encoding = camada::FPEncoding::BV;
   // Large binary16 values: every one of these is exactly an integer, so

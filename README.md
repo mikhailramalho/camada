@@ -139,18 +139,44 @@ location during the build.
 
 | Backend    | Minimum version | Native floating-point support |
 | ---------- | :-------------: | :-------------: |
-| [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.1          | ✔️ |
-| [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️ |
-| [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>1</sup> |
+| [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.1          | ✔️<sup>1</sup> |
+| [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️<sup>1</sup> |
+| [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>2</sup> |
 | [STP](https://stp.github.io/)              |  2.4.0          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
 | [Z3](https://github.com/Z3Prover/z3)       |  4.13.3         | ✔️ |
 | SMT-LIB (any external solver) | n/a | depends on child |
 
-<sup>1</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
+<sup>1</sup> Bitwuzla and CVC5 restrict which *formats* native FP accepts,
+because both word-blast through SymFPU, whose algorithms assume
+`exponentWidth <= significandWidth`. Bitwuzla takes the four IEEE-754
+interchange formats (binary16, binary32, binary64, binary128); CVC5 takes
+only binary32 and binary64. Everything else needs an experimental flag
+(`--fp-exp` on CVC5, a `--fpexp` build option on Bitwuzla), which Camada
+does not enable — see the format table below. Z3 and MathSAT accept any
+format natively.
+
+<sup>2</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
 it does not support these operations natively. `ROUND_TO_AWAY` is also not
 supported by the native MathSAT floating-point API and aborts with an error if
-requested.
+requested (query `SolverFeature::NativeRoundToAway` before building the mode,
+or use `FPEncoding::BV`).
+
+#### Native floating-point formats
+
+`FPEncoding::Native` support by format, measured against the pinned
+versions above. `FPEncoding::BV` works for every format on every backend,
+including STP and Yices, and is what Camada's own tests use for anything
+outside binary32/binary64.
+
+| Format               | Z3 | CVC5 | Bitwuzla | MathSAT |
+| -------------------- | :-: | :-: | :-: | :-: |
+| binary16 (5, 10)     | ✔️ |    | ✔️ | ✔️ |
+| binary32 (8, 23)     | ✔️ | ✔️ | ✔️ | ✔️ |
+| binary64 (11, 52)    | ✔️ | ✔️ | ✔️ | ✔️ |
+| binary128 (15, 112)  | ✔️ |    | ✔️ | ✔️ |
+| bfloat16 (8, 7)      | ✔️ |    |    | ✔️ |
+| anything else        | ✔️ |    |    | ✔️ |
 
 ### SMT-LIB backend
 
