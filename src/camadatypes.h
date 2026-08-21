@@ -78,18 +78,17 @@ enum class FPEncoding : bool { Native, BV };
 /// indexes).
 enum class ConstArrayLowering : std::uint8_t { Auto, Native, Lazy };
 
-/// Selects how Camada lowers `mkFPNeg` for backends whose native FP
-/// implementation diverges from the IEEE-754 sign-bit-flip semantics
-/// some users expect.
+/// Which negation semantics `mkFPNeg` encodes: the IEEE-754 sign-bit flip
+/// most users expect, or the SMT-LIB definition.
 ///
 /// - FlipSignBit: always flip the IEEE-754 sign bit, including on NaN
 ///   inputs. Matches the behavior of CPU FP units and most language
-///   runtimes. Backed by an explicit bit-blast on solvers whose native
-///   `fp.neg` preserves the NaN payload — see PR #59 for the per-
-///   backend status.
+///   runtimes.
 /// - PreserveNaNPayload: follow the SMT-LIB `fp.neg` definition, which
-///   leaves NaN payloads (including the sign bit) unchanged. Cheaper to
-///   emit on backends that natively implement this semantics.
+///   leaves NaN payloads (including the sign bit) unchanged.
+///
+/// The distinction is only observable under FPEncoding::BV. A native FP
+/// sort gives the same canonical NaN either way; see mkFPNeg.
 enum class FPNegBehavior : bool {
   FlipSignBit,
   PreserveNaNPayload,
