@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <tuple>
 #include <utility>
@@ -988,4 +989,102 @@ inline void rm_model_value(const camada::SMTSolverRef &solver,
            Any.value() == camada::RM::ROUND_TO_PLUS_INF ||
            Any.value() == camada::RM::ROUND_TO_MINUS_INF ||
            Any.value() == camada::RM::ROUND_TO_ZERO));
+inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
+  // IEEE-754 recommends returning one of the input NaNs rather than a
+  // fresh one (6.2), and requires the result be quiet (6.2.3). Every
+  // hardware FPU does this, and the values below were taken from one.
+  // Only observable through raw bits, so the BV encoding is the subject:
+  // a native FP sort has a single abstract NaN.
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  const std::string QA = "01111111110101010101010101010101"; // qNaN, payload
+  const std::string QB = "11111111111010101010101010101010"; // qNaN, sign set
+  const std::string SN =
+      "11111111101010101010101010101010"; // sNaN (quiet bit clear)
+  const std::string SNq = "11111111111010101010101010101010"; // SN, quieted
+  const std::string One = "00111111100000000000000000000000";
+  const std::string Zero = "00000000000000000000000000000000";
+
+  const auto bits =
+      [&](const std::string &Expected,
+          const std::function<camada::SMTExprRef(
+              const camada::SMTExprRef &, const camada::SMTExprRef &,
+              const camada::SMTExprRef &)> &Build,
+          const std::string &A, const std::string &B) {
+        solver->reset();
+        auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Enc);
+        auto x = solver->mkFPFromBin(A, 8, Enc);
+        auto y = solver->mkFPFromBin(B, 8, Enc);
+        auto rb = solver->mkSymbol("nan_bits", solver->mkBVSort(32));
+        solver->addConstraint(
+            solver->mkEqual(rb, solver->mkIEEEFPToBV(Build(x, y, rm))));
+        REQUIRE(solver->check() == camada::CheckResult::SAT);
+        auto v = solver->getBVInBin(rb);
+        REQUIRE(v);
+        REQUIRE(v.value() == Expected);
+      };
+
+  const auto add = [&](const camada::SMTExprRef &a, const camada::SMTExprRef &b,
+                       const camada::SMTExprRef &r) {
+    return solver->mkFPAdd(a, b, r);
+  };
+  const auto mul = [&](const camada::SMTExprRef &a, const camada::SMTExprRef &b,
+                       const camada::SMTExprRef &r) {
+    return solver->mkFPMul(a, b, r);
+  };
+  const auto div = [&](const camada::SMTExprRef &a, const camada::SMTExprRef &b,
+                       const camada::SMTExprRef &r) {
+    return solver->mkFPDiv(a, b, r);
+  };
+  const auto sub = [&](const camada::SMTExprRef &a, const camada::SMTExprRef &b,
+                       const camada::SMTExprRef &r) {
+    return solver->mkFPSub(a, b, r);
+  };
+  const auto rem = [&](const camada::SMTExprRef &a, const camada::SMTExprRef &b,
+                       const camada::SMTExprRef &) {
+    return solver->mkFPRem(a, b);
+  };
+
+  // The operand's payload survives, on either side.
+  bits(QA, add, QA, One);
+  bits(QA, add, One, QA);
+  bits(QA, mul, QA, One);
+  bits(QA, div, QA, One);
+  bits(QA, sub, QA, One);
+  bits(QA, rem, QA, One);
+
+  // Two NaN operands: the first one wins.
+  bits(QA, add, QA, QB);
+  bits(QB, add, QB, QA);
+
+  // A signalling operand comes back quieted.
+  bits(SNq, mul, SN, One);
+  bits(SNq, add, SN, Zero);
+
+  // sqrt propagates too, and quiets.
+  solver->reset();
+  {
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Enc);
+    auto rb = solver->mkSymbol("sqrt_bits", solver->mkBVSort(32));
+    solver->addConstraint(
+        solver->mkEqual(rb, solver->mkIEEEFPToBV(solver->mkFPSqrt(
+                                solver->mkFPFromBin(SN, 8, Enc), rm))));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    REQUIRE(solver->getBVInBin(rb).value() == SNq);
+  }
+
+  // An invalid operation on non-NaN operands still builds a fresh NaN:
+  // there is no input payload to carry.
+  solver->reset();
+  {
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Enc);
+    auto z = solver->mkFPFromBin(Zero, 8, Enc);
+    auto rb = solver->mkSymbol("zdz_bits", solver->mkBVSort(32));
+    solver->addConstraint(
+        solver->mkEqual(rb, solver->mkIEEEFPToBV(solver->mkFPDiv(z, z, rm))));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto v = solver->getBVInBin(rb);
+    REQUIRE(v);
+    REQUIRE(v.value() != QA);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
 }
