@@ -123,6 +123,20 @@ static inline SMTExprRef extractExpSig(SMTSolver &S, const SMTExprRef &Exp) {
   return S.mkBVExtract(Exp->getWidth() - 2, 0, Exp);
 }
 
+/// The NaN an operation returns when one of its operands is already NaN:
+/// that operand, with the significand's leading bit forced to 1. IEEE-754
+/// recommends propagating an input NaN's payload (6.2) and requires the
+/// result be quiet (6.2.3), so a signalling operand comes back quieted and
+/// a quiet one is unchanged. Forcing the bit is a no-op on a format whose
+/// significand is one bit wide, where that bit is the only NaN there is.
+static inline SMTExprRef quietNaNOf(SMTSolver &S, const SMTExprRef &Exp) {
+  const unsigned Width = Exp->getWidth();
+  const unsigned QuietBit = Exp->Sort->getFPSignificandBits() - 2;
+  SMTExprRef Mask =
+      S.mkBVShl(S.mkBVFromDec(1, Width), S.mkBVFromDec(QuietBit, Width));
+  return S.mkBVToIEEEFP(S.mkBVOr(S.mkIEEEFPToBV(Exp), Mask), Exp->Sort);
+}
+
 // Two's-complement bit string of +-(2^Pow + Add) at the given width,
 // computed entirely in string arithmetic. Every constant this file needs
 // has that shape, and the previous int64 helpers (1ULL << N) capped the
@@ -601,9 +615,12 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   SMTExprRef y_is_zero = mkFPIsZero(RHS);
   SMTExprRef y_is_pos = mkIsPos(*this, RHS);
 
-  // (x is NaN) || (y is NaN) -> NaN
+  // (x is NaN) || (y is NaN) -> that operand's NaN, quieted (see
+  // quietNaNOf). `nan` is kept for the invalid cases below, where neither
+  // operand was a NaN.
   SMTExprRef c1 = mkOr(x_is_nan, y_is_nan);
-  const SMTExprRef &v1 = nan;
+  SMTExprRef v1 =
+      mkIte(x_is_nan, quietNaNOf(*this, LHS), quietNaNOf(*this, RHS));
 
   // (x is +oo) -> if (y is 0) then NaN else inf with y's sign.
   SMTExprRef c2 = mkIsPInf(*this, LHS);
@@ -707,9 +724,12 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
   SMTExprRef y_is_pos = mkIsPos(*this, RHS);
   SMTExprRef y_is_inf = mkFPIsInfinite(RHS);
 
-  // (x is NaN) || (y is NaN) -> NaN
+  // (x is NaN) || (y is NaN) -> that operand's NaN, quieted (see
+  // quietNaNOf). `nan` is kept for the invalid cases below, where neither
+  // operand was a NaN.
   SMTExprRef c1 = mkOr(x_is_nan, y_is_nan);
-  const SMTExprRef &v1 = nan;
+  SMTExprRef v1 =
+      mkIte(x_is_nan, quietNaNOf(*this, LHS), quietNaNOf(*this, RHS));
 
   // (x is +oo) -> if (y is oo) then NaN else inf with y's sign.
   SMTExprRef c2 = mkIsPInf(*this, LHS);
@@ -824,9 +844,12 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef y_is_zero = mkFPIsZero(RHS);
   SMTExprRef y_is_inf = mkFPIsInfinite(RHS);
 
-  // (x is NaN) || (y is NaN) -> NaN
+  // (x is NaN) || (y is NaN) -> that operand's NaN, quieted (see
+  // quietNaNOf). `nan` is kept for the invalid cases below, where neither
+  // operand was a NaN.
   SMTExprRef c1 = mkOr(x_is_nan, y_is_nan);
-  const SMTExprRef &v1 = nan;
+  SMTExprRef v1 =
+      mkIte(x_is_nan, quietNaNOf(*this, LHS), quietNaNOf(*this, RHS));
 
   // (x is +-oo) -> NaN
   const SMTExprRef &c2 = x_is_inf;
@@ -1096,7 +1119,11 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
   SMTExprRef y_is_inf = mkFPIsInfinite(RHS);
 
   SMTExprRef c1 = mkOr(x_is_nan, y_is_nan);
-  const SMTExprRef &v1 = nan;
+  // IEEE-754 propagates an input NaN's payload; the first NaN operand
+  // wins, matching every hardware FPU. `nan` stays for the genuinely
+  // invalid cases below, where neither operand was a NaN.
+  SMTExprRef v1 =
+      mkIte(x_is_nan, quietNaNOf(*this, LHS), quietNaNOf(*this, RHS));
 
   const SMTExprRef &c2 = x_is_inf;
   const SMTExprRef &nx = x_is_neg;
@@ -1182,9 +1209,10 @@ SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp,
   SMTExprRef zero1 = mkBVZero1(*this);
   SMTExprRef one1 = mkBVOne1(*this);
 
-  // (x is NaN) -> NaN
+  // (x is NaN) -> that NaN, quieted (see quietNaNOf). `nan` below is for
+  // the invalid case, a negative non-NaN operand.
   const SMTExprRef &c1 = x_is_nan;
-  const SMTExprRef &v1 = Exp;
+  SMTExprRef v1 = quietNaNOf(*this, Exp);
 
   // (x is +oo) -> +oo
   SMTExprRef c2 = mkIsPInf(*this, Exp);
@@ -1308,9 +1336,13 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   inf_xor = mkXor(inf_xor, z_is_neg);
   SMTExprRef inf_cond = mkAnd(z_is_inf, inf_xor);
 
-  // (x is NaN) || (y is NaN) || (z is Nan) -> NaN
+  // (x is NaN) || (y is NaN) || (z is NaN) -> that operand's NaN, quieted
+  // (see quietNaNOf), first one winning. `nan` is kept for the invalid
+  // cases below, where no operand was a NaN.
   SMTExprRef c1 = mkOr(mkOr(x_is_nan, y_is_nan), z_is_nan);
-  const SMTExprRef &v1 = nan;
+  SMTExprRef v1 =
+      mkIte(x_is_nan, quietNaNOf(*this, X),
+            mkIte(y_is_nan, quietNaNOf(*this, Y), quietNaNOf(*this, Z)));
 
   // (x is +oo) -> if (y is 0) then NaN else inf with y's sign.
   SMTExprRef c2 = mkAnd(x_is_inf, x_is_pos);
@@ -2099,9 +2131,9 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
   SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
   SMTExprRef pzero = mkFPZero(*this, ebits, sbits, false);
 
-  // (x is NaN) -> NaN
+  // (x is NaN) -> that NaN, quieted (see quietNaNOf).
   SMTExprRef c1 = mkFPIsNaN(From);
-  const SMTExprRef &v1 = From;
+  SMTExprRef v1 = quietNaNOf(*this, From);
 
   // (x is +-oo) -> x
   SMTExprRef c2 = mkFPIsInfinite(From);

@@ -380,6 +380,28 @@ public:
   /// Creates a floating-point isZero operation
   virtual SMTExprRef mkFPIsZero(const SMTExprRef &Exp) = 0;
 
+  // NaN results, for every operation below that computes a value.
+  //
+  // Under FPEncoding::BV, where an FP value is its bit pattern, an
+  // operation given a NaN operand returns *that operand's* NaN with the
+  // significand's leading bit forced to 1: IEEE-754 recommends
+  // propagating the payload (6.2) and requires the result be quiet
+  // (6.2.3), so a signalling operand comes back quieted. With more than
+  // one NaN operand the first wins. This follows hardware rather than
+  // SMT-LIB, which has a single abstract NaN and says nothing about
+  // payloads -- it matters when a formula reads the bits of a result, as
+  // a C memory model does.
+  //
+  // An invalid operation on non-NaN operands (0/0, inf - inf, sqrt of a
+  // negative) has no payload to carry and builds a fresh NaN. mkFPAbs
+  // keeps the payload and clears the sign without quieting, since
+  // IEEE-754 treats it as a non-computational bit manipulation.
+  // mkFPToFP does not yet reposition the payload into the target
+  // format's significand; see issue #195.
+  //
+  // On a native FP sort none of this is observable: the backend has one
+  // abstract NaN, so any NaN result reads back as its canonical pattern.
+
   /// Creates a floating-point multiplication operation
   virtual SMTExprRef mkFPMul(const SMTExprRef &LHS, const SMTExprRef &RHS,
                              const SMTExprRef &R) = 0;
