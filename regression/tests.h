@@ -128,6 +128,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(equal_ten);
   RESETANDTEST(symbol_name_punctuation_distinct);
   RESETANDTEST(null_sort_handle_equality);
+  RESETANDTEST(bv_typed_getter_domain);
   RESETANDTEST(pop_underflow_rejected);
   RESETANDTEST(pop_past_root_rejected);
   RESETANDTEST(implies_semantics);
@@ -188,6 +189,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
+  RESETANDARGTEST(fp_typed_getter_format, NativeFP);
+  RESETANDARGTEST(fp_typed_getter_format, BVFP);
   RESETANDARGTEST(fp_equal, NativeFP);
   RESETANDARGTEST(fp_equal, BVFP);
   RESETANDARGTEST(fp_infinity_model_value, NativeFP);
