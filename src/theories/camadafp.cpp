@@ -24,12 +24,28 @@
 
 #include <algorithm>
 #include <bitset>
-#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
 namespace camada {
 namespace {
+
+/// Position of the most significant set bit, i.e. floor(log2(V)) for
+/// V >= 1. Mirrors Z3's `unsigned log2(unsigned)` from util.h, which the
+/// guards ported from fpa2bv_converter are written against. Spelling it
+/// out matters: with <cmath> included a bare log2() binds to the
+/// floating-point overload, which answers 4.17 where the integer one
+/// answers 4, and that mismatch silently disabled toIntegral's
+/// already-an-integer branch for binary16. Keep the arithmetic integral
+/// so the guards cannot drift on a libm whose log2 is not correctly
+/// rounded.
+static inline unsigned log2i(unsigned V) {
+  assert(V != 0 && "log2i is undefined at zero");
+  unsigned R = 0;
+  while (V >>= 1)
+    ++R;
+  return R;
+}
 
 template <typename FPType, typename IntType> FPType IntAsFP(const IntType Int) {
   assert(sizeof(FPType) == sizeof(IntType) &&
@@ -1031,7 +1047,7 @@ static inline void addCore(SMTSolver &S, unsigned int SWidth,
   // c/d are now such that c_exp >= d_exp.
   SMTExprRef exp_delta = S.mkBVSub(CExp, DExp);
 
-  if (log2(SWidth + 2) < EWidth + 2) {
+  if (log2i(SWidth + 2) < EWidth + 2) {
     // cap the delta
     SMTExprRef cap = S.mkBVFromDec(SWidth + 2, EWidth + 2);
     SMTExprRef cap_le_delta = S.mkBVUle(cap, S.mkBVZeroExt(exp_delta, 2));
@@ -1853,8 +1869,7 @@ SMTExprRef SMTSolverImpl::mkSBVToFPImpl(const SMTExprRef &From,
 
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
-  unsigned exp_worst_case_sz = static_cast<unsigned>(
-      (log(static_cast<double>(bv_sz)) / log(static_cast<double>(2))) + 1.0);
+  unsigned exp_worst_case_sz = log2i(bv_sz) + 1;
 
   // `<=`, not `<`: round() reads the exponent as signed, so a value
   // needing the full exp_sz bits is already unrepresentable and must be
@@ -1952,8 +1967,7 @@ SMTExprRef SMTSolverImpl::mkUBVToFPImpl(const SMTExprRef &From,
 
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
-  unsigned exp_worst_case_sz = static_cast<unsigned>(
-      (log(static_cast<double>(bv_sz)) / log(static_cast<double>(2))) + 1.0);
+  unsigned exp_worst_case_sz = log2i(bv_sz) + 1;
 
   // `<=`, not `<`: round() reads the exponent as signed, so a value
   // needing the full exp_sz bits is already unrepresentable and must be
@@ -2189,16 +2203,16 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
   // exponent >= sbits-1 -> x is already an integer, return it unchanged.
   //
   // The comparison is signed over ebits bits, so it is only meaningful
-  // when sbits-1 is representable as a positive signed ebits-bit value,
-  // i.e. sbits-1 <= 2^(ebits-1) - 1. Test that exactly: a floating-point
-  // log2 formulation reads 4.17 > 4 for binary16 (ebits 5, sbits 10) and
-  // wrongly disables this branch, leaving every large binary16 value to
-  // fall through the rounding path below and come back wrong.
-  bool exp_fits =
-      ebits >= 2 && ebits - 1 < 63 &&
-      static_cast<uint64_t>(sbits - 1) <= (UINT64_C(1) << (ebits - 1)) - 1;
-  SMTExprRef exp_is_large =
-      exp_fits ? mkBVSle(mkBVFromDec(sbits - 1, ebits), a_exp) : mkBool(false);
+  // when sbits-1 is representable as a positive signed ebits-bit value.
+  // This is Z3's guard verbatim; log2i is the integer log2 it is written
+  // against (floor(log2(n)) + 1 is n's bit length, and bitlen(n) <= k iff
+  // n <= 2^k - 1, so the test is exact). A floating-point log2 reads
+  // 4.17 > 4 for binary16 and wrongly disables the branch, leaving large
+  // binary16 values to fall through the rounding path and come back
+  // wrong.
+  SMTExprRef exp_is_large = (ebits >= 2 && log2i(sbits - 1) + 1 <= ebits - 1)
+                                ? mkBVSle(mkBVFromDec(sbits - 1, ebits), a_exp)
+                                : mkBool(false);
   const SMTExprRef &c5 = exp_is_large;
   const SMTExprRef &v5 = From;
 
