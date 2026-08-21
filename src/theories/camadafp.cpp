@@ -2534,6 +2534,44 @@ SMTResult<int64_t> SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
   return static_cast<int64_t>(res);
 }
 
+SMTResult<RM> SMTSolverImpl::getRMImpl(const SMTExprRef &Exp) {
+  // A native rounding mode is an opaque backend term whose printed form
+  // differs per solver, so identify it by asking the solver which of the
+  // five it equals. mkRM caches the constants, so this is five cached
+  // terms and five model evaluations rather than any solving.
+  if (!Exp->Sort->isBVRMSort()) {
+    for (const RM Mode :
+         {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
+          RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO}) {
+      // MathSAT aborts on a native round-to-away term; skip the mode it
+      // cannot represent rather than build it.
+      if (Mode == RM::ROUND_TO_AWAY && !nativeRoundToAwaySupport())
+        continue;
+      SMTResult<bool> Same =
+          getBool(mkEqual(Exp, mkRM(Mode, FPEncoding::Native)));
+      if (!Same)
+        return Same.error();
+      if (Same.value())
+        return Mode;
+    }
+    return SMTError{SMTErrorCode::InvalidModelValue, Exp->getBackendKind(),
+                    "Rounding-mode model value matched none of the five "
+                    "IEEE-754 rounding modes"};
+  }
+
+  // The BV encoding stores the mode as the RM enum in three bits, so the
+  // model value decodes straight back.
+  SMTResult<std::string> Bits = getBVInBinImpl(Exp);
+  if (!Bits)
+    return Bits.error();
+  const uint64_t Value = std::strtoull(Bits.value().c_str(), nullptr, 2);
+  if (Value > static_cast<uint64_t>(RM::ROUND_TO_ZERO))
+    return SMTError{SMTErrorCode::InvalidModelValue, Exp->getBackendKind(),
+                    "Rounding-mode model value is not one of the five "
+                    "IEEE-754 rounding modes"};
+  return static_cast<RM>(Value);
+}
+
 SMTResult<uint64_t> SMTSolverImpl::getBVUnsignedImpl(const SMTExprRef &Exp) {
   if (Exp->getWidth() > 64)
     return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),

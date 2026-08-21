@@ -733,6 +733,7 @@ public:
   SMTResult<bool> getBool(const SMTExprRef &Exp) override final;
   SMTResult<int64_t> getBV(const SMTExprRef &Exp) override final;
   SMTResult<uint64_t> getBVUnsigned(const SMTExprRef &Exp) override final;
+  SMTResult<RM> getRM(const SMTExprRef &Exp) override final;
   SMTResult<std::string> getBVInBin(const SMTExprRef &Exp) override final;
   SMTResult<std::string> getInt(const SMTExprRef &Exp) override final;
   SMTResult<std::pair<std::string, std::string>>
@@ -1193,6 +1194,11 @@ protected:
 
   SMTResult<int64_t> getBVImpl(const SMTExprRef &Exp);
   SMTResult<uint64_t> getBVUnsignedImpl(const SMTExprRef &Exp);
+
+  /// Decodes a rounding-mode model value. The default handles the BV
+  /// encoding, where the mode is the RM enum in three bits; backends with
+  /// native rounding modes override it to read their own term.
+  virtual SMTResult<RM> getRMImpl(const SMTExprRef &Exp);
 
   virtual SMTResult<std::string> getBVInBinImpl(const SMTExprRef &Exp) = 0;
 

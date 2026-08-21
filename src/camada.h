@@ -886,6 +886,13 @@ public:
   /// getFPInBin for arbitrary formats.
   virtual SMTResult<double> getFP64(const SMTExprRef &Exp) = 0;
 
+  /// If a model is available, returns the rounding mode a rounding-mode
+  /// expression evaluates to. Rounding modes can be symbols (mkRMSort is
+  /// public), so the mode a solver chose is part of the model.
+  ///
+  /// On failure, returns an `SMTError` instead of aborting.
+  virtual SMTResult<RM> getRM(const SMTExprRef &Exp) = 0;
+
   /// If a model is available, returns the exact value of a given fixed-point
   /// expression.
   virtual SMTResult<FXPValue> getFXP(const SMTExprRef &Exp) = 0;

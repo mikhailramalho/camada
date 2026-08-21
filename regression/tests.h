@@ -113,6 +113,15 @@ inline void pop_past_root_rejected(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
+// getRM on a non-rounding-mode expression is a usage error. Lives here
+// because it needs require_abort.
+inline void rm_getter_rejects_non_rm(const camada::SMTSolverRef &solver) {
+  auto bv = solver->mkSymbol("not_rm", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(1, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  require_abort([&]() { (void)solver->getRM(bv); });
+}
+
 inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
   require_abort(
       [&]() { (void)solver->mkFPSort(2, 10, camada::FPEncoding::BV); });
@@ -191,6 +200,9 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
   RESETANDTEST(fp_sort_width_accessors);
+  RESETANDARGTEST(rm_model_value, NativeFP);
+  RESETANDARGTEST(rm_model_value, BVFP);
+  RESETANDTEST(rm_getter_rejects_non_rm);
   RESETANDARGTEST(fp_typed_getter_format, NativeFP);
   RESETANDARGTEST(fp_typed_getter_format, BVFP);
   RESETANDARGTEST(fp_equal, NativeFP);
