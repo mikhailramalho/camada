@@ -1034,6 +1034,20 @@ public:
   /// Check if the constraints are satisfiable
   virtual CheckResult check() = 0;
 
+  /// Why the last check returned CheckResult::UNKNOWN.
+  ///
+  /// Valid right after check() or checkSatAssuming() answered UNKNOWN;
+  /// any other time it reports UnknownReason::NotApplicable. The
+  /// distinction matters because UNKNOWN covers both "no answer for this
+  /// formula" and "the query never ran" -- a consumer that retries with a
+  /// longer limit wants Timeout, and one that should stop wants
+  /// BackendError or ProtocolError.
+  ///
+  /// Backends differ in how much they can tell apart: a timeout Camada
+  /// imposed itself is always known, while a solver that reports only
+  /// "unknown" is reported as Incomplete.
+  virtual UnknownReason reasonUnknown() const = 0;
+
   /// Set a wall-clock time limit, in milliseconds, applied to each
   /// subsequent check() or checkSatAssuming() individually; 0 removes the
   /// limit. A check that hits the limit returns CheckResult::UNKNOWN and

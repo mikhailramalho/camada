@@ -639,7 +639,9 @@ CheckResult STPSolver::checkImpl() {
   if (res == 1)
     return CheckResult::UNSAT;
 
-  // 2 is an error, 3 a timeout.
+  // 2 is an error, 3 the search abandoned when the budget expired.
+  noteUnknownReason(res == 2 ? UnknownReason::BackendError
+                             : UnknownReason::Timeout);
   return CheckResult::UNKNOWN;
 }
 

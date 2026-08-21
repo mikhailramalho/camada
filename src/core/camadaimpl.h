@@ -391,6 +391,10 @@ protected:
   /// read the current value.
   uint64_t TimeoutMs = 0;
 
+  /// Set by the backend's checkImpl when it answers UNKNOWN; cleared by
+  /// any check that decides, so a stale reason cannot be read back.
+  UnknownReason LastUnknownReason = UnknownReason::NotApplicable;
+
   // --- Assumption-based solving ---
   // The assumptions of the most recent checkSatAssuming() call, kept so
   // backends can map the solver's native unsat core back to the caller's
@@ -781,6 +785,22 @@ public:
                           const SMTSortRef &To) override final;
   SMTExprRef mkIEEEFPToBV(const SMTExprRef &Exp) override final;
   CheckResult check() override final;
+
+  UnknownReason reasonUnknown() const override final {
+    return LastUnknownReason;
+  }
+
+protected:
+  /// Called by a backend's checkImpl when it can tell why the search did
+  /// not decide. Leaving it unset means Camada attributes the UNKNOWN to
+  /// its own timeout, if one was configured, and to Incomplete otherwise.
+  void noteUnknownReason(UnknownReason Reason) { LastUnknownReason = Reason; }
+
+private:
+  /// Settles LastUnknownReason once the backend has answered.
+  CheckResult finishCheck(CheckResult Result);
+
+public:
   bool setTimeout(uint64_t Milliseconds) override final;
 
   CheckResult

@@ -1058,6 +1058,12 @@ CheckResult YicesSolver::checkImpl() {
   if (res == YICES_STATUS_UNSAT)
     return CheckResult::UNSAT;
 
+  // The timeout is delivered by interrupting the search (see
+  // yicesAlarmHandler), so INTERRUPTED means the deadline fired.
+  if (res == YICES_STATUS_INTERRUPTED)
+    noteUnknownReason(UnknownReason::Timeout);
+  else if (res == YICES_STATUS_ERROR)
+    noteUnknownReason(UnknownReason::BackendError);
   return CheckResult::UNKNOWN;
 }
 

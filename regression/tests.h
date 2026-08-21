@@ -141,6 +141,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_conformance_semantics, NativeFP);
   RESETANDARGTEST(fp_conformance_semantics, BVFP);
   RESETANDTEST(bv_overflow_semantics);
+  RESETANDTEST(unknown_reason_semantics);
   RESETANDTEST(solver_timeout_semantics);
 
   RESETANDTEST(check_sat_assuming_semantics);

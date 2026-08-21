@@ -1117,6 +1117,15 @@ CheckResult Z3Solver::checkImpl() {
   if (res == z3::check_result::unsat)
     return CheckResult::UNSAT;
 
+  // Z3 explains itself through reason_unknown(); it answers "timeout"
+  // when a limit stopped the search and something else (often nothing at
+  // all) when the search was genuinely incomplete. Only the timeout
+  // string is stable enough to key on -- the common layer already infers
+  // a configured timeout, so anything else stays Incomplete.
+  if (Solver.reason_unknown() == "timeout")
+    noteUnknownReason(UnknownReason::Timeout);
+  else
+    noteUnknownReason(UnknownReason::Incomplete);
   return CheckResult::UNKNOWN;
 }
 

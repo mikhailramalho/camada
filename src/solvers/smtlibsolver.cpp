@@ -856,10 +856,15 @@ CheckResult SMTLIBSolver::runOneShotCommand() {
   // wrapper tearing the job down) cannot be trusted: a truncated run must
   // not become a verification verdict. Non-zero *exit codes* stay
   // accepted — SAT-competition-style solvers exit 10/20.
-  if (Verdict && WIFSIGNALED(Status))
+  if (Verdict && WIFSIGNALED(Status)) {
+    noteUnknownReason(UnknownReason::ProtocolError);
     return CheckResult::UNKNOWN;
-  if (!Verdict)
+  }
+  if (!Verdict) {
+    // The run produced no line we could read as a verdict.
+    noteUnknownReason(UnknownReason::ProtocolError);
     return CheckResult::UNKNOWN;
+  }
   return *Verdict;
 }
 
@@ -2505,12 +2510,22 @@ CheckResult SMTLIBSolver::emitCheckCommand(const std::string &Cmd) {
     Proc->emitRaw(Cmd);
     Proc->flush();
     const std::string Resp = Proc->readResponse();
-    return Resp == "sat"     ? CheckResult::SAT
-           : Resp == "unsat" ? CheckResult::UNSAT
-                             : CheckResult::UNKNOWN;
+    if (Resp == "sat")
+      return CheckResult::SAT;
+    if (Resp == "unsat")
+      return CheckResult::UNSAT;
+    // Only a literal `unknown` is the solver declining to decide.
+    // Anything else means the exchange broke: an `(error ...)` reply, a
+    // line we cannot parse, or an empty string for end-of-stream because
+    // the child is gone.
+    if (Resp != "unknown")
+      noteUnknownReason(UnknownReason::ProtocolError);
+    return CheckResult::UNKNOWN;
   }
+  // Write-only mode: the script was emitted but nothing solved it.
   if (File)
     File->flush();
+  noteUnknownReason(UnknownReason::ProtocolError);
   return CheckResult::UNKNOWN;
 }
 

@@ -81,6 +81,22 @@ inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
+inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
+  // Nothing has answered UNKNOWN yet.
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+
+  auto x = solver->mkSymbol("ur_x", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(3, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  // A decided check clears any earlier reason rather than leaving it to
+  // be misread as belonging to this one.
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(4, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+}
+
 inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   if (!solver->setTimeout(150)) {
     // Backends without enforceable limits must report so and stay usable.
@@ -114,6 +130,8 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   };
   assertSemiprimeFactoring();
   REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
+  // The UNKNOWN is the limit firing, not the solver giving up.
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::Timeout);
 
   // The limit applies to assumption-based checks too. Rebuild the problem
   // from scratch first: an incremental solver resumes the interrupted
@@ -123,6 +141,7 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   assertSemiprimeFactoring();
   auto t = solver->mkSymbol("t", solver->mkBoolSort());
   REQUIRE(solver->checkSatAssuming({t}) == camada::CheckResult::UNKNOWN);
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::Timeout);
 
   // Clearing the limit must work from the just-timed-out state.
   REQUIRE(solver->setTimeout(0));
