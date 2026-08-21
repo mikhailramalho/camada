@@ -989,6 +989,8 @@ inline void rm_model_value(const camada::SMTSolverRef &solver,
            Any.value() == camada::RM::ROUND_TO_PLUS_INF ||
            Any.value() == camada::RM::ROUND_TO_MINUS_INF ||
            Any.value() == camada::RM::ROUND_TO_ZERO));
+}
+
 inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
   // IEEE-754 recommends returning one of the input NaNs rather than a
   // fresh one (6.2), and requires the result be quiet (6.2.3). Every
