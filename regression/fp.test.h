@@ -51,6 +51,46 @@ inline void fp_native_bv_predicate_parity(const camada::SMTSolverRef &solver) {
   });
 }
 
+// The FPNegBehavior distinction is observable under the BV encoding and
+// not on a native FP sort, where both modes yield the backend's canonical
+// NaN. fp_neg_nan_native_bv_parity below compares with FP equality, under
+// which every NaN is equal to every other, so it cannot see this; the
+// comparison here is on IEEE bits.
+inline void fp_neg_nan_payload_bits(const camada::SMTSolverRef &solver) {
+  // A qNaN with a payload and the sign bit clear.
+  const std::string Nan = "01111111110101010101010101010101";
+  const std::string Flipped = "11111111110101010101010101010101";
+
+  const auto bits_of = [&](camada::FPEncoding Enc,
+                           camada::FPNegBehavior Behavior) {
+    solver->reset();
+    auto x = solver->mkFPFromBin(Nan, 8, Enc);
+    auto neg = solver->mkFPNeg(x, Behavior);
+    auto rb = solver->mkSymbol("neg_bits", solver->mkBVSort(32));
+    solver->addConstraint(solver->mkEqual(rb, solver->mkIEEEFPToBV(neg)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto v = solver->getBVInBin(rb);
+    REQUIRE(v);
+    return v.value();
+  };
+
+  // Under BV the two modes differ, and each does what it says.
+  REQUIRE(bits_of(camada::FPEncoding::BV, camada::FPNegBehavior::FlipSignBit) ==
+          Flipped);
+  REQUIRE(bits_of(camada::FPEncoding::BV,
+                  camada::FPNegBehavior::PreserveNaNPayload) == Nan);
+
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+
+  // On a native sort the two agree, which is the documented limitation:
+  // the payload is the backend's, not the operand's.
+  REQUIRE(
+      bits_of(camada::FPEncoding::Native, camada::FPNegBehavior::FlipSignBit) ==
+      bits_of(camada::FPEncoding::Native,
+              camada::FPNegBehavior::PreserveNaNPayload));
+}
+
 inline void fp_neg_nan_native_bv_parity(const camada::SMTSolverRef &solver) {
   const auto backend = solver->mkBool(true)->getBackendKind();
   if (backend != camada::SMTBackendKind::Bitwuzla &&

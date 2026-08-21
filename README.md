@@ -531,7 +531,7 @@ Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbm
 - `mkFPNeg` now accepts `FPNegBehavior`.
 - The default, `FPNegBehavior::FlipSignBit`, preserves the full IEEE payload and only toggles the sign bit, including on `NaN`s.
 - `FPNegBehavior::PreserveNaNPayload` follows the SMT floating-point standard and leaves `NaN`s unchanged.
-- `FlipSignBit` is fully honored under BV encoding and via the SMTLIB pipeline. On native FP backends (Bitwuzla, CVC5, Z3) it is best-effort: these solvers treat all `NaN`s as a single equivalence class, so when the operand is a `NaN` the resulting `NaN`'s bit pattern is not guaranteed to match a literal sign-bit flip of the input bits.
+- The distinction is only observable under `FPEncoding::BV`, where an FP value is its bit pattern. On a native FP sort both behaviors give that solver's canonical `NaN`, losing the operand's payload and sign; use `FPEncoding::BV` when the `NaN` bit pattern matters.
 
 Camada's own FP-over-BV encoding also follows IEEE-754's recommended `NaN` handling rather than SMT-LIB's, which matters when a formula reads the bits of a `NaN` result:
 - An operation with a `NaN` operand returns *that operand's* payload, with the significand's leading bit forced to 1: propagated per IEEE-754 6.2, quieted per 6.2.3. With two `NaN` operands the first one wins. This is what every hardware FPU does; SMT-LIB has a single abstract `NaN` and says nothing about payloads.

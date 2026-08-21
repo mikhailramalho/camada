@@ -356,11 +356,16 @@ public:
   /// bit. `PreserveNaNPayload` follows the SMT floating-point standard and
   /// leaves NaNs unchanged.
   ///
-  /// `FlipSignBit` is fully honored under BV encoding and via the SMTLIB
-  /// pipeline. On native FP backends (Bitwuzla, CVC5, Z3) it is best-effort:
-  /// these solvers treat all NaNs as a single equivalence class, so when the
-  /// operand is a NaN the resulting NaN's bit pattern is not guaranteed to
-  /// match a literal sign-bit flip of the input bits.
+  /// Both behaviors are honored under FPEncoding::BV, where an FP value is
+  /// its bit pattern. On a native FP sort the two are indistinguishable: the
+  /// backends treat NaNs as one equivalence class, so a NaN operand yields
+  /// that solver's canonical NaN under either behavior, with the operand's
+  /// payload and sign lost. Measured on Bitwuzla, CVC5, MathSAT and Z3.
+  ///
+  /// Use FPEncoding::BV when the NaN bit pattern matters. Routing a native
+  /// operand through mkIEEEFPToBV does not help: that only returns exact
+  /// bits for terms whose provenance Camada tracks, so the guarantee is
+  /// lost again as soon as the result reaches a symbol or a model query.
   virtual SMTExprRef
   mkFPNeg(const SMTExprRef &Exp,
           FPNegBehavior Behavior = FPNegBehavior::FlipSignBit) = 0;
