@@ -1081,15 +1081,28 @@ function(camada_setup_yices)
   set(yices_shared_soname "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so.2.7.0")
   set(yices_source_stamp
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices/camada-source-build.stamp")
+  # Bump when the configure flags below change, so an install left by an older
+  # recipe is rebuilt rather than silently reused: the stamp used to record only
+  # that a source build had happened, not which one.
+  set(yices_recipe_version "1")
+  set(yices_stamp_current FALSE)
+  if(EXISTS "${yices_source_stamp}")
+    file(READ "${yices_source_stamp}" yices_stamp_contents)
+    string(STRIP "${yices_stamp_contents}" yices_stamp_contents)
+    if(yices_stamp_contents STREQUAL yices_recipe_version)
+      set(yices_stamp_current TRUE)
+    endif()
+  endif()
   if(BUILD_SHARED_LIBS
      AND EXISTS "${yices_shared_lib}"
      AND EXISTS "${yices_header}"
-     AND EXISTS "${yices_source_stamp}")
+     AND yices_stamp_current)
     return()
   endif()
   if(NOT BUILD_SHARED_LIBS
      AND EXISTS "${yices_lib}"
-     AND EXISTS "${yices_header}")
+     AND EXISTS "${yices_header}"
+     AND yices_stamp_current)
     if(EXISTS "${yices_shared_soname}" AND NOT EXISTS "${yices_shared_lib}")
       file(CREATE_LINK "${yices_shared_soname}" "${yices_shared_lib}" SYMBOLIC)
     endif()
@@ -1150,7 +1163,7 @@ function(camada_setup_yices)
     make
     install)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices")
-  file(WRITE "${yices_source_stamp}" "1\n")
+  file(WRITE "${yices_source_stamp}" "${yices_recipe_version}\n")
 endfunction()
 
 function(camada_setup_z3)

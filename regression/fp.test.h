@@ -777,6 +777,88 @@ inline void fp_fma_host_oracle(const camada::SMTSolverRef &solver,
   }
 }
 
+inline void fp_addsub_host_oracle(const camada::SMTSolverRef &solver,
+                                  camada::FPEncoding Encoding) {
+  // Addition and subtraction against the host FPU. The conformance
+  // fixtures cover predicates and conversions; without these the suite
+  // passed with FMA's operand normalization removed entirely, so the
+  // arithmetic paths need their own oracle (see issue #170).
+  const float Sub = std::numeric_limits<float>::denorm_min();
+  const std::pair<float, float> Pairs[] = {
+      // Ordinary values, as a control.
+      {2.0f, 3.0f},
+      {1.5f, 0.25f},
+      {-2.5f, 4.0f},
+      // Cancellation: the result needs renormalizing over many bits.
+      {1.0f, -0.99999994f},
+      {16777216.0f, -16777215.0f},
+      // Subnormal operands and results, where the exponent is pinned at
+      // the minimum and the significand carries the leading zeros.
+      {Sub, Sub},
+      {Sub * 3.0f, -Sub},
+      {Sub, -Sub},
+      {1.1754944e-38f, -Sub},
+      // Mixed magnitudes: the smaller operand is shifted out entirely.
+      {1e38f, Sub},
+      {1.0f, 1e-45f},
+      // Rounding at the tie.
+      {1.0f, 5.9604645e-08f},
+  };
+
+  for (auto [X, Y] : Pairs) {
+    for (int IsSub = 0; IsSub < 2; ++IsSub) {
+      solver->reset();
+      auto x = solver->mkFP32(X, Encoding);
+      auto y = solver->mkFP32(Y, Encoding);
+      auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+      auto got = IsSub ? solver->mkFPSub(x, y, rm) : solver->mkFPAdd(x, y, rm);
+      auto want = solver->mkFP32(IsSub ? X - Y : X + Y, Encoding);
+      INFO((IsSub ? "sub(" : "add(") << X << ", " << Y << ")");
+      solver->addConstraint(solver->mkNot(solver->mkFPEqual(got, want)));
+      REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+    }
+  }
+}
+
+inline void fp_sqrt_host_oracle(const camada::SMTSolverRef &solver,
+                                camada::FPEncoding Encoding) {
+  const float Sub = std::numeric_limits<float>::denorm_min();
+  const float Values[] = {
+      // Exact roots, as a control.
+      4.0f,
+      0.25f,
+      1.0f,
+      16777216.0f,
+      // Inexact, so the rounding path runs.
+      2.0f,
+      3.0f,
+      0.1f,
+      1e38f,
+      // Subnormal input: the significand is renormalized before the root,
+      // and the halved exponent lands back in the normal range.
+      Sub,
+      Sub * 3.0f,
+      1.1754944e-38f,
+      // Zeros keep their sign; sqrt(-0.0) is -0.0.
+      0.0f,
+      -0.0f,
+  };
+
+  for (float V : Values) {
+    solver->reset();
+    auto x = solver->mkFP32(V, Encoding);
+    auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
+    auto got = solver->mkFPSqrt(x, rm);
+    auto want = solver->mkFP32(std::sqrt(V), Encoding);
+    INFO("sqrt(" << V << ")");
+    // Bit comparison, not fp.eq: sqrt(-0.0) must be -0.0, and fp.eq would
+    // accept +0.0.
+    solver->addConstraint(solver->mkNot(solver->mkEqual(
+        solver->mkIEEEFPToBV(got), solver->mkIEEEFPToBV(want))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
+}
+
 inline void fp_remainder_host_oracle(const camada::SMTSolverRef &solver,
                                      camada::FPEncoding Encoding) {
   const std::pair<float, float> Pairs[] = {

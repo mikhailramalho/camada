@@ -3,6 +3,7 @@ include_directories(${CMAKE_BINARY_DIR}/src)
 
 set(REGRESSION_TARGET_NAME ${PROJECT_NAME}-regression)
 set(BENCH_TARGET_NAME ${PROJECT_NAME}-bench)
+set(XCHECK_TARGET_NAME ${PROJECT_NAME}-xcheck)
 
 # -----------------------------------------------------------------------------#
 # Macro to add solver files to test
@@ -101,6 +102,18 @@ if(CAMADA_MATHSAT_BIN_PATH)
   target_compile_definitions(
     ${REGRESSION_TARGET_NAME}
     PRIVATE "CAMADA_TEST_MATHSAT_BIN=\"${CAMADA_MATHSAT_BIN_PATH}\"")
+endif()
+
+# The cross-check driver proves the FP-over-BV encoding equivalent to each
+# backend's native FP, symbolically and exhaustively per operation. It is a
+# standalone tool rather than a ctest case: a single cell can run for hours,
+# which is why the audit is a release-time activity rather than part of the
+# suite. Off by default; see regression/xcheck/README.md.
+option(CAMADA_ENABLE_XCHECK "Build the FP cross-check driver (camada-xcheck)"
+       OFF)
+if(CAMADA_ENABLE_XCHECK)
+  add_executable(${XCHECK_TARGET_NAME} xcheck/xcheck.cpp)
+  target_link_libraries(${XCHECK_TARGET_NAME} PRIVATE ${PROJECT_NAME})
 endif()
 
 # The bench driver reads /proc/self/statm and is Linux-shaped; we only measure
@@ -221,4 +234,18 @@ if(_camada_regression_dl_paths)
                        "${_camada_regression_dl_paths}")
 else()
   catch_discover_tests(${REGRESSION_TARGET_NAME})
+endif()
+
+# The cross-check driver includes the backend headers directly, so it needs the
+# same solver link libraries the regression target gets.
+if(TARGET ${XCHECK_TARGET_NAME})
+  get_target_property(_xcheck_libs ${REGRESSION_TARGET_NAME} LINK_LIBRARIES)
+  if(_xcheck_libs)
+    list(REMOVE_ITEM _xcheck_libs Catch2::Catch2)
+    target_link_libraries(${XCHECK_TARGET_NAME} PRIVATE ${_xcheck_libs})
+  endif()
+  get_target_property(_xcheck_dirs ${REGRESSION_TARGET_NAME} LINK_DIRECTORIES)
+  if(_xcheck_dirs)
+    target_link_directories(${XCHECK_TARGET_NAME} PRIVATE ${_xcheck_dirs})
+  endif()
 endif()
