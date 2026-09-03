@@ -1355,6 +1355,12 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
   // this wrapper, so the lazy guards/tracking below apply per leaf.
   if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
     return mkCamadaTupleArrayStore(*this, Array, Index, Element);
+  // A store index is an index the formula constrains, exactly like a select
+  // index: without observing it, encoded array equality never instantiates
+  // congruence there and a model can satisfy the equality by picking a
+  // witness away from it (store(a,i,1) == store(a,i,2) answered SAT).
+  if (!InLazyModelQuery)
+    observeArrayIndex(Index);
   fatalErrorIf(!LazyConstArrayRoots.empty() && reachesLazyArray(Element),
                "Storing a lazily lowered constant array inside another array "
                "is not supported");
