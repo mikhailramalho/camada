@@ -25,7 +25,6 @@
 #include "../camada.h"
 #include "../camadaerrors.h"
 
-#include <cstdio>
 #include <gmp.h>
 #include <mutex>
 #include <utility>
@@ -154,12 +153,6 @@ unsigned YicesSort::getWidthFromSolver() const {
   return yices_bvtype_size(Sort);
 }
 
-void YicesSort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void YicesSort::dump(std::string &Out) const {
   char *ty_str = yices_type_to_string(Sort, 160, 80, 0);
   Out = ty_str;
@@ -171,12 +164,6 @@ bool YicesExpr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
   return (Expr == static_cast<const YicesExpr &>(Other).Expr);
-}
-
-void YicesExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void YicesExpr::dump(std::string &Out) const {
@@ -817,29 +804,8 @@ YicesSolver::getRationalImpl(const SMTExprRef &Exp) {
 SMTResult<SMTExprRef>
 YicesSolver::getArrayElementImpl(const SMTExprRef &Array,
                                  const SMTExprRef &Index) {
-  const SMTExprRef &sel = mkArraySelect(Array, Index);
-
-  const SMTSortRef &elementSort = Array->Sort->getElementSort();
-  if (elementSort->isBoolSort()) {
-    SMTResult<bool> result = getBool(sel);
-    if (!result)
-      return result.error();
-    return mkBool(result.value());
-  }
-
-  if (elementSort->isBVSort()) {
-    SMTResult<std::string> result = getBVInBin(sel);
-    if (!result)
-      return result.error();
-    return SMTSolverImpl::mkBVFromBin(result.value());
-  }
-
-  fatalErrorIf(!elementSort->isFPSort(), "Unknown Yices array element type");
-  SMTResult<std::string> result = getFPInBin(sel);
-  if (!result)
-    return result.error();
-  return SMTSolverImpl::mkFPFromBin(
-      result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
+  return getArrayElementByModelValue(Array, Index,
+                                     "Unknown Yices array element type");
 }
 
 SMTResult<ArrayModel> YicesSolver::getArrayValuesImpl(const SMTExprRef &Array) {

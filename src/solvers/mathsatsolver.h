@@ -50,8 +50,8 @@ public:
 
   unsigned getWidthFromSolver() const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTSort::dump;
 }; // end class MathSATSort
 
 class MathSATExpr : public SolverExpr<MathSATContextRef, MathSATNode> {
@@ -73,8 +73,8 @@ public:
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTExpr::dump;
 
   bool isDecl() const { return std::holds_alternative<msat_decl>(Expr); }
   bool isTerm() const { return std::holds_alternative<msat_term>(Expr); }

@@ -184,12 +184,6 @@ unsigned SMTLIBSort::getWidthFromSolver() const {
   return getStoredWidth();
 }
 
-void SMTLIBSort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void SMTLIBSort::dump(std::string &Out) const {
   Out = Sort;
   Out += "\n";
@@ -207,12 +201,6 @@ bool SMTLIBExpr::equal_to(SMTExpr const &Other) const {
         !(*Expr.Args[I] == *O.Expr.Args[I]))
       return false;
   return true;
-}
-
-void SMTLIBExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void SMTLIBExpr::dump(std::string &Out) const {
@@ -1926,35 +1914,55 @@ std::string extractValueFromGetValue(const std::string &Resp) {
   return Resp.substr(Start, End - Start);
 }
 
+// Value of one hex digit, or -1 when the character is not one.
+int hexDigitValue(char C) {
+  if (C >= '0' && C <= '9')
+    return C - '0';
+  if (C >= 'a' && C <= 'f')
+    return 10 + (C - 'a');
+  if (C >= 'A' && C <= 'F')
+    return 10 + (C - 'A');
+  return -1;
+}
+
+// Append a hex digit's four bits, most significant first.
+void appendNibbleBits(std::string &Bits, int Nibble) {
+  for (int B = 3; B >= 0; --B)
+    Bits.push_back(((Nibble >> B) & 1) ? '1' : '0');
+}
+
+// Force a binary string to exactly Width bits: hex literals arrive rounded up
+// to a nibble boundary, so the high bits are dropped rather than the low ones.
+void normalizeToWidth(std::string &Bits, unsigned Width) {
+  if (Bits.size() > Width)
+    Bits.erase(0, Bits.size() - Width);
+  else if (Bits.size() < Width)
+    Bits.insert(0, Width - Bits.size(), '0');
+}
+
 // Convert an SMT-LIB BV value literal into a binary string (no `#b` prefix).
 // Handles `#b...`, `#x...`, and `(_ bv<n> <w>)` forms. Returns empty on
 // failure.
 std::string bvValueToBinary(const std::string &Value, unsigned Width) {
-  if (Value.size() >= 2 && Value[0] == '#' && Value[1] == 'b')
-    return Value.substr(2);
+  if (Value.size() >= 2 && Value[0] == '#' && Value[1] == 'b') {
+    // Normalize like the #x branch below: a literal wider than the declared
+    // width would otherwise reach addLeadingZeroes, whose Width - length()
+    // underflows unsigned.
+    std::string Bits = Value.substr(2);
+    normalizeToWidth(Bits, Width);
+    return Bits;
+  }
   if (Value.size() >= 2 && Value[0] == '#' && Value[1] == 'x') {
     // Hex: each digit -> 4 bits.
     std::string Bits;
     Bits.reserve((Value.size() - 2) * 4);
     for (std::size_t I = 2; I < Value.size(); ++I) {
-      char C = Value[I];
-      int N = 0;
-      if (C >= '0' && C <= '9')
-        N = C - '0';
-      else if (C >= 'a' && C <= 'f')
-        N = 10 + (C - 'a');
-      else if (C >= 'A' && C <= 'F')
-        N = 10 + (C - 'A');
-      else
+      const int N = hexDigitValue(Value[I]);
+      if (N < 0)
         return {};
-      for (int B = 3; B >= 0; --B)
-        Bits.push_back(((N >> B) & 1) ? '1' : '0');
+      appendNibbleBits(Bits, N);
     }
-    // Trim leading zeros to fit the expected width if needed.
-    if (Bits.size() > Width)
-      Bits = Bits.substr(Bits.size() - Width);
-    while (Bits.size() < Width)
-      Bits.insert(Bits.begin(), '0');
+    normalizeToWidth(Bits, Width);
     return Bits;
   }
   // (_ bv<n> <w>): parse the decimal value and convert.
@@ -2026,27 +2034,16 @@ std::size_t parseBVLiteralAppend(const std::string &S, std::size_t I,
   } else if (S[I + 1] == 'x') {
     I += 2;
     while (I < S.size()) {
-      char C = S[I];
-      int N = 0;
-      if (C >= '0' && C <= '9')
-        N = C - '0';
-      else if (C >= 'a' && C <= 'f')
-        N = 10 + (C - 'a');
-      else if (C >= 'A' && C <= 'F')
-        N = 10 + (C - 'A');
-      else
-        break;
-      for (int B = 3; B >= 0; --B)
-        Bits.push_back(((N >> B) & 1) ? '1' : '0');
+      const int N = hexDigitValue(S[I]);
+      if (N < 0)
+        break; // a non-hex character ends the literal, it is not an error
+      appendNibbleBits(Bits, N);
       ++I;
     }
   } else {
     return std::string::npos;
   }
-  if (Bits.size() > Width)
-    Bits = Bits.substr(Bits.size() - Width);
-  while (Bits.size() < Width)
-    Bits.insert(Bits.begin(), '0');
+  normalizeToWidth(Bits, Width);
   Out += Bits;
   return I;
 }

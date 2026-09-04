@@ -119,6 +119,13 @@ public:
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
 
+  /// Model bits of a bool/BV-sorted expression after a SAT check, used to
+  /// compare index terms by model value. Empty string when the sort is
+  /// unsupported or the model query fails. Callers that revisit the same
+  /// index term should memoize: each call is a backend model query.
+  /// Public because the Camada tuple lowering is a free function.
+  std::string lazyIndexModelBits(const SMTExprRef &Exp);
+
 protected:
   void invalidateGeneratedObjects();
   void clearSortCaches();
@@ -424,11 +431,6 @@ protected:
                     "No model is available: the last check did not return "
                     "SAT, or the solver was modified since"};
   }
-
-  /// Model bits of a bool/BV-sorted expression after a SAT check, used to
-  /// compare index terms by model value. Empty string when the sort is
-  /// unsupported or the model query fails.
-  std::string lazyIndexModelBits(const SMTExprRef &Exp);
 
   /// Sparse model for an expression that reaches a lazily lowered constant
   /// array, built from the tracked derivation chain instead of the backend
@@ -1234,6 +1236,14 @@ protected:
 
   virtual SMTResult<SMTExprRef>
   getArrayElementImpl(const SMTExprRef &Array, const SMTExprRef &Index) = 0;
+
+  /// Reads one array element through the generic model getters and rebuilds
+  /// it as a Camada constant. For backends whose model API cannot hand back
+  /// an element term directly (STP, Yices); the others evaluate the select
+  /// natively instead.
+  SMTResult<SMTExprRef> getArrayElementByModelValue(const SMTExprRef &Array,
+                                                    const SMTExprRef &Index,
+                                                    const char *SortErrorMsg);
 
   /// Walk the backend model's representation of Array (store chains over a
   /// constant array, function interpretations, ...) into an ArrayModel.

@@ -52,8 +52,8 @@ public:
 
   unsigned getWidthFromSolver() const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTSort::dump;
 };
 
 /// Structural SMT-LIB term. Head is either the complete text of a terminal
@@ -82,8 +82,8 @@ public:
 
   bool equal_to(SMTExpr const &Other) const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTExpr::dump;
 };
 
 /// Emits SMT-LIB output to a file (or stdout if path is "-").

@@ -26,7 +26,6 @@
 #include "../camadacache.h"
 #include "../camadaerrors.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -109,12 +108,6 @@ bool BitwExpr::equal_to(SMTExpr const &Other) const {
   if (Sort != Other.Sort || Other.getBackendKind() != getBackendKind())
     return false;
   return Expr == static_cast<const BitwExpr &>(Other).Expr;
-}
-
-void BitwExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void BitwExpr::dump(std::string &Out) const {

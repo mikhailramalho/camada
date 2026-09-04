@@ -26,7 +26,6 @@
 #include "../camadaerrors.h"
 
 #include <algorithm>
-#include <cstdio>
 #include <cstdlib>
 #include <limits>
 
@@ -45,12 +44,6 @@ unsigned STPSort::getWidthFromSolver() const {
   return STP::vc_getValueSize(Context, Sort);
 }
 
-void STPSort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
-
 void STPSort::dump(std::string &Out) const {
   char *s = STP::typeString(Sort);
   Out = s;
@@ -63,12 +56,6 @@ bool STPExpr::equal_to(SMTExpr const &Other) const {
     return false;
   return (STP::getExprID(Expr) ==
           STP::getExprID(static_cast<const STPExpr &>(Other).Expr));
-}
-
-void STPExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
 }
 
 void STPExpr::dump(std::string &Out) const {
@@ -546,29 +533,8 @@ SMTResult<std::string> STPSolver::getBVInBinImpl(const SMTExprRef &Exp) {
 
 SMTResult<SMTExprRef> STPSolver::getArrayElementImpl(const SMTExprRef &Array,
                                                      const SMTExprRef &Index) {
-  const SMTExprRef &sel = mkArraySelect(Array, Index);
-
-  const SMTSortRef &elementSort = Array->Sort->getElementSort();
-  if (elementSort->isBoolSort()) {
-    SMTResult<bool> result = getBool(sel);
-    if (!result)
-      return result.error();
-    return mkBool(result.value());
-  }
-
-  if (elementSort->isBVSort()) {
-    SMTResult<std::string> result = getBVInBin(sel);
-    if (!result)
-      return result.error();
-    return SMTSolverImpl::mkBVFromBin(result.value());
-  }
-
-  fatalErrorIf(!elementSort->isFPSort(), "Unknown STP array element type");
-  SMTResult<std::string> result = getFPInBin(sel);
-  if (!result)
-    return result.error();
-  return SMTSolverImpl::mkFPFromBin(
-      result.value(), elementSort->getFPExponentWidth(), FPEncoding::BV);
+  return getArrayElementByModelValue(Array, Index,
+                                     "Unknown STP array element type");
 }
 
 SMTExprRef STPSolver::mkBoolImpl(const bool b) {

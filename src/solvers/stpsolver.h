@@ -48,8 +48,8 @@ public:
 
   unsigned getWidthFromSolver() const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTSort::dump;
 }; // end class STPSort
 
 /// Wrapper for STP expressions. The underlying STP term nodes are owned by
@@ -68,8 +68,8 @@ public:
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTExpr::dump;
 }; // end class STPExpr
 
 class STPSolver : public SMTSolverImpl {

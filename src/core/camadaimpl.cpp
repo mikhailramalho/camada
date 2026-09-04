@@ -1895,6 +1895,43 @@ SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
   }
 }
 
+SMTResult<SMTExprRef>
+SMTSolverImpl::getArrayElementByModelValue(const SMTExprRef &Array,
+                                           const SMTExprRef &Index,
+                                           const char *SortErrorMsg) {
+  // Reject an unsupported element sort before building the select: STP
+  // rejects nested arrays at sort construction, but Yices accepts them, so
+  // without this the Yices path mints a live backend term and only then
+  // aborts.
+  const SMTSortRef &ElementSort = Array->Sort->getElementSort();
+  fatalErrorIf(!ElementSort->isBoolSort() && !ElementSort->isBVSort() &&
+                   !ElementSort->isFPSort(),
+               SortErrorMsg);
+
+  const SMTExprRef &Sel = mkArraySelect(Array, Index);
+
+  if (ElementSort->isBoolSort()) {
+    SMTResult<bool> Result = getBool(Sel);
+    if (!Result)
+      return Result.error();
+    return mkBool(Result.value());
+  }
+
+  if (ElementSort->isBVSort()) {
+    SMTResult<std::string> Result = getBVInBin(Sel);
+    if (!Result)
+      return Result.error();
+    return SMTSolverImpl::mkBVFromBin(Result.value());
+  }
+
+  SMTResult<std::string> Result = getFPInBin(Sel);
+  if (!Result)
+    return Result.error();
+  return SMTSolverImpl::mkFPFromBin(
+      Result.value(), ElementSort->getFPExponentWidth(),
+      ElementSort->isBVFPSort() ? FPEncoding::BV : FPEncoding::Native);
+}
+
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValuesImpl(const SMTExprRef &) {
   return SMTError{SMTErrorCode::UnsupportedOperation,
                   CachedBoolExprs[0]->getBackendKind(),
