@@ -232,6 +232,11 @@ std::string power2Dec(unsigned int N) {
 std::string addLeadingZeroes(const std::string &Str, const unsigned Width) {
   if (Str.length() == Width)
     return Str;
+  // A backend returning more bits than the sort declares would underflow the
+  // subtraction below and ask for a ~SIZE_MAX-long string; keep the low bits,
+  // which is what every caller means by a value of this width.
+  if (Str.length() > Width)
+    return Str.substr(Str.length() - Width);
   return std::string(Width - Str.length(), '0') + Str;
 }
 
@@ -937,6 +942,7 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
       SMTExprRef theEq = mkEqualImpl(LHS, RHS);
       assert(theEq->isBoolSort());
       SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
+      PreserveModelAvailability ModelGuard(*this);
       addConstraint(Lemma);
       LazyConstraintLevels.back().push_back(std::move(Lemma));
       return theEq;
@@ -1465,6 +1471,7 @@ void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
   } else {
     Constraint = mkEqual(Sel, Root.Init);
   }
+  PreserveModelAvailability ModelGuard(*this);
   addConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
@@ -1532,6 +1539,7 @@ SMTExprRef SMTSolverImpl::mkEncodedArrayEqual(const SMTExprRef &LHS,
       LHS->Sort->getIndexSort());
   SMTExprRef Lemma = mkOr(EqVar, mkNot(mkEqual(mkArraySelect(LHS, Witness),
                                                mkArraySelect(RHS, Witness))));
+  PreserveModelAvailability ModelGuard(*this);
   addConstraint(Lemma);
   LazyConstraintLevels.back().push_back(std::move(Lemma));
   return EqVar;
@@ -1545,6 +1553,7 @@ void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,
   SMTExprRef Constraint =
       mkImplies(Link.EqVar, mkEqual(mkArraySelect(Link.LHS, Index),
                                     mkArraySelect(Link.RHS, Index)));
+  PreserveModelAvailability ModelGuard(*this);
   addConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
@@ -2253,6 +2262,7 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
         mkFunctionSort({Exp->Sort}, mkBVSort(Exp->getWidth())));
   SMTExprRef Bits = mkApply(FnIt->second, {Exp});
   SMTExprRef Tie = mkEqual(mkBVToIEEEFP(Bits, Exp->Sort), Exp);
+  PreserveModelAvailability ModelGuard(*this);
   addConstraint(Tie);
   LazyConstraintLevels.back().push_back(std::move(Tie));
   // Memoize only once the tie holds: caching first would leave a wholly

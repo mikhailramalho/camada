@@ -424,6 +424,25 @@ protected:
   // throws an uncaught exception, or (STP) fabricates a zero, all of
   // which contradict the documented "returns an SMTError" contract.
   bool ModelAvailable = false;
+  /// Scope guard for constraints Camada generates itself (lazy array
+  /// defaults, extensionality lemmas, congruence axioms, FP-to-BV ties).
+  /// Those are consequences of the formula already asserted, so a model
+  /// that satisfies the formula satisfies them too -- they must not
+  /// invalidate it. Without this, merely building an array term after a
+  /// SAT check destroys the model, breaking the read-back loop every
+  /// consumer uses to extract a counterexample.
+  struct PreserveModelAvailability {
+    SMTSolverImpl &S;
+    const bool Saved;
+    const UnknownReason SavedReason;
+    explicit PreserveModelAvailability(SMTSolverImpl &Solver)
+        : S(Solver), Saved(Solver.ModelAvailable),
+          SavedReason(Solver.LastUnknownReason) {}
+    ~PreserveModelAvailability() {
+      S.ModelAvailable = Saved;
+      S.LastUnknownReason = SavedReason;
+    }
+  };
   /// The SMTError every model getter returns when no model is available.
   /// Takes the queried expression only to name the backend in the error.
   static SMTError noModelError(const SMTExprRef &Exp) {

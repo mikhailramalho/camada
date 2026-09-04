@@ -1945,10 +1945,15 @@ void normalizeToWidth(std::string &Bits, unsigned Width) {
 // failure.
 std::string bvValueToBinary(const std::string &Value, unsigned Width) {
   if (Value.size() >= 2 && Value[0] == '#' && Value[1] == 'b') {
-    // Normalize like the #x branch below: a literal wider than the declared
-    // width would otherwise reach addLeadingZeroes, whose Width - length()
-    // underflows unsigned.
+    // Validate before normalizing: the caller uses an empty return as its
+    // only "unparseable reply" signal, and padding a truncated or malformed
+    // body to Width would turn a dead child into a fabricated zero.
     std::string Bits = Value.substr(2);
+    if (Bits.empty())
+      return {};
+    for (char C : Bits)
+      if (C != '0' && C != '1')
+        return {};
     normalizeToWidth(Bits, Width);
     return Bits;
   }

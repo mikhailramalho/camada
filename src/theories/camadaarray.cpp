@@ -335,6 +335,7 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
       continue;
     SMTExprRef Constraint =
         mkImplies(mkEqual(Index, P.Index), mkEqual(Read, P.Value));
+    PreserveModelAvailability ModelGuard(*this);
     addConstraint(Constraint);
     // Congruence is a scope-independent fact; journal it so pop()
     // re-asserts it at the outer level (see LazyConstraintLevels).
