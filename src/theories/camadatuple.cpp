@@ -592,26 +592,17 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   // value-based, never term identity). Bool and BV index sorts are the
   // only ones the lazy machinery produces entries for; anything else
   // cannot be canonicalized.
-  // Memoized on the index term: each call is a real backend model query,
-  // and the assembly below re-asks for the same indexes once per leaf, so
-  // an unmemoized version costs (leaves * entries)^2 queries -- three
+  // Memoized: lazyIndexModelBits issues a real backend model query per
+  // call, and the assembly below re-reads each index once per leaf, so
+  // without the memo the cost is (leaves * entries)^2 queries -- three
   // seconds for an 800-entry four-field array.
   std::unordered_map<const SMTExpr *, std::string> IndexBitsMemo;
   auto indexBitsOf = [&](const SMTExprRef &Idx) -> const std::string & {
     auto It = IndexBitsMemo.find(&*Idx);
     if (It != IndexBitsMemo.end())
       return It->second;
-    std::string Bits;
-    if (Idx->isBoolSort()) {
-      SMTResult<bool> V = Solver.getBool(Idx);
-      if (V)
-        Bits = V.value() ? "1" : "0";
-    } else if (Idx->isBVSort()) {
-      SMTResult<std::string> V = Solver.getBVInBin(Idx);
-      if (V)
-        Bits = std::move(V.value());
-    }
-    return IndexBitsMemo.emplace(&*Idx, std::move(Bits)).first->second;
+    return IndexBitsMemo.emplace(&*Idx, Solver.lazyIndexModelBits(Idx))
+        .first->second;
   };
 
   // The defined indexes are the union across leaves, canonicalized by

@@ -119,6 +119,13 @@ public:
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
 
+  /// Model bits of a bool/BV-sorted expression after a SAT check, used to
+  /// compare index terms by model value. Empty string when the sort is
+  /// unsupported or the model query fails. Callers that revisit the same
+  /// index term should memoize: each call is a backend model query.
+  /// Public because the Camada tuple lowering is a free function.
+  std::string lazyIndexModelBits(const SMTExprRef &Exp);
+
 protected:
   void invalidateGeneratedObjects();
   void clearSortCaches();
@@ -424,11 +431,6 @@ protected:
                     "No model is available: the last check did not return "
                     "SAT, or the solver was modified since"};
   }
-
-  /// Model bits of a bool/BV-sorted expression after a SAT check, used to
-  /// compare index terms by model value. Empty string when the sort is
-  /// unsupported or the model query fails.
-  std::string lazyIndexModelBits(const SMTExprRef &Exp);
 
   /// Sparse model for an expression that reaches a lazily lowered constant
   /// array, built from the tracked derivation chain instead of the backend
