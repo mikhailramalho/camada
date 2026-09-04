@@ -45,8 +45,8 @@ public:
 
   unsigned getWidthFromSolver() const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTSort::dump;
 }; // end class CVC5Sort
 
 class CVC5Expr : public SolverExpr<CVC5ContextRef, cvc5::Term> {
@@ -60,8 +60,8 @@ public:
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTExpr::dump;
 }; // end class CVC5Expr
 
 class CVC5Solver : public SMTSolverImpl {

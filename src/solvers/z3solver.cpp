@@ -75,11 +75,6 @@ unsigned Z3Sort::getWidthFromSolver() const {
   return 3;
 }
 
-void Z3Sort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void Z3Sort::dump(std::string &Out) const {
   Out = Sort.to_string();
@@ -92,11 +87,6 @@ bool Z3Expr::equal_to(SMTExpr const &Other) const {
   return z3::eq(Expr, static_cast<const Z3Expr &>(Other).Expr);
 }
 
-void Z3Expr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void Z3Expr::dump(std::string &Out) const {
   Out = Expr.to_string();

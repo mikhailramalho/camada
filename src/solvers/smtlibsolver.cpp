@@ -184,11 +184,6 @@ unsigned SMTLIBSort::getWidthFromSolver() const {
   return getStoredWidth();
 }
 
-void SMTLIBSort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void SMTLIBSort::dump(std::string &Out) const {
   Out = Sort;
@@ -209,11 +204,6 @@ bool SMTLIBExpr::equal_to(SMTExpr const &Other) const {
   return true;
 }
 
-void SMTLIBExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void SMTLIBExpr::dump(std::string &Out) const {
   Out = renderSMTLIBExpr(*this);

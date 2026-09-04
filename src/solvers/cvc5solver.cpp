@@ -76,11 +76,6 @@ unsigned CVC5Sort::getWidthFromSolver() const {
          fpType.getFloatingPointSignificandSize();
 }
 
-void CVC5Sort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void CVC5Sort::dump(std::string &Out) const {
   Out = Sort.toString();
@@ -93,11 +88,6 @@ bool CVC5Expr::equal_to(SMTExpr const &Other) const {
   return (Expr == static_cast<const CVC5Expr &>(Other).Expr);
 }
 
-void CVC5Expr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void CVC5Expr::dump(std::string &Out) const {
   Out = Expr.toString();

@@ -47,8 +47,8 @@ public:
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   unsigned getWidthFromSolver() const override;
-  void dump() const override { return SMTSort::dump(); }
   void dump(std::string &Out) const override;
+  using SMTSort::dump;
 };
 
 class BitwExpr : public SolverExpr<BitwuzlaContextRef, BitwuzlaTerm> {
@@ -60,8 +60,8 @@ public:
   SMTBackendKind getBackendKind() const override { return BackendKindValue; }
 
   bool equal_to(SMTExpr const &Other) const override;
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTExpr::dump;
 };
 
 class BitwuzlaSolver : public SMTSolverImpl {

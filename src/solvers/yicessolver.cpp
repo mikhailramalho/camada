@@ -154,11 +154,6 @@ unsigned YicesSort::getWidthFromSolver() const {
   return yices_bvtype_size(Sort);
 }
 
-void YicesSort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void YicesSort::dump(std::string &Out) const {
   char *ty_str = yices_type_to_string(Sort, 160, 80, 0);
@@ -173,11 +168,6 @@ bool YicesExpr::equal_to(SMTExpr const &Other) const {
   return (Expr == static_cast<const YicesExpr &>(Other).Expr);
 }
 
-void YicesExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void YicesExpr::dump(std::string &Out) const {
   char *term_str = yices_term_to_string(Expr, 160, 80, 0);

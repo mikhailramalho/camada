@@ -111,11 +111,6 @@ bool BitwExpr::equal_to(SMTExpr const &Other) const {
   return Expr == static_cast<const BitwExpr &>(Other).Expr;
 }
 
-void BitwExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void BitwExpr::dump(std::string &Out) const {
   Out = bitwuzla_term_to_string(Expr);

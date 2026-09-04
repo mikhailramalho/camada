@@ -46,8 +46,8 @@ public:
 
   unsigned getWidthFromSolver() const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTSort::dump;
 }; // end class Z3Sort
 
 class Z3Expr : public SolverExpr<Z3ContextRef, z3::ast> {
@@ -61,8 +61,8 @@ public:
   /// Comparison of Expr equality, not model equivalence.
   bool equal_to(SMTExpr const &Other) const override;
 
-  void dump() const override;
   void dump(std::string &Out) const override;
+  using SMTExpr::dump;
 }; // end class Z3Expr
 
 class Z3Solver : public SMTSolverImpl {

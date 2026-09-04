@@ -45,11 +45,6 @@ unsigned STPSort::getWidthFromSolver() const {
   return STP::vc_getValueSize(Context, Sort);
 }
 
-void STPSort::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void STPSort::dump(std::string &Out) const {
   char *s = STP::typeString(Sort);
@@ -65,11 +60,6 @@ bool STPExpr::equal_to(SMTExpr const &Other) const {
           STP::getExprID(static_cast<const STPExpr &>(Other).Expr));
 }
 
-void STPExpr::dump() const {
-  std::string Out;
-  dump(Out);
-  std::fprintf(stderr, "%s", Out.c_str());
-}
 
 void STPExpr::dump(std::string &Out) const {
   char *s = STP::exprString(Expr);
