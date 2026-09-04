@@ -1235,6 +1235,14 @@ protected:
   virtual SMTResult<SMTExprRef>
   getArrayElementImpl(const SMTExprRef &Array, const SMTExprRef &Index) = 0;
 
+  /// Reads one array element through the generic model getters and rebuilds
+  /// it as a Camada constant. For backends whose model API cannot hand back
+  /// an element term directly (STP, Yices); the others evaluate the select
+  /// natively instead.
+  SMTResult<SMTExprRef> getArrayElementByModelValue(const SMTExprRef &Array,
+                                                    const SMTExprRef &Index,
+                                                    const char *SortErrorMsg);
+
   /// Walk the backend model's representation of Array (store chains over a
   /// constant array, function interpretations, ...) into an ArrayModel.
   /// The default returns UnsupportedOperation for backends without a
