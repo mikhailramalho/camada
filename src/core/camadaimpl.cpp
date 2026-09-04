@@ -393,17 +393,6 @@ void SMTSolverImpl::noteAckBVConstBits(const SMTExprRef &Exp,
     AckBVConstBits.emplace(&*Exp, Bits);
 }
 
-static std::string int64ToBits(int64_t Value, unsigned Width) {
-  std::string Bits(Width, '0');
-  for (unsigned I = 0; I < Width; ++I) {
-    // Arithmetic shift on the signed value sign-extends, matching the
-    // two's-complement semantics of mkBVFromDec for widths beyond 64.
-    const int64_t Bit = I < 64 ? (Value >> I) & 1 : (Value < 0 ? 1 : 0);
-    Bits[Width - 1 - I] = Bit ? '1' : '0';
-  }
-  return Bits;
-}
-
 void SMTSolverImpl::invalidateUnsatAssumptions() {
   LastAssumptions.clear();
   UnsatAssumptionsValid = false;
@@ -731,8 +720,17 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   auto It = PendingShadowLinks.find(&*Constraint);
   if (It == PendingShadowLinks.end())
     return;
-  // Keep the first (outermost) entry on collision so a pop cannot erase a
-  // fact established in an outer scope; only journal what was inserted.
+  // Only assert-derived shadows that can never be retracted are safe to
+  // record. mkIEEEFPToBV is a *term-level* rewrite: once it has handed a
+  // caller the shadowed bits, that term IS those bits forever, so a later
+  // pop cannot undo it -- erasing the map entry only stops future calls.
+  // Committing inside a scope therefore leaks the tie past its pop and
+  // reports UNSAT on satisfiable formulas. At scope 0 no pop can retract
+  // the tie, so the rewrite stays sound; deeper scopes fall back to the
+  // underspecified backend operation, which is always correct.
+  if (ShadowScopeLevels.size() != 1)
+    return;
+  // Keep the first entry on collision; only journal what was inserted.
   if (IEEEBVShadow.emplace(It->second.Target, It->second.Bits).second)
     ShadowScopeLevels.back().push_back(It->second.Target);
 }
@@ -1945,7 +1943,7 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
       SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
       assert(theExp->isBVSort());
       assert(theExp->getWidth() == Width);
-      noteAckBVConstBits(theExp, int64ToBits(Int, Width));
+      noteAckBVConstBits(theExp, toTwosComplementBin(Int, Width));
       CachedExpr = theExp;
       return CachedExpr;
     }
@@ -1954,7 +1952,7 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
   SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
   assert(theExp->isBVSort());
   assert(theExp->getWidth() == Sort->getWidth());
-  noteAckBVConstBits(theExp, int64ToBits(Int, Sort->getWidth()));
+  noteAckBVConstBits(theExp, toTwosComplementBin(Int, Sort->getWidth()));
   return theExp;
 }
 
@@ -2189,10 +2187,13 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
         "__CAMADA_ieeebv_fn" + std::to_string(IEEEBVFnCache.size() - 1),
         mkFunctionSort({Exp->Sort}, mkBVSort(Exp->getWidth())));
   SMTExprRef Bits = mkApply(FnIt->second, {Exp});
-  IEEEBVAppCache.emplace(&*Exp, Bits);
   SMTExprRef Tie = mkEqual(mkBVToIEEEFP(Bits, Exp->Sort), Exp);
   addConstraint(Tie);
   LazyConstraintLevels.back().push_back(std::move(Tie));
+  // Memoize only once the tie holds: caching first would leave a wholly
+  // unconstrained BV memoized if addConstraint threw, and later calls
+  // would return it from the cache without ever retrying the tie.
+  IEEEBVAppCache.emplace(&*Exp, Bits);
   return Bits;
 }
 
@@ -2256,12 +2257,19 @@ SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
 
 CheckResult SMTSolverImpl::checkSatAssumingImpl(
     const std::vector<SMTExprRef> &Assumptions) {
+  // RAII: addConstraint or checkImpl can throw (a backend exception, or a
+  // fatalError in a sort check). Without the guard the scope stays open and
+  // the assumptions remain asserted as hard constraints, so every later
+  // check answers against them and the caller's next pop unwinds the wrong
+  // scope.
   push();
+  struct ScopeGuard {
+    SMTSolverImpl &S;
+    ~ScopeGuard() { S.pop(); }
+  } Guard{*this};
   for (const SMTExprRef &Assumption : Assumptions)
     addConstraint(Assumption);
-  const CheckResult Result = checkImpl();
-  pop();
-  return Result;
+  return checkImpl();
 }
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
@@ -2338,6 +2346,10 @@ bool SMTSolverImpl::setTimeoutImpl(uint64_t) { return false; }
 
 void SMTSolverImpl::reset() {
   invalidateGeneratedObjects();
+  // reasonUnknown() is documented to report NotApplicable at any time
+  // other than right after an UNKNOWN check; a reset discards the query
+  // the reason belonged to.
+  LastUnknownReason = UnknownReason::NotApplicable;
   resetImpl();
   initializeCommonSingletons();
   // resetImpl() may recreate the backend context, dropping any limit

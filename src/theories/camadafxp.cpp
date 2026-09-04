@@ -1396,6 +1396,15 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
   }
   Root = mkIte(RoundUp, mkBVAdd(Root, One), Root);
 
+  // The round-up can carry Root past the format maximum: the square root of
+  // the largest all-fraction value rounds up to exactly 1.0, which an
+  // all-fraction format cannot represent. Truncating to F.Width would wrap
+  // that to the most negative value -- a negative square root of a positive
+  // number -- so clamp to the format maximum instead, as the overflow paths
+  // elsewhere in this file do.
+  SMTExprRef MaxRaw = mkBVFromBin(maxRawBits(F, RadWidth), RadWidth);
+  Root = mkIte(mkBVUgt(Root, MaxRaw), MaxRaw, Root);
+
   SMTExprRef Res = mkBVExtract(F.Width - 1, 0, Root);
   // A negative operand has no real square root, and the zero-extension
   // above reads its two's-complement bits as a large positive radicand,
