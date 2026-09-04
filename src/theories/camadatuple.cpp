@@ -25,6 +25,8 @@
 #include "../core/camadaimpl.h"
 
 #include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace camada {
@@ -590,16 +592,26 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   // value-based, never term identity). Bool and BV index sorts are the
   // only ones the lazy machinery produces entries for; anything else
   // cannot be canonicalized.
-  auto indexBitsOf = [&](const SMTExprRef &Idx) -> std::string {
+  // Memoized on the index term: each call is a real backend model query,
+  // and the assembly below re-asks for the same indexes once per leaf, so
+  // an unmemoized version costs (leaves * entries)^2 queries -- three
+  // seconds for an 800-entry four-field array.
+  std::unordered_map<const SMTExpr *, std::string> IndexBitsMemo;
+  auto indexBitsOf = [&](const SMTExprRef &Idx) -> const std::string & {
+    auto It = IndexBitsMemo.find(&*Idx);
+    if (It != IndexBitsMemo.end())
+      return It->second;
+    std::string Bits;
     if (Idx->isBoolSort()) {
       SMTResult<bool> V = Solver.getBool(Idx);
-      return V ? std::string(V.value() ? "1" : "0") : std::string();
-    }
-    if (Idx->isBVSort()) {
+      if (V)
+        Bits = V.value() ? "1" : "0";
+    } else if (Idx->isBVSort()) {
       SMTResult<std::string> V = Solver.getBVInBin(Idx);
-      return V ? V.value() : std::string();
+      if (V)
+        Bits = std::move(V.value());
     }
-    return std::string();
+    return IndexBitsMemo.emplace(&*Idx, std::move(Bits)).first->second;
   };
 
   // The defined indexes are the union across leaves, canonicalized by
@@ -608,14 +620,14 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   // is leaf-major so the result is deterministic.
   std::vector<SMTExprRef> IndexExprs;
   std::vector<std::string> IndexBits;
+  std::unordered_set<std::string> SeenIndexBits;
   for (const ArrayModel &M : LeafModels) {
     for (const auto &Entry : M.Entries) {
       const std::string Bits = indexBitsOf(Entry.first);
       if (Bits.empty())
         return SMTError{SMTErrorCode::BackendError, Array->getBackendKind(),
                         "Could not canonicalize a tuple-array model index"};
-      if (std::find(IndexBits.begin(), IndexBits.end(), Bits) ==
-          IndexBits.end()) {
+      if (SeenIndexBits.insert(Bits).second) {
         IndexBits.push_back(Bits);
         IndexExprs.push_back(Entry.first);
       }
@@ -623,18 +635,27 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   }
 
   // Per leaf, resolve the value at a given index by its model value: the
-  // first matching entry wins, else the leaf base.
-  auto leafValueAt = [&](const ArrayModel &M, const std::string &Bits,
+  // first matching entry wins, else the leaf base. Indexed once per leaf
+  // rather than rescanned per (index, leaf) pair.
+  std::vector<std::unordered_map<std::string, SMTExprRef>> LeafByBits;
+  LeafByBits.reserve(LeafModels.size());
+  for (const ArrayModel &M : LeafModels) {
+    std::unordered_map<std::string, SMTExprRef> ByBits;
+    ByBits.reserve(M.Entries.size());
+    for (const auto &Entry : M.Entries)
+      ByBits.emplace(indexBitsOf(Entry.first), Entry.second);
+    LeafByBits.push_back(std::move(ByBits));
+  }
+  auto leafValueAt = [&](std::size_t Leaf, const std::string &Bits,
                          bool &Found) -> SMTExprRef {
-    for (const auto &Entry : M.Entries) {
-      if (indexBitsOf(Entry.first) == Bits) {
-        Found = true;
-        return Entry.second;
-      }
-    }
-    if (M.Base) {
+    const auto &ByBits = LeafByBits[Leaf];
+    if (auto It = ByBits.find(Bits); It != ByBits.end()) {
       Found = true;
-      return M.Base;
+      return It->second;
+    }
+    if (LeafModels[Leaf].Base) {
+      Found = true;
+      return LeafModels[Leaf].Base;
     }
     Found = false;
     return {};
@@ -644,9 +665,9 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   for (std::size_t K = 0; K < IndexExprs.size(); ++K) {
     std::vector<SMTExprRef> LeafValues;
     LeafValues.reserve(LeafModels.size());
-    for (const ArrayModel &M : LeafModels) {
+    for (std::size_t L = 0; L < LeafModels.size(); ++L) {
       bool Found = false;
-      SMTExprRef V = leafValueAt(M, IndexBits[K], Found);
+      SMTExprRef V = leafValueAt(L, IndexBits[K], Found);
       if (!Found)
         return SMTError{SMTErrorCode::UnsupportedOperation,
                         Array->getBackendKind(),
