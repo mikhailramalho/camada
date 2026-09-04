@@ -132,12 +132,15 @@ namespace camada {
     assert(theExp->getWidth() == ToWidth);                                     \
     return theExp;                                                             \
   }
-// Model-value getter: check the sort, then delegate. The guard is the whole
-// wrapper, so it is the only thing worth not retyping.
+// Model-value getter: check ownership, the sort, and that a model exists,
+// then delegate. The guard is the whole wrapper, so it is the only thing
+// worth not retyping.
 #define CAMADA_DEFINE_MODEL_GETTER(ResultType, Name, SortAssert, ImplName)     \
   SMTResult<ResultType> SMTSolverImpl::Name(const SMTExprRef &Exp) {           \
     requireOwned(Exp);                                                         \
     SortAssert;                                                                \
+    if (!ModelAvailable)                                                       \
+      return noModelError(Exp);                                                \
     return ImplName(Exp);                                                      \
   }
 // Constant constructor: nothing to check on the way in -- there is no operand
@@ -407,6 +410,11 @@ static std::string int64ToBits(int64_t Value, unsigned Width) {
 void SMTSolverImpl::invalidateUnsatAssumptions() {
   LastAssumptions.clear();
   UnsatAssumptionsValid = false;
+  // A model and an unsat core are invalidated by exactly the same events
+  // (addConstraint, push, pop, reset, a later check), so they share this
+  // hook. finishCheck() re-arms the model afterwards for a check that
+  // answers SAT or UNKNOWN.
+  ModelAvailable = false;
   // Fires on everything that invalidates the current model (constraint,
   // check, push, pop, reset), which is exactly the lifetime of the
   // default values handed out for unconstrained Ackermann-array queries.
@@ -1722,6 +1730,8 @@ CAMADA_DEFINE_MODEL_GETTER(RM, getRM,
 
 SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
   requireBVSort(Exp, "Expected bit-vector expression");
+  if (!ModelAvailable)
+    return noModelError(Exp);
   SMTResult<std::string> result = getBVInBinImpl(Exp);
   if (!result)
     return result.error();
@@ -1731,12 +1741,16 @@ SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
 SMTResult<std::string> SMTSolverImpl::getInt(const SMTExprRef &Exp) {
   fatalErrorIf(!Exp->isIntSort() && !Exp->isRealSort(),
                "Expected integer or real expression");
+  if (!ModelAvailable)
+    return noModelError(Exp);
   return getIntImpl(Exp);
 }
 
 SMTResult<std::pair<std::string, std::string>>
 SMTSolverImpl::getRational(const SMTExprRef &Exp) {
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
+  if (!ModelAvailable)
+    return noModelError(Exp);
   return getRationalImpl(Exp);
 }
 
@@ -1748,6 +1762,8 @@ SMTSolverImpl::getRationalImpl(const SMTExprRef &Exp) {
 
 SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
+  if (!ModelAvailable)
+    return noModelError(Exp);
   SMTResult<std::pair<std::string, std::string>> result = getRationalImpl(Exp);
   if (!result)
     return result.error();
@@ -1757,6 +1773,8 @@ SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
 SMTResult<std::string>
 SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
+  if (!ModelAvailable)
+    return noModelError(Exp);
   SMTResult<std::pair<std::string, std::string>> result = getRationalImpl(Exp);
   if (!result)
     return result.error();
@@ -1765,6 +1783,8 @@ SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
 
 SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   requireFPSort(Exp, "Expected floating-point expression");
+  if (!ModelAvailable)
+    return noModelError(Exp);
   SMTResult<std::string> result = usesBVFPEncoding(Exp)
                                       ? SMTSolverImpl::getFPInBinImpl(Exp)
                                       : getFPInBinImpl(Exp);
@@ -1788,6 +1808,8 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
+  if (!ModelAvailable)
+    return noModelError(Array);
   // Decomposed tuple arrays read each leaf at Index and reassemble the
   // per-leaf values into a tuple; the per-leaf reads re-enter this wrapper.
   if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
@@ -1815,6 +1837,8 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  if (!ModelAvailable)
+    return noModelError(Array);
   // Decomposed tuple arrays zip the per-leaf sparse models into one
   // tuple-valued model; the per-leaf queries re-enter this wrapper.
   if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
@@ -2218,6 +2242,13 @@ CheckResult SMTSolverImpl::check() {
 }
 
 CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
+  // Both check() and checkSatAssuming() settle here, so this is the one
+  // place a model becomes readable. Only SAT qualifies: after UNKNOWN,
+  // Z3 throws, Bitwuzla and Yices abort and MathSAT segfaults on a model
+  // query, so admitting it would reinstate exactly the failures this
+  // guard exists to prevent. cvc5 alone answers, which makes a partial
+  // model after UNKNOWN a per-backend capability rather than a default.
+  ModelAvailable = Result == CheckResult::SAT;
   if (Result != CheckResult::UNKNOWN) {
     LastUnknownReason = UnknownReason::NotApplicable;
     return Result;

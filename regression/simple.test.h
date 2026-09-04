@@ -656,6 +656,104 @@ inline void bv_typed_getter_domain(const camada::SMTSolverRef &solver) {
   }
 }
 
+// Every model getter is documented to return an SMTError, not abort, when
+// no model is available. Before this was enforced in the common layer each
+// backend failed its own way -- Z3 and cvc5 threw uncaught exceptions,
+// Bitwuzla and MathSAT died, and STP fabricated an all-zeroes value, the
+// worst outcome because the caller cannot tell it from a real answer.
+inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
+  const auto requireNoModel = [&](const camada::SMTExprRef &E) {
+    auto Bits = solver->getBVInBin(E);
+    REQUIRE_FALSE(Bits);
+    REQUIRE(Bits.error().Code == camada::SMTErrorCode::InvalidUsage);
+  };
+
+  auto x = solver->mkSymbol("nomodel_x", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(5, 8)));
+
+  // No check has run yet. Every getter is gated, not just getBVInBin, so
+  // sweep the sorts this fixture can build on every backend: a getter
+  // added later without a guard fails here.
+  requireNoModel(x);
+  {
+    const auto requireCode = [](const auto &Result) {
+      REQUIRE_FALSE(Result);
+      REQUIRE(Result.error().Code == camada::SMTErrorCode::InvalidUsage);
+    };
+    requireCode(solver->getBV(x));
+    requireCode(solver->getBVUnsigned(x));
+    requireCode(
+        solver->getBool(solver->mkSymbol("nomodel_b", solver->mkBoolSort())));
+    auto arr = solver->mkSymbol(
+        "nomodel_arr",
+        solver->mkArraySort(solver->mkBVSort(8), solver->mkBVSort(8)));
+    requireCode(solver->getArrayElement(arr, solver->mkBVFromDec(0, 8)));
+    requireCode(solver->getArrayValues(arr));
+  }
+
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(x).value() == "00000101");
+
+  // A scope change invalidates the model in both directions.
+  solver->push();
+  requireNoModel(x);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  solver->pop();
+  requireNoModel(x);
+
+  // So does asserting.
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(6, 8)));
+  requireNoModel(x);
+
+  // UNSAT leaves no model to read.
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  requireNoModel(x);
+
+  // checkSatAssuming leaves a readable model too. The default fallback
+  // pops its assumption scope before returning, which clears the flag;
+  // finishCheck() wraps the impl call, so the set always lands last.
+  solver->reset();
+  auto a = solver->mkSymbol("nomodel_a", solver->mkBoolSort());
+  auto z = solver->mkSymbol("nomodel_z", solver->mkBVSort(8));
+  solver->addConstraint(
+      solver->mkImplies(a, solver->mkEqual(z, solver->mkBVFromDec(9, 8))));
+  REQUIRE(solver->checkSatAssuming({a}) == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(z).value() == "00001001");
+
+  // UNKNOWN is not a model. Most backends abort on a model query after
+  // one (Z3 throws, Bitwuzla and Yices abort, MathSAT segfaults), so the
+  // guard must reject it rather than pass it through. Skipped where the
+  // limit is unenforceable, since then nothing produces an UNKNOWN.
+  solver->reset();
+  if (solver->setTimeout(150)) {
+    auto p = solver->mkSymbol("nomodel_p", solver->mkBVSort(64));
+    auto q = solver->mkSymbol("nomodel_q", solver->mkBVSort(64));
+    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
+    auto prod =
+        solver->mkBVMul(solver->mkBVZeroExt(p, 64), solver->mkBVZeroExt(q, 64));
+    auto k = solver->mkBVZeroExt(
+        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
+    solver->addConstraint(solver->mkEqual(prod, k));
+    auto one = solver->mkBVFromDec(1, 64);
+    solver->addConstraint(solver->mkBVUgt(p, one));
+    solver->addConstraint(solver->mkBVUgt(q, one));
+    // A backend that ignores the limit and actually decides this is fine
+    // -- then a model legitimately exists and the guard must allow it.
+    if (solver->check() == camada::CheckResult::UNKNOWN)
+      requireNoModel(p);
+    solver->setTimeout(0);
+  }
+
+  // And a reset clears it.
+  solver->reset();
+  auto y = solver->mkSymbol("nomodel_y", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(y, solver->mkBVFromDec(7, 8)));
+  requireNoModel(y);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(y).value() == "00000111");
+}
+
 inline void pop_underflow_rejected(const camada::SMTSolverRef &solver) {
   // Popping past the root would take the backend below its own scope
   // floor while the common layer's journals stop at theirs, leaving the

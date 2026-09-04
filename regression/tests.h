@@ -138,6 +138,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(symbol_name_punctuation_distinct);
   RESETANDTEST(null_sort_handle_equality);
   RESETANDTEST(bv_typed_getter_domain);
+  RESETANDTEST(model_getters_require_a_model);
   RESETANDTEST(pop_underflow_rejected);
   RESETANDTEST(pop_past_root_rejected);
   RESETANDTEST(implies_semantics);

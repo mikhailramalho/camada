@@ -858,6 +858,13 @@ public:
   virtual SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
                               const SMTExprRef &Body) = 0;
 
+  /// A model is available only from a check() or checkSatAssuming() that
+  /// answered SAT, until the next solver mutation — addConstraint(),
+  /// push(), pop(), reset() — or the next check. Every getter below
+  /// reports InvalidUsage outside that window rather than reading
+  /// whatever the backend happens to return; UNKNOWN is outside it,
+  /// since most backends abort on a model query after one.
+
   /// If a model is available, returns the value of a given boolean symbol.
   ///
   /// On failure, returns an `SMTError` instead of aborting.
