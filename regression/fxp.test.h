@@ -1019,7 +1019,13 @@ inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
   const uint64_t Rem = S - R * R;
   if (Rem > R || (Rem == R && (R & 1)))
     ++R;
-  return R;
+  // The round-up can carry past the format maximum (sqrt of the largest
+  // all-fraction value rounds up to exactly 1.0, which the format cannot
+  // hold). Clamp, matching mkFXPSqrt: returning the unclamped value here
+  // let the caller's mask wrap it to the most negative raw value, so the
+  // oracle reproduced the very bug it should have caught.
+  const uint64_t Max = uint64_t(F.maxRaw());
+  return R > Max ? Max : R;
 }
 
 inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
