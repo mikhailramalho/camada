@@ -409,6 +409,22 @@ protected:
   bool UnsatAssumptionsValid = false;
   void invalidateUnsatAssumptions();
 
+  // --- Model availability ---
+  // Gates every model getter. Set only by a check that answers SAT, and
+  // cleared by anything that invalidates the model — addConstraint(),
+  // push(), pop(), reset(), or a later check. Without this the getters
+  // reach a backend that has no model to give: each one then aborts,
+  // throws an uncaught exception, or (STP) fabricates a zero, all of
+  // which contradict the documented "returns an SMTError" contract.
+  bool ModelAvailable = false;
+  /// The SMTError every model getter returns when no model is available.
+  /// Takes the queried expression only to name the backend in the error.
+  static SMTError noModelError(const SMTExprRef &Exp) {
+    return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
+                    "No model is available: the last check did not return "
+                    "SAT, or the solver was modified since"};
+  }
+
   /// Model bits of a bool/BV-sorted expression after a SAT check, used to
   /// compare index terms by model value. Empty string when the sort is
   /// unsupported or the model query fails.
