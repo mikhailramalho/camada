@@ -759,24 +759,41 @@ SMTExprRef MathSATSolver::mkFPSqrtImpl(const SMTExprRef &Exp,
 SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                                       const SMTExprRef &Z,
                                       const SMTExprRef &R) {
-  // MathSAT does not support FMA, so convert to BVFP and call the fp_api
+  // MathSAT does not support FMA, so convert to BVFP and call the fp_api.
 
-  // To convert the rounding mode, we first need to generate the equalities in
-  // floating-point mode
-  const SMTExprRef &isNe =
-      mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native));
-  const SMTExprRef &isPi =
-      mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native));
-  const SMTExprRef &isMi =
-      mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF, FPEncoding::Native));
-
-  // Now we want to generate the correct rounding mode encoded as a bitvector,
-  // so use the equalities previously generated in an ite chain
-  const SMTExprRef &roundingMode =
-      mkIte(isNe, mkBVFromDec(0, mkRMSort(FPEncoding::BV)),
-            mkIte(isPi, mkBVFromDec(2, mkRMSort(FPEncoding::BV)),
-                  mkIte(isMi, mkBVFromDec(3, mkRMSort(FPEncoding::BV)),
-                        mkBVFromDec(4, mkRMSort(FPEncoding::BV)))));
+  // Translate the native rounding mode into the BV encoding's 3-bit value.
+  // For a rounding-mode *constant* an ite chain over mkEqual(R, mkRM(...))
+  // must not be used: MathSAT builds those as atoms it never folds, and its
+  // model evaluator can report a false rounding-mode equality as true,
+  // selecting the wrong arm -- FMA then rounded the wrong way (RTP returned
+  // the round-down result). Identify a constant with the native predicates
+  // instead, the same route getRMImpl takes and for the same reason.
+  // A symbolic rounding mode matches none of them (mkRMSort is public, so
+  // the mode can be a symbol); it keeps the ite chain, whose arms the
+  // solver then has to reason about rather than evaluate.
+  const msat_term RTerm = toMathSATTerm(R);
+  const SMTSortRef BVRMSort = mkRMSort(FPEncoding::BV);
+  const auto bvRM = [&](RM Mode) {
+    return mkBVFromDec(static_cast<unsigned>(Mode), BVRMSort);
+  };
+  SMTExprRef roundingMode;
+  if (msat_term_is_fp_roundingmode_nearest_even(Context, RTerm))
+    roundingMode = bvRM(RM::ROUND_TO_EVEN);
+  else if (msat_term_is_fp_roundingmode_plus_inf(Context, RTerm))
+    roundingMode = bvRM(RM::ROUND_TO_PLUS_INF);
+  else if (msat_term_is_fp_roundingmode_minus_inf(Context, RTerm))
+    roundingMode = bvRM(RM::ROUND_TO_MINUS_INF);
+  else if (msat_term_is_fp_roundingmode_zero(Context, RTerm))
+    roundingMode = bvRM(RM::ROUND_TO_ZERO);
+  else
+    roundingMode = mkIte(
+        mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native)),
+        bvRM(RM::ROUND_TO_EVEN),
+        mkIte(
+            mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native)),
+            bvRM(RM::ROUND_TO_PLUS_INF),
+            mkIte(mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF, FPEncoding::Native)),
+                  bvRM(RM::ROUND_TO_MINUS_INF), bvRM(RM::ROUND_TO_ZERO))));
 
   // We can call the conversion API directly here because the arguments were
   // already checked

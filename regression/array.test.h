@@ -397,6 +397,31 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
       solver->mkEqual(solver->mkArraySelect(v, idx(0)), idx(2)));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
+  // A store index is constrained even with no select there: congruence
+  // must fire at it, or the encoding satisfies the equality by placing
+  // its extensionality witness elsewhere. Symbolic and constant index.
+  solver->reset();
+  auto [y, _y] = mk("y", "unused_y");
+  auto j = solver->mkSymbol("j", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(solver->mkArrayStore(y, j, idx(1)),
+                                        solver->mkArrayStore(y, j, idx(2))));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  solver->reset();
+  auto [aa, _aa] = mk("aa", "unused_aa");
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArrayStore(aa, idx(1), idx(10)),
+                      solver->mkArrayStore(aa, idx(1), idx(20))));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // Storing the same value at the same index stays satisfiable.
+  solver->reset();
+  auto [cc, _cc] = mk("cc", "unused_cc");
+  auto k = solver->mkSymbol("k", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(solver->mkArrayStore(cc, k, idx(1)),
+                                        solver->mkArrayStore(cc, k, idx(1))));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
   // Polarity safety: the equality literal used under boolean structure.
   solver->reset();
   auto [w, x] = mk("w", "x");
