@@ -130,6 +130,79 @@ inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
   REQUIRE(ok->isFPSort());
 }
 
+// mkFPSort only rejects a significand too wide for the exponent, so the
+// opposite corner -- a wide exponent over a narrow significand -- builds
+// a sort whose operations cannot be encoded. Each operation carries its
+// own guard because the boundaries genuinely differ: roundToIntegral
+// needs the widest significand, FMA the narrowest, and the bitvector
+// conversions depend on the source width rather than the format alone.
+// Without them these formats reached an internal width computation that
+// underflowed and aborted with "zero extension width overflow" or
+// "extract high bit is below low bit".
+inline void
+fp_narrow_significand_operations_rejected(const camada::SMTSolverRef &solver) {
+  constexpr auto BV = camada::FPEncoding::BV;
+  const auto rm = [&]() { return solver->mkRM(camada::RM::ROUND_TO_EVEN, BV); };
+  const auto sym = [&](const char *N, unsigned E, unsigned S) {
+    return solver->mkSymbol(N, solver->mkFPSort(E, S, BV));
+  };
+
+  // roundToIntegral requires SigWidth+1 >= ExpWidth+2. e5s4 is one short.
+  require_abort([&]() {
+    auto a = sym("ni_a", 5, 4);
+    (void)solver->mkFPToIntegral(a, rm());
+  });
+  // ... and e5s6 clears it (the check is on the significand including
+  // its hidden bit, so SigWidth 6 gives sbits 7 = ExpWidth+2).
+  {
+    auto a = sym("ni_ok", 5, 6);
+    REQUIRE(solver->mkFPToIntegral(a, rm())->isFPSort());
+  }
+
+  // Division requires SigWidth+1 >= ExpWidth-2 and SigWidth >= 2.
+  require_abort([&]() {
+    auto a = sym("nd_a", 8, 3);
+    (void)solver->mkFPDiv(a, a, rm());
+  });
+  // A single-bit significand inverts the quotient extract at any width.
+  require_abort([&]() {
+    auto a = sym("nd_b", 3, 1);
+    (void)solver->mkFPDiv(a, a, rm());
+  });
+  {
+    auto a = sym("nd_ok", 8, 5);
+    REQUIRE(solver->mkFPDiv(a, a, rm())->isFPSort());
+  }
+
+  // FMA requires 2*(SigWidth+1) + 3 >= ExpWidth, so it only bites on a
+  // very wide exponent over a one-bit significand.
+  require_abort([&]() {
+    auto a = sym("nf_a", 8, 1);
+    (void)solver->mkFPFMA(a, a, a, rm());
+  });
+  {
+    auto a = sym("nf_ok", 8, 2);
+    REQUIRE(solver->mkFPFMA(a, a, a, rm())->isFPSort());
+  }
+
+  // The bitvector conversions depend on the source width: an 8-bit source
+  // cannot carry an exponent needing 10 bits of headroom.
+  require_abort([&]() {
+    auto x = solver->mkSymbol("nc_x", solver->mkBVSort(8));
+    (void)solver->mkSBVToFP(x, solver->mkFPSort(8, 3, BV), rm());
+  });
+  require_abort([&]() {
+    auto x = solver->mkSymbol("nc_y", solver->mkBVSort(8));
+    (void)solver->mkUBVToFP(x, solver->mkFPSort(8, 3, BV), rm());
+  });
+  // Widening the source admits the same target format -- the constraint
+  // is the source width, not the format alone.
+  {
+    auto x = solver->mkSymbol("nc_ok", solver->mkBVSort(16));
+    REQUIRE(solver->mkSBVToFP(x, solver->mkFPSort(8, 3, BV), rm())->isFPSort());
+  }
+}
+
 inline void tests(const camada::SMTSolverRef &solver) {
   constexpr auto NativeFP = camada::FPEncoding::Native;
   constexpr auto BVFP = camada::FPEncoding::BV;
@@ -250,6 +323,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
   RESETANDTEST(fp_wide_format_semantics);
   RESETANDTEST(fp_degenerate_format_rejected);
+  RESETANDTEST(fp_narrow_significand_operations_rejected);
   RESETANDTEST(fxp_countls_narrow_target_rejected);
 
   // Fixed-point: pure common-layer BV encoding, no backend gating needed.
