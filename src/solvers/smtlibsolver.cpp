@@ -2196,6 +2196,8 @@ bool decimalToFraction(const std::string &S, std::string &Num,
 // signed forms) and only returns success if the value is integral.
 bool rationalValueToFraction(const std::string &Value, std::string &Num,
                              std::string &Den);
+bool rationalValueToFractionCore(const std::string &Value, std::string &Num,
+                                 std::string &Den);
 
 // Decimal long division: divide non-negative decimal string Num by
 // non-negative decimal string Den. If the division is exact, set Quotient
@@ -2353,14 +2355,14 @@ std::string intValueToDecimal(const std::string &Value) {
 //   (/ p q)                 (rational; p and q are integer or decimal)
 //   (- (/ p q))             (negative rational)
 //   (/ (- p) q), (/ p (- q))  (rare but valid)
-bool rationalValueToFraction(const std::string &Value, std::string &Num,
-                             std::string &Den) {
+bool rationalValueToFractionCore(const std::string &Value, std::string &Num,
+                                 std::string &Den) {
   std::string V = trimWS(Value);
   // Strip a leading (- ...) negation, recurse, and flip the numerator sign.
   if (V.size() >= 4 && V[0] == '(' && V[1] == '-' && V[2] == ' ' &&
       V.back() == ')') {
     std::string Inner = trimWS(V.substr(3, V.size() - 4));
-    if (!rationalValueToFraction(Inner, Num, Den))
+    if (!rationalValueToFractionCore(Inner, Num, Den))
       return false;
     if (!Num.empty() && Num[0] == '-')
       Num = Num.substr(1);
@@ -2390,9 +2392,9 @@ bool rationalValueToFraction(const std::string &Value, std::string &Num,
     std::string P = trimWS(Body.substr(0, Split));
     std::string Q = trimWS(Body.substr(Split + 1));
     std::string PNum, PDen, QNum, QDen;
-    if (!rationalValueToFraction(P, PNum, PDen))
+    if (!rationalValueToFractionCore(P, PNum, PDen))
       return false;
-    if (!rationalValueToFraction(Q, QNum, QDen))
+    if (!rationalValueToFractionCore(Q, QNum, QDen))
       return false;
     // (PNum/PDen) / (QNum/QDen) = (PNum*QDen) / (PDen*QNum). For the common
     // case where PDen and QDen are both "1" this collapses to PNum/QNum.
@@ -2418,6 +2420,19 @@ bool rationalValueToFraction(const std::string &Value, std::string &Num,
   // Bare numeric (possibly decimal).
   std::string Norm = normalizeNumeric(V);
   return decimalToFraction(Norm, Num, Den);
+}
+
+// Parse, then apply the one sign convention every caller expects: a value of
+// zero is "0", never "-0". A child reporting negated zero as `(- 0)` would
+// otherwise make getRealNumerator disagree with getInt on the same model
+// value, and a caller comparing against "0" would read it as non-zero.
+bool rationalValueToFraction(const std::string &Value, std::string &Num,
+                             std::string &Den) {
+  if (!rationalValueToFractionCore(Value, Num, Den))
+    return false;
+  if (Num == "-0")
+    Num = "0";
+  return true;
 }
 
 } // namespace

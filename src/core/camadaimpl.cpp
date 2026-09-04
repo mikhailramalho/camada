@@ -404,6 +404,10 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   // hook. finishCheck() re-arms the model afterwards for a check that
   // answers SAT or UNKNOWN.
   ModelAvailable = false;
+  // reasonUnknown() is documented to report NotApplicable at any time other
+  // than right after an UNKNOWN check, so the reason dies with the model
+  // rather than outliving the query it belonged to.
+  LastUnknownReason = UnknownReason::NotApplicable;
   // Fires on everything that invalidates the current model (constraint,
   // check, push, pop, reset), which is exactly the lifetime of the
   // default values handed out for unconstrained Ackermann-array queries.
@@ -2477,7 +2481,17 @@ void SMTSolverImpl::dump(std::string &Out) { return dumpImpl(Out); }
 
 CAMADA_DEFINE_DUMP_TO_STDERR(dumpModel)
 
-void SMTSolverImpl::dumpModel(std::string &Out) { return dumpModelImpl(Out); }
+void SMTSolverImpl::dumpModel(std::string &Out) {
+  // dumpModel reads the model like the getters do, so it needs their guard:
+  // without one, Z3 throws an uncaught exception and STP emits fabricated
+  // text. The getters report an SMTError; this returns void, so the
+  // equivalent is to write nothing.
+  if (!ModelAvailable) {
+    Out.clear();
+    return;
+  }
+  return dumpModelImpl(Out);
+}
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTSortRef, mkTupleSortImpl, "Tuples",
                                const std::vector<SMTSortRef> &)
