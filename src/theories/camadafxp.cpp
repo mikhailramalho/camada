@@ -1659,6 +1659,7 @@ SMTExprRef SMTSolverImpl::mkFPToFXPSat(const SMTExprRef &Exp,
 // ---------------------------------------------------------------------------
 
 SMTResult<FXPValue> SMTSolverImpl::getFXP(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   requireFXP(Exp);
   SMTResult<std::string> Bits = getBVInBin(mkFXPToRawBV(Exp));
   if (!Bits)

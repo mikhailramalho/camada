@@ -406,8 +406,9 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   UnsatAssumptionsValid = false;
   // A model and an unsat core are invalidated by exactly the same events
   // (addConstraint, push, pop, reset, a later check), so they share this
-  // hook. finishCheck() re-arms the model afterwards for a check that
-  // answers SAT or UNKNOWN.
+  // hook. finishCheck() re-arms the model afterwards, but only for a check
+  // that answers SAT -- see the reasoning there for why UNKNOWN does not
+  // qualify.
   ModelAvailable = false;
   // reasonUnknown() is documented to report NotApplicable at any time other
   // than right after an UNKNOWN check, so the reason dies with the model
@@ -737,6 +738,12 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   auto It = PendingShadowLinks.find(&*Constraint);
   if (It == PendingShadowLinks.end())
     return;
+  const PendingShadowLink Link = It->second;
+  // Consume the entry either way: the map is keyed by raw SMTExpr pointers
+  // that the arena recycles, so an entry left behind after its constraint
+  // is asserted both grows without bound and risks matching a later,
+  // unrelated expression that reuses the address.
+  PendingShadowLinks.erase(It);
   // Only assert-derived shadows that can never be retracted are safe to
   // record. mkIEEEFPToBV is a *term-level* rewrite: once it has handed a
   // caller the shadowed bits, that term IS those bits forever, so a later
@@ -745,11 +752,16 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // reports UNSAT on satisfiable formulas. At scope 0 no pop can retract
   // the tie, so the rewrite stays sound; deeper scopes fall back to the
   // underspecified backend operation, which is always correct.
+  //
+  // Because only scope 0 commits, ShadowScopeLevels never holds more than
+  // the root entry and pop()'s retraction loop is unreachable today. Both
+  // are kept deliberately: they are what makes relaxing this gate safe, and
+  // the journal is the only record of which shadows a scope established.
   if (ShadowScopeLevels.size() != 1)
     return;
   // Keep the first entry on collision; only journal what was inserted.
-  if (IEEEBVShadow.emplace(It->second.Target, It->second.Bits).second)
-    ShadowScopeLevels.back().push_back(It->second.Target);
+  if (IEEEBVShadow.emplace(Link.Target, Link.Bits).second)
+    ShadowScopeLevels.back().push_back(Link.Target);
 }
 
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
@@ -1746,6 +1758,7 @@ CAMADA_DEFINE_MODEL_GETTER(RM, getRM,
                            getRMImpl)
 
 SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   requireBVSort(Exp, "Expected bit-vector expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1756,6 +1769,7 @@ SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTSolverImpl::getInt(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isIntSort() && !Exp->isRealSort(),
                "Expected integer or real expression");
   if (!ModelAvailable)
@@ -1765,6 +1779,7 @@ SMTResult<std::string> SMTSolverImpl::getInt(const SMTExprRef &Exp) {
 
 SMTResult<std::pair<std::string, std::string>>
 SMTSolverImpl::getRational(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1778,6 +1793,7 @@ SMTSolverImpl::getRationalImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1789,6 +1805,7 @@ SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
 
 SMTResult<std::string>
 SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1799,6 +1816,7 @@ SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   requireFPSort(Exp, "Expected floating-point expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1822,6 +1840,8 @@ CAMADA_DEFINE_MODEL_GETTER(double, getFP64,
 
 SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
                                                      const SMTExprRef &Index) {
+  requireOwned(Array);
+  requireOwned(Index);
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
@@ -1853,6 +1873,7 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
+  requireOwned(Array);
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   if (!ModelAvailable)
     return noModelError(Array);
@@ -2347,7 +2368,18 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
   push();
   struct ScopeGuard {
     SMTSolverImpl &S;
-    ~ScopeGuard() { S.pop(); }
+    // A destructor is implicitly noexcept, and pop() can throw: it calls
+    // popImpl() and then re-asserts the journaled lazy constraints, exactly
+    // when the backend context may already be in an error state. Letting
+    // that escape while an earlier exception unwinds calls std::terminate,
+    // turning a recoverable backend error into a killed process, so the
+    // failure to restore the scope is swallowed here instead.
+    ~ScopeGuard() {
+      try {
+        S.pop();
+      } catch (...) {
+      }
+    }
   } Guard{*this};
   for (const SMTExprRef &Assumption : Assumptions)
     addConstraint(Assumption);

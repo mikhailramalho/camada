@@ -414,12 +414,17 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
                       solver->mkArrayStore(aa, idx(1), idx(20))));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
-  // Storing the same value at the same index stays satisfiable.
+  // Storing the same value at two different indexes stays satisfiable: the
+  // observation must constrain the arrays at those indexes without forcing
+  // them equal. Using one index twice would make this a tautology that
+  // holds with the store-index observation removed entirely.
   solver->reset();
   auto [cc, _cc] = mk("cc", "unused_cc");
   auto k = solver->mkSymbol("k", solver->mkBVSort(8));
+  auto k2 = solver->mkSymbol("k2", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(k, k2)));
   solver->addConstraint(solver->mkEqual(solver->mkArrayStore(cc, k, idx(1)),
-                                        solver->mkArrayStore(cc, k, idx(1))));
+                                        solver->mkArrayStore(cc, k2, idx(1))));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Polarity safety: the equality literal used under boolean structure.

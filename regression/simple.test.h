@@ -727,6 +727,13 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
   // limit is unenforceable, since then nothing produces an UNKNOWN.
   solver->reset();
   if (solver->setTimeout(150)) {
+    // The limit survives reset() by design, and RESETANDTEST only resets, so
+    // a REQUIRE failure below would leak 150ms into every later fixture and
+    // bury this failure under unrelated UNKNOWNs. Clear it unconditionally.
+    struct TimeoutGuard {
+      const camada::SMTSolverRef &S;
+      ~TimeoutGuard() { S->setTimeout(0); }
+    } ClearTimeout{solver};
     auto p = solver->mkSymbol("nomodel_p", solver->mkBVSort(64));
     auto q = solver->mkSymbol("nomodel_q", solver->mkBVSort(64));
     constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
@@ -742,7 +749,6 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
     // -- then a model legitimately exists and the guard must allow it.
     if (solver->check() == camada::CheckResult::UNKNOWN)
       requireNoModel(p);
-    solver->setTimeout(0);
   }
 
   // And a reset clears it.

@@ -310,6 +310,20 @@ std::string readOneSmtlibResponse(std::FILE *In) {
         InString = false;
       continue;
     }
+    if (Ch == ';') {
+      // A comment runs to end-of-line and its text is not syntax: a `(` or
+      // `)` inside one would unbalance Depth. An unmatched `(` then blocks
+      // this loop forever, since readResponse has no timeout, while a `)`
+      // truncates the reply and shifts every later get-value answer onto
+      // the wrong expression. The child's stderr shares this pipe, so
+      // solver warnings do arrive mid-response.
+      while ((C = std::fgetc(In)) != EOF && C != '\n' && C != '\r')
+        Out.push_back(static_cast<char>(C));
+      if (C == EOF)
+        return Out;
+      Out.push_back(static_cast<char>(C));
+      continue;
+    }
     if (Ch == '|')
       InQuoted = true;
     else if (Ch == '"')
