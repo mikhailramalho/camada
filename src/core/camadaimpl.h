@@ -198,7 +198,8 @@ protected:
   std::set<std::pair<const SMTExpr *, const SMTExpr *>> LazyTouched;
   std::vector<std::vector<SMTExprRef>> LazyConstraintLevels{1};
   uint64_t LazyConstArrayCounter = 0;
-  // Every distinct index term ever selected with, grouped by index sort.
+  // Every distinct index term ever selected or stored at, grouped by index
+  // sort.
   // Lazy default axioms and encoded-equality congruence are instantiated
   // at EVERY observed index of the matching sort — not just indexes seen
   // on the syntactic array operands — because reads can reach an array
@@ -232,7 +233,9 @@ protected:
   //     fresh witness index W (a difference must be exhibitable), and
   //   * the positive direction: EqVar => select(L,i) = select(R,i) at
   //     every index i either array is observed at — replayed for past
-  //     selects and hooked into mkArraySelect for future ones.
+  //     indexes and hooked into mkArraySelect/mkArrayStore for future
+  //     ones. Store indexes count: a store constrains its array there,
+  //     so congruence must fire there too.
   // Sound and complete for quantifier-free formulas: only finitely many
   // index terms are ever observed.
   struct ArrayEqualLink {
