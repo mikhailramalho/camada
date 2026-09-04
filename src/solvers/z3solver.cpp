@@ -27,7 +27,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdio>
 #include <limits>
 #include <vector>
 #include <z3_api.h>
@@ -75,7 +74,6 @@ unsigned Z3Sort::getWidthFromSolver() const {
   return 3;
 }
 
-
 void Z3Sort::dump(std::string &Out) const {
   Out = Sort.to_string();
   Out += "\n";
@@ -86,7 +84,6 @@ bool Z3Expr::equal_to(SMTExpr const &Other) const {
     return false;
   return z3::eq(Expr, static_cast<const Z3Expr &>(Other).Expr);
 }
-
 
 void Z3Expr::dump(std::string &Out) const {
   Out = Expr.to_string();
@@ -839,7 +836,6 @@ SMTResult<std::string> Z3Solver::getBVInBinImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> Z3Solver::getIntImpl(const SMTExprRef &Exp) {
-  z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
   if (Exp->isRealSort()) {
     SMTResult<std::pair<std::string, std::string>> result =
         getRationalImpl(Exp);
@@ -850,6 +846,7 @@ SMTResult<std::string> Z3Solver::getIntImpl(const SMTExprRef &Exp) {
                       "Real model value is not integral"};
     return result.value().first;
   }
+  z3::expr value = Solver.get_model().eval(toZ3Expr(Exp), true);
   if (!value.is_numeral())
     return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Z3,
                     "Expected integer numeral from Z3"};

@@ -26,7 +26,6 @@
 #include "../camadacache.h"
 #include "../camadaerrors.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -110,7 +109,6 @@ bool BitwExpr::equal_to(SMTExpr const &Other) const {
     return false;
   return Expr == static_cast<const BitwExpr &>(Other).Expr;
 }
-
 
 void BitwExpr::dump(std::string &Out) const {
   Out = bitwuzla_term_to_string(Expr);

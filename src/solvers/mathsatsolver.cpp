@@ -92,7 +92,6 @@ unsigned MathSATSort::getWidthFromSolver() const {
   return 1 + exp + sig;
 }
 
-
 void MathSATSort::dump(std::string &Out) const {
   char *s = msat_type_repr(Sort);
   Out = s;
@@ -110,7 +109,6 @@ bool MathSATExpr::equal_to(SMTExpr const &Other) const {
     return msat_decl_id(getDecl()) == msat_decl_id(OtherExpr.getDecl());
   return msat_term_id(getTerm()) == msat_term_id(OtherExpr.getTerm());
 }
-
 
 void MathSATExpr::dump(std::string &Out) const {
   if (isDecl()) {

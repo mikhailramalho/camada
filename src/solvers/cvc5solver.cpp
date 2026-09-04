@@ -26,7 +26,6 @@
 #include "../camadaerrors.h"
 
 #include <cassert>
-#include <cstdio>
 #include <cvc5/cvc5_kind.h>
 #include <cvc5/cvc5_types.h>
 #include <optional>
@@ -76,7 +75,6 @@ unsigned CVC5Sort::getWidthFromSolver() const {
          fpType.getFloatingPointSignificandSize();
 }
 
-
 void CVC5Sort::dump(std::string &Out) const {
   Out = Sort.toString();
   Out += "\n";
@@ -87,7 +85,6 @@ bool CVC5Expr::equal_to(SMTExpr const &Other) const {
     return false;
   return (Expr == static_cast<const CVC5Expr &>(Other).Expr);
 }
-
 
 void CVC5Expr::dump(std::string &Out) const {
   Out = Expr.toString();
@@ -1002,7 +999,6 @@ SMTResult<std::string> CVC5Solver::getBVInBinImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
-  cvc5::Term value = Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
   if (Exp->isRealSort()) {
     SMTResult<std::pair<std::string, std::string>> result =
         getRationalImpl(Exp);
@@ -1013,6 +1009,7 @@ SMTResult<std::string> CVC5Solver::getIntImpl(const SMTExprRef &Exp) {
                       "Real model value is not integral"};
     return result.value().first;
   }
+  cvc5::Term value = Context.getValue(toSolverExpr<CVC5Expr>(*Exp).Expr);
   if (!value.isIntegerValue())
     return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::CVC5,
                     "Expected integer model value from CVC5"};
