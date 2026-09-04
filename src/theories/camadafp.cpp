@@ -777,8 +777,16 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
   const SMTExprRef &c7 = x_is_zero;
   SMTExprRef v7 = mkIte(signs_xor, nzero, pzero);
 
-  // else comes the actual division.
-  assert(ebits <= sbits);
+  // else comes the actual division. Two widths below are derived by
+  // subtraction and underflow on a narrow significand: the exponent
+  // correction extracts ebits+2 bits from an (sbits+4)-bit shift amount,
+  // and the quotient rounding extracts a range that inverts once the
+  // significand is a single bit. The assert that used to stand here was
+  // compiled out under NDEBUG, so these formats reached the extracts.
+  fatalErrorIf(sbits + 2 < ebits || sbits < 3,
+               "Floating-point format unsupported by the BV encoding's "
+               "division: the significand is too narrow for the exponent "
+               "width (requires SigWidth+1 >= ExpWidth-2 and SigWidth >= 2)");
 
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
@@ -1323,6 +1331,11 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   assert(X->Sort->getFPExponentWidth() == Y->Sort->getFPExponentWidth());
 
   unsigned ebits = X->Sort->getFPExponentWidth();
+  // The renormalization shift zero-extends to (2*sbits + 3 - ebits) bits.
+  fatalErrorIf(2 * X->Sort->getFPSignificandBits() + 3 < ebits,
+               "Floating-point format unsupported by the BV encoding's FMA: "
+               "the significand is too narrow for the exponent width "
+               "(requires 2*(SigWidth+1) + 3 >= ExpWidth)");
   unsigned sbits = X->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
@@ -1815,6 +1828,16 @@ SMTExprRef SMTSolverImpl::mkSBVToFPImpl(const SMTExprRef &From,
   unsigned ebits = To->getFPExponentWidth();
   unsigned sbits = To->getFPSignificandBits();
   unsigned bv_sz = From->getWidth();
+  // The exponent is computed in the source's width: an (ebits+2)-bit
+  // extract from a bv_sz-wide term, and a zero-extension by their
+  // difference. Both need the source to be at least that wide, unless
+  // the significand is wide enough that the clamp below is skipped.
+  fatalErrorIf(ebits + 2 > bv_sz && sbits + 2 < ebits,
+               "Floating-point format unsupported by the BV encoding's "
+               "bitvector-to-float conversion: the target exponent is wider "
+               "than the source bitvector and the significand is too narrow "
+               "to compensate (requires ExpWidth+2 <= source width or "
+               "SigWidth+1 >= ExpWidth-2)");
 
   SMTExprRef bv1_1 = mkBVOne1(*this);
   SMTExprRef bv0_sz = mkBVFromDec(0, bv_sz);
@@ -1918,6 +1941,16 @@ SMTExprRef SMTSolverImpl::mkUBVToFPImpl(const SMTExprRef &From,
   unsigned ebits = To->getFPExponentWidth();
   unsigned sbits = To->getFPSignificandBits();
   unsigned bv_sz = From->getWidth();
+  // The exponent is computed in the source's width: an (ebits+2)-bit
+  // extract from a bv_sz-wide term, and a zero-extension by their
+  // difference. Both need the source to be at least that wide, unless
+  // the significand is wide enough that the clamp below is skipped.
+  fatalErrorIf(ebits + 2 > bv_sz && sbits + 2 < ebits,
+               "Floating-point format unsupported by the BV encoding's "
+               "bitvector-to-float conversion: the target exponent is wider "
+               "than the source bitvector and the significand is too narrow "
+               "to compensate (requires ExpWidth+2 <= source width or "
+               "SigWidth+1 >= ExpWidth-2)");
 
   SMTExprRef bv0_1 = mkBVZero1(*this);
   SMTExprRef bv0_sz = mkBVFromDec(0, bv_sz);
@@ -2136,6 +2169,13 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
                                              const SMTExprRef &R) {
   unsigned ebits = From->Sort->getFPExponentWidth();
   unsigned sbits = From->Sort->getFPSignificandBits();
+  // The renormalization shift zero-extends an (ebits+2)-bit delta to
+  // sbits bits, and the subnormal path shifts by (sbits - ebits); both
+  // underflow once the significand no longer exceeds the exponent.
+  fatalErrorIf(sbits < ebits + 2,
+               "Floating-point format unsupported by the BV encoding's "
+               "roundToIntegral: the significand is too narrow for the "
+               "exponent width (requires SigWidth+1 >= ExpWidth+2)");
   SMTExprRef rm_is_rta = mkIsRM(*this, R, RM::ROUND_TO_AWAY);
   SMTExprRef rm_is_rte = mkIsRM(*this, R, RM::ROUND_TO_EVEN);
   SMTExprRef rm_is_rtp = mkIsRM(*this, R, RM::ROUND_TO_PLUS_INF);
