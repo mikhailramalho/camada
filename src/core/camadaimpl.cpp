@@ -414,6 +414,7 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   // than right after an UNKNOWN check, so the reason dies with the model
   // rather than outliving the query it belonged to.
   LastUnknownReason = UnknownReason::NotApplicable;
+  IndexBitsMemo.clear();
   // Fires on everything that invalidates the current model (constraint,
   // check, push, pop, reset), which is exactly the lifetime of the
   // default values handed out for unconstrained Ackermann-array queries.
@@ -1489,6 +1490,18 @@ void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
 }
 
 std::string SMTSolverImpl::lazyIndexModelBits(const SMTExprRef &Exp) {
+  auto It = IndexBitsMemo.find(&*Exp);
+  if (It != IndexBitsMemo.end())
+    return It->second;
+  std::string Bits = lazyIndexModelBitsUncached(Exp);
+  // Only cache a real answer: an empty string means "no model yet" or an
+  // unsupported sort, neither of which should stick once a model exists.
+  if (!Bits.empty())
+    IndexBitsMemo.emplace(&*Exp, Bits);
+  return Bits;
+}
+
+std::string SMTSolverImpl::lazyIndexModelBitsUncached(const SMTExprRef &Exp) {
   if (Exp->isBoolSort()) {
     SMTResult<bool> Value = getBool(Exp);
     return Value ? std::string(Value.value() ? "1" : "0") : std::string();

@@ -126,6 +126,15 @@ public:
   /// Public because the Camada tuple lowering is a free function.
   std::string lazyIndexModelBits(const SMTExprRef &Exp);
 
+private:
+  /// Memo for lazyIndexModelBits, valid for the lifetime of one model and
+  /// cleared with it. Every caller resolves the same index terms repeatedly
+  /// -- the array-model walks do so inside nested loops -- and each miss is
+  /// a live backend query.
+  std::unordered_map<const SMTExpr *, std::string> IndexBitsMemo;
+  std::string lazyIndexModelBitsUncached(const SMTExprRef &Exp);
+
+public:
 protected:
   void invalidateGeneratedObjects();
   void clearSortCaches();
