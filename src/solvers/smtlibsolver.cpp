@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cctype>
+#include <cerrno>
 #include <climits>
 #include <csignal>
 #include <cstdio>
@@ -269,13 +270,26 @@ namespace {
 std::string readOneSmtlibResponse(std::FILE *In) {
   fatalErrorIf(!In, "ProcessEmitter::readResponse: stream is null");
 
-  // Skip leading whitespace.
+  // Skip leading whitespace and comments. SMT-LIB 2.6 §3.1 allows a `;`
+  // comment through end-of-line anywhere in the solver's output, and
+  // solvers do emit banner or warning lines; returning ";" as a token
+  // would desynchronize every later reply.
   int C;
-  do {
+  for (;;) {
     C = std::fgetc(In);
     if (C == EOF)
       return {};
-  } while (C == ' ' || C == '\t' || C == '\n' || C == '\r');
+    if (C == ' ' || C == '\t' || C == '\n' || C == '\r')
+      continue;
+    if (C == ';') {
+      while ((C = std::fgetc(In)) != EOF && C != '\n' && C != '\r') {
+      }
+      if (C == EOF)
+        return {};
+      continue;
+    }
+    break;
+  }
 
   std::string Out;
   if (C != '(') {
@@ -579,7 +593,11 @@ ProcessEmitter::~ProcessEmitter() noexcept {
   if (Pid > 0) {
     ::kill(static_cast<pid_t>(Pid), SIGTERM);
     int Status = 0;
-    ::waitpid(static_cast<pid_t>(Pid), &Status, 0);
+    // Retry on EINTR so the child is actually reaped rather than left a
+    // zombie for the lifetime of the host process.
+    while (::waitpid(static_cast<pid_t>(Pid), &Status, 0) < 0 &&
+           errno == EINTR) {
+    }
   }
 }
 
@@ -844,7 +862,12 @@ CheckResult SMTLIBSolver::runOneShotCommand() {
   }
   std::fclose(ChildOut);
   int Status = 0;
-  ::waitpid(Pid, &Status, 0);
+  // Retry on EINTR: a host signal handler without SA_RESTART (a wall-clock
+  // watchdog, say) would otherwise leave Status at 0, so the WIFSIGNALED
+  // guard below could not tell a crashed solver from a clean exit and would
+  // promote a truncated run's verdict to a trusted answer.
+  while (::waitpid(Pid, &Status, 0) < 0 && errno == EINTR) {
+  }
 
   Diags.ExitStatus = describeExitStatus(Status);
   for (const std::string &Line : Tail) {
@@ -2098,10 +2121,13 @@ std::string fpValueToBinary(const std::string &Value, unsigned ExpWidth,
     } else if (IsNaN) {
       Bits.append(ExpWidth, '1');
       // Canonical NaN: top significand bit set, rest zero. (Camada's signed
-      // NaN convention reads the sign bit as 0.)
-      Bits.push_back('1');
-      if (SigWidth >= 1)
+      // NaN convention reads the sign bit as 0.) Guard the leading bit on
+      // SigWidth too, so a zero-width significand does not yield a string
+      // one bit wider than the sort.
+      if (SigWidth >= 1) {
+        Bits.push_back('1');
         Bits.append(SigWidth - 1, '0');
+      }
     }
     return Bits;
   }
@@ -2297,8 +2323,14 @@ std::string intValueToDecimal(const std::string &Value) {
   std::string Num, Den;
   if (!rationalValueToFraction(Value, Num, Den))
     return {};
-  if (Den == "1")
+  if (Den == "1") {
+    // Normalize "-0" to "0": a solver may report negated zero as (- 0),
+    // and a caller comparing the string against "0" would read it as
+    // non-zero. The divided path below normalizes it already.
+    if (Num == "-0")
+      return "0";
     return Num;
+  }
 
   // Den != "1": exact-divide Num by Den. Strip the sign first so the
   // divider only sees non-negative magnitudes.
