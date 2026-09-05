@@ -8,6 +8,32 @@
 #include <tuple>
 #include <utility>
 
+// mkIEEEFPToBV on a backend without a native op mints an uninterpreted
+// function and ties it to the operand. That tie names terms the current
+// model has no value for, so the model dies -- and the next getter must
+// say so rather than reaching a backend that has already discarded it.
+// Building the term after a check aborted on Bitwuzla and cvc5.
+inline void
+ieee_fp_to_bv_after_check_reports(const camada::SMTSolverRef &solver) {
+  auto bvsort = solver->mkBVSort(32);
+  auto x = solver->mkSymbol("ieeeuf_x", bvsort);
+  auto f = solver->mkSymbol("ieeeuf_f",
+                            solver->mkFP32Sort(camada::FPEncoding::Native));
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(5, 32)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(x).value() == "00000000000000000000000000000101");
+
+  (void)solver->mkIEEEFPToBV(f);
+
+  // Either the model survived (a backend with a native op never asserts a
+  // tie) or it did not -- but it must be reported, never thrown.
+  auto After = solver->getBVInBin(x);
+  if (!After)
+    REQUIRE(After.error().Code == camada::SMTErrorCode::InvalidUsage);
+  else
+    REQUIRE(After.value() == "00000000000000000000000000000101");
+}
+
 inline void fp_native_bv_predicate_parity(const camada::SMTSolverRef &solver) {
   const auto backend = solver->mkBool(true)->getBackendKind();
   if (backend != camada::SMTBackendKind::Bitwuzla &&

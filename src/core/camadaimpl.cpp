@@ -2297,14 +2297,24 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
   // re-asserts it, keeping the application memo valid across scopes.
   if (auto It = IEEEBVAppCache.find(&*Exp); It != IEEEBVAppCache.end())
     return It->second;
-  auto [FnIt, Inserted] = IEEEBVFnCache.try_emplace(&*Exp->Sort);
-  if (Inserted)
-    FnIt->second = mkSymbolUnchecked(
-        "__CAMADA_ieeebv_fn" + std::to_string(IEEEBVFnCache.size() - 1),
+  // Build the function symbol before caching it: mkFunctionSort reports
+  // unsupportedFeature on a backend without UFs, and an entry inserted
+  // first would survive that throw as a null handle for every later call
+  // at this sort. Same reasoning as the application memo below.
+  auto FnIt = IEEEBVFnCache.find(&*Exp->Sort);
+  if (FnIt == IEEEBVFnCache.end()) {
+    SMTExprRef Fn = mkSymbolUnchecked(
+        "__CAMADA_ieeebv_fn" + std::to_string(IEEEBVFnCache.size()),
         mkFunctionSort({Exp->Sort}, mkBVSort(Exp->getWidth())));
+    FnIt = IEEEBVFnCache.emplace(&*Exp->Sort, std::move(Fn)).first;
+  }
   SMTExprRef Bits = mkApply(FnIt->second, {Exp});
   SMTExprRef Tie = mkEqual(mkBVToIEEEFP(Bits, Exp->Sort), Exp);
-  addInternalConstraint(Tie);
+  // Not model-preserving: Bits applies a freshly minted uninterpreted
+  // function, so the current model has no value for it and the backend
+  // discards the model. Claiming otherwise makes the next getter reach a
+  // backend with no model and abort instead of reporting InvalidUsage.
+  addConstraint(Tie);
   LazyConstraintLevels.back().push_back(std::move(Tie));
   // Memoize only once the tie holds: caching first would leave a wholly
   // unconstrained BV memoized if addConstraint threw, and later calls
@@ -2397,6 +2407,9 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
   push();
   struct ScopeGuard {
     SMTSolverImpl &S;
+    // Set once checkImpl() has answered; NotApplicable until then, so an
+    // exception before that point restores nothing.
+    UnknownReason ReasonToRestore = UnknownReason::NotApplicable;
     // A destructor is implicitly noexcept, and pop() can throw: it calls
     // popImpl() and then re-asserts the journaled lazy constraints, exactly
     // when the backend context may already be in an error state. Letting
@@ -2408,11 +2421,19 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
         S.pop();
       } catch (...) {
       }
+      S.LastUnknownReason = ReasonToRestore;
     }
   } Guard{*this};
   for (const SMTExprRef &Assumption : Assumptions)
     addConstraint(Assumption);
-  return checkImpl();
+  const CheckResult Result = checkImpl();
+  // The backend records its unknown reason inside checkImpl(), but the
+  // guard's pop() clears it through invalidateUnsatAssumptions and runs
+  // before finishCheck() can read it. Have the guard carry it across the
+  // teardown, or a precise BackendError is downgraded to the coarse
+  // Timeout/Incomplete that finishCheck re-derives.
+  Guard.ReasonToRestore = LastUnknownReason;
+  return Result;
 }
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {

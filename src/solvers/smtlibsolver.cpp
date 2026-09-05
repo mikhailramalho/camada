@@ -1972,7 +1972,11 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
     return Bits;
   }
   if (Value.size() >= 2 && Value[0] == '#' && Value[1] == 'x') {
-    // Hex: each digit -> 4 bits.
+    // Hex: each digit -> 4 bits. An empty body is a truncated reply, not a
+    // zero: without this the normalization below pads it to a full-width
+    // zero and the caller's empty-string error signal never fires.
+    if (Value.size() == 2)
+      return {};
     std::string Bits;
     Bits.reserve((Value.size() - 2) * 4);
     for (std::size_t I = 2; I < Value.size(); ++I) {

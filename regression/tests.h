@@ -287,6 +287,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(empty_tuple_semantics);
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(fp_native_bv_predicate_parity);
+  RESETANDTEST(ieee_fp_to_bv_after_check_reports);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
   RESETANDTEST(fp_neg_nan_payload_bits);
   RESETANDTEST(fp_nan_payload_propagation);
