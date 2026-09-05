@@ -780,6 +780,18 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
     REQUIRE(Dump.find("nomodel_d") != std::string::npos);
   }
 
+  // A model that binds no symbol reports nothing, so emptiness is a usable
+  // signal rather than one three backends could never produce: Z3 and Yices
+  // emit a bare newline of their own framing here, STP a 45-byte banner.
+  solver->reset();
+  {
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    std::string Dump = "seed";
+    solver->dumpModel(Dump);
+    REQUIRE(Dump.empty());
+  }
+
   // UNKNOWN is not a model. Most backends abort on a model query after
   // one (Z3 throws, Bitwuzla and Yices abort, MathSAT segfaults), so the
   // guard must reject it rather than pass it through. Skipped where the

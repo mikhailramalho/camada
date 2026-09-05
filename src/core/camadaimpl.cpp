@@ -2642,7 +2642,13 @@ void SMTSolverImpl::dumpModel(std::string &Out) {
     Out.clear();
     return;
   }
-  return dumpModelImpl(Out);
+  dumpModelImpl(Out);
+  // Make the "empty means no model" signal usable. A backend with nothing
+  // to report still emits its own framing -- Z3 and Yices a bare newline,
+  // STP its COUNTEREXAMPLE banner -- so without this a caller branching on
+  // emptiness could never see the no-model case on those three.
+  if (Out.find_first_not_of(" \t\n\r") == std::string::npos)
+    Out.clear();
 }
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTSortRef, mkTupleSortImpl, "Tuples",
