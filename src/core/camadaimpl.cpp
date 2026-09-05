@@ -735,6 +735,11 @@ void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
   return addConstraintImpl(Exp);
 }
 
+void SMTSolverImpl::addInternalConstraint(const SMTExprRef &Exp) {
+  PreserveModelState ModelGuard(*this);
+  addConstraint(Exp);
+}
+
 void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   auto It = PendingShadowLinks.find(&*Constraint);
   if (It == PendingShadowLinks.end())
@@ -955,8 +960,7 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
       SMTExprRef theEq = mkEqualImpl(LHS, RHS);
       assert(theEq->isBoolSort());
       SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
-      PreserveModelAvailability ModelGuard(*this);
-      addConstraint(Lemma);
+      addInternalConstraint(Lemma);
       LazyConstraintLevels.back().push_back(std::move(Lemma));
       return theEq;
     }
@@ -1484,8 +1488,7 @@ void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
   } else {
     Constraint = mkEqual(Sel, Root.Init);
   }
-  PreserveModelAvailability ModelGuard(*this);
-  addConstraint(Constraint);
+  addInternalConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 
@@ -1580,8 +1583,7 @@ void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,
   SMTExprRef Constraint =
       mkImplies(Link.EqVar, mkEqual(mkArraySelect(Link.LHS, Index),
                                     mkArraySelect(Link.RHS, Index)));
-  PreserveModelAvailability ModelGuard(*this);
-  addConstraint(Constraint);
+  addInternalConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 
@@ -2298,8 +2300,7 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
         mkFunctionSort({Exp->Sort}, mkBVSort(Exp->getWidth())));
   SMTExprRef Bits = mkApply(FnIt->second, {Exp});
   SMTExprRef Tie = mkEqual(mkBVToIEEEFP(Bits, Exp->Sort), Exp);
-  PreserveModelAvailability ModelGuard(*this);
-  addConstraint(Tie);
+  addInternalConstraint(Tie);
   LazyConstraintLevels.back().push_back(std::move(Tie));
   // Memoize only once the tie holds: caching first would leave a wholly
   // unconstrained BV memoized if addConstraint threw, and later calls
@@ -2330,8 +2331,10 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
 }
 
 CheckResult SMTSolverImpl::check() {
+  // invalidateUnsatAssumptions() clears LastUnknownReason too. The sibling
+  // in checkSatAssuming() does not have that luxury: it never calls this
+  // hook, so it clears the reason itself.
   invalidateUnsatAssumptions();
-  LastUnknownReason = UnknownReason::NotApplicable;
   return finishCheck(checkImpl());
 }
 

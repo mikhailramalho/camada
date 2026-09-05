@@ -81,6 +81,36 @@ inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
+// Clears a per-check wall-clock limit on the way out. The limit survives
+// reset() by design and RESETANDTEST only resets, so a fixture that leaves
+// one set leaks it into every fixture after it -- a REQUIRE failure would
+// then bury itself under unrelated UNKNOWNs.
+struct TimeoutGuard {
+  const camada::SMTSolverRef &S;
+  ~TimeoutGuard() { S->setTimeout(0); }
+};
+
+// Asserts that Prefix_p * Prefix_q is a 64-bit semiprime, with both factors
+// above one. The 128-bit extension rules out wrap-around shortcuts, so the
+// query is far beyond any small time budget on every backend -- the standard
+// way these fixtures force a deterministic UNKNOWN.
+inline camada::SMTExprRef
+assert_semiprime_factoring(const camada::SMTSolverRef &solver,
+                           const std::string &Prefix) {
+  auto p = solver->mkSymbol(Prefix + "_p", solver->mkBVSort(64));
+  auto q = solver->mkSymbol(Prefix + "_q", solver->mkBVSort(64));
+  constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
+  auto prod =
+      solver->mkBVMul(solver->mkBVZeroExt(p, 64), solver->mkBVZeroExt(q, 64));
+  auto k = solver->mkBVZeroExt(
+      solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
+  solver->addConstraint(solver->mkEqual(prod, k));
+  auto one = solver->mkBVFromDec(1, 64);
+  solver->addConstraint(solver->mkBVUgt(p, one));
+  solver->addConstraint(solver->mkBVUgt(q, one));
+  return p; // the caller may constrain a factor further
+}
+
 inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
   // Nothing has answered UNKNOWN yet.
   REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
@@ -102,21 +132,8 @@ inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
   // after an UNKNOWN left a stale Timeout for a query that never ran.
   solver->reset();
   if (solver->setTimeout(150)) {
-    struct TimeoutGuard {
-      const camada::SMTSolverRef &S;
-      ~TimeoutGuard() { S->setTimeout(0); }
-    } ClearTimeout{solver};
-    auto p = solver->mkSymbol("ur_p", solver->mkBVSort(64));
-    auto q = solver->mkSymbol("ur_q", solver->mkBVSort(64));
-    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
-    auto prod =
-        solver->mkBVMul(solver->mkBVZeroExt(p, 64), solver->mkBVZeroExt(q, 64));
-    auto k = solver->mkBVZeroExt(
-        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
-    solver->addConstraint(solver->mkEqual(prod, k));
-    auto one = solver->mkBVFromDec(1, 64);
-    solver->addConstraint(solver->mkBVUgt(p, one));
-    solver->addConstraint(solver->mkBVUgt(q, one));
+    TimeoutGuard ClearTimeout{solver};
+    auto p = assert_semiprime_factoring(solver, "ur");
     if (solver->check() == camada::CheckResult::UNKNOWN) {
       REQUIRE(solver->reasonUnknown() != camada::UnknownReason::NotApplicable);
       solver->addConstraint(solver->mkBVUgt(p, solver->mkBVFromDec(2, 64)));
@@ -144,17 +161,7 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   // resets also pin that the limit itself survives reset().
   auto assertSemiprimeFactoring = [&]() {
     solver->reset();
-    auto a = solver->mkSymbol("a", solver->mkBVSort(64));
-    auto b = solver->mkSymbol("b", solver->mkBVSort(64));
-    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
-    auto prod =
-        solver->mkBVMul(solver->mkBVZeroExt(a, 64), solver->mkBVZeroExt(b, 64));
-    auto k = solver->mkBVZeroExt(
-        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
-    solver->addConstraint(solver->mkEqual(prod, k));
-    auto one = solver->mkBVFromDec(1, 64);
-    solver->addConstraint(solver->mkBVUgt(a, one));
-    solver->addConstraint(solver->mkBVUgt(b, one));
+    (void)assert_semiprime_factoring(solver, "st");
   };
   assertSemiprimeFactoring();
   REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
@@ -777,21 +784,8 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
     // The limit survives reset() by design, and RESETANDTEST only resets, so
     // a REQUIRE failure below would leak 150ms into every later fixture and
     // bury this failure under unrelated UNKNOWNs. Clear it unconditionally.
-    struct TimeoutGuard {
-      const camada::SMTSolverRef &S;
-      ~TimeoutGuard() { S->setTimeout(0); }
-    } ClearTimeout{solver};
-    auto p = solver->mkSymbol("nomodel_p", solver->mkBVSort(64));
-    auto q = solver->mkSymbol("nomodel_q", solver->mkBVSort(64));
-    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
-    auto prod =
-        solver->mkBVMul(solver->mkBVZeroExt(p, 64), solver->mkBVZeroExt(q, 64));
-    auto k = solver->mkBVZeroExt(
-        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
-    solver->addConstraint(solver->mkEqual(prod, k));
-    auto one = solver->mkBVFromDec(1, 64);
-    solver->addConstraint(solver->mkBVUgt(p, one));
-    solver->addConstraint(solver->mkBVUgt(q, one));
+    TimeoutGuard ClearTimeout{solver};
+    auto p = assert_semiprime_factoring(solver, "nomodel");
     // A backend that ignores the limit and actually decides this is fine
     // -- then a model legitimately exists and the guard must allow it.
     if (solver->check() == camada::CheckResult::UNKNOWN)
