@@ -296,7 +296,31 @@ inline void ack_check_sat_assuming(const camada::SMTSolverRef &solver) {
 // not an encoding one. ack_distinct_index_reads and
 // ack_check_sat_assuming do push/pop but create all reads at the outer
 // level, which is safe.
+// dumpModel must survive the Camada-owned nodes this encoding puts in the
+// symbol cache. A backend that walks that cache and casts every entry to
+// its own expression type builds a garbage term from an Ackermann array
+// symbol, which carries no backend term at all -- a SIGSEGV, not an error.
+// Ordinary symbols must still appear.
+inline void
+ack_dump_model_skips_camada_nodes(const camada::SMTSolverRef &solver) {
+  auto idxsort = solver->mkBVSort(8);
+  auto arr =
+      solver->mkSymbol("ackdump_arr", solver->mkArraySort(idxsort, idxsort));
+  auto plain = solver->mkSymbol("ackdump_plain", idxsort);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(arr, solver->mkBVFromDec(0, 8)),
+                      solver->mkBVFromDec(3, 8)));
+  solver->addConstraint(solver->mkEqual(plain, solver->mkBVFromDec(9, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  std::string Dump;
+  solver->dumpModel(Dump);
+  REQUIRE(Dump.find("ackdump_plain") != std::string::npos);
+}
+
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
+  ack_dump_model_skips_camada_nodes(solver);
+  solver->reset();
   ack_read_congruence(solver);
   solver->reset();
   ack_distinct_index_reads(solver);

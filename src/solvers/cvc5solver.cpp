@@ -1323,8 +1323,22 @@ void CVC5Solver::dumpModelImpl(std::string &Out) {
     // what the caller declared.
     if (Key.Name.compare(0, 9, "__CAMADA_") == 0)
       continue;
-    const cvc5::Term &Term = toSolverExpr<CVC5Expr>(*Exp).Expr;
-    Bindings.emplace_back(Key.Name, Context.getValue(Term).toString());
+    // The cache also holds Camada-owned nodes (encoded tuples, tuple-array
+    // bundles, Ackermann arrays) that carry no cvc5 term at all; casting
+    // one yields a garbage Term and a SIGSEGV inside getValue. Skip them —
+    // the backend symbols backing their fields and reads are separate
+    // cache entries and print on their own. BitwuzlaSolver::dumpModelImpl
+    // guards the same hazard the same way.
+    // The cache also holds Camada-owned nodes (encoded tuples, tuple-array
+    // bundles, Ackermann arrays) that carry no cvc5 term at all; casting
+    // one yields a garbage Term and a SIGSEGV inside getValue. Skip them --
+    // the backend symbols backing their fields and reads are separate
+    // cache entries and print on their own. BitwuzlaSolver::dumpModelImpl
+    // guards the same hazard the same way.
+    const auto *CE = dynamic_cast<const CVC5Expr *>(Exp.get());
+    if (CE == nullptr)
+      continue;
+    Bindings.emplace_back(Key.Name, Context.getValue(CE->Expr).toString());
   }
   std::sort(Bindings.begin(), Bindings.end());
   for (const auto &[Name, Value] : Bindings) {
