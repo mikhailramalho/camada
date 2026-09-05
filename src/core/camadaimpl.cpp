@@ -414,7 +414,7 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   // than right after an UNKNOWN check, so the reason dies with the model
   // rather than outliving the query it belonged to.
   LastUnknownReason = UnknownReason::NotApplicable;
-  IndexBitsMemo.clear();
+  dropIndexBitsMemo();
   // Fires on everything that invalidates the current model (constraint,
   // check, push, pop, reset), which is exactly the lifetime of the
   // default values handed out for unconstrained Ackermann-array queries.
@@ -2346,7 +2346,7 @@ CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
   // guard exists to prevent. cvc5 alone answers, which makes a partial
   // model after UNKNOWN a per-backend capability rather than a default.
   ModelAvailable = Result == CheckResult::SAT;
-  IndexBitsMemo.clear();
+  dropIndexBitsMemo();
   // Every check installs a new model, so index bits cached against the old
   // one must go. Clearing only in invalidateUnsatAssumptions is not enough:
   // checkSatAssuming does not call it, and the backends that implement

@@ -134,6 +134,16 @@ private:
   /// a live backend query.
   std::unordered_map<const SMTExpr *, std::string> IndexBitsMemo;
   std::string lazyIndexModelBitsUncached(const SMTExprRef &Exp);
+  /// Drops the memo and its bucket array. This sits on addConstraint's path
+  /// via invalidateUnsatAssumptions, so it must be free when no model has
+  /// been read: unordered_map::clear() is O(bucket_count), not O(size), and
+  /// keeps the buckets, so a single large array-model read would otherwise
+  /// tax every later addConstraint forever (measured: 55us per call once
+  /// the map has held 100k entries, and it never shrinks).
+  void dropIndexBitsMemo() {
+    if (!IndexBitsMemo.empty())
+      std::unordered_map<const SMTExpr *, std::string>().swap(IndexBitsMemo);
+  }
 
 protected:
   void invalidateGeneratedObjects();
