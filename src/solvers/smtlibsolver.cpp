@@ -2000,6 +2000,20 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
     for (char C : Decimal)
       if (C < '0' || C > '9')
         return {};
+    // Validate the declared width too, like the #b and #x branches
+    // validate their bodies: it is dropped otherwise, so a reply for a
+    // different sort, or one truncated before the closing paren, was
+    // accepted and padded into a confident wrong value.
+    if (Value.empty() || Value.back() != ')')
+      return {};
+    const std::string Declared = Value.substr(End + 1, Value.size() - End - 2);
+    if (Declared.empty())
+      return {};
+    for (char C : Declared)
+      if (C < '0' || C > '9')
+        return {};
+    if (Declared != std::to_string(Width))
+      return {};
     // Repeated long-division by 2 over the decimal string, reading the
     // remainders out from least to most significant. This works at any width
     // without pulling in big-integer libraries.
@@ -2022,8 +2036,15 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
       if (!NonZero)
         break;
     }
-    if (Bits.size() > Width)
-      Bits.resize(Width); // truncate high bits beyond declared width
+    // A value needing more bits than the sort holds is a protocol error,
+    // not something to silently narrow: truncating turned (_ bv999 8) into
+    // a confident 11100111.
+    if (Bits.size() > Width) {
+      for (std::size_t I = Width; I < Bits.size(); ++I)
+        if (Bits[I] != '0')
+          return {};
+      Bits.resize(Width);
+    }
     while (Bits.size() < Width)
       Bits.push_back('0');
     std::reverse(Bits.begin(), Bits.end());

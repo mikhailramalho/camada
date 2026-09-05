@@ -2594,6 +2594,13 @@ void SMTSolverImpl::pop(unsigned nscopes) {
   // backend scope states permanently out of step.
   fatalErrorIf(nscopes > LazyConstraintLevels.size() - 1,
                "Cannot pop more scopes than were pushed");
+  // Pop the backend first. Everything below destroys common-layer state --
+  // it moves the journaled axioms out of LazyConstraintLevels and erases
+  // the shadow entries -- so a popImpl() that threw after that ran would
+  // leave the backend a scope deeper than the common layer believes and
+  // lose those axioms for good. popImpl touches only its own backend, so
+  // it is safe to run first, and a throw now leaves both sides unchanged.
+  popImpl(nscopes);
   invalidateUnsatAssumptions();
   // Lazy default axioms and extensionality lemmas asserted inside the
   // popped scopes are scope-independent facts about expressions that
@@ -2614,7 +2621,6 @@ void SMTSolverImpl::pop(unsigned nscopes) {
       IEEEBVShadow.erase(Key);
     ShadowScopeLevels.pop_back();
   }
-  popImpl(nscopes);
   for (SMTExprRef &Constraint : Reassert) {
     addConstraint(Constraint);
     LazyConstraintLevels.back().push_back(std::move(Constraint));
