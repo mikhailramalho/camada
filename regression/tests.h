@@ -104,9 +104,13 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
   require_abort([&]() { (void)solver->getBVUnsigned(theirs); });
   require_abort([&]() { (void)solver->getBVInBin(theirs); });
   // Sort-matched foreign handles, so the abort can only come from the
-  // ownership check and not from a sort assertion firing first. Each of
-  // these getters is hand-written rather than macro-generated, so each
-  // carries its own requireOwned and each can lose it independently.
+  // ownership check and not from a sort assertion firing first. getBool is
+  // macro-generated and shares the macro's single requireOwned; the rest
+  // are hand-written and each carries its own, so each can lose it
+  // independently. Note the expression builders (mkBVExtract, mkIte,
+  // mkArraySelect, mkTupleUpdate, ...) still have no ownership check at
+  // all -- a foreign operand segfaults there, or worse, mkTupleUpdate
+  // returns an expression owned by the other solver with no diagnostic.
   auto theirBool = other->mkSymbol("foreign_b", other->mkBoolSort());
   require_abort([&]() { (void)solver->getBool(theirBool); });
   auto theirArray =
