@@ -95,6 +95,34 @@ inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(4, 8)));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+
+  // A reason must not outlive the query it belonged to: reasonUnknown() is
+  // documented to report NotApplicable at any time other than right after
+  // an UNKNOWN check, but only reset() used to clear it, so a mutation
+  // after an UNKNOWN left a stale Timeout for a query that never ran.
+  solver->reset();
+  if (solver->setTimeout(150)) {
+    struct TimeoutGuard {
+      const camada::SMTSolverRef &S;
+      ~TimeoutGuard() { S->setTimeout(0); }
+    } ClearTimeout{solver};
+    auto p = solver->mkSymbol("ur_p", solver->mkBVSort(64));
+    auto q = solver->mkSymbol("ur_q", solver->mkBVSort(64));
+    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
+    auto prod =
+        solver->mkBVMul(solver->mkBVZeroExt(p, 64), solver->mkBVZeroExt(q, 64));
+    auto k = solver->mkBVZeroExt(
+        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
+    solver->addConstraint(solver->mkEqual(prod, k));
+    auto one = solver->mkBVFromDec(1, 64);
+    solver->addConstraint(solver->mkBVUgt(p, one));
+    solver->addConstraint(solver->mkBVUgt(q, one));
+    if (solver->check() == camada::CheckResult::UNKNOWN) {
+      REQUIRE(solver->reasonUnknown() != camada::UnknownReason::NotApplicable);
+      solver->addConstraint(solver->mkBVUgt(p, solver->mkBVFromDec(2, 64)));
+      REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+    }
+  }
 }
 
 inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
@@ -720,6 +748,25 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
       solver->mkImplies(a, solver->mkEqual(z, solver->mkBVFromDec(9, 8))));
   REQUIRE(solver->checkSatAssuming({a}) == camada::CheckResult::SAT);
   REQUIRE(solver->getBVInBin(z).value() == "00001001");
+
+  // dumpModel reads the model like the getters do and must be gated the
+  // same way: unguarded it aborted on Z3 and emitted fabricated text on
+  // STP while the getter beside it correctly reported InvalidUsage.
+  // It returns void, so writing nothing is the equivalent of SMTError.
+  solver->reset();
+  auto d = solver->mkSymbol("nomodel_d", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(d, solver->mkBVFromDec(3, 8)));
+  {
+    std::string Dump = "seed";
+    solver->dumpModel(Dump);
+    REQUIRE(Dump.empty());
+  }
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  {
+    std::string Dump;
+    solver->dumpModel(Dump);
+    REQUIRE(!Dump.empty());
+  }
 
   // UNKNOWN is not a model. Most backends abort on a model query after
   // one (Z3 throws, Bitwuzla and Yices abort, MathSAT segfaults), so the

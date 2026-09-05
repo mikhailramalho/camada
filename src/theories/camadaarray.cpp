@@ -335,7 +335,9 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
       continue;
     SMTExprRef Constraint =
         mkImplies(mkEqual(Index, P.Index), mkEqual(Read, P.Value));
-    PreserveModelAvailability ModelGuard(*this);
+    // Not model-preserving: Read is a fresh variable minted for this
+    // select, so the backend's current model has no value for it and
+    // asserting the axiom genuinely discards that model.
     addConstraint(Constraint);
     // Congruence is a scope-independent fact; journal it so pop()
     // re-asserts it at the outer level (see LazyConstraintLevels).

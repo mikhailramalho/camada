@@ -92,8 +92,20 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
     (void)solver->mkArraySort(other->mkBVSort(4), solver->mkBVSort(4));
   });
 
-  // The solver's own handles keep working after all that.
+  // Model getters, on a solver that has a model to hand back. The
+  // macro-generated getters and the hand-written ones must agree here:
+  // the hand-written six once skipped requireOwned and answered a foreign
+  // handle with a fabricated zero instead of rejecting it.
   solver->addConstraint(solver->mkEqual(mine, solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  other->addConstraint(other->mkEqual(theirs, other->mkBVFromDec(9, 8)));
+  REQUIRE(other->check() == camada::CheckResult::SAT);
+  require_abort([&]() { (void)solver->getBV(theirs); });
+  require_abort([&]() { (void)solver->getBVUnsigned(theirs); });
+  require_abort([&]() { (void)solver->getBVInBin(theirs); });
+  require_abort([&]() { (void)solver->getBool(theirs); });
+
+  // The solver's own handles keep working after all that.
   REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto v = solver->getBV(mine);
   REQUIRE(v);
@@ -250,6 +262,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(wide_index_const_array_semantics, LazyArrays);
   RESETANDARGTEST(const_array_select_survives_pop, LazyArrays);
   RESETANDARGTEST(const_array_equality_semantics, LazyArrays);
+  RESETANDTEST(array_model_survives_term_construction);
+  RESETANDTEST(array_model_across_assumption_checks);
   RESETANDTEST(array_model_values);
   RESETANDTEST(const_array_model_values);
   RESETANDARGTEST(const_array_model_values, LazyArrays);
