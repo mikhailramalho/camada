@@ -414,10 +414,11 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
                       solver->mkArrayStore(aa, idx(1), idx(20))));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
-  // Storing the same value at two different indexes stays satisfiable: the
-  // observation must constrain the arrays at those indexes without forcing
-  // them equal. Using one index twice would make this a tautology that
-  // holds with the store-index observation removed entirely.
+  // Guards the opposite error from the two cases above: observing a store
+  // index must not over-constrain, so equal stores at distinct indexes stay
+  // satisfiable. Unlike those cases this one does not detect a *missing*
+  // observation -- it holds either way -- and it is not meant to; the UNSAT
+  // cases above are what pin the observation itself.
   solver->reset();
   auto [cc, _cc] = mk("cc", "unused_cc");
   auto k = solver->mkSymbol("k", solver->mkBVSort(8));

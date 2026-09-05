@@ -2341,6 +2341,13 @@ CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
   // guard exists to prevent. cvc5 alone answers, which makes a partial
   // model after UNKNOWN a per-backend capability rather than a default.
   ModelAvailable = Result == CheckResult::SAT;
+  // Every check installs a new model, so index bits cached against the old
+  // one must go. Clearing only in invalidateUnsatAssumptions is not enough:
+  // checkSatAssuming does not call it, and the backends that implement
+  // checkSatAssumingImpl natively never push/pop either, so a second
+  // assumption-based check would resolve this model's indexes with the
+  // previous model's values and silently merge or drop array entries.
+  IndexBitsMemo.clear();
   if (Result != CheckResult::UNKNOWN) {
     LastUnknownReason = UnknownReason::NotApplicable;
     return Result;
