@@ -316,6 +316,10 @@ ack_dump_model_skips_camada_nodes(const camada::SMTSolverRef &solver) {
   std::string Dump;
   solver->dumpModel(Dump);
   REQUIRE(Dump.find("ackdump_plain") != std::string::npos);
+  // The array's content lives entirely in the reserved __CAMADA_ackread
+  // symbols, so a dump that filters those reports no array at all --
+  // which the assertion above cannot see.
+  REQUIRE(Dump.find("__CAMADA_ackread") != std::string::npos);
 }
 
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
