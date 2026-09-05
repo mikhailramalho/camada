@@ -2735,7 +2735,19 @@ void SMTLIBSolver::dumpImpl(std::string &Out) {
 }
 
 void SMTLIBSolver::dumpModelImpl(std::string &Out) {
-  Out = "SMTLIBSolver write-only mode does not produce a model.\n";
+  // Write-only mode has no child to ask, and the common layer's contract is
+  // that an empty dump means "no model" -- a prose placeholder here would
+  // read as a model to a caller that branches on emptiness.
+  if (!Proc) {
+    Out.clear();
+    return;
+  }
+  const std::string Cmd = "(get-model)\n";
+  if (File)
+    File->emitRaw(Cmd);
+  Proc->emitRaw(Cmd);
+  Proc->flush();
+  Out = Proc->readResponse();
 }
 
 std::string SMTLIBSolver::getSolverNameAndVersion() const {

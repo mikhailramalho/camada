@@ -414,11 +414,11 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   // than right after an UNKNOWN check, so the reason dies with the model
   // rather than outliving the query it belonged to.
   LastUnknownReason = UnknownReason::NotApplicable;
-  dropIndexBitsMemo();
   // Fires on everything that invalidates the current model (constraint,
-  // check, push, pop, reset), which is exactly the lifetime of the
-  // default values handed out for unconstrained Ackermann-array queries.
-  AckModelDefaults.clear();
+  // check, push, pop, reset), which is exactly the lifetime of the index
+  // bits and of the default values handed out for unconstrained
+  // Ackermann-array queries.
+  dropPerModelCaches();
 }
 
 void SMTSolverImpl::clearExprCaches() {
@@ -2360,7 +2360,7 @@ CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
   // guard exists to prevent. cvc5 alone answers, which makes a partial
   // model after UNKNOWN a per-backend capability rather than a default.
   ModelAvailable = Result == CheckResult::SAT;
-  dropIndexBitsMemo();
+  dropPerModelCaches();
   // Every check installs a new model, so index bits cached against the old
   // one must go. Clearing only in invalidateUnsatAssumptions is not enough:
   // checkSatAssuming does not call it, and the backends that implement
@@ -2836,7 +2836,10 @@ void SMTSolverImpl::dumpImpl(std::string &Out) {
 CAMADA_DEFINE_DUMP_TO_STDERR(dumpModelImpl)
 
 void SMTSolverImpl::dumpModelImpl(std::string &Out) {
-  Out = "SMTSolver model dump not implemented.\n";
+  // Every in-tree backend overrides this. An empty dump is the contract's
+  // "no model", so a backend without one says nothing rather than emitting
+  // prose a caller would mistake for model text.
+  Out.clear();
 }
 
 } // namespace camada

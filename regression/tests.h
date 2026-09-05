@@ -103,7 +103,34 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
   require_abort([&]() { (void)solver->getBV(theirs); });
   require_abort([&]() { (void)solver->getBVUnsigned(theirs); });
   require_abort([&]() { (void)solver->getBVInBin(theirs); });
-  require_abort([&]() { (void)solver->getBool(theirs); });
+  // Sort-matched foreign handles, so the abort can only come from the
+  // ownership check and not from a sort assertion firing first. Each of
+  // these getters is hand-written rather than macro-generated, so each
+  // carries its own requireOwned and each can lose it independently.
+  auto theirBool = other->mkSymbol("foreign_b", other->mkBoolSort());
+  require_abort([&]() { (void)solver->getBool(theirBool); });
+  auto theirArray =
+      other->mkSymbol("foreign_arr", other->mkArraySort(other->mkBVSort(8),
+                                                        other->mkBVSort(8)));
+  require_abort([&]() { (void)solver->getArrayValues(theirArray); });
+  require_abort([&]() {
+    (void)solver->getArrayElement(theirArray, other->mkBVFromDec(0, 8));
+  });
+  if (solver->supports(camada::SolverFeature::IntRealArithmetic)) {
+    auto theirInt = other->mkSymbol("foreign_i", other->mkIntSort());
+    require_abort([&]() { (void)solver->getInt(theirInt); });
+    auto theirReal = other->mkSymbol("foreign_r", other->mkRealSort());
+    require_abort([&]() { (void)solver->getRational(theirReal); });
+    require_abort([&]() { (void)solver->getRealNumerator(theirReal); });
+    require_abort([&]() { (void)solver->getRealDenominator(theirReal); });
+  }
+  {
+    // The BV encoding exists on every backend, so this needs no feature
+    // gate -- and getFXP reaches its ownership check through getBVInBin.
+    auto theirFP =
+        other->mkSymbol("foreign_f", other->mkFP32Sort(camada::FPEncoding::BV));
+    require_abort([&]() { (void)solver->getFPInBin(theirFP); });
+  }
 
   // The solver's own handles keep working after all that.
   REQUIRE(solver->check() == camada::CheckResult::SAT);

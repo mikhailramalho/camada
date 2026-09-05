@@ -145,6 +145,16 @@ private:
       std::unordered_map<const SMTExpr *, std::string>().swap(IndexBitsMemo);
   }
 
+  /// Drops every cache whose contents are only valid for one model. Called
+  /// from invalidateUnsatAssumptions and again from finishCheck, because
+  /// checkSatAssuming reaches the latter without the former and the
+  /// backends implementing checkSatAssumingImpl natively never push/pop.
+  void dropPerModelCaches() {
+    dropIndexBitsMemo();
+    if (!AckModelDefaults.empty())
+      AckModelDefaults.clear();
+  }
+
 protected:
   void invalidateGeneratedObjects();
   void clearSortCaches();
