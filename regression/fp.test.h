@@ -447,6 +447,32 @@ inline void fp_ieee_bv_bitexact_roundtrip(const camada::SMTSolverRef &solver,
         solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(g), pat)));
     REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
+  solver->reset();
+
+  // 4. ... but re-asserting the same equality at the root restores it.
+  // The pending link is keyed by the hash-consed equality, so the scoped
+  // assert that could not commit must not consume it: consuming it there
+  // left this assert unable to establish provenance, silently falling
+  // back to the underspecified backend operation.
+  //
+  // Asserted UNSAT alone would not detect that -- a backend with a native
+  // fp.to_ieee_bv forces the bits either way. What only provenance gives
+  // is bit-exactness at NaN, where the backend operation is underspecified:
+  // assert h is a NaN whose payload the equality pins, then require the
+  // reported bits to match it exactly.
+  solver->reset();
+  {
+    auto h = solver->mkSymbol("sc_h", fp32());
+    auto nanPat = solver->mkBVFromDec(0x7FC00001, 32);
+    auto eq = solver->mkEqual(h, solver->mkBVToIEEEFP(nanPat, fp32()));
+    solver->push();
+    solver->addConstraint(eq);
+    solver->pop();
+    solver->addConstraint(eq);
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(h), nanPat)));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
 }
 
 // Regression for the second ESBMC fp.to_ieee_bv report

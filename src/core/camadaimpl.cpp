@@ -745,11 +745,6 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   if (It == PendingShadowLinks.end())
     return;
   const PendingShadowLink Link = It->second;
-  // Consume the entry either way: the map is keyed by raw SMTExpr pointers
-  // that the arena recycles, so an entry left behind after its constraint
-  // is asserted both grows without bound and risks matching a later,
-  // unrelated expression that reuses the address.
-  PendingShadowLinks.erase(It);
   // Only assert-derived shadows that can never be retracted are safe to
   // record. mkIEEEFPToBV is a *term-level* rewrite: once it has handed a
   // caller the shadowed bits, that term IS those bits forever, so a later
@@ -765,6 +760,13 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // the journal is the only record of which shadows a scope established.
   if (ShadowScopeLevels.size() != 1)
     return;
+  // Consume the entry only now that it commits. Erasing before this gate
+  // would drop a link asserted inside a scope, so a later assert of the
+  // same hash-consed equality at scope 0 could never establish the shadow
+  // and mkIEEEFPToBV would silently fall back to the underspecified
+  // backend operation. The entry cannot outlive its key: the map is
+  // cleared in clearExprCaches(), which runs before ExprArena.clear().
+  PendingShadowLinks.erase(It);
   // Keep the first entry on collision; only journal what was inserted.
   if (IEEEBVShadow.emplace(Link.Target, Link.Bits).second)
     ShadowScopeLevels.back().push_back(Link.Target);
