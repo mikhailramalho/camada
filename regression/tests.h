@@ -263,6 +263,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(const_array_select_survives_pop, LazyArrays);
   RESETANDARGTEST(const_array_equality_semantics, LazyArrays);
   RESETANDTEST(array_model_survives_term_construction);
+  RESETANDTEST(lazy_array_default_invalidates_model);
   RESETANDTEST(array_model_across_assumption_checks);
   RESETANDTEST(array_model_values);
   RESETANDTEST(const_array_model_values);

@@ -1488,7 +1488,11 @@ void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
   } else {
     Constraint = mkEqual(Sel, Root.Init);
   }
-  addInternalConstraint(Constraint);
+  // Not model-preserving: this is the first read of the lazy root at this
+  // index, so the select names a term the current model has no value for
+  // and the backend discards the model. Claiming otherwise makes the next
+  // getter throw instead of reporting InvalidUsage.
+  addConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 

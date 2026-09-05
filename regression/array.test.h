@@ -310,6 +310,39 @@ array_model_survives_term_construction(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getBVInBin(x).value() == "00000101");
 }
 
+// A lazily lowered constant array read at a fresh index instantiates its
+// default axiom, and that axiom names a select the current model has never
+// valued -- so the model dies and the getter must say so. This is the
+// counterpart to array_model_survives_term_construction: that fixture pins
+// the axioms that DO preserve the model (and only bites on backends without
+// native array extensionality), this one pins the ones that must not
+// pretend to. Claiming preservation here made the getter throw an uncaught
+// backend exception instead of reporting InvalidUsage.
+inline void
+lazy_array_default_invalidates_model(const camada::SMTSolverRef &solver) {
+  auto idxsort = solver->mkBVSort(8);
+  auto x = solver->mkSymbol("ld_x", idxsort);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(5, 8)));
+  auto lazy = solver->mkArrayConst(idxsort, solver->mkBVFromDec(7, 8),
+                                   camada::ConstArrayLowering::Lazy);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(lazy, solver->mkBVFromDec(0, 8)),
+                      solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(x).value() == "00000101");
+
+  // A read at an index the root has not been instantiated at yet.
+  (void)solver->mkArraySelect(lazy, solver->mkBVFromDec(1, 8));
+
+  // Whatever the backend does, it must be reported and not thrown: either
+  // the model survived, or the getter says it did not.
+  auto After = solver->getBVInBin(x);
+  if (!After)
+    REQUIRE(After.error().Code == camada::SMTErrorCode::InvalidUsage);
+  else
+    REQUIRE(After.value() == "00000101");
+}
+
 // Two consecutive checkSatAssuming calls, each followed by a model read.
 // checkSatAssuming does not route through invalidateUnsatAssumptions, and
 // the backends that implement it natively never push/pop, so any state
