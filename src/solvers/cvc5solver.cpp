@@ -25,6 +25,7 @@
 #include "../camada.h"
 #include "../camadaerrors.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cvc5/cvc5_kind.h>
 #include <cvc5/cvc5_types.h>
@@ -1306,10 +1307,30 @@ void CVC5Solver::dumpImpl(std::string &Out) {
 }
 
 void CVC5Solver::dumpModelImpl(std::string &Out) {
+  // Print each symbol's value, not each assertion's: evaluating an
+  // asserted formula under its own model yields "true", which is not a
+  // model. cvc5's native getModel() takes an explicit term list and is
+  // marked experimental upstream, so build the bindings from the symbols
+  // the common layer already tracks.
   Out.clear();
-  auto const &assertions = Context.getAssertions();
-  for (auto const &a : assertions) {
-    Out += Context.getValue(a).toString();
+  // Sorted, because SymbolExprCache hashes on a pointer and would order
+  // the bindings differently from run to run; a dump a caller diffs or
+  // logs has to be reproducible.
+  std::vector<std::pair<std::string, std::string>> Bindings;
+  Bindings.reserve(SymbolExprCache.size());
+  for (const auto &[Key, Exp] : SymbolExprCache) {
+    // Skip the symbols Camada's own encodings mint; a model dump reports
+    // what the caller declared.
+    if (Key.Name.compare(0, 9, "__CAMADA_") == 0)
+      continue;
+    const cvc5::Term &Term = toSolverExpr<CVC5Expr>(*Exp).Expr;
+    Bindings.emplace_back(Key.Name, Context.getValue(Term).toString());
+  }
+  std::sort(Bindings.begin(), Bindings.end());
+  for (const auto &[Name, Value] : Bindings) {
+    Out += Name;
+    Out += " = ";
+    Out += Value;
     Out += "\n";
   }
 }

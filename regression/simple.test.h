@@ -770,9 +770,14 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
   }
   REQUIRE(solver->check() == camada::CheckResult::SAT);
   {
+    // Non-emptiness alone is too weak: cvc5's dump evaluated each
+    // *assertion* rather than each symbol, so it returned "true" under
+    // SAT and satisfied that check while carrying no model at all. Require
+    // the symbol to appear -- every backend names it, in its own syntax.
     std::string Dump;
     solver->dumpModel(Dump);
     REQUIRE(!Dump.empty());
+    REQUIRE(Dump.find("nomodel_d") != std::string::npos);
   }
 
   // UNKNOWN is not a model. Most backends abort on a model query after
