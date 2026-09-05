@@ -1106,6 +1106,8 @@ SMTExprRef SMTSolverImpl::mkArithShl(const SMTExprRef &Exp, unsigned Amount) {
 
 SMTExprRef SMTSolverImpl::mkArithShl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
+  requireOwned(LHS);
+  requireOwned(RHS);
   requireIntSort(LHS, "Expected integer expression");
   requireIntSort(RHS, "Expected integer shift amount");
   SMTExprRef theExp = mkArithShlImpl(LHS, RHS);
@@ -1228,6 +1230,7 @@ CAMADA_DEFINE_FP_UNARY_WRAPPER(
 
 SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
                                   FPNegBehavior Behavior) {
+  requireOwned(Exp);
   requireFPSort(Exp, "Expected floating-point expression");
   SMTExprRef theExp = usesBVFPEncoding(Exp)
                           ? SMTSolverImpl::mkFPNegImpl(Exp, Behavior)
@@ -2280,6 +2283,8 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
 SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
                                        const SMTExprRef &InitValue,
                                        ConstArrayLowering Lowering) {
+  requireOwned(IndexSort);
+  requireOwned(InitValue);
   fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");

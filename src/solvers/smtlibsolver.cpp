@@ -2006,9 +2006,14 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
     // accepted and padded into a confident wrong value.
     if (Value.empty() || Value.back() != ')')
       return {};
-    const std::string Declared = Value.substr(End + 1, Value.size() - End - 2);
-    if (Declared.empty())
+    // Trim: SMT-LIB allows whitespace around the tokens, so `(_ bv5 8 )`
+    // is as legal as `(_ bv5 8)` and master accepted both.
+    std::string Declared = Value.substr(End + 1, Value.size() - End - 2);
+    const std::size_t First = Declared.find_first_not_of(" \t\n\r");
+    if (First == std::string::npos)
       return {};
+    const std::size_t Last = Declared.find_last_not_of(" \t\n\r");
+    Declared = Declared.substr(First, Last - First + 1);
     for (char C : Declared)
       if (C < '0' || C > '9')
         return {};
@@ -2087,6 +2092,12 @@ std::size_t parseBVLiteralAppend(const std::string &S, std::size_t I,
   } else {
     return std::string::npos;
   }
+  // An empty body is a truncated reply, not a zero. Without this the
+  // normalization below pads it to Width and the caller's error signal
+  // never fires: a `(fp #b1 #b10000000 #b)` from a dying child decoded to
+  // a confident -2.0f. Same check bvValueToBinary makes on its own bodies.
+  if (Bits.empty())
+    return std::string::npos;
   normalizeToWidth(Bits, Width);
   Out += Bits;
   return I;
