@@ -107,10 +107,7 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
   // ownership check and not from a sort assertion firing first. getBool is
   // macro-generated and shares the macro's single requireOwned; the rest
   // are hand-written and each carries its own, so each can lose it
-  // independently. Note the expression builders (mkBVExtract, mkIte,
-  // mkArraySelect, mkTupleUpdate, ...) still have no ownership check at
-  // all -- a foreign operand segfaults there, or worse, mkTupleUpdate
-  // returns an expression owned by the other solver with no diagnostic.
+  // independently. The expression builders are covered below.
   auto theirBool = other->mkSymbol("foreign_b", other->mkBoolSort());
   require_abort([&]() { (void)solver->getBool(theirBool); });
   auto theirArray =
@@ -134,6 +131,37 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
     auto theirFP =
         other->mkSymbol("foreign_f", other->mkFP32Sort(camada::FPEncoding::BV));
     require_abort([&]() { (void)solver->getFPInBin(theirFP); });
+  }
+
+  // Expression builders: a foreign operand used to segfault here, and
+  // mkTupleUpdate was worse still -- it returned an expression owned by
+  // the other solver with no diagnostic at all.
+  require_abort([&]() { (void)solver->mkBVExtract(3, 0, theirs); });
+  require_abort([&]() { (void)solver->mkBVConcat(theirs, mine); });
+  require_abort([&]() { (void)solver->mkBVConcat(mine, theirs); });
+  require_abort([&]() {
+    (void)solver->mkIte(other->mkSymbol("foreign_c", other->mkBoolSort()), mine,
+                        mine);
+  });
+  {
+    auto theirArr =
+        other->mkSymbol("foreign_sel", other->mkArraySort(other->mkBVSort(8),
+                                                          other->mkBVSort(8)));
+    require_abort([&]() {
+      (void)solver->mkArraySelect(theirArr, other->mkBVFromDec(0, 8));
+    });
+    require_abort([&]() {
+      (void)solver->mkArrayStore(theirArr, other->mkBVFromDec(0, 8),
+                                 other->mkBVFromDec(1, 8));
+    });
+  }
+  if (solver->supports(camada::SolverFeature::NativeTuples)) {
+    auto theirTuple =
+        other->mkSymbol("foreign_t", other->mkTupleSort({other->mkBVSort(8)}));
+    require_abort([&]() { (void)solver->mkTupleSelect(theirTuple, 0); });
+    require_abort([&]() {
+      (void)solver->mkTupleUpdate(theirTuple, 0, solver->mkBVFromDec(1, 8));
+    });
   }
 
   // The solver's own handles keep working after all that.

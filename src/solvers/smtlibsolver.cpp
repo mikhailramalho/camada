@@ -2747,7 +2747,18 @@ void SMTLIBSolver::dumpModelImpl(std::string &Out) {
     File->emitRaw(Cmd);
   Proc->emitRaw(Cmd);
   Proc->flush();
-  Out = Proc->readResponse();
+  const std::string Resp = Proc->readResponse();
+  // A child that does not implement (get-model), or whose context cannot
+  // produce one, answers `(error ...)` or `unsupported`. Handing that back
+  // would present an error message as model text to a caller branching on
+  // emptiness, so report it the way the contract does -- and the way
+  // getUnsatAssumptionsImpl already screens the same replies.
+  if (Resp.empty() || Resp.compare(0, 6, "(error") == 0 ||
+      Resp.compare(0, 11, "unsupported") == 0) {
+    Out.clear();
+    return;
+  }
+  Out = Resp;
 }
 
 std::string SMTLIBSolver::getSolverNameAndVersion() const {
