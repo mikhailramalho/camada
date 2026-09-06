@@ -1963,8 +1963,19 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   // tuple-valued model; the per-leaf queries re-enter this wrapper.
   if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
     return getCamadaTupleArrayValues(*this, Array);
-  if (arrayMode() == ArrayEncoding::Ackermann)
+  if (arrayMode() == ArrayEncoding::Ackermann) {
+    // Same limitation getArrayElement screens: the walk compares indexes by
+    // their model bits, which only Bool and BV sorts produce. Report the
+    // capability gap rather than the BackendError the walk would return,
+    // which reads as a solver malfunction.
+    if (!Array->Sort->getIndexSort()->isBoolSort() &&
+        !Array->Sort->getIndexSort()->isBVSort())
+      return SMTError{SMTErrorCode::UnsupportedOperation,
+                      Array->getBackendKind(),
+                      "The Ackermann array encoding can only evaluate "
+                      "bool- and bitvector-sorted indexes against a model"};
     return ackArrayModel(Array);
+  }
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     return lazyArrayModel(Array);
   return getArrayValuesImpl(Array);
@@ -2482,15 +2493,23 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
     UnknownReason ReasonToRestore = UnknownReason::NotApplicable;
     // A destructor is implicitly noexcept, and pop() can throw: it calls
     // popImpl() and then re-asserts the journaled lazy constraints, exactly
-    // when the backend context may already be in an error state. Letting
-    // that escape while an earlier exception unwinds calls std::terminate,
-    // turning a recoverable backend error into a killed process, so the
-    // failure to restore the scope is swallowed here instead.
-    ~ScopeGuard() {
-      try {
-        S.pop();
-      } catch (...) {
+    // when the backend context may already be in an error state. Swallow
+    // that only while an earlier exception is unwinding, where letting it
+    // escape would call std::terminate and turn a recoverable backend
+    // error into a killed process. On the normal path there is no such
+    // risk, and a silent failure there would hand back an ordinary-looking
+    // verdict from a solver whose scope stack no longer matches -- with
+    // the journaled axioms already moved out and lost.
+    ~ScopeGuard() noexcept(false) {
+      if (std::uncaught_exceptions() > 0) {
+        try {
+          S.pop();
+        } catch (...) {
+        }
+        S.LastUnknownReason = ReasonToRestore;
+        return;
       }
+      S.pop();
       S.LastUnknownReason = ReasonToRestore;
     }
   } Guard{*this};
@@ -2610,14 +2629,15 @@ void SMTSolverImpl::pop(unsigned nscopes) {
   // backend scope states permanently out of step.
   fatalErrorIf(nscopes > LazyConstraintLevels.size() - 1,
                "Cannot pop more scopes than were pushed");
-  // Pop the backend first. Everything below destroys common-layer state --
-  // it moves the journaled axioms out of LazyConstraintLevels and erases
-  // the shadow entries -- so a popImpl() that threw after that ran would
-  // leave the backend a scope deeper than the common layer believes and
-  // lose those axioms for good. popImpl touches only its own backend, so
-  // it is safe to run first, and a throw now leaves both sides unchanged.
-  popImpl(nscopes);
+  // Invalidate first: a popImpl() that throws still leaves the backend's
+  // model gone, so the flags must already say so or the next getter walks
+  // into a model-less backend. This is cheap and cannot itself throw.
   invalidateUnsatAssumptions();
+  // Then pop the backend, still ahead of the journal work below. That work
+  // moves the axioms out of LazyConstraintLevels and erases the shadow
+  // entries, so a throw after it would lose them for good while leaving
+  // the backend a scope deeper than the common layer believes.
+  popImpl(nscopes);
   // Lazy default axioms and extensionality lemmas asserted inside the
   // popped scopes are scope-independent facts about expressions that
   // outlive the pop, so re-assert them at the outer level instead of

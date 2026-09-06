@@ -143,6 +143,11 @@ inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
 }
 
 inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
+  // Clear the limit however this fixture exits: it holds one across six
+  // REQUIREs, and Catch2 throws on failure, so without the guard a single
+  // failure here leaks 150ms into every fixture after it and buries itself
+  // under their spurious UNKNOWNs.
+  TimeoutGuard ClearTimeout{solver};
   if (!solver->setTimeout(150)) {
     // Backends without enforceable limits must report so and stay usable.
     solver->addConstraint(solver->mkBool(true));

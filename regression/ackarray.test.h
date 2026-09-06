@@ -346,6 +346,11 @@ ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
   auto Elem = solver->getArrayElement(arr, i);
   REQUIRE_FALSE(Elem);
   REQUIRE(Elem.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+  // getArrayValues hits the same limitation and must name it the same way,
+  // not report it as a backend malfunction a caller cannot act on.
+  auto Values = solver->getArrayValues(arr);
+  REQUIRE_FALSE(Values);
+  REQUIRE(Values.error().Code == camada::SMTErrorCode::UnsupportedOperation);
 }
 
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {

@@ -1968,6 +1968,13 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
     for (char C : Bits)
       if (C != '0' && C != '1')
         return {};
+    // A binary literal states its width exactly, so more bits than the sort
+    // holds is a desynchronized reply, not something to narrow: truncating
+    // turned a 32-bit answer to an 8-bit query into a confident 5. (The #x
+    // branch below may legitimately be wider, since hex rounds up to a
+    // nibble.)
+    if (Bits.size() > Width)
+      return {};
     normalizeToWidth(Bits, Width);
     return Bits;
   }
