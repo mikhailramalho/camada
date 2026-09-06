@@ -232,6 +232,11 @@ std::string power2Dec(unsigned int N) {
 std::string addLeadingZeroes(const std::string &Str, const unsigned Width) {
   if (Str.length() == Width)
     return Str;
+  // A backend returning more bits than the sort declares would underflow the
+  // subtraction below and ask for a ~SIZE_MAX-long string; keep the low bits,
+  // which is what every caller means by a value of this width.
+  if (Str.length() > Width)
+    return Str.substr(Str.length() - Width);
   return std::string(Width - Str.length(), '0') + Str;
 }
 
@@ -401,13 +406,19 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   UnsatAssumptionsValid = false;
   // A model and an unsat core are invalidated by exactly the same events
   // (addConstraint, push, pop, reset, a later check), so they share this
-  // hook. finishCheck() re-arms the model afterwards for a check that
-  // answers SAT or UNKNOWN.
+  // hook. finishCheck() re-arms the model afterwards, but only for a check
+  // that answers SAT -- see the reasoning there for why UNKNOWN does not
+  // qualify.
   ModelAvailable = false;
+  // reasonUnknown() is documented to report NotApplicable at any time other
+  // than right after an UNKNOWN check, so the reason dies with the model
+  // rather than outliving the query it belonged to.
+  LastUnknownReason = UnknownReason::NotApplicable;
   // Fires on everything that invalidates the current model (constraint,
-  // check, push, pop, reset), which is exactly the lifetime of the
-  // default values handed out for unconstrained Ackermann-array queries.
-  AckModelDefaults.clear();
+  // check, push, pop, reset), which is exactly the lifetime of the index
+  // bits and of the default values handed out for unconstrained
+  // Ackermann-array queries.
+  dropPerModelCaches();
 }
 
 void SMTSolverImpl::clearExprCaches() {
@@ -724,10 +735,16 @@ void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
   return addConstraintImpl(Exp);
 }
 
+void SMTSolverImpl::addInternalConstraint(const SMTExprRef &Exp) {
+  PreserveModelState ModelGuard(*this);
+  addConstraint(Exp);
+}
+
 void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   auto It = PendingShadowLinks.find(&*Constraint);
   if (It == PendingShadowLinks.end())
     return;
+  const PendingShadowLink Link = It->second;
   // Only assert-derived shadows that can never be retracted are safe to
   // record. mkIEEEFPToBV is a *term-level* rewrite: once it has handed a
   // caller the shadowed bits, that term IS those bits forever, so a later
@@ -736,11 +753,23 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // reports UNSAT on satisfiable formulas. At scope 0 no pop can retract
   // the tie, so the rewrite stays sound; deeper scopes fall back to the
   // underspecified backend operation, which is always correct.
+  //
+  // Because only scope 0 commits, ShadowScopeLevels never holds more than
+  // the root entry and pop()'s retraction loop is unreachable today. Both
+  // are kept deliberately: they are what makes relaxing this gate safe, and
+  // the journal is the only record of which shadows a scope established.
   if (ShadowScopeLevels.size() != 1)
     return;
+  // Consume the entry only now that it commits. Erasing before this gate
+  // would drop a link asserted inside a scope, so a later assert of the
+  // same hash-consed equality at scope 0 could never establish the shadow
+  // and mkIEEEFPToBV would silently fall back to the underspecified
+  // backend operation. The entry cannot outlive its key: the map is
+  // cleared in clearExprCaches(), which runs before ExprArena.clear().
+  PendingShadowLinks.erase(It);
   // Keep the first entry on collision; only journal what was inserted.
-  if (IEEEBVShadow.emplace(It->second.Target, It->second.Bits).second)
-    ShadowScopeLevels.back().push_back(It->second.Target);
+  if (IEEEBVShadow.emplace(Link.Target, Link.Bits).second)
+    ShadowScopeLevels.back().push_back(Link.Target);
 }
 
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
@@ -933,7 +962,7 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
       SMTExprRef theEq = mkEqualImpl(LHS, RHS);
       assert(theEq->isBoolSort());
       SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
-      addConstraint(Lemma);
+      addInternalConstraint(Lemma);
       LazyConstraintLevels.back().push_back(std::move(Lemma));
       return theEq;
     }
@@ -1461,11 +1490,27 @@ void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
   } else {
     Constraint = mkEqual(Sel, Root.Init);
   }
+  // Not model-preserving: this is the first read of the lazy root at this
+  // index, so the select names a term the current model has no value for
+  // and the backend discards the model. Claiming otherwise makes the next
+  // getter throw instead of reporting InvalidUsage.
   addConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 
 std::string SMTSolverImpl::lazyIndexModelBits(const SMTExprRef &Exp) {
+  auto It = IndexBitsMemo.find(&*Exp);
+  if (It != IndexBitsMemo.end())
+    return It->second;
+  std::string Bits = lazyIndexModelBitsUncached(Exp);
+  // Only cache a real answer: an empty string means "no model yet" or an
+  // unsupported sort, neither of which should stick once a model exists.
+  if (!Bits.empty())
+    IndexBitsMemo.emplace(&*Exp, Bits);
+  return Bits;
+}
+
+std::string SMTSolverImpl::lazyIndexModelBitsUncached(const SMTExprRef &Exp) {
   if (Exp->isBoolSort()) {
     SMTResult<bool> Value = getBool(Exp);
     return Value ? std::string(Value.value() ? "1" : "0") : std::string();
@@ -1528,6 +1573,9 @@ SMTExprRef SMTSolverImpl::mkEncodedArrayEqual(const SMTExprRef &LHS,
       LHS->Sort->getIndexSort());
   SMTExprRef Lemma = mkOr(EqVar, mkNot(mkEqual(mkArraySelect(LHS, Witness),
                                                mkArraySelect(RHS, Witness))));
+  // Not model-preserving, unlike the congruence axioms: this mints a fresh
+  // EqVar and witness index, which the current model cannot have values
+  // for, so the model genuinely dies here.
   addConstraint(Lemma);
   LazyConstraintLevels.back().push_back(std::move(Lemma));
   return EqVar;
@@ -1541,7 +1589,7 @@ void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,
   SMTExprRef Constraint =
       mkImplies(Link.EqVar, mkEqual(mkArraySelect(Link.LHS, Index),
                                     mkArraySelect(Link.RHS, Index)));
-  addConstraint(Constraint);
+  addInternalConstraint(Constraint);
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 
@@ -1733,6 +1781,7 @@ CAMADA_DEFINE_MODEL_GETTER(RM, getRM,
                            getRMImpl)
 
 SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   requireBVSort(Exp, "Expected bit-vector expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1743,6 +1792,7 @@ SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTSolverImpl::getInt(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isIntSort() && !Exp->isRealSort(),
                "Expected integer or real expression");
   if (!ModelAvailable)
@@ -1752,6 +1802,7 @@ SMTResult<std::string> SMTSolverImpl::getInt(const SMTExprRef &Exp) {
 
 SMTResult<std::pair<std::string, std::string>>
 SMTSolverImpl::getRational(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1765,6 +1816,7 @@ SMTSolverImpl::getRationalImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1776,6 +1828,7 @@ SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
 
 SMTResult<std::string>
 SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->isRealSort(), "Expected real expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1786,6 +1839,7 @@ SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
+  requireOwned(Exp);
   requireFPSort(Exp, "Expected floating-point expression");
   if (!ModelAvailable)
     return noModelError(Exp);
@@ -1809,6 +1863,8 @@ CAMADA_DEFINE_MODEL_GETTER(double, getFP64,
 
 SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
                                                      const SMTExprRef &Index) {
+  requireOwned(Array);
+  requireOwned(Index);
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
                "Expected array index with matching sort");
@@ -1840,6 +1896,7 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
+  requireOwned(Array);
   fatalErrorIf(!Array->isArraySort(), "Expected array expression");
   if (!ModelAvailable)
     return noModelError(Array);
@@ -2242,13 +2299,23 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
   // re-asserts it, keeping the application memo valid across scopes.
   if (auto It = IEEEBVAppCache.find(&*Exp); It != IEEEBVAppCache.end())
     return It->second;
-  auto [FnIt, Inserted] = IEEEBVFnCache.try_emplace(&*Exp->Sort);
-  if (Inserted)
-    FnIt->second = mkSymbolUnchecked(
-        "__CAMADA_ieeebv_fn" + std::to_string(IEEEBVFnCache.size() - 1),
+  // Build the function symbol before caching it: mkFunctionSort reports
+  // unsupportedFeature on a backend without UFs, and an entry inserted
+  // first would survive that throw as a null handle for every later call
+  // at this sort. Same reasoning as the application memo below.
+  auto FnIt = IEEEBVFnCache.find(&*Exp->Sort);
+  if (FnIt == IEEEBVFnCache.end()) {
+    SMTExprRef Fn = mkSymbolUnchecked(
+        "__CAMADA_ieeebv_fn" + std::to_string(IEEEBVFnCache.size()),
         mkFunctionSort({Exp->Sort}, mkBVSort(Exp->getWidth())));
+    FnIt = IEEEBVFnCache.emplace(&*Exp->Sort, std::move(Fn)).first;
+  }
   SMTExprRef Bits = mkApply(FnIt->second, {Exp});
   SMTExprRef Tie = mkEqual(mkBVToIEEEFP(Bits, Exp->Sort), Exp);
+  // Not model-preserving: Bits applies a freshly minted uninterpreted
+  // function, so the current model has no value for it and the backend
+  // discards the model. Claiming otherwise makes the next getter reach a
+  // backend with no model and abort instead of reporting InvalidUsage.
   addConstraint(Tie);
   LazyConstraintLevels.back().push_back(std::move(Tie));
   // Memoize only once the tie holds: caching first would leave a wholly
@@ -2280,8 +2347,10 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
 }
 
 CheckResult SMTSolverImpl::check() {
+  // invalidateUnsatAssumptions() clears LastUnknownReason too. The sibling
+  // in checkSatAssuming() does not have that luxury: it never calls this
+  // hook, so it clears the reason itself.
   invalidateUnsatAssumptions();
-  LastUnknownReason = UnknownReason::NotApplicable;
   return finishCheck(checkImpl());
 }
 
@@ -2293,6 +2362,13 @@ CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
   // guard exists to prevent. cvc5 alone answers, which makes a partial
   // model after UNKNOWN a per-backend capability rather than a default.
   ModelAvailable = Result == CheckResult::SAT;
+  dropPerModelCaches();
+  // Every check installs a new model, so index bits cached against the old
+  // one must go. Clearing only in invalidateUnsatAssumptions is not enough:
+  // checkSatAssuming does not call it, and the backends that implement
+  // checkSatAssumingImpl natively never push/pop either, so a second
+  // assumption-based check would resolve this model's indexes with the
+  // previous model's values and silently merge or drop array entries.
   if (Result != CheckResult::UNKNOWN) {
     LastUnknownReason = UnknownReason::NotApplicable;
     return Result;
@@ -2333,11 +2409,33 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
   push();
   struct ScopeGuard {
     SMTSolverImpl &S;
-    ~ScopeGuard() { S.pop(); }
+    // Set once checkImpl() has answered; NotApplicable until then, so an
+    // exception before that point restores nothing.
+    UnknownReason ReasonToRestore = UnknownReason::NotApplicable;
+    // A destructor is implicitly noexcept, and pop() can throw: it calls
+    // popImpl() and then re-asserts the journaled lazy constraints, exactly
+    // when the backend context may already be in an error state. Letting
+    // that escape while an earlier exception unwinds calls std::terminate,
+    // turning a recoverable backend error into a killed process, so the
+    // failure to restore the scope is swallowed here instead.
+    ~ScopeGuard() {
+      try {
+        S.pop();
+      } catch (...) {
+      }
+      S.LastUnknownReason = ReasonToRestore;
+    }
   } Guard{*this};
   for (const SMTExprRef &Assumption : Assumptions)
     addConstraint(Assumption);
-  return checkImpl();
+  const CheckResult Result = checkImpl();
+  // The backend records its unknown reason inside checkImpl(), but the
+  // guard's pop() clears it through invalidateUnsatAssumptions and runs
+  // before finishCheck() can read it. Have the guard carry it across the
+  // teardown, or a precise BackendError is downgraded to the coarse
+  // Timeout/Incomplete that finishCheck re-derives.
+  Guard.ReasonToRestore = LastUnknownReason;
+  return Result;
 }
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
@@ -2477,7 +2575,17 @@ void SMTSolverImpl::dump(std::string &Out) { return dumpImpl(Out); }
 
 CAMADA_DEFINE_DUMP_TO_STDERR(dumpModel)
 
-void SMTSolverImpl::dumpModel(std::string &Out) { return dumpModelImpl(Out); }
+void SMTSolverImpl::dumpModel(std::string &Out) {
+  // dumpModel reads the model like the getters do, so it needs their guard:
+  // without one, Z3 throws an uncaught exception and STP emits fabricated
+  // text. The getters report an SMTError; this returns void, so the
+  // equivalent is to write nothing.
+  if (!ModelAvailable) {
+    Out.clear();
+    return;
+  }
+  return dumpModelImpl(Out);
+}
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTSortRef, mkTupleSortImpl, "Tuples",
                                const std::vector<SMTSortRef> &)
@@ -2730,7 +2838,10 @@ void SMTSolverImpl::dumpImpl(std::string &Out) {
 CAMADA_DEFINE_DUMP_TO_STDERR(dumpModelImpl)
 
 void SMTSolverImpl::dumpModelImpl(std::string &Out) {
-  Out = "SMTSolver model dump not implemented.\n";
+  // Every in-tree backend overrides this. An empty dump is the contract's
+  // "no model", so a backend without one says nothing rather than emitting
+  // prose a caller would mistake for model text.
+  Out.clear();
 }
 
 } // namespace camada

@@ -8,6 +8,32 @@
 #include <tuple>
 #include <utility>
 
+// mkIEEEFPToBV on a backend without a native op mints an uninterpreted
+// function and ties it to the operand. That tie names terms the current
+// model has no value for, so the model dies -- and the next getter must
+// say so rather than reaching a backend that has already discarded it.
+// Building the term after a check aborted on Bitwuzla and cvc5.
+inline void
+ieee_fp_to_bv_after_check_reports(const camada::SMTSolverRef &solver) {
+  auto bvsort = solver->mkBVSort(32);
+  auto x = solver->mkSymbol("ieeeuf_x", bvsort);
+  auto f = solver->mkSymbol("ieeeuf_f",
+                            solver->mkFP32Sort(camada::FPEncoding::Native));
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(5, 32)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(x).value() == "00000000000000000000000000000101");
+
+  (void)solver->mkIEEEFPToBV(f);
+
+  // Either the model survived (a backend with a native op never asserts a
+  // tie) or it did not -- but it must be reported, never thrown.
+  auto After = solver->getBVInBin(x);
+  if (!After)
+    REQUIRE(After.error().Code == camada::SMTErrorCode::InvalidUsage);
+  else
+    REQUIRE(After.value() == "00000000000000000000000000000101");
+}
+
 inline void fp_native_bv_predicate_parity(const camada::SMTSolverRef &solver) {
   const auto backend = solver->mkBool(true)->getBackendKind();
   if (backend != camada::SMTBackendKind::Bitwuzla &&
@@ -420,6 +446,32 @@ inline void fp_ieee_bv_bitexact_roundtrip(const camada::SMTSolverRef &solver,
     solver->addConstraint(
         solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(g), pat)));
     REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
+  solver->reset();
+
+  // 4. ... but re-asserting the same equality at the root restores it.
+  // The pending link is keyed by the hash-consed equality, so the scoped
+  // assert that could not commit must not consume it: consuming it there
+  // left this assert unable to establish provenance, silently falling
+  // back to the underspecified backend operation.
+  //
+  // Asserted UNSAT alone would not detect that -- a backend with a native
+  // fp.to_ieee_bv forces the bits either way. What only provenance gives
+  // is bit-exactness at NaN, where the backend operation is underspecified:
+  // assert h is a NaN whose payload the equality pins, then require the
+  // reported bits to match it exactly.
+  solver->reset();
+  {
+    auto h = solver->mkSymbol("sc_h", fp32());
+    auto nanPat = solver->mkBVFromDec(0x7FC00001, 32);
+    auto eq = solver->mkEqual(h, solver->mkBVToIEEEFP(nanPat, fp32()));
+    solver->push();
+    solver->addConstraint(eq);
+    solver->pop();
+    solver->addConstraint(eq);
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkIEEEFPToBV(h), nanPat)));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 }
 

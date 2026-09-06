@@ -92,8 +92,47 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
     (void)solver->mkArraySort(other->mkBVSort(4), solver->mkBVSort(4));
   });
 
-  // The solver's own handles keep working after all that.
+  // Model getters, on a solver that has a model to hand back. The
+  // macro-generated getters and the hand-written ones must agree here:
+  // the hand-written six once skipped requireOwned and answered a foreign
+  // handle with a fabricated zero instead of rejecting it.
   solver->addConstraint(solver->mkEqual(mine, solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  other->addConstraint(other->mkEqual(theirs, other->mkBVFromDec(9, 8)));
+  REQUIRE(other->check() == camada::CheckResult::SAT);
+  require_abort([&]() { (void)solver->getBV(theirs); });
+  require_abort([&]() { (void)solver->getBVUnsigned(theirs); });
+  require_abort([&]() { (void)solver->getBVInBin(theirs); });
+  // Sort-matched foreign handles, so the abort can only come from the
+  // ownership check and not from a sort assertion firing first. Each of
+  // these getters is hand-written rather than macro-generated, so each
+  // carries its own requireOwned and each can lose it independently.
+  auto theirBool = other->mkSymbol("foreign_b", other->mkBoolSort());
+  require_abort([&]() { (void)solver->getBool(theirBool); });
+  auto theirArray =
+      other->mkSymbol("foreign_arr", other->mkArraySort(other->mkBVSort(8),
+                                                        other->mkBVSort(8)));
+  require_abort([&]() { (void)solver->getArrayValues(theirArray); });
+  require_abort([&]() {
+    (void)solver->getArrayElement(theirArray, other->mkBVFromDec(0, 8));
+  });
+  if (solver->supports(camada::SolverFeature::IntRealArithmetic)) {
+    auto theirInt = other->mkSymbol("foreign_i", other->mkIntSort());
+    require_abort([&]() { (void)solver->getInt(theirInt); });
+    auto theirReal = other->mkSymbol("foreign_r", other->mkRealSort());
+    require_abort([&]() { (void)solver->getRational(theirReal); });
+    require_abort([&]() { (void)solver->getRealNumerator(theirReal); });
+    require_abort([&]() { (void)solver->getRealDenominator(theirReal); });
+  }
+  {
+    // The BV encoding exists on every backend, so this needs no feature
+    // gate -- and getFXP reaches its ownership check through getBVInBin.
+    auto theirFP =
+        other->mkSymbol("foreign_f", other->mkFP32Sort(camada::FPEncoding::BV));
+    require_abort([&]() { (void)solver->getFPInBin(theirFP); });
+  }
+
+  // The solver's own handles keep working after all that.
   REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto v = solver->getBV(mine);
   REQUIRE(v);
@@ -250,6 +289,9 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(wide_index_const_array_semantics, LazyArrays);
   RESETANDARGTEST(const_array_select_survives_pop, LazyArrays);
   RESETANDARGTEST(const_array_equality_semantics, LazyArrays);
+  RESETANDTEST(array_model_survives_term_construction);
+  RESETANDTEST(lazy_array_default_invalidates_model);
+  RESETANDTEST(array_model_across_assumption_checks);
   RESETANDTEST(array_model_values);
   RESETANDTEST(const_array_model_values);
   RESETANDARGTEST(const_array_model_values, LazyArrays);
@@ -272,6 +314,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(empty_tuple_semantics);
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(fp_native_bv_predicate_parity);
+  RESETANDTEST(ieee_fp_to_bv_after_check_reports);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
   RESETANDTEST(fp_neg_nan_payload_bits);
   RESETANDTEST(fp_nan_payload_propagation);

@@ -335,6 +335,9 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
       continue;
     SMTExprRef Constraint =
         mkImplies(mkEqual(Index, P.Index), mkEqual(Read, P.Value));
+    // Not model-preserving: Read is a fresh variable minted for this
+    // select, so the backend's current model has no value for it and
+    // asserting the axiom genuinely discards that model.
     addConstraint(Constraint);
     // Congruence is a scope-independent fact; journal it so pop()
     // re-asserts it at the outer level (see LazyConstraintLevels).
@@ -491,6 +494,12 @@ SMTExprRef SMTSolverImpl::ackDefaultElementValue(const SMTSortRef &Sort) {
 SMTExprRef SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
                                                  const SMTExprRef &Index) {
   const std::string QueryBits = lazyIndexModelBits(Index);
+  // Unreachable through the public API: getArrayElement's ModelAvailable
+  // gate rejects a model-less query before this runs, and it latches
+  // InLazyModelQuery so the selects below emit no axioms that could clear
+  // it mid-call. Kept as an assertion of that invariant rather than a
+  // reachable error path -- an index sort the resolver cannot canonicalize
+  // is a Camada bug, not a caller mistake.
   fatalErrorIf(QueryBits.empty(),
                "Cannot evaluate the queried index against the model under "
                "the Ackermann array encoding (bool/BV index sorts only)");

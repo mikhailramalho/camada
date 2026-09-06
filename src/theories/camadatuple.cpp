@@ -24,7 +24,6 @@
 #include "../camadaerrors.h"
 #include "../core/camadaimpl.h"
 
-#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -592,17 +591,12 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   // value-based, never term identity). Bool and BV index sorts are the
   // only ones the lazy machinery produces entries for; anything else
   // cannot be canonicalized.
-  // Memoized: lazyIndexModelBits issues a real backend model query per
-  // call, and the assembly below re-reads each index once per leaf, so
-  // without the memo the cost is (leaves * entries)^2 queries -- three
+  // lazyIndexModelBits memoizes for the model's lifetime, which this
+  // assembly depends on: it re-reads each index once per leaf, so an
+  // unmemoized version costs (leaves * entries)^2 backend queries -- three
   // seconds for an 800-entry four-field array.
-  std::unordered_map<const SMTExpr *, std::string> IndexBitsMemo;
-  auto indexBitsOf = [&](const SMTExprRef &Idx) -> const std::string & {
-    auto It = IndexBitsMemo.find(&*Idx);
-    if (It != IndexBitsMemo.end())
-      return It->second;
-    return IndexBitsMemo.emplace(&*Idx, Solver.lazyIndexModelBits(Idx))
-        .first->second;
+  auto indexBitsOf = [&Solver](const SMTExprRef &Idx) {
+    return Solver.lazyIndexModelBits(Idx);
   };
 
   // The defined indexes are the union across leaves, canonicalized by

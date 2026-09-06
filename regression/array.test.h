@@ -265,6 +265,123 @@ inline int64_t array_model_value_at(const camada::SMTSolverRef &solver,
   return BaseValue.value();
 }
 
+// Building a term is not a solver mutation and must not invalidate the
+// model. Camada's own axioms (lazy defaults, congruence, extensionality)
+// are emitted through the public addConstraint, which invalidates -- but
+// they are consequences of the formula already asserted, so a model
+// satisfying it satisfies them too. Unguarded, reading an array back
+// element by element returned a value at the first index and
+// InvalidUsage at every one after: the loop every consumer uses to
+// extract a counterexample.
+inline void
+array_model_survives_term_construction(const camada::SMTSolverRef &solver) {
+  // Ackermann arrays are exempt: a select there mints a fresh read
+  // variable, so its congruence axiom introduces a symbol the current
+  // model has no value for and the backend legitimately discards it.
+  if (solver->arrayMode() == camada::ArrayEncoding::Ackermann)
+    return;
+  auto idxsort = solver->mkBVSort(8);
+  auto arrsort = solver->mkArraySort(idxsort, idxsort);
+  auto a = solver->mkSymbol("tc_a", arrsort);
+  auto b = solver->mkSymbol("tc_b", arrsort);
+  auto x = solver->mkSymbol("tc_x", idxsort);
+
+  // The equality is what makes the reads below emit congruence axioms.
+  solver->addConstraint(solver->mkEqual(a, b));
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(5, 8)));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(a, solver->mkBVFromDec(0, 8)),
+                      solver->mkBVFromDec(42, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(x).value() == "00000101");
+
+  // A bare store: term construction, no assertion.
+  (void)solver->mkArrayStore(a, solver->mkBVFromDec(9, 8), x);
+  REQUIRE(solver->getBVInBin(x).value() == "00000101");
+
+  // The read-back loop: each iteration builds a select at a fresh index,
+  // which observes that index and emits axioms for it.
+  for (unsigned I = 0; I < 3; ++I) {
+    auto Sel = solver->mkArraySelect(a, solver->mkBVFromDec(I, 8));
+    auto Value = solver->getBVInBin(Sel);
+    REQUIRE(Value);
+    REQUIRE(Value.value().size() == 8);
+  }
+  REQUIRE(solver->getBVInBin(x).value() == "00000101");
+}
+
+// A lazily lowered constant array read at a fresh index instantiates its
+// default axiom, and that axiom names a select the current model has never
+// valued -- so the model dies and the getter must say so. This is the
+// counterpart to array_model_survives_term_construction: that fixture pins
+// the axioms that DO preserve the model (and only bites on backends without
+// native array extensionality), this one pins the ones that must not
+// pretend to. Claiming preservation here made the getter throw an uncaught
+// backend exception instead of reporting InvalidUsage.
+inline void
+lazy_array_default_invalidates_model(const camada::SMTSolverRef &solver) {
+  auto idxsort = solver->mkBVSort(8);
+  auto x = solver->mkSymbol("ld_x", idxsort);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(5, 8)));
+  auto lazy = solver->mkArrayConst(idxsort, solver->mkBVFromDec(7, 8),
+                                   camada::ConstArrayLowering::Lazy);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(lazy, solver->mkBVFromDec(0, 8)),
+                      solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getBVInBin(x).value() == "00000101");
+
+  // A read at an index the root has not been instantiated at yet.
+  (void)solver->mkArraySelect(lazy, solver->mkBVFromDec(1, 8));
+
+  // Whatever the backend does, it must be reported and not thrown: either
+  // the model survived, or the getter says it did not.
+  auto After = solver->getBVInBin(x);
+  if (!After)
+    REQUIRE(After.error().Code == camada::SMTErrorCode::InvalidUsage);
+  else
+    REQUIRE(After.value() == "00000101");
+}
+
+// Two consecutive checkSatAssuming calls, each followed by a model read.
+// checkSatAssuming does not route through invalidateUnsatAssumptions, and
+// the backends that implement it natively never push/pop, so any state
+// cached against a model must still be dropped when the next one arrives.
+// A memo that survived reported the second model with the first model's
+// index values, silently merging array entries.
+inline void
+array_model_across_assumption_checks(const camada::SMTSolverRef &solver) {
+  auto idxsort = solver->mkBVSort(8);
+  auto base = solver->mkArrayConst(idxsort, solver->mkBVFromDec(0, 8),
+                                   camada::ConstArrayLowering::Lazy);
+  auto k1 = solver->mkSymbol("csa_k1", idxsort);
+  auto k2 = solver->mkSymbol("csa_k2", idxsort);
+  auto arr = solver->mkArrayStore(
+      solver->mkArrayStore(base, k1, solver->mkBVFromDec(1, 8)), k2,
+      solver->mkBVFromDec(2, 8));
+  auto sel = solver->mkSymbol("csa_sel", solver->mkBoolSort());
+
+  // sel: both stores land on the same index. !sel: on different ones.
+  solver->addConstraint(solver->mkImplies(
+      sel, solver->mkAnd(solver->mkEqual(k1, solver->mkBVFromDec(3, 8)),
+                         solver->mkEqual(k2, solver->mkBVFromDec(3, 8)))));
+  solver->addConstraint(solver->mkImplies(
+      solver->mkNot(sel),
+      solver->mkAnd(solver->mkEqual(k1, solver->mkBVFromDec(3, 8)),
+                    solver->mkEqual(k2, solver->mkBVFromDec(4, 8)))));
+
+  REQUIRE(solver->checkSatAssuming({sel}) == camada::CheckResult::SAT);
+  auto First = solver->getArrayValues(arr);
+  REQUIRE(First);
+  REQUIRE(First.value().Entries.size() == 1);
+
+  REQUIRE(solver->checkSatAssuming({solver->mkNot(sel)}) ==
+          camada::CheckResult::SAT);
+  auto Second = solver->getArrayValues(arr);
+  REQUIRE(Second);
+  REQUIRE(Second.value().Entries.size() == 2);
+}
+
 inline void array_model_values(const camada::SMTSolverRef &solver) {
   auto indexsort = solver->mkBVSort(8);
   auto arr = solver->mkSymbol("arr", solver->mkArraySort(indexsort, indexsort));
@@ -414,12 +531,18 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
                       solver->mkArrayStore(aa, idx(1), idx(20))));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 
-  // Storing the same value at the same index stays satisfiable.
+  // Guards the opposite error from the two cases above: observing a store
+  // index must not over-constrain, so equal stores at distinct indexes stay
+  // satisfiable. Unlike those cases this one does not detect a *missing*
+  // observation -- it holds either way -- and it is not meant to; the UNSAT
+  // cases above are what pin the observation itself.
   solver->reset();
   auto [cc, _cc] = mk("cc", "unused_cc");
   auto k = solver->mkSymbol("k", solver->mkBVSort(8));
+  auto k2 = solver->mkSymbol("k2", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(k, k2)));
   solver->addConstraint(solver->mkEqual(solver->mkArrayStore(cc, k, idx(1)),
-                                        solver->mkArrayStore(cc, k, idx(1))));
+                                        solver->mkArrayStore(cc, k2, idx(1))));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 
   // Polarity safety: the equality literal used under boolean structure.

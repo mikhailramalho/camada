@@ -310,6 +310,20 @@ std::string readOneSmtlibResponse(std::FILE *In) {
         InString = false;
       continue;
     }
+    if (Ch == ';') {
+      // A comment runs to end-of-line and its text is not syntax: a `(` or
+      // `)` inside one would unbalance Depth. An unmatched `(` then blocks
+      // this loop forever, since readResponse has no timeout, while a `)`
+      // truncates the reply and shifts every later get-value answer onto
+      // the wrong expression. The child's stderr shares this pipe, so
+      // solver warnings do arrive mid-response.
+      while ((C = std::fgetc(In)) != EOF && C != '\n' && C != '\r')
+        Out.push_back(static_cast<char>(C));
+      if (C == EOF)
+        return Out;
+      Out.push_back(static_cast<char>(C));
+      continue;
+    }
     if (Ch == '|')
       InQuoted = true;
     else if (Ch == '"')
@@ -1945,15 +1959,24 @@ void normalizeToWidth(std::string &Bits, unsigned Width) {
 // failure.
 std::string bvValueToBinary(const std::string &Value, unsigned Width) {
   if (Value.size() >= 2 && Value[0] == '#' && Value[1] == 'b') {
-    // Normalize like the #x branch below: a literal wider than the declared
-    // width would otherwise reach addLeadingZeroes, whose Width - length()
-    // underflows unsigned.
+    // Validate before normalizing: the caller uses an empty return as its
+    // only "unparseable reply" signal, and padding a truncated or malformed
+    // body to Width would turn a dead child into a fabricated zero.
     std::string Bits = Value.substr(2);
+    if (Bits.empty())
+      return {};
+    for (char C : Bits)
+      if (C != '0' && C != '1')
+        return {};
     normalizeToWidth(Bits, Width);
     return Bits;
   }
   if (Value.size() >= 2 && Value[0] == '#' && Value[1] == 'x') {
-    // Hex: each digit -> 4 bits.
+    // Hex: each digit -> 4 bits. An empty body is a truncated reply, not a
+    // zero: without this the normalization below pads it to a full-width
+    // zero and the caller's empty-string error signal never fires.
+    if (Value.size() == 2)
+      return {};
     std::string Bits;
     Bits.reserve((Value.size() - 2) * 4);
     for (std::size_t I = 2; I < Value.size(); ++I) {
@@ -2196,6 +2219,8 @@ bool decimalToFraction(const std::string &S, std::string &Num,
 // signed forms) and only returns success if the value is integral.
 bool rationalValueToFraction(const std::string &Value, std::string &Num,
                              std::string &Den);
+bool rationalValueToFractionCore(const std::string &Value, std::string &Num,
+                                 std::string &Den);
 
 // Decimal long division: divide non-negative decimal string Num by
 // non-negative decimal string Den. If the division is exact, set Quotient
@@ -2353,14 +2378,14 @@ std::string intValueToDecimal(const std::string &Value) {
 //   (/ p q)                 (rational; p and q are integer or decimal)
 //   (- (/ p q))             (negative rational)
 //   (/ (- p) q), (/ p (- q))  (rare but valid)
-bool rationalValueToFraction(const std::string &Value, std::string &Num,
-                             std::string &Den) {
+bool rationalValueToFractionCore(const std::string &Value, std::string &Num,
+                                 std::string &Den) {
   std::string V = trimWS(Value);
   // Strip a leading (- ...) negation, recurse, and flip the numerator sign.
   if (V.size() >= 4 && V[0] == '(' && V[1] == '-' && V[2] == ' ' &&
       V.back() == ')') {
     std::string Inner = trimWS(V.substr(3, V.size() - 4));
-    if (!rationalValueToFraction(Inner, Num, Den))
+    if (!rationalValueToFractionCore(Inner, Num, Den))
       return false;
     if (!Num.empty() && Num[0] == '-')
       Num = Num.substr(1);
@@ -2390,9 +2415,9 @@ bool rationalValueToFraction(const std::string &Value, std::string &Num,
     std::string P = trimWS(Body.substr(0, Split));
     std::string Q = trimWS(Body.substr(Split + 1));
     std::string PNum, PDen, QNum, QDen;
-    if (!rationalValueToFraction(P, PNum, PDen))
+    if (!rationalValueToFractionCore(P, PNum, PDen))
       return false;
-    if (!rationalValueToFraction(Q, QNum, QDen))
+    if (!rationalValueToFractionCore(Q, QNum, QDen))
       return false;
     // (PNum/PDen) / (QNum/QDen) = (PNum*QDen) / (PDen*QNum). For the common
     // case where PDen and QDen are both "1" this collapses to PNum/QNum.
@@ -2418,6 +2443,19 @@ bool rationalValueToFraction(const std::string &Value, std::string &Num,
   // Bare numeric (possibly decimal).
   std::string Norm = normalizeNumeric(V);
   return decimalToFraction(Norm, Num, Den);
+}
+
+// Parse, then apply the one sign convention every caller expects: a value of
+// zero is "0", never "-0". A child reporting negated zero as `(- 0)` would
+// otherwise make getRealNumerator disagree with getInt on the same model
+// value, and a caller comparing against "0" would read it as non-zero.
+bool rationalValueToFraction(const std::string &Value, std::string &Num,
+                             std::string &Den) {
+  if (!rationalValueToFractionCore(Value, Num, Den))
+    return false;
+  if (Num == "-0")
+    Num = "0";
+  return true;
 }
 
 } // namespace
@@ -2697,7 +2735,19 @@ void SMTLIBSolver::dumpImpl(std::string &Out) {
 }
 
 void SMTLIBSolver::dumpModelImpl(std::string &Out) {
-  Out = "SMTLIBSolver write-only mode does not produce a model.\n";
+  // Write-only mode has no child to ask, and the common layer's contract is
+  // that an empty dump means "no model" -- a prose placeholder here would
+  // read as a model to a caller that branches on emptiness.
+  if (!Proc) {
+    Out.clear();
+    return;
+  }
+  const std::string Cmd = "(get-model)\n";
+  if (File)
+    File->emitRaw(Cmd);
+  Proc->emitRaw(Cmd);
+  Proc->flush();
+  Out = Proc->readResponse();
 }
 
 std::string SMTLIBSolver::getSolverNameAndVersion() const {

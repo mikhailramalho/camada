@@ -81,6 +81,36 @@ inline void implies_true_implies_false(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
+// Clears a per-check wall-clock limit on the way out. The limit survives
+// reset() by design and RESETANDTEST only resets, so a fixture that leaves
+// one set leaks it into every fixture after it -- a REQUIRE failure would
+// then bury itself under unrelated UNKNOWNs.
+struct TimeoutGuard {
+  const camada::SMTSolverRef &S;
+  ~TimeoutGuard() { S->setTimeout(0); }
+};
+
+// Asserts that Prefix_p * Prefix_q is a 64-bit semiprime, with both factors
+// above one. The 128-bit extension rules out wrap-around shortcuts, so the
+// query is far beyond any small time budget on every backend -- the standard
+// way these fixtures force a deterministic UNKNOWN.
+inline camada::SMTExprRef
+assert_semiprime_factoring(const camada::SMTSolverRef &solver,
+                           const std::string &Prefix) {
+  auto p = solver->mkSymbol(Prefix + "_p", solver->mkBVSort(64));
+  auto q = solver->mkSymbol(Prefix + "_q", solver->mkBVSort(64));
+  constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
+  auto prod =
+      solver->mkBVMul(solver->mkBVZeroExt(p, 64), solver->mkBVZeroExt(q, 64));
+  auto k = solver->mkBVZeroExt(
+      solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
+  solver->addConstraint(solver->mkEqual(prod, k));
+  auto one = solver->mkBVFromDec(1, 64);
+  solver->addConstraint(solver->mkBVUgt(p, one));
+  solver->addConstraint(solver->mkBVUgt(q, one));
+  return p; // the caller may constrain a factor further
+}
+
 inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
   // Nothing has answered UNKNOWN yet.
   REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
@@ -95,6 +125,21 @@ inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(4, 8)));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+
+  // A reason must not outlive the query it belonged to: reasonUnknown() is
+  // documented to report NotApplicable at any time other than right after
+  // an UNKNOWN check, but only reset() used to clear it, so a mutation
+  // after an UNKNOWN left a stale Timeout for a query that never ran.
+  solver->reset();
+  if (solver->setTimeout(150)) {
+    TimeoutGuard ClearTimeout{solver};
+    auto p = assert_semiprime_factoring(solver, "ur");
+    if (solver->check() == camada::CheckResult::UNKNOWN) {
+      REQUIRE(solver->reasonUnknown() != camada::UnknownReason::NotApplicable);
+      solver->addConstraint(solver->mkBVUgt(p, solver->mkBVFromDec(2, 64)));
+      REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+    }
+  }
 }
 
 inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
@@ -116,17 +161,7 @@ inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
   // resets also pin that the limit itself survives reset().
   auto assertSemiprimeFactoring = [&]() {
     solver->reset();
-    auto a = solver->mkSymbol("a", solver->mkBVSort(64));
-    auto b = solver->mkSymbol("b", solver->mkBVSort(64));
-    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
-    auto prod =
-        solver->mkBVMul(solver->mkBVZeroExt(a, 64), solver->mkBVZeroExt(b, 64));
-    auto k = solver->mkBVZeroExt(
-        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
-    solver->addConstraint(solver->mkEqual(prod, k));
-    auto one = solver->mkBVFromDec(1, 64);
-    solver->addConstraint(solver->mkBVUgt(a, one));
-    solver->addConstraint(solver->mkBVUgt(b, one));
+    (void)assert_semiprime_factoring(solver, "st");
   };
   assertSemiprimeFactoring();
   REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
@@ -721,28 +756,40 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->checkSatAssuming({a}) == camada::CheckResult::SAT);
   REQUIRE(solver->getBVInBin(z).value() == "00001001");
 
+  // dumpModel reads the model like the getters do and must be gated the
+  // same way: unguarded it aborted on Z3 and emitted fabricated text on
+  // STP while the getter beside it correctly reported InvalidUsage.
+  // It returns void, so writing nothing is the equivalent of SMTError.
+  solver->reset();
+  auto d = solver->mkSymbol("nomodel_d", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(d, solver->mkBVFromDec(3, 8)));
+  {
+    std::string Dump = "seed";
+    solver->dumpModel(Dump);
+    REQUIRE(Dump.empty());
+  }
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  {
+    std::string Dump;
+    solver->dumpModel(Dump);
+    REQUIRE(!Dump.empty());
+  }
+
   // UNKNOWN is not a model. Most backends abort on a model query after
   // one (Z3 throws, Bitwuzla and Yices abort, MathSAT segfaults), so the
   // guard must reject it rather than pass it through. Skipped where the
   // limit is unenforceable, since then nothing produces an UNKNOWN.
   solver->reset();
   if (solver->setTimeout(150)) {
-    auto p = solver->mkSymbol("nomodel_p", solver->mkBVSort(64));
-    auto q = solver->mkSymbol("nomodel_q", solver->mkBVSort(64));
-    constexpr uint64_t Semiprime = 4294967291ULL * 4294967279ULL;
-    auto prod =
-        solver->mkBVMul(solver->mkBVZeroExt(p, 64), solver->mkBVZeroExt(q, 64));
-    auto k = solver->mkBVZeroExt(
-        solver->mkBVFromDec(static_cast<int64_t>(Semiprime), 64), 64);
-    solver->addConstraint(solver->mkEqual(prod, k));
-    auto one = solver->mkBVFromDec(1, 64);
-    solver->addConstraint(solver->mkBVUgt(p, one));
-    solver->addConstraint(solver->mkBVUgt(q, one));
+    // The limit survives reset() by design, and RESETANDTEST only resets, so
+    // a REQUIRE failure below would leak 150ms into every later fixture and
+    // bury this failure under unrelated UNKNOWNs. Clear it unconditionally.
+    TimeoutGuard ClearTimeout{solver};
+    auto p = assert_semiprime_factoring(solver, "nomodel");
     // A backend that ignores the limit and actually decides this is fine
     // -- then a model legitimately exists and the guard must allow it.
     if (solver->check() == camada::CheckResult::UNKNOWN)
       requireNoModel(p);
-    solver->setTimeout(0);
   }
 
   // And a reset clears it.

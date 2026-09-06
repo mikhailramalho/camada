@@ -774,6 +774,16 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   else if (msat_term_is_fp_roundingmode_zero(Context, RTerm))
     roundingMode = bvRM(RM::ROUND_TO_ZERO);
   else
+    // KNOWN LIMITATION: a symbolic rounding mode still rounds incorrectly.
+    // The ite chain below is the encoding the comment above calls unsound,
+    // kept only because rejecting a symbolic mode outright would break
+    // mkRMSort, which is public. Verified: with `rm` constrained equal to
+    // ROUND_TO_PLUS_INF, mkFPFMA(2^-24, 1.0, 1.0, rm) yields the round-down
+    // result, while the same case with a literal RTP is correct. The fault
+    // is in MathSAT's model evaluator, so no term-level encoding fixes it;
+    // resolving this needs either a rejection at the API boundary or an
+    // encoding that avoids rounding-mode atoms entirely. The chain also has
+    // no RNA arm and falls through to truncation.
     roundingMode = mkIte(
         mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native)),
         bvRM(RM::ROUND_TO_EVEN),
