@@ -96,7 +96,7 @@ namespace camada {
 #define CAMADA_DEFINE_BV_EXTEND_WRAPPER(Name, ImplName, What)                  \
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &Exp, unsigned ExtraBits) {  \
     requireOwned(Exp);                                                         \
-    requireBVSort(Exp, "Expected bit-vector expression");                      \
+    requireBVSort(Exp);                                                        \
     fatalErrorIf(ExtraBits >                                                   \
                      std::numeric_limits<unsigned>::max() - Exp->getWidth(),   \
                  "Bit-vector " What " extension width overflow");              \
@@ -124,7 +124,7 @@ namespace camada {
 #define CAMADA_DEFINE_FP_TO_BV_WRAPPER(Name, ImplName)                         \
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &From, unsigned ToWidth) {   \
     requireOwned(From);                                                        \
-    requireFPSort(From, "Expected floating-point expression");                 \
+    requireFPSort(From);                                                       \
     fatalErrorIf(ToWidth == 0, "Bit-vector target width must be non-zero");    \
     SMTExprRef theExp = usesBVFPEncoding(From)                                 \
                             ? SMTSolverImpl::ImplName(From, ToWidth)           \
@@ -272,77 +272,133 @@ static bool usesBVRMEncoding(const SMTExprRef &Exp) {
   return usesBVRMEncoding(Exp->Sort);
 }
 
+// The operation name comes from the caller via __builtin_FUNCTION(), so a
+// mismatch reports "mkEqual" rather than the name of the check helper. GCC
+// and Clang evaluate it at the call site even through the wrapper macros;
+// MSVC has no equivalent, so it degrades to an unnamed operation.
+#if defined(__GNUC__) || defined(__clang__)
+#define CAMADA_CALLER_FUNCTION __builtin_FUNCTION()
+#else
+#define CAMADA_CALLER_FUNCTION "camada"
+#endif
+
+// Sort errors abort, so the message text is the only channel a consumer has.
+// Naming just the expectation ("Expected expressions with same sort") leaves
+// a frontend mapping its own type system with no way to see which type went
+// wrong; both sorts and the operation that rejected them are what make the
+// abort actionable.
+[[noreturn]] static void reportSortMismatch(const SMTSortRef &LHS,
+                                            const SMTSortRef &RHS,
+                                            const char *What, const char *Op) {
+  fatalError((std::string(Op) + ": sorts " + LHS->describe() + " and " +
+              RHS->describe() + " are incompatible, expected two " +
+              (*What ? std::string(What) + " expressions" : "expressions") +
+              " with the same sort")
+                 .c_str());
+}
+
+[[noreturn]] static void reportWrongSort(const SMTSortRef &Got,
+                                         const char *What, const char *Op) {
+  fatalError((std::string(Op) + ": sort " + Got->describe() +
+              " is not usable here, expected " + What + " expression")
+                 .c_str());
+}
+
 static void requireSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                            const char *Message) {
-  fatalErrorIf(LHS->Sort != RHS->Sort, Message);
+                            const char *What,
+                            const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (LHS->Sort != RHS->Sort)
+    reportSortMismatch(LHS->Sort, RHS->Sort, What, Op);
 }
 
-static void requireBVSort(const SMTExprRef &Exp, const char *Message) {
-  fatalErrorIf(!Exp->isBVSort(), Message);
+static void requireBVSort(const SMTExprRef &Exp,
+                          const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isBVSort())
+    reportWrongSort(Exp->Sort, "a bit-vector", Op);
 }
 
-static void requireBVSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  requireBVSort(LHS, "Expected bit-vector expression");
-  requireSameSort(LHS, RHS, "Expected bit-vector expressions with same sort");
+static void requireBVSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                              const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireBVSort(LHS, Op);
+  requireSameSort(LHS, RHS, "bit-vector", Op);
 }
 
-static void requireBoolSort(const SMTExprRef &Exp, const char *Message) {
-  fatalErrorIf(!Exp->isBoolSort(), Message);
+static void requireBoolSort(const SMTExprRef &Exp,
+                            const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isBoolSort())
+    reportWrongSort(Exp->Sort, "a boolean", Op);
 }
 
-static void requireBoolSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  requireBoolSort(LHS, "Expected boolean expression");
-  requireSameSort(LHS, RHS, "Expected boolean expressions with same sort");
+static void requireBoolSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireBoolSort(LHS, Op);
+  requireSameSort(LHS, RHS, "boolean", Op);
 }
 
-static void requireArithSort(const SMTExprRef &Exp, const char *Message) {
-  fatalErrorIf(!Exp->isArithSort(), Message);
+static void requireArithSort(const SMTExprRef &Exp,
+                             const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isArithSort())
+    reportWrongSort(Exp->Sort, "an arithmetic", Op);
 }
 
-static void requireArithSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  requireArithSort(LHS, "Expected arithmetic expression");
-  requireSameSort(LHS, RHS, "Expected arithmetic expressions with same sort");
+static void requireArithSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                                 const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireArithSort(LHS, Op);
+  requireSameSort(LHS, RHS, "arithmetic", Op);
 }
 
-static void requireIntSort(const SMTExprRef &Exp, const char *Message) {
-  fatalErrorIf(!Exp->isIntSort(), Message);
+static void requireIntSort(const SMTExprRef &Exp,
+                           const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isIntSort())
+    reportWrongSort(Exp->Sort, "an integer", Op);
 }
 
-static void requireIntSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  requireIntSort(LHS, "Expected integer expression");
-  requireSameSort(LHS, RHS, "Expected integer expressions with same sort");
+static void requireIntSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                               const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireIntSort(LHS, Op);
+  requireSameSort(LHS, RHS, "integer", Op);
 }
 
-static void requireFPSort(const SMTExprRef &Exp, const char *Message) {
-  fatalErrorIf(!Exp->isFPSort(), Message);
+static void requireFPSort(const SMTExprRef &Exp,
+                          const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isFPSort())
+    reportWrongSort(Exp->Sort, "a floating-point", Op);
 }
 
-static void requireFPSort(const SMTSortRef &Sort, const char *Message) {
-  fatalErrorIf(!Sort->isFPSort(), Message);
+static void requireFPSort(const SMTSortRef &Sort,
+                          const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Sort->isFPSort())
+    reportWrongSort(Sort, "a floating-point", Op);
 }
 
-static void requireFPSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS) {
-  requireFPSort(LHS, "Expected floating-point expression");
-  requireSameSort(LHS, RHS,
-                  "Expected floating-point expressions with same sort");
+static void requireFPSameSort(const SMTExprRef &LHS, const SMTExprRef &RHS,
+                              const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireFPSort(LHS, Op);
+  requireSameSort(LHS, RHS, "floating-point", Op);
 }
 
-static void requireRMSort(const SMTExprRef &Exp, const char *Message) {
-  fatalErrorIf(!Exp->isRMSort(), Message);
+static void requireRMSort(const SMTExprRef &Exp,
+                          const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isRMSort())
+    reportWrongSort(Exp->Sort, "a rounding-mode", Op);
 }
 
-static void requireMatchingFPAndRMEncoding(const SMTExprRef &FP,
-                                           const SMTExprRef &RM) {
-  requireRMSort(RM, "Expected rounding-mode expression");
-  fatalErrorIf(
-      usesBVFPEncoding(FP) != usesBVRMEncoding(RM),
-      "Floating-point expression and rounding mode use different encodings");
+static void
+requireMatchingFPAndRMEncoding(const SMTExprRef &FP, const SMTExprRef &RM,
+                               const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireRMSort(RM, Op);
+  if (usesBVFPEncoding(FP) != usesBVRMEncoding(RM))
+    fatalError((std::string(Op) +
+                ": floating-point expression and rounding mode use different "
+                "encodings")
+                   .c_str());
 }
 
 static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
-                                   const SMTExprRef &RM) {
-  requireFPSameSort(LHS, RHS);
-  requireMatchingFPAndRMEncoding(LHS, RM);
+                                   const SMTExprRef &RM,
+                                   const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireFPSameSort(LHS, RHS, Op);
+  requireMatchingFPAndRMEncoding(LHS, RM, Op);
 }
 
 } // namespace
@@ -729,7 +785,7 @@ SMTSortRef SMTSolverImpl::mkFunctionSortImpl(const std::vector<SMTSortRef> &,
 
 void SMTSolverImpl::addConstraint(const SMTExprRef &Exp) {
   requireOwned(Exp);
-  requireBoolSort(Exp, "Expected boolean constraint");
+  requireBoolSort(Exp);
   invalidateUnsatAssumptions();
   commitShadowLink(Exp);
   return addConstraintImpl(Exp);
@@ -908,16 +964,15 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSDivOverflow,
                                     mkBVSDivOverflowImpl(LHS, RHS),
                                     assert(theExp->Sort->isBoolSort()))
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkBVNegOverflow,
-    requireBVSort(Exp, "Expected bit-vector expression"),
-    mkBVNegOverflowImpl(Exp), assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVNegOverflow,
+                                   requireBVSort(Exp), mkBVNegOverflowImpl(Exp),
+                                   assert(theExp->Sort->isBoolSort()))
 
 SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
   requireOwned(LHS);
   requireOwned(RHS);
-  requireSameSort(LHS, RHS, "Expected expressions with same sort");
+  requireSameSort(LHS, RHS, "");
   // Tuple-sorted operands on backends without native datatype support
   // route through the Camada lowering, which fans out to per-field
   // equalities.
@@ -1079,26 +1134,24 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkFPEqual,
 
 #undef CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkBVNeg, requireBVSort(Exp, "Expected bit-vector expression"),
-    mkBVNegImpl(Exp), assert(theExp->Sort == Exp->Sort))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVNeg, requireBVSort(Exp),
+                                   mkBVNegImpl(Exp),
+                                   assert(theExp->Sort == Exp->Sort))
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkBVNot, requireBVSort(Exp, "Expected bit-vector expression"),
-    mkBVNotImpl(Exp), assert(theExp->Sort == Exp->Sort))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVNot, requireBVSort(Exp),
+                                   mkBVNotImpl(Exp),
+                                   assert(theExp->Sort == Exp->Sort))
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkNot, requireBoolSort(Exp, "Expected boolean expression"),
-    mkNotImpl(Exp), assert(theExp->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkNot, requireBoolSort(Exp),
+                                   mkNotImpl(Exp), assert(theExp->isBoolSort()))
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkArithNeg,
-    requireArithSort(Exp, "Expected arithmetic expression"),
-    mkArithNegImpl(Exp), assert(theExp->Sort == Exp->Sort))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkArithNeg,
+                                   requireArithSort(Exp), mkArithNegImpl(Exp),
+                                   assert(theExp->Sort == Exp->Sort))
 
 SMTExprRef SMTSolverImpl::mkArithShl(const SMTExprRef &Exp, unsigned Amount) {
   requireOwned(Exp);
-  requireIntSort(Exp, "Expected integer expression");
+  requireIntSort(Exp);
   SMTExprRef theExp = mkArithShlImpl(Exp, Amount);
   assert(theExp->isIntSort());
   return theExp;
@@ -1108,31 +1161,29 @@ SMTExprRef SMTSolverImpl::mkArithShl(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   requireOwned(LHS);
   requireOwned(RHS);
-  requireIntSort(LHS, "Expected integer expression");
-  requireIntSort(RHS, "Expected integer shift amount");
+  requireIntSort(LHS);
+  requireIntSort(RHS);
   SMTExprRef theExp = mkArithShlImpl(LHS, RHS);
   assert(theExp->isIntSort());
   return theExp;
 }
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkInt2Real, requireIntSort(Exp, "Expected integer expression"),
-    mkInt2RealImpl(Exp), assert(theExp->isRealSort()))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkInt2Real, requireIntSort(Exp),
+                                   mkInt2RealImpl(Exp),
+                                   assert(theExp->isRealSort()))
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkReal2Int,
-    requireArithSort(Exp, "Expected arithmetic expression"),
-    mkReal2IntImpl(Exp), assert(theExp->isIntSort()))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkReal2Int,
+                                   requireArithSort(Exp), mkReal2IntImpl(Exp),
+                                   assert(theExp->isIntSort()))
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkIsInt,
-    requireArithSort(Exp, "Expected arithmetic expression"), mkIsIntImpl(Exp),
-    assert(theExp->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkIsInt, requireArithSort(Exp),
+                                   mkIsIntImpl(Exp),
+                                   assert(theExp->isBoolSort()))
 
 SMTExprRef SMTSolverImpl::mkInt2BV(const SMTExprRef &Exp, unsigned Width) {
   requireOwned(Exp);
   fatalErrorIf(Width == 0, "Bit-vector width must be non-zero");
-  requireIntSort(Exp, "Expected integer expression");
+  requireIntSort(Exp);
   SMTExprRef theExp = mkInt2BVImpl(Exp, Width);
   assert(theExp->isBVSort());
   assert(theExp->getWidth() == Width);
@@ -1141,7 +1192,7 @@ SMTExprRef SMTSolverImpl::mkInt2BV(const SMTExprRef &Exp, unsigned Width) {
 
 SMTExprRef SMTSolverImpl::mkBV2Int(const SMTExprRef &Exp, bool IsSigned) {
   requireOwned(Exp);
-  requireBVSort(Exp, "Expected bit-vector expression");
+  requireBVSort(Exp);
   SMTExprRef theExp = mkBV2IntImpl(Exp, IsSigned);
   assert(theExp->isIntSort());
   return theExp;
@@ -1152,8 +1203,8 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
   requireOwned(Cond);
   requireOwned(T);
   requireOwned(F);
-  requireBoolSort(Cond, "Expected boolean condition");
-  requireSameSort(T, F, "Expected ITE branches with same sort");
+  requireBoolSort(Cond);
+  requireSameSort(T, F, "ITE branch");
   // Tuple-sorted branches on backends without native datatype support
   // route through the Camada lowering, which builds an Ite-kind tuple
   // node that distributes selection over its fields lazily.
@@ -1204,8 +1255,8 @@ SMTExprRef SMTSolverImpl::mkBVConcat(const SMTExprRef &LHS,
                                      const SMTExprRef &RHS) {
   requireOwned(LHS);
   requireOwned(RHS);
-  requireBVSort(LHS, "Expected bit-vector expression");
-  requireBVSort(RHS, "Expected bit-vector expression");
+  requireBVSort(LHS);
+  requireBVSort(RHS);
   fatalErrorIf(LHS->getWidth() >
                    std::numeric_limits<unsigned>::max() - RHS->getWidth(),
                "Bit-vector concatenation width overflow");
@@ -1214,24 +1265,21 @@ SMTExprRef SMTSolverImpl::mkBVConcat(const SMTExprRef &LHS,
   return theExp;
 }
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkBVRedOr, requireBVSort(Exp, "Expected bit-vector expression"),
-    mkBVRedOrImpl(Exp), assert(theExp->getWidth() == 1))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVRedOr, requireBVSort(Exp),
+                                   mkBVRedOrImpl(Exp),
+                                   assert(theExp->getWidth() == 1))
 
-CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(
-    SMTExprRef, mkBVRedAnd,
-    requireBVSort(Exp, "Expected bit-vector expression"), mkBVRedAndImpl(Exp),
-    assert(theExp->getWidth() == 1))
+CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVRedAnd, requireBVSort(Exp),
+                                   mkBVRedAndImpl(Exp),
+                                   assert(theExp->getWidth() == 1))
 
-CAMADA_DEFINE_FP_UNARY_WRAPPER(
-    mkFPAbs, mkFPAbsImpl,
-    requireFPSort(Exp, "Expected floating-point expression"),
-    assert(theExp->Sort == Exp->Sort))
+CAMADA_DEFINE_FP_UNARY_WRAPPER(mkFPAbs, mkFPAbsImpl, requireFPSort(Exp),
+                               assert(theExp->Sort == Exp->Sort))
 
 SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
                                   FPNegBehavior Behavior) {
   requireOwned(Exp);
-  requireFPSort(Exp, "Expected floating-point expression");
+  requireFPSort(Exp);
   SMTExprRef theExp = usesBVFPEncoding(Exp)
                           ? SMTSolverImpl::mkFPNegImpl(Exp, Behavior)
                           : mkFPNegImpl(Exp, Behavior);
@@ -1239,30 +1287,20 @@ SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
   return theExp;
 }
 
-CAMADA_DEFINE_FP_UNARY_WRAPPER(
-    mkFPIsInfinite, mkFPIsInfiniteImpl,
-    requireFPSort(Exp, "Expected floating-point expression"),
-    assert(theExp->isBoolSort()))
+CAMADA_DEFINE_FP_UNARY_WRAPPER(mkFPIsInfinite, mkFPIsInfiniteImpl,
+                               requireFPSort(Exp), assert(theExp->isBoolSort()))
 
-CAMADA_DEFINE_FP_UNARY_WRAPPER(
-    mkFPIsNaN, mkFPIsNaNImpl,
-    requireFPSort(Exp, "Expected floating-point expression"),
-    assert(theExp->isBoolSort()))
+CAMADA_DEFINE_FP_UNARY_WRAPPER(mkFPIsNaN, mkFPIsNaNImpl, requireFPSort(Exp),
+                               assert(theExp->isBoolSort()))
 
-CAMADA_DEFINE_FP_UNARY_WRAPPER(
-    mkFPIsSubnormal, mkFPIsSubnormalImpl,
-    requireFPSort(Exp, "Expected floating-point expression"),
-    assert(theExp->isBoolSort()))
+CAMADA_DEFINE_FP_UNARY_WRAPPER(mkFPIsSubnormal, mkFPIsSubnormalImpl,
+                               requireFPSort(Exp), assert(theExp->isBoolSort()))
 
-CAMADA_DEFINE_FP_UNARY_WRAPPER(
-    mkFPIsNormal, mkFPIsNormalImpl,
-    requireFPSort(Exp, "Expected floating-point expression"),
-    assert(theExp->isBoolSort()))
+CAMADA_DEFINE_FP_UNARY_WRAPPER(mkFPIsNormal, mkFPIsNormalImpl,
+                               requireFPSort(Exp), assert(theExp->isBoolSort()))
 
-CAMADA_DEFINE_FP_UNARY_WRAPPER(
-    mkFPIsZero, mkFPIsZeroImpl,
-    requireFPSort(Exp, "Expected floating-point expression"),
-    assert(theExp->isBoolSort()))
+CAMADA_DEFINE_FP_UNARY_WRAPPER(mkFPIsZero, mkFPIsZeroImpl, requireFPSort(Exp),
+                               assert(theExp->isBoolSort()))
 
 CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(mkFPMul, mkFPMulImpl)
 
@@ -1287,7 +1325,7 @@ CAMADA_DEFINE_FP_RM_BINARY_WRAPPER(mkFPSub, mkFPSubImpl)
 SMTExprRef SMTSolverImpl::mkFPSqrt(const SMTExprRef &Exp, const SMTExprRef &R) {
   requireOwned(Exp);
   requireOwned(R);
-  requireFPSort(Exp, "Expected floating-point expression");
+  requireFPSort(Exp);
   requireMatchingFPAndRMEncoding(Exp, R);
   SMTExprRef theExp = usesBVFPEncoding(Exp)
                           ? SMTSolverImpl::mkFPSqrtImpl(Exp, R)
@@ -1303,7 +1341,7 @@ SMTExprRef SMTSolverImpl::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
   requireOwned(Z);
   requireOwned(R);
   requireFPSameSortAndRM(X, Y, R);
-  requireSameSort(Y, Z, "Expected floating-point expressions with same sort");
+  requireSameSort(Y, Z, "floating-point");
   SMTExprRef theExp = usesBVFPEncoding(X)
                           ? SMTSolverImpl::mkFPFMAImpl(X, Y, Z, R)
                           : mkFPFMAImpl(X, Y, Z, R);
@@ -1316,9 +1354,9 @@ SMTExprRef SMTSolverImpl::mkFPToFP(const SMTExprRef &From, const SMTSortRef &To,
   requireOwned(From);
   requireOwned(To);
   requireOwned(R);
-  requireFPSort(From, "Expected floating-point expression");
-  requireFPSort(To, "Expected floating-point target sort");
-  requireRMSort(R, "Expected rounding-mode expression");
+  requireFPSort(From);
+  requireFPSort(To);
+  requireRMSort(R);
   fatalErrorIf(usesBVFPEncoding(From) != usesBVFPEncoding(To),
                "Floating-point source and target use different encodings");
   fatalErrorIf(
@@ -1336,9 +1374,9 @@ SMTExprRef SMTSolverImpl::mkSBVToFP(const SMTExprRef &From,
   requireOwned(From);
   requireOwned(To);
   requireOwned(R);
-  requireBVSort(From, "Expected bit-vector expression");
-  requireFPSort(To, "Expected floating-point target sort");
-  requireRMSort(R, "Expected rounding-mode expression");
+  requireBVSort(From);
+  requireFPSort(To);
+  requireRMSort(R);
   fatalErrorIf(
       usesBVFPEncoding(To) != usesBVRMEncoding(R),
       "Floating-point target and rounding mode use different encodings");
@@ -1354,9 +1392,9 @@ SMTExprRef SMTSolverImpl::mkUBVToFP(const SMTExprRef &From,
   requireOwned(From);
   requireOwned(To);
   requireOwned(R);
-  requireBVSort(From, "Expected bit-vector expression");
-  requireFPSort(To, "Expected floating-point target sort");
-  requireRMSort(R, "Expected rounding-mode expression");
+  requireBVSort(From);
+  requireFPSort(To);
+  requireRMSort(R);
   fatalErrorIf(
       usesBVFPEncoding(To) != usesBVRMEncoding(R),
       "Floating-point target and rounding mode use different encodings");
@@ -1375,7 +1413,7 @@ SMTExprRef SMTSolverImpl::mkFPToIntegral(const SMTExprRef &From,
                                          const SMTExprRef &R) {
   requireOwned(From);
   requireOwned(R);
-  requireFPSort(From, "Expected floating-point expression");
+  requireFPSort(From);
   requireMatchingFPAndRMEncoding(From, R);
   SMTExprRef theExp = usesBVFPEncoding(From)
                           ? SMTSolverImpl::mkFPToIntegralImpl(From, R)
@@ -1763,7 +1801,7 @@ SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
   requireOwned(Body);
   for (const SMTExprRef &E : Vars)
     requireOwned(E);
-  requireBoolSort(Body, "Expected boolean quantifier body");
+  requireBoolSort(Body);
   // Every quantifier is rejected in Ackermann mode, not just those over
   // array terms: a select at a bound index lowers to a nullary read
   // variable, silently losing the dependence on the bound variable, and
@@ -1794,7 +1832,7 @@ SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
   requireOwned(Body);
   for (const SMTExprRef &E : Vars)
     requireOwned(E);
-  requireBoolSort(Body, "Expected boolean quantifier body");
+  requireBoolSort(Body);
   fatalErrorIf(arrayMode() == ArrayEncoding::Ackermann,
                "Quantifiers are not supported with the Ackermann array "
                "encoding (quantifier-free formulas only)");
@@ -1813,26 +1851,18 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkExistsImpl, "Quantifiers",
                                const std::vector<SMTExprRef> &,
                                const SMTExprRef &)
 
-CAMADA_DEFINE_MODEL_GETTER(bool, getBool,
-                           requireBoolSort(Exp, "Expected boolean expression"),
-                           getBoolImpl)
+CAMADA_DEFINE_MODEL_GETTER(bool, getBool, requireBoolSort(Exp), getBoolImpl)
 
-CAMADA_DEFINE_MODEL_GETTER(int64_t, getBV,
-                           requireBVSort(Exp, "Expected bit-vector expression"),
-                           getBVImpl)
+CAMADA_DEFINE_MODEL_GETTER(int64_t, getBV, requireBVSort(Exp), getBVImpl)
 
-CAMADA_DEFINE_MODEL_GETTER(uint64_t, getBVUnsigned,
-                           requireBVSort(Exp, "Expected bit-vector expression"),
+CAMADA_DEFINE_MODEL_GETTER(uint64_t, getBVUnsigned, requireBVSort(Exp),
                            getBVUnsignedImpl)
 
-CAMADA_DEFINE_MODEL_GETTER(RM, getRM,
-                           requireRMSort(Exp,
-                                         "Expected rounding-mode expression"),
-                           getRMImpl)
+CAMADA_DEFINE_MODEL_GETTER(RM, getRM, requireRMSort(Exp), getRMImpl)
 
 SMTResult<std::string> SMTSolverImpl::getBVInBin(const SMTExprRef &Exp) {
   requireOwned(Exp);
-  requireBVSort(Exp, "Expected bit-vector expression");
+  requireBVSort(Exp);
   if (!ModelAvailable)
     return noModelError(Exp);
   SMTResult<std::string> result = getBVInBinImpl(Exp);
@@ -1890,7 +1920,7 @@ SMTSolverImpl::getRealDenominator(const SMTExprRef &Exp) {
 
 SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   requireOwned(Exp);
-  requireFPSort(Exp, "Expected floating-point expression");
+  requireFPSort(Exp);
   if (!ModelAvailable)
     return noModelError(Exp);
   SMTResult<std::string> result = usesBVFPEncoding(Exp)
@@ -1901,15 +1931,9 @@ SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   return addLeadingZeroes(result.value(), Exp->getWidth());
 }
 
-CAMADA_DEFINE_MODEL_GETTER(float, getFP32,
-                           requireFPSort(Exp,
-                                         "Expected floating-point expression"),
-                           getFP32Impl)
+CAMADA_DEFINE_MODEL_GETTER(float, getFP32, requireFPSort(Exp), getFP32Impl)
 
-CAMADA_DEFINE_MODEL_GETTER(double, getFP64,
-                           requireFPSort(Exp,
-                                         "Expected floating-point expression"),
-                           getFP64Impl)
+CAMADA_DEFINE_MODEL_GETTER(double, getFP64, requireFPSort(Exp), getFP64Impl)
 
 SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
                                                      const SMTExprRef &Index) {
@@ -2339,8 +2363,8 @@ SMTExprRef SMTSolverImpl::mkBVToIEEEFP(const SMTExprRef &Exp,
                                        const SMTSortRef &To) {
   requireOwned(Exp);
   requireOwned(To);
-  requireBVSort(Exp, "Expected bit-vector expression");
-  requireFPSort(To, "Expected floating-point target sort");
+  requireBVSort(Exp);
+  requireFPSort(To);
   fatalErrorIf(Exp->getWidth() != To->getWidth(),
                "Bit-vector and floating-point target widths must match");
   SMTExprRef theExp = usesBVFPEncoding(To)
@@ -2396,7 +2420,7 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBVViaUF(const SMTExprRef &Exp) {
 
 SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   requireOwned(Exp);
-  requireFPSort(Exp, "Expected floating-point expression");
+  requireFPSort(Exp);
   // Bit-exact where provenance is known: if this term was built from bits
   // (or an asserted equality ties it to one that was), hand the original
   // bits back instead of asking the backend — fp.to_ieee_bv is
@@ -2456,7 +2480,7 @@ CheckResult
 SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
   for (const SMTExprRef &Assumption : Assumptions) {
     requireOwned(Assumption);
-    requireBoolSort(Assumption, "Expected boolean assumption");
+    requireBoolSort(Assumption);
   }
   // checkSatAssumingImpl may route through the public
   // addConstraint/push/pop (the default fallback and the activation-literal
