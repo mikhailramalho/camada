@@ -774,21 +774,29 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   else if (msat_term_is_fp_roundingmode_zero(Context, RTerm))
     roundingMode = bvRM(RM::ROUND_TO_ZERO);
   else
-    // KNOWN LIMITATION: a symbolic rounding mode still rounds incorrectly.
-    // The ite chain below is the encoding the comment above calls unsound,
-    // kept only because rejecting a symbolic mode outright would break
-    // mkRMSort, which is public. Verified: with `rm` constrained equal to
-    // ROUND_TO_PLUS_INF, mkFPFMA(2^-24, 1.0, 1.0, rm) yields the round-down
-    // result, while the same case with a literal RTP is correct. The fault
-    // is in MathSAT's model evaluator, so no term-level encoding fixes it;
-    // resolving this needs either a rejection at the API boundary or an
-    // encoding that avoids rounding-mode atoms entirely. The chain also has
-    // no RNA arm and falls through to truncation.
-    roundingMode = mkIte(
-        mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native)),
-        bvRM(RM::ROUND_TO_EVEN),
-        mkIte(
-            mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native)),
+    // The chain is exhaustive: MathSAT has no round-to-away term at all
+    // (mkRMImpl fatalErrors on it, and there is no
+    // msat_make_fp_roundingmode_away), so a native rounding-mode sort has
+    // exactly four inhabitants and testing three leaves only RTZ. It is not
+    // the silent RNA-to-RTZ mapping it looks like -- but it depends on that
+    // absence, so assert it rather than leave the reader to infer it.
+    fatalErrorIf(nativeRoundToAwaySupport(),
+                 "MathSAT gained a native round-to-away mode: the rounding "
+                 "chain below needs an explicit RNA arm, since its default "
+                 "would silently map RNA to truncation");
+  //
+  // KNOWN LIMITATION: a symbolic rounding mode still rounds incorrectly,
+  // whichever arm it takes. Verified: with `rm` constrained equal to
+  // ROUND_TO_PLUS_INF, mkFPFMA(2^-24, 1.0, 1.0, rm) yields the round-down
+  // result, while the same case with a literal RTP is correct. The fault
+  // is in MathSAT's model evaluator mis-evaluating the equalities this
+  // chain tests, so no term-level encoding fixes it; resolving it needs
+  // either a rejection at the API boundary or an encoding that avoids
+  // rounding-mode atoms entirely (see issue #177).
+  roundingMode = mkIte(
+      mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native)),
+      bvRM(RM::ROUND_TO_EVEN),
+      mkIte(mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native)),
             bvRM(RM::ROUND_TO_PLUS_INF),
             mkIte(mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF, FPEncoding::Native)),
                   bvRM(RM::ROUND_TO_MINUS_INF), bvRM(RM::ROUND_TO_ZERO))));
@@ -910,10 +918,26 @@ SMTResult<RM> MathSATSolver::getRMImpl(const SMTExprRef &Exp) {
                   "MathSAT represents"};
 }
 
+// Reads a model value, reporting rather than handing back an error term.
+// MathSAT answers one for anything it cannot evaluate, and every consumer
+// below would otherwise pass it to a predicate or converter that segfaults.
+static SMTResult<msat_term> modelValueOf(msat_env Context,
+                                         const SMTExprRef &Exp) {
+  const msat_term Value = msat_get_model_value(Context, toMathSATTerm(Exp));
+  if (MSAT_ERROR_TERM(Value))
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::MathSAT,
+                    "Failed to get a model value from MathSAT"};
+  return Value;
+}
+
 SMTResult<bool> MathSATSolver::getBoolImpl(const SMTExprRef &Exp) {
+  // A false rounding-mode equality is one of the values MathSAT answers with
+  // an error term, and the predicates below segfault on one.
+  SMTResult<msat_term> RawValue = modelValueOf(Context, Exp);
+  if (!RawValue)
+    return RawValue.error();
   const SMTExprRef &Value = makeExprRef<MathSATExpr>(
-      SMTExprKind::BoolConst, &Context, mkBoolSort(),
-      msat_get_model_value(Context, toMathSATTerm(Exp)));
+      SMTExprKind::BoolConst, &Context, mkBoolSort(), RawValue.value());
 
   if (msat_term_is_true(Context, toMathSATTerm(Value)))
     return true;
@@ -947,9 +971,11 @@ static inline void getMathSATModelRational(const SMTExprRef &t, mpq_t val) {
 }
 
 SMTResult<std::string> MathSATSolver::getBVInBinImpl(const SMTExprRef &Exp) {
-  const SMTExprRef &t = makeExprRef<MathSATExpr>(
-      Exp->getKind(), &Context, Exp->Sort,
-      msat_get_model_value(Context, toMathSATTerm(Exp)));
+  SMTResult<msat_term> Value = modelValueOf(Context, Exp);
+  if (!Value)
+    return Value.error();
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(Exp->getKind(), &Context,
+                                                 Exp->Sort, Value.value());
   return getGMPVal(t);
 }
 
@@ -967,9 +993,13 @@ SMTResult<std::string> MathSATSolver::getIntImpl(const SMTExprRef &Exp) {
 
   mpq_t val;
   mpq_init(val);
-  const SMTExprRef &t = makeExprRef<MathSATExpr>(
-      Exp->getKind(), &Context, Exp->Sort,
-      msat_get_model_value(Context, toMathSATTerm(Exp)));
+  SMTResult<msat_term> Value = modelValueOf(Context, Exp);
+  if (!Value) {
+    mpq_clear(val);
+    return Value.error();
+  }
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(Exp->getKind(), &Context,
+                                                 Exp->Sort, Value.value());
   getMathSATModelRational(t, val);
   if (mpz_cmp_ui(mpq_denref(val), 1) != 0) {
     mpq_clear(val);
@@ -989,9 +1019,13 @@ SMTResult<std::pair<std::string, std::string>>
 MathSATSolver::getRationalImpl(const SMTExprRef &Exp) {
   mpq_t val;
   mpq_init(val);
-  const SMTExprRef &t = makeExprRef<MathSATExpr>(
-      Exp->getKind(), &Context, Exp->Sort,
-      msat_get_model_value(Context, toMathSATTerm(Exp)));
+  SMTResult<msat_term> Value = modelValueOf(Context, Exp);
+  if (!Value) {
+    mpq_clear(val);
+    return Value.error();
+  }
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(Exp->getKind(), &Context,
+                                                 Exp->Sort, Value.value());
   getMathSATModelRational(t, val);
   char *raw_num = mpz_get_str(nullptr, 10, mpq_numref(val));
   char *raw_den = mpz_get_str(nullptr, 10, mpq_denref(val));
@@ -1006,9 +1040,11 @@ MathSATSolver::getRationalImpl(const SMTExprRef &Exp) {
 }
 
 SMTResult<std::string> MathSATSolver::getFPInBinImpl(const SMTExprRef &Exp) {
-  const SMTExprRef &t = makeExprRef<MathSATExpr>(
-      Exp->getKind(), &Context, Exp->Sort,
-      msat_get_model_value(Context, toMathSATTerm(Exp)));
+  SMTResult<msat_term> Value = modelValueOf(Context, Exp);
+  if (!Value)
+    return Value.error();
+  const SMTExprRef &t = makeExprRef<MathSATExpr>(Exp->getKind(), &Context,
+                                                 Exp->Sort, Value.value());
   return getGMPVal(t);
 }
 
@@ -1016,9 +1052,11 @@ SMTResult<SMTExprRef>
 MathSATSolver::getArrayElementImpl(const SMTExprRef &Array,
                                    const SMTExprRef &Index) {
   const SMTExprRef &sel = mkArraySelect(Array, Index);
-  return makeExprRef<MathSATExpr>(
-      sel->getKind(), &Context, sel->Sort,
-      msat_get_model_value(Context, toMathSATTerm(sel)));
+  SMTResult<msat_term> Value = modelValueOf(Context, sel);
+  if (!Value)
+    return Value.error();
+  return makeExprRef<MathSATExpr>(sel->getKind(), &Context, sel->Sort,
+                                  Value.value());
 }
 
 SMTResult<ArrayModel>
