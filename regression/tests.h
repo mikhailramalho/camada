@@ -194,6 +194,39 @@ inline void pop_past_root_rejected(const camada::SMTSolverRef &solver) {
 
 // getRM on a non-rounding-mode expression is a usage error. Lives here
 // because it needs require_abort.
+// A model query the backend cannot evaluate must report, not crash. MathSAT
+// answers an error term for a rounding-mode equality that is false in the
+// model, and passing one to its term predicates segfaults -- so reading the
+// false arm of two competing equalities used to kill the process.
+inline void false_rm_equality_reports(const camada::SMTSolverRef &solver) {
+  // Native encoding: under the BV encoding a rounding mode is a bitvector
+  // and the backend never sees a rounding-mode equality at all, so the
+  // crashing path is unreachable there.
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+  auto rm =
+      solver->mkSymbol("frm", solver->mkRMSort(camada::FPEncoding::Native));
+  auto rtp =
+      solver->mkRM(camada::RM::ROUND_TO_PLUS_INF, camada::FPEncoding::Native);
+  auto rtz =
+      solver->mkRM(camada::RM::ROUND_TO_ZERO, camada::FPEncoding::Native);
+  auto IsRTP = solver->mkEqual(rm, rtp);
+  auto IsRTZ = solver->mkEqual(rm, rtz);
+  solver->addConstraint(IsRTP);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  auto True = solver->getBool(IsRTP);
+  REQUIRE(True);
+  REQUIRE(True.value());
+
+  // The false one: either a value or an error, never a crash.
+  auto False = solver->getBool(IsRTZ);
+  if (False)
+    REQUIRE_FALSE(False.value());
+  else
+    REQUIRE(False.error().Code == camada::SMTErrorCode::InvalidModelValue);
+}
+
 inline void rm_getter_rejects_non_rm(const camada::SMTSolverRef &solver) {
   auto bv = solver->mkSymbol("not_rm", solver->mkBVSort(8));
   solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(1, 8)));
@@ -361,6 +394,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_sort_width_accessors);
   RESETANDARGTEST(rm_model_value, NativeFP);
   RESETANDARGTEST(rm_model_value, BVFP);
+  RESETANDTEST(false_rm_equality_reports);
   RESETANDTEST(rm_getter_rejects_non_rm);
   RESETANDARGTEST(fp_typed_getter_format, NativeFP);
   RESETANDARGTEST(fp_typed_getter_format, BVFP);
