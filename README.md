@@ -188,7 +188,12 @@ stdin/stdout — z3, cvc5, or anything else that honors the
 can contain spaces or other characters without escaping concerns. Use it via:
 
 ```cpp
-auto solver = camada::createSMTLIBSolver({"z3", "-in"});
+// The factory reports an SMTError when the child cannot be started -- the
+// host is out of descriptors or process slots -- rather than aborting.
+auto created = camada::createSMTLIBSolver({"z3", "-in"});
+if (!created)
+  return handle(created.error());
+const auto &solver = created.value();
 // ... build a problem with the usual mk*/addConstraint API ...
 auto result = solver->check();          // sat / unsat / unknown
 auto value = solver->getBV(symbol);     // round-trips through (get-value ...)
@@ -224,8 +229,9 @@ A two-argument form also tees the emitted SMT-LIB script to a file, useful
 when you want both an interactive answer and a reproducer to share:
 
 ```cpp
-auto solver = camada::createSMTLIBSolver(
+auto created = camada::createSMTLIBSolver(
     {"cvc5", "--lang", "smt2", "--incremental"}, "session.smt2");
+// Also reports rather than aborts when the script file cannot be opened.
 ```
 
 Verified child solvers (the regression suite drives each one through the

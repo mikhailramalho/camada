@@ -1222,15 +1222,22 @@ SMTSolverRef createSTPSolver(const SolverConfig &Config = {});
 /// The child must speak standard SMT-LIB on stdin/stdout. Camada sends
 /// `(set-option :print-success true)` to it at startup, so any solver that
 /// honors that contract works.
-SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                const SolverConfig &Config = {});
+/// Returns an `SMTError` rather than a solver when the child cannot be
+/// started -- the host is out of file descriptors or process slots. That is
+/// an environment failure a caller can act on (retry, fall back to another
+/// backend), unlike the caller errors elsewhere in this API, which abort.
+/// A child that starts and then misbehaves is reported per operation, not
+/// here: execvp failure surfaces on the first exchange, since the fork
+/// itself succeeds.
+SMTResult<SMTSolverRef> createSMTLIBSolver(const std::vector<std::string> &Argv,
+                                           const SolverConfig &Config = {});
 
 /// Same as `createSMTLIBSolver(Argv)` but also tees the emitted SMT-LIB
 /// script to OutputPath (or stdout if OutputPath is "-") for offline
 /// reproduction.
-SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                const std::string &OutputPath,
-                                const SolverConfig &Config = {});
+SMTResult<SMTSolverRef> createSMTLIBSolver(const std::vector<std::string> &Argv,
+                                           const std::string &OutputPath,
+                                           const SolverConfig &Config = {});
 
 } // namespace camada
 
