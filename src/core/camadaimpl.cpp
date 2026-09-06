@@ -1930,11 +1930,8 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     // The resolver compares indexes by their model bits, which only Bool
     // and BV sorts produce. An Int-indexed array is perfectly legal on the
     // backends that support Int, so report the gap instead of aborting.
-    if (!Index->isBoolSort() && !Index->isBVSort())
-      return SMTError{SMTErrorCode::UnsupportedOperation,
-                      Array->getBackendKind(),
-                      "The Ackermann array encoding can only evaluate "
-                      "bool- and bitvector-sorted indexes against a model"};
+    if (!ackCanEvaluateIndexSort(Index->Sort))
+      return ackUnsupportedIndexSort(Array->getBackendKind());
     return resolveAckArrayElement(Array, Index);
   }
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
@@ -1968,12 +1965,8 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
     // their model bits, which only Bool and BV sorts produce. Report the
     // capability gap rather than the BackendError the walk would return,
     // which reads as a solver malfunction.
-    if (!Array->Sort->getIndexSort()->isBoolSort() &&
-        !Array->Sort->getIndexSort()->isBVSort())
-      return SMTError{SMTErrorCode::UnsupportedOperation,
-                      Array->getBackendKind(),
-                      "The Ackermann array encoding can only evaluate "
-                      "bool- and bitvector-sorted indexes against a model"};
+    if (!ackCanEvaluateIndexSort(Array->Sort->getIndexSort()))
+      return ackUnsupportedIndexSort(Array->getBackendKind());
     return ackArrayModel(Array);
   }
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
@@ -2506,10 +2499,9 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
           S.pop();
         } catch (...) {
         }
-        S.LastUnknownReason = ReasonToRestore;
-        return;
+      } else {
+        S.pop();
       }
-      S.pop();
       S.LastUnknownReason = ReasonToRestore;
     }
   } Guard{*this};
@@ -2657,6 +2649,9 @@ void SMTSolverImpl::pop(unsigned nscopes) {
       IEEEBVShadow.erase(Key);
     ShadowScopeLevels.pop_back();
   }
+  // Not model-preserving, despite re-asserting axioms that were: popImpl
+  // above already discarded the backend's model, so there is nothing left
+  // to preserve and invalidateUnsatAssumptions has already said so.
   for (SMTExprRef &Constraint : Reassert) {
     addConstraint(Constraint);
     LazyConstraintLevels.back().push_back(std::move(Constraint));
@@ -2875,6 +2870,8 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   SMTExprRef Fresh = mkSymbolUnchecked(
       "__CAMADA_int2bv_" + std::to_string(NextInt2BVId++), mkBVSort(Width));
   SMTExprRef Wrapped = mkArithMod(Exp, mkInt(power2Dec(Width)));
+  // Not model-preserving: Fresh is minted just above, so the current model
+  // has no value for it and the backend discards the model here.
   addConstraint(mkEqual(mkBV2IntImpl(Fresh, /*IsSigned=*/false), Wrapped));
   return rewrapExprImpl(*Fresh, Fresh->Sort, SMTExprKind::Int2BV);
 }

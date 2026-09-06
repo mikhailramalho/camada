@@ -1954,6 +1954,9 @@ void normalizeToWidth(std::string &Bits, unsigned Width) {
     Bits.insert(0, Width - Bits.size(), '0');
 }
 
+// Defined below in this same anonymous namespace.
+std::string trimWS(const std::string &S);
+
 // Convert an SMT-LIB BV value literal into a binary string (no `#b` prefix).
 // Handles `#b...`, `#x...`, and `(_ bv<n> <w>)` forms. Returns empty on
 // failure.
@@ -2015,12 +2018,10 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
       return {};
     // Trim: SMT-LIB allows whitespace around the tokens, so `(_ bv5 8 )`
     // is as legal as `(_ bv5 8)` and master accepted both.
-    std::string Declared = Value.substr(End + 1, Value.size() - End - 2);
-    const std::size_t First = Declared.find_first_not_of(" \t\n\r");
-    if (First == std::string::npos)
+    const std::string Declared =
+        trimWS(Value.substr(End + 1, Value.size() - End - 2));
+    if (Declared.empty())
       return {};
-    const std::size_t Last = Declared.find_last_not_of(" \t\n\r");
-    Declared = Declared.substr(First, Last - First + 1);
     for (char C : Declared)
       if (C < '0' || C > '9')
         return {};

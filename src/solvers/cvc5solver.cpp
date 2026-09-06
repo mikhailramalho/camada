@@ -1326,12 +1326,6 @@ void CVC5Solver::dumpModelImpl(std::string &Out) {
   for (const auto &[Key, Exp] : SymbolExprCache) {
     // The cache also holds Camada-owned nodes (encoded tuples, tuple-array
     // bundles, Ackermann arrays) that carry no cvc5 term at all; casting
-    // one yields a garbage Term and a SIGSEGV inside getValue. Skip them —
-    // the backend symbols backing their fields and reads are separate
-    // cache entries and print on their own. BitwuzlaSolver::dumpModelImpl
-    // guards the same hazard the same way.
-    // The cache also holds Camada-owned nodes (encoded tuples, tuple-array
-    // bundles, Ackermann arrays) that carry no cvc5 term at all; casting
     // one yields a garbage Term and a SIGSEGV inside getValue. Skip them --
     // the backend symbols backing their fields and reads are separate
     // cache entries and print on their own. BitwuzlaSolver::dumpModelImpl
