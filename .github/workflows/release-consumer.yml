@@ -41,7 +41,7 @@ jobs:
       run: cmake --build scripts/release-consumer/build
 
     - name: Run consumer
-      run: ctest --test-dir scripts/release-consumer/build --output-on-failure
+      run: ctest --test-dir scripts/release-consumer/build --parallel 4 --output-on-failure
 
   windows:
     name: Windows release consumer
@@ -71,7 +71,7 @@ jobs:
 
     - name: Run consumer
       shell: pwsh
-      run: ctest --test-dir scripts/release-consumer/build -C Release --output-on-failure
+      run: ctest --test-dir scripts/release-consumer/build -C Release --parallel 4 --output-on-failure
 
   macos:
     name: macOS release consumer
@@ -109,4 +109,4 @@ jobs:
       run: cmake --build scripts/release-consumer/build
 
     - name: Run consumer
-      run: ctest --test-dir scripts/release-consumer/build --output-on-failure
+      run: ctest --test-dir scripts/release-consumer/build --parallel 4 --output-on-failure
