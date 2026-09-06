@@ -104,9 +104,15 @@ public:
 
   bool isOpen() const { return Out != nullptr; }
 
+  /// Why the constructor failed, empty when it succeeded. Opening the script
+  /// file is an environment failure the caller can act on, so it is reported
+  /// through createSMTLIBSolver rather than aborting.
+  const std::string &openError() const { return OpenError; }
+
 private:
   std::FILE *Out = nullptr;
   bool OwnsHandle = false;
+  std::string OpenError;
 };
 
 /// Drives an external SMT-LIB-speaking solver via stdin/stdout pipes.
@@ -125,6 +131,12 @@ public:
   ProcessEmitter(const ProcessEmitter &) = delete;
   ProcessEmitter &operator=(const ProcessEmitter &) = delete;
   ~ProcessEmitter() noexcept;
+
+  /// Why the constructor failed, empty when it succeeded. Running out of
+  /// descriptors or process slots is an environment failure the caller can
+  /// act on, so it is reported through createSMTLIBSolver rather than
+  /// aborting.
+  const std::string &spawnError() const { return SpawnError; }
 
   /// Write a chunk of SMT-LIB text to the child's stdin. The caller is
   /// responsible for terminating each command with a newline.
@@ -167,6 +179,7 @@ private:
   std::FILE *In = nullptr;  // read side: child's stdout
   std::FILE *Out = nullptr; // write side: child's stdin
   long Pid = -1;            // typed as long to avoid leaking <sys/types.h>
+  std::string SpawnError;
 };
 
 /// Tag type used to disambiguate the SMTLIBSolver constructor that spawns a
@@ -508,6 +521,12 @@ protected:
 
   void dumpImpl(std::string &Out) override;
   void dumpModelImpl(std::string &Out) override;
+
+public:
+  /// Why construction failed, empty when it succeeded. createSMTLIBSolver
+  /// checks this and reports an SMTError rather than handing back a solver
+  /// whose child never started or whose script file never opened.
+  std::string setupError() const;
 
   std::string getSolverNameAndVersion() const override;
 

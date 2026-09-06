@@ -139,7 +139,9 @@ inline std::vector<std::string> mathsatCommand() {
 // works with any fixture helper that takes `const camada::SMTSolverRef &`.
 inline camada::SMTSolverRef
 makeSMTLIBSolver(const std::vector<std::string> &Argv) {
-  return camada::createSMTLIBSolver(Argv);
+  auto Solver = camada::createSMTLIBSolver(Argv);
+  REQUIRE(Solver);
+  return std::move(Solver.value());
 }
 
 // Same, but the SMTLIBSolver lowers tuples in Camada (per-field BV/Bool
@@ -150,7 +152,9 @@ inline camada::SMTSolverRef
 makeSMTLIBSolverCamadaTuples(const std::vector<std::string> &Argv) {
   camada::SolverConfig Cfg;
   Cfg.Tuples = camada::TupleEncoding::Camada;
-  return camada::createSMTLIBSolver(Argv, Cfg);
+  auto Solver = camada::createSMTLIBSolver(Argv, Cfg);
+  REQUIRE(Solver);
+  return std::move(Solver.value());
 }
 
 // Same, but arrays use the Ackermann encoding: the wire carries no array
@@ -160,7 +164,9 @@ inline camada::SMTSolverRef
 makeSMTLIBSolverAckermannArrays(const std::vector<std::string> &Argv) {
   camada::SolverConfig Cfg;
   Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  return camada::createSMTLIBSolver(Argv, Cfg);
+  auto Solver = camada::createSMTLIBSolver(Argv, Cfg);
+  REQUIRE(Solver);
+  return std::move(Solver.value());
 }
 
 // Skip the test if the binary isn't reachable.
@@ -193,10 +199,23 @@ inline std::string readFile(const std::string &Path) {
   return Ss.str();
 }
 
+// An environment failure at construction is reported, not aborted: the
+// factory returns SMTResult, and a script path that cannot be opened is the
+// one such failure reachable without exhausting the host's descriptors.
+inline void
+runSMTLIBFactoryReportsSetupFailure(const std::vector<std::string> &Argv) {
+  auto Created = camada::createSMTLIBSolver(Argv, "/nonexistent-dir/o.smt2");
+  REQUIRE_FALSE(Created);
+  REQUIRE(Created.error().Code == camada::SMTErrorCode::BackendError);
+  REQUIRE(Created.error().Message.find("output file") != std::string::npos);
+}
+
 // The createSMTLIBSolver(Argv) public factory must produce a solver that can
 // drive a trivial round-trip through the child.
 inline void runSMTLIBPublicFactory(const std::vector<std::string> &Argv) {
-  auto Solver = camada::createSMTLIBSolver(Argv);
+  auto Created = camada::createSMTLIBSolver(Argv);
+  REQUIRE(Created);
+  const camada::SMTSolverRef &Solver = Created.value();
   auto BV8 = Solver->mkBVSort(8);
   auto X = Solver->mkSymbol("x", BV8);
   Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(1, BV8)));
@@ -208,7 +227,9 @@ inline void runSMTLIBPublicFactory(const std::vector<std::string> &Argv) {
 inline void runSMTLIBDualEmitter(const std::vector<std::string> &Argv) {
   std::string Path = makeTempPath();
   {
-    auto Solver = camada::createSMTLIBSolver(Argv, Path);
+    auto Created = camada::createSMTLIBSolver(Argv, Path);
+    REQUIRE(Created);
+    const camada::SMTSolverRef &Solver = Created.value();
     auto BV8 = Solver->mkBVSort(8);
     auto X = Solver->mkSymbol("x", BV8);
     Solver->addConstraint(Solver->mkEqual(X, Solver->mkBVFromDec(3, BV8)));

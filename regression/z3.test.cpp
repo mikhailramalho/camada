@@ -160,6 +160,8 @@ TEST_CASE("Override Z3 Solver", "[Z3]") {
 // FlipSignBit-on-NaN round-trip are now polymorphic fixtures in
 // simple.test.h / fp.test.h and run via tests(solver) below.
 CAMADA_Z3_SMTLIB_PIPELINE_TEST("public factory works", runSMTLIBPublicFactory)
+CAMADA_Z3_SMTLIB_PIPELINE_TEST("factory reports setup failure",
+                               runSMTLIBFactoryReportsSetupFailure)
 CAMADA_Z3_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
                                runSMTLIBDualEmitter)
 
