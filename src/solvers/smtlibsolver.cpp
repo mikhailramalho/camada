@@ -814,10 +814,23 @@ CheckResult SMTLIBSolver::runOneShotCommand() {
   // Spawn the command in its own process group so the caller's
   // signal/timeout exit paths can kill the whole subtree (a wrapper shell
   // and any further children, e.g. an mpirun job) with one killpg.
+  // A host out of descriptors or process slots is a recoverable condition,
+  // not a caller mistake: report UNKNOWN with the reason rather than
+  // killing a long-running consumer that could retry or fall back.
   int Fds[2];
-  fatalErrorIf(::pipe(Fds) != 0, "SMTLIBSolver: one-shot pipe() failed");
+  if (::pipe(Fds) != 0) {
+    Diags.ExitStatus = "one-shot pipe() failed";
+    noteUnknownReason(UnknownReason::BackendError);
+    return CheckResult::UNKNOWN;
+  }
   const ::pid_t Pid = ::fork();
-  fatalErrorIf(Pid < 0, "SMTLIBSolver: one-shot fork() failed");
+  if (Pid < 0) {
+    ::close(Fds[0]);
+    ::close(Fds[1]);
+    Diags.ExitStatus = "one-shot fork() failed";
+    noteUnknownReason(UnknownReason::BackendError);
+    return CheckResult::UNKNOWN;
+  }
   if (Pid == 0) {
     ::setpgid(0, 0); // become leader of a new group; pgid == pid
     ::close(Fds[0]);
@@ -839,7 +852,12 @@ CheckResult SMTLIBSolver::runOneShotCommand() {
     OneShotOnSpawn(static_cast<long>(Pid));
 
   std::FILE *ChildOut = ::fdopen(Fds[0], "r");
-  fatalErrorIf(ChildOut == nullptr, "SMTLIBSolver: one-shot fdopen() failed");
+  if (ChildOut == nullptr) {
+    ::close(Fds[0]);
+    Diags.ExitStatus = "one-shot fdopen() failed";
+    noteUnknownReason(UnknownReason::BackendError);
+    return CheckResult::UNKNOWN;
+  }
 
   // Scan the output for verdict lines; the LAST one wins. Keep a tail of
   // the output for the caller's diagnostics.
