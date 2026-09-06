@@ -260,4 +260,42 @@ bool SMTSort::operator==(SMTSort const &Other) const {
       Data, Other.Data);
 }
 
+std::string SMTSort::describe() const {
+  switch (Kind) {
+  case SMTSortKind::Bool:
+    return "Bool";
+  case SMTSortKind::Int:
+    return "Int";
+  case SMTSortKind::Real:
+    return "Real";
+  case SMTSortKind::BV:
+    return "(_ BitVec " + std::to_string(getWidth()) + ")";
+  case SMTSortKind::FP:
+  case SMTSortKind::BVFP:
+    return std::string(Kind == SMTSortKind::BVFP ? "BVFloat(" : "Float(") +
+           std::to_string(getFPExponentWidth()) + ", " +
+           std::to_string(getFPSignificandBits()) + ")";
+  case SMTSortKind::RM:
+    return "RoundingMode";
+  case SMTSortKind::BVRM:
+    return "BVRoundingMode";
+  case SMTSortKind::FXP:
+    return std::string(isFXPSignedSort() ? "SFXP(" : "UFXP(") +
+           std::to_string(getWidth() - getFXPFracBits()) + ", " +
+           std::to_string(getFXPFracBits()) + ")";
+  case SMTSortKind::Array:
+    return "(Array " + getIndexSort()->describe() + " " +
+           getElementSort()->describe() + ")";
+  case SMTSortKind::Tuple: {
+    std::string Out = "(Tuple";
+    for (const SMTSortRef &Field : getTupleElementSorts())
+      Out += " " + Field->describe();
+    return Out + ")";
+  }
+  case SMTSortKind::Function:
+    return "Function";
+  }
+  return "<unknown sort>";
+}
+
 } // namespace camada

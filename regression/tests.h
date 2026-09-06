@@ -12,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <csignal>
 #include <cstdlib>
+#include <string>
 #if !defined(_WIN32)
 #include <sys/wait.h>
 #include <unistd.h>
@@ -41,6 +42,53 @@ template <typename Fn> inline void require_abort(Fn &&Body) {
   REQUIRE(waitpid(pid, &status, 0) == pid);
   REQUIRE(WIFSIGNALED(status));
   REQUIRE(WTERMSIG(status) == SIGABRT);
+#endif
+}
+
+// Like require_abort, but returns what the aborting child wrote to stderr so
+// a test can assert on the diagnostic itself. A sort mismatch that aborts
+// with the right signal but an unhelpful message is still a bug for the
+// consumer trying to find which of its types mapped wrong.
+//
+// The child writes to a temporary file rather than a pipe: other fixtures in
+// this suite fork too, and a pipe held open across those forks is inherited
+// by their children, so the read here would block until they exit.
+template <typename Fn> inline std::string abort_message(Fn &&Body) {
+#if defined(_WIN32)
+  SKIP("Abort regression helper is not implemented on Windows");
+  return {};
+#else
+  char Path[] = "/tmp/camada-abort-XXXXXX";
+  const int fd = mkstemp(Path);
+  REQUIRE(fd != -1);
+
+  const pid_t pid = fork();
+  REQUIRE(pid != -1);
+
+  if (pid == 0) {
+    dup2(fd, STDERR_FILENO);
+    close(fd);
+    // Catch2 installs a SIGABRT handler that reports the abort and resumes
+    // the runner, so the child would carry on running the remaining test
+    // cases -- and fork again in each of them. Restore the default.
+    std::signal(SIGABRT, SIG_DFL);
+    Body();
+    std::_Exit(0);
+  }
+
+  int status = 0;
+  REQUIRE(waitpid(pid, &status, 0) == pid);
+  REQUIRE(WIFSIGNALED(status));
+  REQUIRE(WTERMSIG(status) == SIGABRT);
+
+  REQUIRE(lseek(fd, 0, SEEK_SET) == 0);
+  std::string Out;
+  char Buf[256];
+  for (ssize_t N; (N = read(fd, Buf, sizeof(Buf))) > 0;)
+    Out.append(Buf, static_cast<size_t>(N));
+  close(fd);
+  unlink(Path);
+  return Out;
 #endif
 }
 
@@ -232,6 +280,36 @@ inline void rm_getter_rejects_non_rm(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(1, 8)));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
   require_abort([&]() { (void)solver->getRM(bv); });
+}
+
+// A sort error must name the operation and the sorts. ESBMC hit "Expected
+// expressions with same sort" out of mkEqual and had no way to tell which of
+// its own types mapped wrong, nor which call produced it. These aborts, so
+// the message text is the only channel the check has.
+inline void sort_mismatch_names_both_sorts(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkSymbol("a", solver->mkBVSort(8));
+  auto bv32 = solver->mkSymbol("b", solver->mkBVSort(32));
+  const std::string Mismatch =
+      abort_message([&]() { (void)solver->mkEqual(bv8, bv32); });
+  REQUIRE(Mismatch.find("mkEqual") != std::string::npos);
+  REQUIRE(Mismatch.find("(_ BitVec 8)") != std::string::npos);
+  REQUIRE(Mismatch.find("(_ BitVec 32)") != std::string::npos);
+
+  // The operation name reaches the check through the wrapper macros, so a
+  // macro-generated builder must report its own name rather than the helper's.
+  const std::string Wrapped =
+      abort_message([&]() { (void)solver->mkBVAdd(bv8, bv32); });
+  REQUIRE(Wrapped.find("mkBVAdd") != std::string::npos);
+
+  // Nested sorts are spelled out too -- an array mismatch is exactly the
+  // case where naming only the outer kind says nothing.
+  auto arr = solver->mkSymbol(
+      "arr", solver->mkArraySort(solver->mkBVSort(8), solver->mkBVSort(8)));
+  const std::string Nested =
+      abort_message([&]() { (void)solver->mkBVNeg(arr); });
+  REQUIRE(Nested.find("mkBVNeg") != std::string::npos);
+  REQUIRE(Nested.find("(Array (_ BitVec 8) (_ BitVec 8))") !=
+          std::string::npos);
 }
 
 inline void fp_degenerate_format_rejected(const camada::SMTSolverRef &solver) {
@@ -440,6 +518,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_cancellation_and_normalization, NativeFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
   RESETANDTEST(fp_wide_format_semantics);
+  RESETANDTEST(sort_mismatch_names_both_sorts);
   RESETANDTEST(fp_degenerate_format_rejected);
   RESETANDTEST(fp_narrow_significand_operations_rejected);
   RESETANDTEST(fxp_countls_narrow_target_rejected);
