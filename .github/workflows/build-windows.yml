@@ -55,4 +55,4 @@ jobs:
 
     - name: Run tests
       shell: pwsh
-      run: ctest --test-dir build -C Debug --output-on-failure
+      run: ctest --test-dir build -C Debug --parallel 4 --output-on-failure

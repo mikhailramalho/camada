@@ -296,7 +296,68 @@ inline void ack_check_sat_assuming(const camada::SMTSolverRef &solver) {
 // not an encoding one. ack_distinct_index_reads and
 // ack_check_sat_assuming do push/pop but create all reads at the outer
 // level, which is safe.
+// dumpModel must survive the Camada-owned nodes this encoding puts in the
+// symbol cache. A backend that walks that cache and casts every entry to
+// its own expression type builds a garbage term from an Ackermann array
+// symbol, which carries no backend term at all -- a SIGSEGV, not an error.
+// Ordinary symbols must still appear.
+inline void
+ack_dump_model_skips_camada_nodes(const camada::SMTSolverRef &solver) {
+  auto idxsort = solver->mkBVSort(8);
+  auto arr =
+      solver->mkSymbol("ackdump_arr", solver->mkArraySort(idxsort, idxsort));
+  auto plain = solver->mkSymbol("ackdump_plain", idxsort);
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(arr, solver->mkBVFromDec(0, 8)),
+                      solver->mkBVFromDec(3, 8)));
+  solver->addConstraint(solver->mkEqual(plain, solver->mkBVFromDec(9, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  std::string Dump;
+  solver->dumpModel(Dump);
+  REQUIRE(Dump.find("ackdump_plain") != std::string::npos);
+  // The array's content lives entirely in the reserved __CAMADA_ackread
+  // symbols, so a dump that filters those reports no array at all --
+  // which the assertion above cannot see.
+  REQUIRE(Dump.find("__CAMADA_ackread") != std::string::npos);
+}
+
+// The Ackermann resolver compares indexes by their model bits, which only
+// Bool and BV sorts produce. An Int-indexed array is legal on the backends
+// that support Int, so the query must report the gap rather than abort --
+// it used to kill the process from ordinary public API use.
+inline void
+ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
+  if (!solver->supports(camada::SolverFeature::IntRealArithmetic))
+    return;
+  // The SMT-LIB pipeline drives a child that may reject Int outright (the
+  // STP child answers `syntax error ... token: Int`), and the capability
+  // flag describes the wrapper, not the child.
+  if (solver->getSolverNameAndVersion().compare(0, 6, "SMTLIB") == 0)
+    return;
+  auto intsort = solver->mkIntSort();
+  auto arr = solver->mkSymbol(
+      "ackint_arr", solver->mkArraySort(intsort, solver->mkBVSort(8)));
+  auto i = solver->mkSymbol("ackint_i", intsort);
+  solver->addConstraint(solver->mkEqual(i, solver->mkInt(int64_t(1))));
+  solver->addConstraint(solver->mkEqual(solver->mkArraySelect(arr, i),
+                                        solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Elem = solver->getArrayElement(arr, i);
+  REQUIRE_FALSE(Elem);
+  REQUIRE(Elem.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+  // getArrayValues hits the same limitation and must name it the same way,
+  // not report it as a backend malfunction a caller cannot act on.
+  auto Values = solver->getArrayValues(arr);
+  REQUIRE_FALSE(Values);
+  REQUIRE(Values.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+}
+
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
+  ack_unsupported_index_sort_reports(solver);
+  solver->reset();
+  ack_dump_model_skips_camada_nodes(solver);
+  solver->reset();
   ack_read_congruence(solver);
   solver->reset();
   ack_distinct_index_reads(solver);

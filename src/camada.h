@@ -1166,7 +1166,13 @@ public:
   virtual void dump() = 0;
   virtual void dump(std::string &Out) = 0;
 
-  /// Dump Model
+  /// Writes the current model in the backend's own syntax, which differs
+  /// per backend and is meant for diagnostics rather than parsing.
+  ///
+  /// Writes nothing when there is no model to report -- outside the
+  /// availability window described above, or when the model binds no
+  /// symbol -- so an empty result is the "no model" signal, the same
+  /// condition on which the getters report InvalidUsage.
   virtual void dumpModel() = 0;
   virtual void dumpModel(std::string &Out) = 0;
 };

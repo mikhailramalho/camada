@@ -143,6 +143,11 @@ inline void unknown_reason_semantics(const camada::SMTSolverRef &solver) {
 }
 
 inline void solver_timeout_semantics(const camada::SMTSolverRef &solver) {
+  // Clear the limit however this fixture exits: it holds one across six
+  // REQUIREs, and Catch2 throws on failure, so without the guard a single
+  // failure here leaks 150ms into every fixture after it and buries itself
+  // under their spurious UNKNOWNs.
+  TimeoutGuard ClearTimeout{solver};
   if (!solver->setTimeout(150)) {
     // Backends without enforceable limits must report so and stay usable.
     solver->addConstraint(solver->mkBool(true));
@@ -770,9 +775,26 @@ inline void model_getters_require_a_model(const camada::SMTSolverRef &solver) {
   }
   REQUIRE(solver->check() == camada::CheckResult::SAT);
   {
+    // Non-emptiness alone is too weak: cvc5's dump evaluated each
+    // *assertion* rather than each symbol, so it returned "true" under
+    // SAT and satisfied that check while carrying no model at all. Require
+    // the symbol to appear -- every backend names it, in its own syntax.
     std::string Dump;
     solver->dumpModel(Dump);
     REQUIRE(!Dump.empty());
+    REQUIRE(Dump.find("nomodel_d") != std::string::npos);
+  }
+
+  // A model that binds no symbol reports nothing, so emptiness is a usable
+  // signal rather than one three backends could never produce: Z3 and Yices
+  // emit a bare newline of their own framing here, STP a 45-byte banner.
+  solver->reset();
+  {
+    solver->addConstraint(solver->mkBool(true));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    std::string Dump = "seed";
+    solver->dumpModel(Dump);
+    REQUIRE(Dump.empty());
   }
 
   // UNKNOWN is not a model. Most backends abort on a model query after

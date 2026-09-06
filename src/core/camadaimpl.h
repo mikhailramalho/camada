@@ -119,6 +119,18 @@ public:
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
 
+  /// The sorts lazyIndexModelBits can canonicalize. The Ackermann model
+  /// walks compare indexes by those bits, so an index outside this set is
+  /// a capability gap to report, not a failure to diagnose.
+  static bool ackCanEvaluateIndexSort(const SMTSortRef &Sort) {
+    return Sort->isBoolSort() || Sort->isBVSort();
+  }
+  static SMTError ackUnsupportedIndexSort(SMTBackendKind Backend) {
+    return SMTError{SMTErrorCode::UnsupportedOperation, Backend,
+                    "The Ackermann array encoding can only evaluate bool- "
+                    "and bitvector-sorted indexes against a model"};
+  }
+
   /// Model bits of a bool/BV-sorted expression after a SAT check, used to
   /// compare index terms by model value. Empty string when the sort is
   /// unsupported or the model query fails. Callers that revisit the same
@@ -517,7 +529,6 @@ protected:
 #endif
   }
 
-private:
 public:
   SMTExprRef getBVZero1Expr() const;
   SMTExprRef getBVOne1Expr() const;
@@ -547,20 +558,21 @@ public:
   mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) override final;
   void addConstraint(const SMTExprRef &Exp) override final;
 
-  /// Asserts an axiom Camada generated itself, preserving the model.
+  /// Asserts an axiom Camada generated itself, keeping the model alive.
   ///
-  /// Use this for every internally generated constraint whose symbols the
-  /// current model already values -- lazy array defaults, congruence
-  /// axioms, FP-to-BV ties. They are consequences of the formula already
-  /// asserted, so a model satisfying the formula satisfies them too, and
-  /// invalidating on them destroys a live model for no reason: merely
+  /// Use this ONLY for an axiom every symbol of which the current model
+  /// already values. Such an axiom is a consequence of the formula already
+  /// asserted, so a model satisfying the formula satisfies it too, and
+  /// invalidating on it would destroy a live model for no reason: merely
   /// building an array term after a SAT check would break the read-back
   /// loop consumers use to extract a counterexample.
   ///
-  /// An axiom over freshly minted symbols (an extensionality witness, an
-  /// Ackermann read) must NOT use this -- the model has no value for them,
-  /// so it genuinely dies. Those sites call addConstraint() directly, which
-  /// is then visibly the deliberate exception.
+  /// Most internal axioms do NOT qualify, and call addConstraint()
+  /// directly: anything minting a symbol (an extensionality witness, an
+  /// Ackermann read, a lazy array default's first select at an index, an
+  /// FP-to-BV tie's uninterpreted function, an int-to-BV fresh variable)
+  /// leaves the model with no value for it, so the model genuinely dies.
+  /// Two call sites qualify today; eight do not.
   void addInternalConstraint(const SMTExprRef &Exp);
   SMTExprRef mkBVAdd(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final;

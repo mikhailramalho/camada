@@ -653,8 +653,19 @@ void STPSolver::dumpModelImpl(std::string &Out) {
   unsigned long len;
   STP::vc_printCounterExampleToBuffer(Context, &buf, &len);
   Out = buf;
-  Out += "\n";
   free(buf);
+  // STP always wraps its output in a BEGIN/END banner, so a model with
+  // nothing to report still comes back as 45 bytes of framing. The common
+  // layer's contract is that an empty dump means no model, and a caller
+  // branching on emptiness could never see that here otherwise.
+  const std::size_t Begin = Out.find('\n');
+  const std::size_t End = Out.rfind("COUNTEREXAMPLE END");
+  if (Begin != std::string::npos && End != std::string::npos && Begin < End &&
+      Out.find_first_not_of(" \t\n\r", Begin) == End) {
+    Out.clear();
+    return;
+  }
+  Out += "\n";
 }
 
 } // namespace camada

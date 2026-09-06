@@ -1954,6 +1954,9 @@ void normalizeToWidth(std::string &Bits, unsigned Width) {
     Bits.insert(0, Width - Bits.size(), '0');
 }
 
+// Defined below in this same anonymous namespace.
+std::string trimWS(const std::string &S);
+
 // Convert an SMT-LIB BV value literal into a binary string (no `#b` prefix).
 // Handles `#b...`, `#x...`, and `(_ bv<n> <w>)` forms. Returns empty on
 // failure.
@@ -1968,6 +1971,13 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
     for (char C : Bits)
       if (C != '0' && C != '1')
         return {};
+    // A binary literal states its width exactly, so more bits than the sort
+    // holds is a desynchronized reply, not something to narrow: truncating
+    // turned a 32-bit answer to an 8-bit query into a confident 5. (The #x
+    // branch below may legitimately be wider, since hex rounds up to a
+    // nibble.)
+    if (Bits.size() > Width)
+      return {};
     normalizeToWidth(Bits, Width);
     return Bits;
   }
@@ -2000,6 +2010,23 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
     for (char C : Decimal)
       if (C < '0' || C > '9')
         return {};
+    // Validate the declared width too, like the #b and #x branches
+    // validate their bodies: it is dropped otherwise, so a reply for a
+    // different sort, or one truncated before the closing paren, was
+    // accepted and padded into a confident wrong value.
+    if (Value.empty() || Value.back() != ')')
+      return {};
+    // Trim: SMT-LIB allows whitespace around the tokens, so `(_ bv5 8 )`
+    // is as legal as `(_ bv5 8)` and master accepted both.
+    const std::string Declared =
+        trimWS(Value.substr(End + 1, Value.size() - End - 2));
+    if (Declared.empty())
+      return {};
+    for (char C : Declared)
+      if (C < '0' || C > '9')
+        return {};
+    if (Declared != std::to_string(Width))
+      return {};
     // Repeated long-division by 2 over the decimal string, reading the
     // remainders out from least to most significant. This works at any width
     // without pulling in big-integer libraries.
@@ -2022,8 +2049,15 @@ std::string bvValueToBinary(const std::string &Value, unsigned Width) {
       if (!NonZero)
         break;
     }
-    if (Bits.size() > Width)
-      Bits.resize(Width); // truncate high bits beyond declared width
+    // A value needing more bits than the sort holds is a protocol error,
+    // not something to silently narrow: truncating turned (_ bv999 8) into
+    // a confident 11100111.
+    if (Bits.size() > Width) {
+      for (std::size_t I = Width; I < Bits.size(); ++I)
+        if (Bits[I] != '0')
+          return {};
+      Bits.resize(Width);
+    }
     while (Bits.size() < Width)
       Bits.push_back('0');
     std::reverse(Bits.begin(), Bits.end());
@@ -2066,6 +2100,12 @@ std::size_t parseBVLiteralAppend(const std::string &S, std::size_t I,
   } else {
     return std::string::npos;
   }
+  // An empty body is a truncated reply, not a zero. Without this the
+  // normalization below pads it to Width and the caller's error signal
+  // never fires: a `(fp #b1 #b10000000 #b)` from a dying child decoded to
+  // a confident -2.0f. Same check bvValueToBinary makes on its own bodies.
+  if (Bits.empty())
+    return std::string::npos;
   normalizeToWidth(Bits, Width);
   Out += Bits;
   return I;
@@ -2747,7 +2787,18 @@ void SMTLIBSolver::dumpModelImpl(std::string &Out) {
     File->emitRaw(Cmd);
   Proc->emitRaw(Cmd);
   Proc->flush();
-  Out = Proc->readResponse();
+  const std::string Resp = Proc->readResponse();
+  // A child that does not implement (get-model), or whose context cannot
+  // produce one, answers `(error ...)` or `unsupported`. Handing that back
+  // would present an error message as model text to a caller branching on
+  // emptiness, so report it the way the contract does -- and the way
+  // getUnsatAssumptionsImpl already screens the same replies.
+  if (Resp.empty() || Resp.compare(0, 6, "(error") == 0 ||
+      Resp.compare(0, 11, "unsupported") == 0) {
+    Out.clear();
+    return;
+  }
+  Out = Resp;
 }
 
 std::string SMTLIBSolver::getSolverNameAndVersion() const {

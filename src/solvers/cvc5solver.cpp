@@ -25,6 +25,7 @@
 #include "../camada.h"
 #include "../camadaerrors.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cvc5/cvc5_kind.h>
 #include <cvc5/cvc5_types.h>
@@ -1306,10 +1307,39 @@ void CVC5Solver::dumpImpl(std::string &Out) {
 }
 
 void CVC5Solver::dumpModelImpl(std::string &Out) {
+  // Print each symbol's value, not each assertion's: evaluating an
+  // asserted formula under its own model yields "true", which is not a
+  // model. cvc5's native getModel() takes an explicit term list and is
+  // marked experimental upstream, so build the bindings from the symbols
+  // the common layer already tracks.
   Out.clear();
-  auto const &assertions = Context.getAssertions();
-  for (auto const &a : assertions) {
-    Out += Context.getValue(a).toString();
+  // Reserved __CAMADA_ names are kept: for the Camada-lowered encodings
+  // they ARE the model content -- a tuple's fields and an Ackermann
+  // array's reads live nowhere else, and filtering them left cvc5 dumping
+  // nothing for those sorts while Bitwuzla dumped the bindings.
+  //
+  // Sorted, because SymbolExprCache hashes on a pointer and would order
+  // the bindings differently from run to run; a dump a caller diffs or
+  // logs has to be reproducible.
+  std::vector<std::pair<std::string, std::string>> Bindings;
+  Bindings.reserve(SymbolExprCache.size());
+  for (const auto &[Key, Exp] : SymbolExprCache) {
+    // The cache also holds Camada-owned nodes (encoded tuples, tuple-array
+    // bundles, Ackermann arrays) that carry no cvc5 term at all; casting
+    // one yields a garbage Term and a SIGSEGV inside getValue. Skip them --
+    // the backend symbols backing their fields and reads are separate
+    // cache entries and print on their own. BitwuzlaSolver::dumpModelImpl
+    // guards the same hazard the same way.
+    const auto *CE = dynamic_cast<const CVC5Expr *>(Exp.get());
+    if (CE == nullptr)
+      continue;
+    Bindings.emplace_back(Key.Name, Context.getValue(CE->Expr).toString());
+  }
+  std::sort(Bindings.begin(), Bindings.end());
+  for (const auto &[Name, Value] : Bindings) {
+    Out += Name;
+    Out += " = ";
+    Out += Value;
     Out += "\n";
   }
 }

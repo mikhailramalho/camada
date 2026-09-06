@@ -47,4 +47,4 @@ jobs:
       run: cmake --build build --target install
 
     - name: Run tests
-      run: ctest --test-dir build --output-on-failure
+      run: ctest --test-dir build --parallel 4 --output-on-failure
