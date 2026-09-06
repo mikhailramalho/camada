@@ -164,6 +164,14 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
     });
   }
 
+  // Assumptions are an entry point of their own: they bypass the builder
+  // and getter checks entirely and reach the backend's own cast, where a
+  // foreign handle surfaced as an uncaught vendor exception.
+  require_abort([&]() {
+    (void)solver->checkSatAssuming(
+        {other->mkSymbol("foreign_assume", other->mkBoolSort())});
+  });
+
   // The solver's own handles keep working after all that.
   REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto v = solver->getBV(mine);

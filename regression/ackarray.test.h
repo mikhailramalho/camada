@@ -322,7 +322,35 @@ ack_dump_model_skips_camada_nodes(const camada::SMTSolverRef &solver) {
   REQUIRE(Dump.find("__CAMADA_ackread") != std::string::npos);
 }
 
+// The Ackermann resolver compares indexes by their model bits, which only
+// Bool and BV sorts produce. An Int-indexed array is legal on the backends
+// that support Int, so the query must report the gap rather than abort --
+// it used to kill the process from ordinary public API use.
+inline void
+ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
+  if (!solver->supports(camada::SolverFeature::IntRealArithmetic))
+    return;
+  // The SMT-LIB pipeline drives a child that may reject Int outright (the
+  // STP child answers `syntax error ... token: Int`), and the capability
+  // flag describes the wrapper, not the child.
+  if (solver->getSolverNameAndVersion().compare(0, 6, "SMTLIB") == 0)
+    return;
+  auto intsort = solver->mkIntSort();
+  auto arr = solver->mkSymbol(
+      "ackint_arr", solver->mkArraySort(intsort, solver->mkBVSort(8)));
+  auto i = solver->mkSymbol("ackint_i", intsort);
+  solver->addConstraint(solver->mkEqual(i, solver->mkInt(int64_t(1))));
+  solver->addConstraint(solver->mkEqual(solver->mkArraySelect(arr, i),
+                                        solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Elem = solver->getArrayElement(arr, i);
+  REQUIRE_FALSE(Elem);
+  REQUIRE(Elem.error().Code == camada::SMTErrorCode::UnsupportedOperation);
+}
+
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
+  ack_unsupported_index_sort_reports(solver);
+  solver->reset();
   ack_dump_model_skips_camada_nodes(solver);
   solver->reset();
   ack_read_congruence(solver);

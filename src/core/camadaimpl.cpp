@@ -1926,8 +1926,17 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     return getCamadaTupleArrayElement(*this, Array, Index);
   // Ackermann-mode arrays have no backend term to evaluate; resolve from
   // the tracked derivation chain and the reads of the equality class.
-  if (arrayMode() == ArrayEncoding::Ackermann)
+  if (arrayMode() == ArrayEncoding::Ackermann) {
+    // The resolver compares indexes by their model bits, which only Bool
+    // and BV sorts produce. An Int-indexed array is perfectly legal on the
+    // backends that support Int, so report the gap instead of aborting.
+    if (!Index->isBoolSort() && !Index->isBVSort())
+      return SMTError{SMTErrorCode::UnsupportedOperation,
+                      Array->getBackendKind(),
+                      "The Ackermann array encoding can only evaluate "
+                      "bool- and bitvector-sorted indexes against a model"};
     return resolveAckArrayElement(Array, Index);
+  }
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
       return Resolved;
@@ -2441,8 +2450,10 @@ CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
 
 CheckResult
 SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
-  for (const SMTExprRef &Assumption : Assumptions)
+  for (const SMTExprRef &Assumption : Assumptions) {
+    requireOwned(Assumption);
     requireBoolSort(Assumption, "Expected boolean assumption");
+  }
   // checkSatAssumingImpl may route through the public
   // addConstraint/push/pop (the default fallback and the activation-literal
   // lowerings do), all of which invalidate the unsat-assumption state, so
