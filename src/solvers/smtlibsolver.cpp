@@ -221,7 +221,10 @@ FileEmitter::FileEmitter(const std::string &Path) {
     return;
   }
   Out = std::fopen(Path.c_str(), "w");
-  fatalErrorIf(Out == nullptr, "FileEmitter could not open output file");
+  if (Out == nullptr) {
+    OpenError = "could not open the SMT-LIB output file: " + Path;
+    return;
+  }
   OwnsHandle = true;
 }
 
@@ -480,21 +483,38 @@ inline void closeFdsAboveStderr([[maybe_unused]] int MaxFd) {
 //     sysconf. In a multithreaded host the child inherits only the forking
 //     thread; any libc lock held by another thread at fork would deadlock
 //     the child if we touched the corresponding subsystem.
+// Returns the child pid, or -1 with Error set. Running out of descriptors or
+// process slots is an environment failure the caller can act on, so it is
+// reported rather than aborted -- see createSMTLIBSolver.
 template <typename ExecInChild>
-long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn) {
+long forkAndWire(std::FILE *&In, std::FILE *&Out, ExecInChild ExecInChildFn,
+                 std::string &Error) {
   int InPipe[2];  // child stdout -> parent reads
   int OutPipe[2]; // parent writes -> child stdin
-  fatalErrorIf(openPipeCloexec(InPipe) != 0,
-               "ProcessEmitter: failed to open pipe");
-  fatalErrorIf(openPipeCloexec(OutPipe) != 0,
-               "ProcessEmitter: failed to open pipe");
+  if (openPipeCloexec(InPipe) != 0) {
+    Error = "failed to open a pipe to the child solver";
+    return -1;
+  }
+  if (openPipeCloexec(OutPipe) != 0) {
+    ::close(InPipe[0]);
+    ::close(InPipe[1]);
+    Error = "failed to open a pipe to the child solver";
+    return -1;
+  }
 
   // Compute the fd-table limit BEFORE fork; the child must not call
   // sysconf() in its post-fork pre-exec window.
   const int MaxFd = computeFdLimitForChild();
 
   pid_t Child = ::fork();
-  fatalErrorIf(Child < 0, "ProcessEmitter: fork() failed");
+  if (Child < 0) {
+    ::close(InPipe[0]);
+    ::close(InPipe[1]);
+    ::close(OutPipe[0]);
+    ::close(OutPipe[1]);
+    Error = "failed to fork the child solver process";
+    return -1;
+  }
 
   if (Child == 0) {
     // Child: move every pipe endpoint we'll use to fd >= 3 first, so the
@@ -583,8 +603,11 @@ ProcessEmitter::ProcessEmitter(const std::vector<std::string> &Argv) {
   ArgvPtrs.push_back(nullptr);
 
   ensureSigpipeIgnored();
-  Pid = forkAndWire(In, Out,
-                    [&ArgvPtrs]() { ::execvp(ArgvPtrs[0], ArgvPtrs.data()); });
+  Pid = forkAndWire(
+      In, Out, [&ArgvPtrs]() { ::execvp(ArgvPtrs[0], ArgvPtrs.data()); },
+      SpawnError);
+  if (Pid < 0)
+    return;
 }
 
 ProcessEmitter::~ProcessEmitter() noexcept {
@@ -716,9 +739,19 @@ const std::string &textOf(const SMTSortRef &S) {
 
 } // namespace
 
+std::string SMTLIBSolver::setupError() const {
+  if (File && !File->openError().empty())
+    return File->openError();
+  if (Proc && !Proc->spawnError().empty())
+    return Proc->spawnError();
+  return {};
+}
+
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
                            const SolverConfig &Config)
     : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)) {
+  if (!setupError().empty())
+    return; // half-built; createSMTLIBSolver reports and discards it
   // The base sets arrayMode() before the singletons are built: constant
   // tracking (AckBVConstBits) must cover the cached small bit-vectors.
   emitPreamble();
@@ -729,6 +762,8 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const SolverConfig &Config)
     : SMTSolverImpl(Config), Proc(std::make_unique<ProcessEmitter>(Argv)) {
+  if (!setupError().empty())
+    return; // half-built; createSMTLIBSolver reports and discards it
   emitPreamble();
   initializeCommonSingletons();
 }
@@ -739,6 +774,8 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const SolverConfig &Config)
     : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)),
       Proc(std::make_unique<ProcessEmitter>(Argv)) {
+  if (!setupError().empty())
+    return; // half-built; createSMTLIBSolver reports and discards it
   emitPreamble();
   initializeCommonSingletons();
 }

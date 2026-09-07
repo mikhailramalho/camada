@@ -117,10 +117,15 @@ SMTSolverRef createSTPSolver(const SolverConfig &Config) {
 #endif
 }
 
-SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                const SolverConfig &Config) {
+SMTResult<SMTSolverRef> createSMTLIBSolver(const std::vector<std::string> &Argv,
+                                           const SolverConfig &Config) {
 #if SOLVER_SMTLIB_ENABLED
-  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, Config);
+  auto Solver =
+      std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, Config);
+  if (const std::string Error = Solver->setupError(); !Error.empty())
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver: " + Error};
+  return SMTSolverRef(std::move(Solver));
 #else
   (void)Argv;
   (void)Config;
@@ -129,12 +134,16 @@ SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
 #endif
 }
 
-SMTSolverRef createSMTLIBSolver(const std::vector<std::string> &Argv,
-                                const std::string &OutputPath,
-                                const SolverConfig &Config) {
+SMTResult<SMTSolverRef> createSMTLIBSolver(const std::vector<std::string> &Argv,
+                                           const std::string &OutputPath,
+                                           const SolverConfig &Config) {
 #if SOLVER_SMTLIB_ENABLED
-  return std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv, OutputPath,
-                                        Config);
+  auto Solver = std::make_unique<SMTLIBSolver>(SMTLIBProcessTag{}, Argv,
+                                               OutputPath, Config);
+  if (const std::string Error = Solver->setupError(); !Error.empty())
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::SMTLIB,
+                    "SMTLIBSolver: " + Error};
+  return SMTSolverRef(std::move(Solver));
 #else
   (void)Argv;
   (void)OutputPath;
