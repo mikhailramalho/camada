@@ -329,6 +329,30 @@ static inline SMTExprRef mkUnbias(SMTSolver &S, const SMTExprRef &Src) {
   return S.mkBVSub(Src, bias);
 }
 
+// Resize to an exact width, extending or truncating as needed. The encoding
+// repeatedly has to line up an exponent-derived term with a significand-
+// derived one, and writing that as mkBVZeroExt(e, sbits - ebits) underflows
+// whenever ebits > sbits -- an unsigned wrap to a huge extension. These pick
+// the direction from the two widths instead, so formats with a wide exponent
+// over a narrow significand encode like any other.
+static SMTExprRef fitBVZeroExt(SMTSolver &S, const SMTExprRef &Src,
+                               unsigned Width) {
+  unsigned Have = Src->getWidth();
+  if (Have == Width)
+    return Src;
+  return Have < Width ? S.mkBVZeroExt(Src, Width - Have)
+                      : S.mkBVExtract(Width - 1, 0, Src);
+}
+
+static SMTExprRef fitBVSignExt(SMTSolver &S, const SMTExprRef &Src,
+                               unsigned Width) {
+  unsigned Have = Src->getWidth();
+  if (Have == Width)
+    return Src;
+  return Have < Width ? S.mkBVSignExt(Src, Width - Have)
+                      : S.mkBVExtract(Width - 1, 0, Src);
+}
+
 /* Recurses into BOTH halves and selects with one ite per level, so every
  * zero-test examines a static slice of the original input. The obvious
  * alternative -- a narrowing loop that keeps muxing a "current" half -- emits
@@ -777,17 +801,7 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
   const SMTExprRef &c7 = x_is_zero;
   SMTExprRef v7 = mkIte(signs_xor, nzero, pzero);
 
-  // else comes the actual division. Two widths below are derived by
-  // subtraction and underflow on a narrow significand: the exponent
-  // correction extracts ebits+2 bits from an (sbits+4)-bit shift amount,
-  // and the quotient rounding extracts a range that inverts once the
-  // significand is a single bit. The assert that used to stand here was
-  // compiled out under NDEBUG, so these formats reached the extracts.
-  fatalErrorIf(sbits + 2 < ebits || sbits < 3,
-               "Floating-point format unsupported by the BV encoding's "
-               "division: the significand is too narrow for the exponent "
-               "width (requires SigWidth+1 >= ExpWidth-2 and SigWidth >= 2)");
-
+  // else comes the actual division.
   SMTExprRef a_sgn, a_sig, a_exp, a_lz;
   SMTExprRef b_sgn, b_sig, b_exp, b_lz;
   // Normalized, for the same reason as multiply: an unnormalized
@@ -819,10 +833,16 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
   SMTExprRef res_sig = mkBVConcat(
       mkBVExtract(extra_bits + sbits + 1, extra_bits - 1, quotient), sticky);
 
-  SMTExprRef upper = mkBVExtract(sbits + sbits + extra_bits - 1,
-                                 extra_bits + sbits + 2, quotient);
-  SMTExprRef upper_reduced = mkBVRedOr(upper);
-  SMTExprRef too_large = mkEqual(upper_reduced, mkBVOne1(*this));
+  // Bits above the rounded result signal a quotient too large for the
+  // format. The slice spans [2*sbits+extra_bits-1 : extra_bits+sbits+2],
+  // which is empty for sbits < 3 -- there are no such bits, so overflow is
+  // impossible and an extract there would invert.
+  SMTExprRef too_large =
+      sbits >= 3
+          ? mkEqual(mkBVRedOr(mkBVExtract(sbits + sbits + extra_bits - 1,
+                                          extra_bits + sbits + 2, quotient)),
+                    mkBVOne1(*this))
+          : mkBool(false);
   SMTExprRef c8 = too_large;
   SMTExprRef v8 = mkIte(signs_xor, ninf, pinf);
 
@@ -833,8 +853,12 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
       mkBVSub(res_sig_lz, mkBVFromDec(1, sbits + 4));
   SMTExprRef shift_cond = mkBVUle(res_sig_lz, mkBVFromDec(1, sbits + 4));
   SMTExprRef res_sig_shifted = mkBVShl(res_sig, res_sig_shift_amount);
+  // The shift amount is (sbits+4) wide and the exponent (ebits+2); either
+  // can be the narrower, so fit rather than extract. The amount is a leading
+  // -zero count less one, so it is small and non-negative here, and a
+  // zero-extension preserves it.
   SMTExprRef res_exp_shifted =
-      mkBVSub(res_exp, mkBVExtract(ebits + 1, 0, res_sig_shift_amount));
+      mkBVSub(res_exp, fitBVZeroExt(*this, res_sig_shift_amount, ebits + 2));
   res_sig = mkIte(shift_cond, res_sig, res_sig_shifted);
   res_exp = mkIte(shift_cond, res_exp, res_exp_shifted);
 
@@ -1331,11 +1355,6 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   assert(X->Sort->getFPExponentWidth() == Y->Sort->getFPExponentWidth());
 
   unsigned ebits = X->Sort->getFPExponentWidth();
-  // The renormalization shift zero-extends to (2*sbits + 3 - ebits) bits.
-  fatalErrorIf(2 * X->Sort->getFPSignificandBits() + 3 < ebits,
-               "Floating-point format unsupported by the BV encoding's FMA: "
-               "the significand is too narrow for the exponent width "
-               "(requires 2*(SigWidth+1) + 3 >= ExpWidth)");
   unsigned sbits = X->Sort->getFPSignificandBits();
 
   SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
@@ -1480,9 +1499,12 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   assert(exp_delta->getWidth() == ebits + 2);
 
   // Alignment shift with sticky bit computation.
+  // The delta is capped at 2*sbits+3 just above, so it always fits the
+  // shifted value's width; fit rather than zero-extend, since ebits+2 can
+  // exceed 3*sbits+3 when the exponent is wide next to a narrow significand.
   SMTExprRef shifted_big =
       mkBVLshr(mkBVConcat(f_sig, mkBVFromDec(0, sbits)),
-               mkBVZeroExt(exp_delta, (3 * sbits + 3) - (ebits + 2)));
+               fitBVZeroExt(*this, exp_delta, 3 * sbits + 3));
   SMTExprRef shifted_f_sig = mkBVExtract(3 * sbits + 2, sbits, shifted_big);
   SMTExprRef alignment_sticky_raw = mkBVExtract(sbits - 1, 0, shifted_big);
   SMTExprRef alignment_sticky = mkBVRedOr(alignment_sticky_raw);
@@ -1547,7 +1569,7 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   SMTExprRef renorm_delta =
       mkIte(mkBVSle(zero_e2, sig_lz_capped), sig_lz_capped, zero_e2);
   res_exp = mkBVSub(res_exp, renorm_delta);
-  sig_abs = mkBVShl(sig_abs, mkBVZeroExt(renorm_delta, 2 * sbits + 3 - ebits));
+  sig_abs = mkBVShl(sig_abs, fitBVZeroExt(*this, renorm_delta, 2 * sbits + 5));
 
   unsigned too_short = 0;
   if (sbits < 5) {
@@ -1828,16 +1850,6 @@ SMTExprRef SMTSolverImpl::mkSBVToFPImpl(const SMTExprRef &From,
   unsigned ebits = To->getFPExponentWidth();
   unsigned sbits = To->getFPSignificandBits();
   unsigned bv_sz = From->getWidth();
-  // The exponent is computed in the source's width: an (ebits+2)-bit
-  // extract from a bv_sz-wide term, and a zero-extension by their
-  // difference. Both need the source to be at least that wide, unless
-  // the significand is wide enough that the clamp below is skipped.
-  fatalErrorIf(ebits + 2 > bv_sz && sbits + 2 < ebits,
-               "Floating-point format unsupported by the BV encoding's "
-               "bitvector-to-float conversion: the target exponent is wider "
-               "than the source bitvector and the significand is too narrow "
-               "to compensate (requires ExpWidth+2 <= source width or "
-               "SigWidth+1 >= ExpWidth-2)");
 
   SMTExprRef bv1_1 = mkBVOne1(*this);
   SMTExprRef bv0_sz = mkBVFromDec(0, bv_sz);
@@ -1888,7 +1900,10 @@ SMTExprRef SMTSolverImpl::mkSBVToFPImpl(const SMTExprRef &From,
   assert(s_exp->getWidth() == bv_sz);
 
   unsigned exp_sz = ebits + 2; // (+2 for rounder)
-  SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
+  // s_exp is bv_sz wide and exp_sz is ebits+2; either can be the narrower,
+  // so fit rather than extract. s_exp is a signed exponent, so widening
+  // sign-extends.
+  SMTExprRef exp_2 = fitBVSignExt(*this, s_exp, exp_sz);
 
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
@@ -1902,10 +1917,14 @@ SMTExprRef SMTSolverImpl::mkSBVToFPImpl(const SMTExprRef &From,
     // Take the maximum legal exponent; this
     // allows us to keep the most precision.
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
-    SMTExprRef max_exp_bvsz = mkBVZeroExt(max_exp, bv_sz - exp_sz);
+    // Compare in whichever of the two widths is larger, so a target
+    // exponent wider than the source does not underflow the extension.
+    const unsigned cmp_w = std::max(bv_sz, exp_sz);
+    SMTExprRef max_exp_bvsz = fitBVZeroExt(*this, max_exp, cmp_w);
 
     SMTExprRef exp_too_large =
-        mkBVSle(mkBVAdd(max_exp_bvsz, mkBVFromDec(1, bv_sz)), s_exp);
+        mkBVSle(mkBVAdd(max_exp_bvsz, mkBVFromDec(1, cmp_w)),
+                fitBVSignExt(*this, s_exp, cmp_w));
     SMTExprRef zero_sig_sz = mkBVFromDec(0, sig_sz);
     sig_4 = mkIte(exp_too_large, zero_sig_sz, sig_4);
     exp_2 = mkIte(exp_too_large, max_exp, exp_2);
@@ -1941,16 +1960,6 @@ SMTExprRef SMTSolverImpl::mkUBVToFPImpl(const SMTExprRef &From,
   unsigned ebits = To->getFPExponentWidth();
   unsigned sbits = To->getFPSignificandBits();
   unsigned bv_sz = From->getWidth();
-  // The exponent is computed in the source's width: an (ebits+2)-bit
-  // extract from a bv_sz-wide term, and a zero-extension by their
-  // difference. Both need the source to be at least that wide, unless
-  // the significand is wide enough that the clamp below is skipped.
-  fatalErrorIf(ebits + 2 > bv_sz && sbits + 2 < ebits,
-               "Floating-point format unsupported by the BV encoding's "
-               "bitvector-to-float conversion: the target exponent is wider "
-               "than the source bitvector and the significand is too narrow "
-               "to compensate (requires ExpWidth+2 <= source width or "
-               "SigWidth+1 >= ExpWidth-2)");
 
   SMTExprRef bv0_1 = mkBVZero1(*this);
   SMTExprRef bv0_sz = mkBVFromDec(0, bv_sz);
@@ -1996,7 +2005,10 @@ SMTExprRef SMTSolverImpl::mkUBVToFPImpl(const SMTExprRef &From,
   assert(s_exp->getWidth() == bv_sz);
 
   unsigned exp_sz = ebits + 2; // (+2 for rounder)
-  SMTExprRef exp_2 = mkBVExtract(exp_sz - 1, 0, s_exp);
+  // s_exp is bv_sz wide and exp_sz is ebits+2; either can be the narrower,
+  // so fit rather than extract. s_exp is a signed exponent, so widening
+  // sign-extends.
+  SMTExprRef exp_2 = fitBVSignExt(*this, s_exp, exp_sz);
 
   // The exponent is at most bv_sz, i.e., we need ld(bv_sz)+1 ebits.
   // exp < bv_sz (+sign bit which is [0])
@@ -2010,10 +2022,14 @@ SMTExprRef SMTSolverImpl::mkUBVToFPImpl(const SMTExprRef &From,
     // Take the maximum legal exponent; this
     // allows us to keep the most precision.
     SMTExprRef max_exp = mkMaxExp(*this, exp_sz);
-    SMTExprRef max_exp_bvsz = mkBVZeroExt(max_exp, bv_sz - exp_sz);
+    // Compare in whichever of the two widths is larger, so a target
+    // exponent wider than the source does not underflow the extension.
+    const unsigned cmp_w = std::max(bv_sz, exp_sz);
+    SMTExprRef max_exp_bvsz = fitBVZeroExt(*this, max_exp, cmp_w);
 
     SMTExprRef exp_too_large =
-        mkBVSle(mkBVAdd(max_exp_bvsz, mkBVFromDec(1, bv_sz)), s_exp);
+        mkBVSle(mkBVAdd(max_exp_bvsz, mkBVFromDec(1, cmp_w)),
+                fitBVSignExt(*this, s_exp, cmp_w));
     SMTExprRef zero_sig_sz = mkBVFromDec(0, sig_sz);
     sig_4 = mkIte(exp_too_large, zero_sig_sz, sig_4);
     exp_2 = mkIte(exp_too_large, max_exp, exp_2);
@@ -2169,13 +2185,6 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
                                              const SMTExprRef &R) {
   unsigned ebits = From->Sort->getFPExponentWidth();
   unsigned sbits = From->Sort->getFPSignificandBits();
-  // The renormalization shift zero-extends an (ebits+2)-bit delta to
-  // sbits bits, and the subnormal path shifts by (sbits - ebits); both
-  // underflow once the significand no longer exceeds the exponent.
-  fatalErrorIf(sbits < ebits + 2,
-               "Floating-point format unsupported by the BV encoding's "
-               "roundToIntegral: the significand is too narrow for the "
-               "exponent width (requires SigWidth+1 >= ExpWidth+2)");
   SMTExprRef rm_is_rta = mkIsRM(*this, R, RM::ROUND_TO_AWAY);
   SMTExprRef rm_is_rte = mkIsRM(*this, R, RM::ROUND_TO_EVEN);
   SMTExprRef rm_is_rtp = mkIsRM(*this, R, RM::ROUND_TO_PLUS_INF);
@@ -2266,8 +2275,15 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
 
   SMTExprRef zero_s = mkBVFromDec(0, sbits);
 
-  SMTExprRef shift =
-      mkBVSub(mkBVFromDec(sbits - 1, sbits), mkBVZeroExt(a_exp, sbits - ebits));
+  // The shift amount is (sbits-1) - exponent. It is applied to a 2*sbits
+  // concat, so it has to be sbits wide there, but computing it in sbits
+  // truncates the exponent when ebits > sbits. Compute it wide enough to
+  // hold both, then narrow: the branch guarding this code has already
+  // established 0 <= exponent < sbits-1, so the value fits.
+  const unsigned shift_w = std::max(sbits, ebits) + 1;
+  SMTExprRef shift_wide = mkBVSub(mkBVFromDec(sbits - 1, shift_w),
+                                  fitBVZeroExt(*this, a_exp, shift_w));
+  SMTExprRef shift = fitBVZeroExt(*this, shift_wide, sbits);
   SMTExprRef shifted_sig =
       mkBVLshr(mkBVConcat(a_sig, zero_s), mkBVConcat(zero_s, shift));
   SMTExprRef div = mkBVExtract(2 * sbits - 1, sbits, shifted_sig);
@@ -2312,9 +2328,7 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
   assert(res_exp->getWidth() == ebits);
   assert(shift->getWidth() == sbits);
 
-  SMTExprRef e_shift = (ebits + 2 <= sbits + 1)
-                           ? mkBVExtract(ebits + 1, 0, shift)
-                           : mkBVSignExt(shift, (ebits + 2) - (sbits));
+  SMTExprRef e_shift = fitBVSignExt(*this, shift_wide, ebits + 2);
   assert(e_shift->getWidth() == ebits + 2);
   res_exp = mkBVAdd(mkBVZeroExt(res_exp, 2), e_shift);
 
@@ -2334,7 +2348,7 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
       mkIte(mkBVSle(zero_e2, sig_lz_capped), sig_lz_capped, zero_e2);
   assert(renorm_delta->getWidth() == ebits + 2);
   res_exp = mkBVSub(res_exp, renorm_delta);
-  res_sig = mkBVShl(res_sig, mkBVZeroExt(renorm_delta, sbits - ebits - 2));
+  res_sig = mkBVShl(res_sig, fitBVZeroExt(*this, renorm_delta, sbits));
 
   res_exp = mkBVExtract(ebits - 1, 0, res_exp);
   res_exp = mkBias(*this, res_exp);
