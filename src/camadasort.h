@@ -262,6 +262,12 @@ public:
   virtual void dump() const;
   virtual void dump(std::string &Out) const;
 
+  /// A short one-line rendering for diagnostics -- "(_ BitVec 32)",
+  /// "Float(8, 24)", "(Array (_ BitVec 8) Bool)". Unlike dump(), which is a
+  /// multi-line debugging aid, this is meant to be embedded in an error
+  /// message naming the sort that was wrong.
+  std::string describe() const;
+
 protected:
   unsigned getStoredWidth() const;
 
