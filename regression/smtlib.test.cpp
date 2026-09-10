@@ -854,10 +854,25 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
             std::string::npos);
     std::remove(Path.c_str());
   }
-  // A rejected explicit logic is a fatal error, not a silent downgrade.
-  requireAborts([&]() {
-    auto solver = std::make_unique<camada::SMTLIBSolver>(
-        camada::SMTLIBProcessTag{}, ModelArgv, withLogic("NOT_A_LOGIC"));
-    (void)solver->check();
-  });
+  // A rejected explicit logic is reported, not a silent downgrade and no
+  // longer fatal: a child that starts but refuses the caller's logic is a
+  // backend failure under the failure model in camada.h, so it surfaces
+  // through setupError() -- which is what createSMTLIBSolver() turns into
+  // the factory's SMTError. Direct construction leaves the solver
+  // half-built, the same shape an unopenable tee path already had.
+  {
+    camada::SMTLIBSolver solver(camada::SMTLIBProcessTag{}, ModelArgv,
+                                withLogic("NOT_A_LOGIC"));
+    const std::string Error = solver.setupError();
+    REQUIRE_FALSE(Error.empty());
+    REQUIRE(Error.find("NOT_A_LOGIC") != std::string::npos);
+  }
+  // ... and through the factory it is an SMTError rather than an abort.
+  {
+    auto Created =
+        camada::createSMTLIBSolver(ModelArgv, withLogic("NOT_A_LOGIC"));
+    REQUIRE_FALSE(Created);
+    REQUIRE(Created.error().Code == camada::SMTErrorCode::BackendError);
+    REQUIRE(Created.error().Message.find("NOT_A_LOGIC") != std::string::npos);
+  }
 }

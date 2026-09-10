@@ -528,6 +528,12 @@ public:
   /// whose child never started or whose script file never opened.
   std::string setupError() const;
 
+  /// Set when the child solver rejects a command in the construction-time
+  /// preamble. The emitters report their own spawn and open failures;
+  /// this covers a child that starts but refuses to negotiate, which is a
+  /// backend failure rather than caller error and so must not abort.
+  std::string PreambleError;
+
   std::string getSolverNameAndVersion() const override;
 
 public:

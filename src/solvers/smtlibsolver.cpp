@@ -259,7 +259,12 @@ namespace {
 //
 // Returns the empty string on EOF.
 std::string readOneSmtlibResponse(std::FILE *In) {
-  fatalErrorIf(!In, "ProcessEmitter::readResponse: stream is null");
+  // No read side is the same as EOF, which is how readResponseWithin
+  // already treats it: a write-only emitter has nothing to report, and a
+  // consumer that reaches this through a dead child should see the empty
+  // response its callers already handle rather than lose the process.
+  if (!In)
+    return {};
 
   // Skip leading whitespace and comments. SMT-LIB 2.6 §3.1 allows a `;`
   // comment through end-of-line anywhere in the solver's output, and
@@ -744,7 +749,7 @@ std::string SMTLIBSolver::setupError() const {
     return File->openError();
   if (Proc && !Proc->spawnError().empty())
     return Proc->spawnError();
-  return {};
+  return PreambleError;
 }
 
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
@@ -1086,11 +1091,12 @@ void SMTLIBSolver::emitPreamble() {
         Proc.reset();
     } else {
       const std::string Resp = Proc->readResponse();
-      fatalErrorIf(Resp != "success",
-                   ("SMTLIBSolver: child solver rejected the caller-chosen "
-                    "(set-logic " +
-                    logic() + "): " + Resp)
-                       .c_str());
+      if (Resp != "success") {
+        PreambleError = "child solver rejected the caller-chosen "
+                        "(set-logic " +
+                        logic() + "): " + Resp;
+        return;
+      }
     }
     if (File)
       File->emitRaw("(set-logic " + logic() + ")\n");
@@ -1127,11 +1133,12 @@ void SMTLIBSolver::emitPreamble() {
       Proc->emitRaw("(set-logic QF_AUFBV)\n");
       Proc->flush();
       std::string Resp = Proc->readResponse();
-      fatalErrorIf(Resp != "success",
-                   ("SMTLIBSolver: child solver rejected both (set-logic ALL) "
-                    "and (set-logic QF_AUFBV): " +
-                    Resp)
-                       .c_str());
+      if (Resp != "success") {
+        PreambleError = "child solver rejected both (set-logic ALL) and "
+                        "(set-logic QF_AUFBV): " +
+                        Resp;
+        return;
+      }
     }
     if (File)
       File->emitRaw("(set-logic " + Logic + ")\n");

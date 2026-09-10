@@ -165,6 +165,13 @@ CAMADA_Z3_SMTLIB_PIPELINE_TEST("factory reports setup failure",
 CAMADA_Z3_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
                                runSMTLIBDualEmitter)
 
+// Needs no solver binary: the child is a shell script that rejects
+// (set-logic), so it runs unconditionally rather than through the macro.
+TEST_CASE("SMTLIB pipeline: preamble rejection is reported [z3]",
+          "[Z3][SMTLIB][pipeline]") {
+  camada_smtlib_pipeline::runSMTLIBPreambleRejectionReported();
+}
+
 #undef CAMADA_Z3_SMTLIB_PIPELINE_TEST
 
 // Shared fixtures driven through the pipe. Each TEST_CASE creates a fresh

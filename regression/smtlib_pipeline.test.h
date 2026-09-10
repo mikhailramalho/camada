@@ -33,6 +33,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace camada_smtlib_pipeline {
@@ -208,6 +209,35 @@ runSMTLIBFactoryReportsSetupFailure(const std::vector<std::string> &Argv) {
   REQUIRE_FALSE(Created);
   REQUIRE(Created.error().Code == camada::SMTErrorCode::BackendError);
   REQUIRE(Created.error().Message.find("output file") != std::string::npos);
+}
+
+// A child that starts but then refuses to negotiate is a backend failure,
+// not caller error, so it is reported rather than fatal. The rejection is
+// written in the two-line shape stp uses (diagnostic then a stray ack), the
+// one the preamble's resync path expects; a single-line rejection leaves
+// camada waiting on a reply the child never sends, which is issue #167's
+// territory rather than this contract's. Before the failure model was
+// enforced this aborted the process. See #154.
+inline void runSMTLIBPreambleRejectionReported() {
+  std::string Path = makeTempPath() + ".sh";
+  {
+    std::ofstream Out(Path);
+    REQUIRE(Out.good());
+    Out << "#!/bin/sh\n"
+           "while IFS= read -r line; do\n"
+           "  case \"$line\" in\n"
+           "    *set-logic*) echo '(error \"no\")'; echo success ;;\n"
+           "    *)           echo success ;;\n"
+           "  esac\n"
+           "done\n";
+  }
+  REQUIRE(::chmod(Path.c_str(), 0700) == 0);
+
+  auto Created = camada::createSMTLIBSolver({Path});
+  REQUIRE_FALSE(Created);
+  REQUIRE(Created.error().Code == camada::SMTErrorCode::BackendError);
+  REQUIRE(Created.error().Message.find("set-logic") != std::string::npos);
+  ::unlink(Path.c_str());
 }
 
 // The createSMTLIBSolver(Argv) public factory must produce a solver that can
