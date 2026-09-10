@@ -43,6 +43,58 @@ std::string getCamadaVersion();
 /// This class is responsible for wrapping all sorts and expression generation,
 /// through the mk* methods.
 ///
+/// Failure model:
+///
+/// Camada splits failures into ones the caller could have prevented and ones
+/// it could not. The first kind aborts, the second is reported.
+///
+///   * Caller error aborts via fatalError(). Passing the wrong sort, a zero
+///     width, a stale or foreign handle, a reserved `__CAMADA_` symbol name,
+///     or an out-of-range enum is a bug in the calling code, not a runtime
+///     condition. Most of camada's abort sites are this kind. They stay
+///     aborts deliberately: returning SMTResult from every mk* method would
+///     force error handling at thousands of call sites that cannot fail,
+///     and a caller who wrote the wrong sort has nothing to recover to.
+///     This is the same division LLVM draws between assertions and
+///     recoverable errors. Where the abort text names the operation and the
+///     sorts involved, it is meant to be read directly -- see mkEqual.
+///
+///   * Missing build configuration aborts. "Camada was not compiled with Z3
+///     support" is settled on the first run of a build, not per input, so
+///     the create*Solver() factories for a backend that was compiled out
+///     abort rather than return an error every caller would have to check.
+///
+///   * Environment and backend failures are reported, never fatal. A
+///     process, file descriptor, or memory limit that stops camada from
+///     starting a child solver, and a backend that starts but then refuses
+///     a command, returns garbage, or dies mid-solve, are conditions a
+///     long-running consumer can neither predict nor prevent. These arrive
+///     as SMTResult<T> holding an SMTError -- see createSMTLIBSolver(), the
+///     model getters, and getUnsatAssumptions(). The in-process factories
+///     (createZ3Solver() and friends) return a bare SMTSolverRef because
+///     they link the backend directly: there is no child to spawn and no
+///     pipe to lose, so they have no environment failure to report.
+///     Constructing SMTLIBSolver directly rather than through its factory
+///     bypasses that reporting: a constructor has no error channel, so it
+///     leaves the object half-built and the failure readable through
+///     SMTLIBSolver::setupError(). Prefer the factory.
+///
+///   * Camada does not abort on valid input the caller could not have
+///     checked first. Where a backend cannot do something camada either
+///     does it itself in the common layer or answers through
+///     supports(SolverFeature) beforehand, so the caller can branch. The
+///     one abort of this shape that remains -- MathSAT's lack of a native
+///     round-to-away term -- is queryable as
+///     SolverFeature::NativeRoundToAway and has FPEncoding::BV as a
+///     working escape hatch.
+///
+/// Two backend-failure paths are known exceptions, both on the SMT-LIB pipe
+/// backend and both after construction has succeeded: a child that rejects
+/// a declaration command (makeSMTLIBExpr) or closes the pipe during reset()
+/// still aborts, because those sit on void hot paths whose signatures every
+/// expression builder shares. Reporting them would mean making construction
+/// fallible everywhere, which this model rejects.
+///
 /// Threading contract:
 ///   * An SMTSolver instance is NOT thread-safe. All mutating and querying
 ///     methods (mk*, addConstraint, push/pop, check, get*, reset, dump...)
