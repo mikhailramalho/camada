@@ -664,6 +664,24 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
       69255f55e411207c4bdea02c6c2ab1ef29740ce1 cms_cadiback_source_dir)
     camada_prepare_cryptominisat_dependency_layout("${cms_cadiback_dir}"
                                                    "${cms_cadiback_source_dir}")
+    # cadiback's configure builds its compile line from CXX and ignores
+    # CXXFLAGS, so extra flags have to ride along with the compiler name. It
+    # then substitutes that string with sed -e "s/@COMPILE@/$COMPILE/", which an
+    # absolute compiler path breaks on its own slashes, so pass only the
+    # basename and let PATH resolve it -- what the script's own default does.
+    get_filename_component(camada_cadiback_cxx_name "${CMAKE_CXX_COMPILER}"
+                           NAME)
+    set(camada_cadiback_cxx "${camada_cadiback_cxx_name} -iquote.")
+    #
+    # -I- has no modern equivalent, but the problem it solves is live here:
+    # cadiback ships a plain-text VERSION file holding "0.2.1", and Clang
+    # searches the compilation directory for angle-bracket includes. On a
+    # case-insensitive filesystem the libc++ chain <algorithm> -> ... ->
+    # <cstddef> -> #include <version> finds that file and the build dies on
+    # "./version:1:1: expected unqualified-id". -iquote. keeps the directory
+    # available to "..." includes, which is all cadiback.cpp needs from it,
+    # while leaving <version> to the SDK. Harmless on GCC, which never searched
+    # the directory for <> includes to begin with.
     camada_run_checked(
       WORKING_DIRECTORY
       "${cms_cadiback_dir}"
@@ -673,6 +691,7 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
       ${CMAKE_COMMAND}
       -E
       env
+      "CXX=${camada_cadiback_cxx}"
       "CXXFLAGS=-fPIC ${CAMADA_CMS_EXTRA_CXX_FLAGS}"
       ./configure)
     camada_run_checked(
