@@ -40,5 +40,12 @@ jobs:
     - name: Build Camada
       run: cmake --build build --target install
 
+    # This leg links every backend statically, which is the only configuration
+    # where two bundled copies of one SAT engine collide. It is invisible at
+    # link time and the suite below does not reach the affected code path, so
+    # check the archives directly.
+    - name: Check for duplicate SAT engines
+      run: ./scripts/check-duplicate-sat-engines.py --verbose build/deps/install
+
     - name: Run tests
       run: ctest --test-dir build --parallel 4 --output-on-failure

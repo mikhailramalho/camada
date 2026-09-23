@@ -64,6 +64,46 @@ set(CAMADA_CVC5_MACOS_ARM64_URL
 # picpolyxx, and gmp as bare-name INTERFACE_LINK_LIBRARIES, but the static
 # Windows release zip merges them into cvc5.lib without shipping standalone .lib
 # files, so MSVC fails with LNK1104 trying to find cadical.lib.
+
+# Only the static combination of both backends is broken: a shared build gives
+# each library its own CaDiCaL, so the default turns the source build on exactly
+# where it is needed and leaves every other configuration on the prebuilt
+# archive, which is far cheaper to fetch.
+if(NOT BUILD_SHARED_LIBS
+   AND CAMADA_SOLVER_BITWUZLA_ENABLE STREQUAL "ON"
+   AND CAMADA_SOLVER_CVC5_ENABLE STREQUAL "ON")
+  set(_camada_shared_cadical_default ON)
+else()
+  set(_camada_shared_cadical_default OFF)
+endif()
+option(
+  CAMADA_SHARED_CADICAL
+  "Build Bitwuzla from source against the same CaDiCaL CVC5 uses, so a static build of both does not link two incompatible copies"
+  ${_camada_shared_cadical_default})
+
+# CVC5 ships a patched CaDiCaL ("elevate"), Bitwuzla's prebuilt bundles stock
+# CaDiCaL inside libbitwuzla.a. A static link of both keeps one definition of
+# each of their ~1100 shared symbols while each library's code still computes
+# member offsets from the headers it was compiled against -- cvc5 builds CaDiCaL
+# with -DQUIET, which drops two members from the middle of CaDiCaL::Internal, so
+# the survivor reads every later field at the wrong offset. Bitwuzla then sized
+# a Walker allocation from garbage and asked for 8 GB. Building Bitwuzla from
+# source against cvc5's exact CaDiCaL leaves one implementation in the binary
+# and removes the clash. Source and flags are taken verbatim from cvc5's
+# cmake/FindCaDiCaL.cmake so the two agree.
+set(CAMADA_CADICAL_URL
+    "https://github.com/arminbiere/cadical/archive/rel-2.1.3-elevate.tar.gz"
+    CACHE STRING
+          "URL of the CaDiCaL source shared by the Bitwuzla and CVC5 backends")
+set(CAMADA_CADICAL_SHA256
+    "15e1e82f7f9a9da0e97070cb8ac41d5b32139f65d54f72d2ff84849b0466ef92"
+    CACHE STRING "Expected SHA256 of the shared CaDiCaL source archive")
+set(CAMADA_BITWUZLA_GIT_TAG
+    "0.9.1"
+    CACHE
+      STRING
+      "Bitwuzla tag used when building it from source against a shared CaDiCaL")
+
 set(CAMADA_BITWUZLA_LINUX_X86_64_URL
     "https://github.com/bitwuzla/bitwuzla/releases/download/0.9.1/Bitwuzla-Linux-x86_64-static.zip"
     CACHE STRING
@@ -901,7 +941,176 @@ function(camada_setup_minisat)
   file(WRITE "${minisat_source_stamp}" "1\n")
 endfunction()
 
+# Builds the CaDiCaL that both Bitwuzla and CVC5 link against, with the same
+# source and flags CVC5's own recipe uses (cmake/FindCaDiCaL.cmake). -DQUIET in
+# particular is load-bearing: it changes CaDiCaL::Internal's layout, so a
+# CaDiCaL built without it is not interchangeable with CVC5's.
+function(camada_setup_shared_cadical out_dir)
+  # Deliberately outside CAMADA_DEPS_INSTALL_DIR: this copy exists only so
+  # Bitwuzla's meson find_library can see it at build time, and a second
+  # libcadical.a inside the installed tree would look exactly like the
+  # duplicate-engine bug that scripts/check-duplicate-sat-engines.py hunts.
+  set(cadical_prefix "${CAMADA_DEPS_DIR}/cadical")
+  set(cadical_lib "${cadical_prefix}/lib/libcadical.a")
+  set(cadical_header "${cadical_prefix}/include/cadical/cadical.hpp")
+  set(cadical_stamp "${cadical_prefix}/camada-cadical.stamp")
+  # Bump when the URL or the flags below change, so an install left by an older
+  # recipe is rebuilt rather than silently reused.
+  set(cadical_recipe_version "1:${CAMADA_CADICAL_SHA256}")
+
+  set(${out_dir}
+      "${cadical_prefix}"
+      PARENT_SCOPE)
+
+  if(EXISTS "${cadical_lib}" AND EXISTS "${cadical_header}")
+    if(EXISTS "${cadical_stamp}")
+      file(READ "${cadical_stamp}" cadical_stamp_contents)
+      string(STRIP "${cadical_stamp_contents}" cadical_stamp_contents)
+      if(cadical_stamp_contents STREQUAL cadical_recipe_version)
+        return()
+      endif()
+    endif()
+  endif()
+
+  camada_ensure_deps_dirs()
+  get_filename_component(cadical_archive_name "${CAMADA_CADICAL_URL}" NAME)
+  set(cadical_archive "${CAMADA_DEPS_SRC_DIR}/${cadical_archive_name}")
+
+  camada_download_file("${CAMADA_CADICAL_URL}" "${cadical_archive}")
+  file(SHA256 "${cadical_archive}" cadical_actual_sha256)
+  if(NOT cadical_actual_sha256 STREQUAL CAMADA_CADICAL_SHA256)
+    message(
+      FATAL_ERROR
+        "CaDiCaL archive checksum mismatch.\nURL: ${CAMADA_CADICAL_URL}\nExpected: ${CAMADA_CADICAL_SHA256}\nActual:   ${cadical_actual_sha256}"
+    )
+  endif()
+
+  # The archive unpacks to cadical-<tag>/ ; cmake -E tar cannot strip a leading
+  # component, so take the directory the tag gives us.
+  string(REGEX REPLACE "\\.tar\\.gz$" "" cadical_tag_name
+                       "${cadical_archive_name}")
+  set(cadical_source_dir "${CAMADA_DEPS_SRC_DIR}/cadical-${cadical_tag_name}")
+  camada_extract_archive(
+    ARCHIVE_PATH
+    "${cadical_archive}"
+    DESTINATION_DIR
+    "${CAMADA_DEPS_SRC_DIR}"
+    MARKER_PATH
+    "${cadical_source_dir}/makefile.in"
+    ARCHIVE_URL
+    "${CAMADA_CADICAL_URL}"
+    SOURCE_DIR
+    "${cadical_source_dir}")
+
+  # CaDiCaL's configure script is avoided the same way CVC5 avoids it: the
+  # makefile template is instantiated directly, which also keeps the flags under
+  # our control rather than the script's.
+  set(cadical_build_dir "${cadical_source_dir}/build")
+  file(MAKE_DIRECTORY "${cadical_build_dir}")
+  file(READ "${cadical_source_dir}/makefile.in" cadical_makefile)
+  string(REPLACE "@CXX@" "${CMAKE_CXX_COMPILER}" cadical_makefile
+                 "${cadical_makefile}")
+  string(REPLACE "@CXXFLAGS@" "-fPIC -O3 -DNDEBUG -DQUIET -std=c++11"
+                 cadical_makefile "${cadical_makefile}")
+  string(REPLACE "@ROOT@" "${cadical_source_dir}" cadical_makefile
+                 "${cadical_makefile}")
+  string(REPLACE "@CONTRIB@" "no" cadical_makefile "${cadical_makefile}")
+  file(WRITE "${cadical_build_dir}/makefile" "${cadical_makefile}")
+
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${cadical_build_dir}"
+    MESSAGE
+    "Building CaDiCaL"
+    COMMAND
+    make
+    -j
+    libcadical.a)
+
+  file(MAKE_DIRECTORY "${cadical_prefix}/lib")
+  file(MAKE_DIRECTORY "${cadical_prefix}/include/cadical")
+  file(COPY "${cadical_build_dir}/libcadical.a"
+       DESTINATION "${cadical_prefix}/lib")
+  file(COPY "${cadical_source_dir}/src/cadical.hpp"
+            "${cadical_source_dir}/src/tracer.hpp"
+       DESTINATION "${cadical_prefix}/include/cadical")
+  file(WRITE "${cadical_stamp}" "${cadical_recipe_version}\n")
+endfunction()
+
+# Builds Bitwuzla from source against the shared CaDiCaL. Bitwuzla's
+# src/meson.build prefers a system CaDiCaL over its bundled subproject:
+# cadical_dep = cpp_compiler.find_library('cadical', has_headers: [...]) so
+# staging the shared build where the compiler looks is enough to keep the stock
+# copy out of libbitwuzla.a. find_library consults the compiler's own search
+# path, which -Dcpp_link_args does not extend -- hence LIBRARY_PATH.
+function(camada_build_bitwuzla_from_source cadical_prefix)
+  camada_find_program_with_prefixes(meson_program meson)
+  camada_find_program_with_prefixes(ninja_program ninja)
+  if(NOT meson_program OR NOT ninja_program)
+    message(
+      FATAL_ERROR
+        "Building Bitwuzla from source needs meson and ninja on PATH (CAMADA_SHARED_CADICAL is ON)."
+    )
+  endif()
+
+  camada_fetch_git_source(bitwuzla bitwuzla/bitwuzla
+                          "${CAMADA_BITWUZLA_GIT_TAG}" bitwuzla_source_dir)
+  set(bitwuzla_build_dir "${bitwuzla_source_dir}/build-camada")
+  file(REMOVE_RECURSE "${bitwuzla_build_dir}")
+
+  set(saved_library_path "$ENV{LIBRARY_PATH}")
+  set(saved_cpath "$ENV{CPATH}")
+  if(saved_library_path)
+    set(ENV{LIBRARY_PATH} "${cadical_prefix}/lib:${saved_library_path}")
+  else()
+    set(ENV{LIBRARY_PATH} "${cadical_prefix}/lib")
+  endif()
+  if(saved_cpath)
+    set(ENV{CPATH} "${cadical_prefix}/include:${saved_cpath}")
+  else()
+    set(ENV{CPATH} "${cadical_prefix}/include")
+  endif()
+
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${bitwuzla_source_dir}"
+    MESSAGE
+    "Configuring Bitwuzla against the shared CaDiCaL"
+    COMMAND
+    "${meson_program}"
+    setup
+    "${bitwuzla_build_dir}"
+    "--prefix=${CAMADA_DEPS_INSTALL_DIR}"
+    "--default-library=static"
+    "--buildtype=release"
+    -Dcadical=true
+    -Dkissat=false
+    -Dcryptominisat=false
+    -Dgimsatul=false
+    -Dtesting=disabled)
+  camada_run_checked(WORKING_DIRECTORY "${bitwuzla_build_dir}" MESSAGE
+                     "Building Bitwuzla" COMMAND "${ninja_program}")
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${bitwuzla_build_dir}"
+    MESSAGE
+    "Installing Bitwuzla"
+    COMMAND
+    "${ninja_program}"
+    install)
+
+  set(ENV{LIBRARY_PATH} "${saved_library_path}")
+  set(ENV{CPATH} "${saved_cpath}")
+endfunction()
+
 function(camada_setup_bitwuzla)
+  if(CAMADA_SHARED_CADICAL
+     AND NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
+    camada_ensure_deps_dirs()
+    camada_setup_shared_cadical(camada_cadical_prefix)
+    camada_build_bitwuzla_from_source("${camada_cadical_prefix}")
+  endif()
+
   if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
     camada_ensure_deps_dirs()
     camada_select_prebuilt_url(bitwuzla_url BITWUZLA)
@@ -927,6 +1136,15 @@ function(camada_setup_bitwuzla)
     camada_stage_prebuilt_tree("${bitwuzla_root_dir}")
   endif()
 
+  # A source-built Bitwuzla links CaDiCaL externally, so the pkg-config file has
+  # to name it; meson writes an absolute build-time path here, which the rewrite
+  # below replaces with the installed one. The prebuilt bundles CaDiCaL inside
+  # libbitwuzla.a and needs no extra flag.
+  set(bitwuzla_cadical_flags "")
+  if(EXISTS "${CAMADA_DEPS_DIR}/cadical/lib/libcadical.a")
+    set(bitwuzla_cadical_flags " ${CAMADA_DEPS_DIR}/cadical/lib/libcadical.a")
+  endif()
+
   file(
     GLOB
     bitwuzla_pc_files
@@ -941,7 +1159,7 @@ function(camada_setup_bitwuzla)
                            DIRECTORY)
     file(
       WRITE "${bitwuzla_pc_file}"
-      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb\nCflags: -I\${includedir}\n"
+      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb${bitwuzla_cadical_flags}\nCflags: -I\${includedir}\n"
     )
   endforeach()
 endfunction()

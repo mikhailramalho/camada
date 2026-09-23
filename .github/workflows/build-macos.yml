@@ -46,5 +46,10 @@ jobs:
     - name: Build Camada
       run: cmake --build build --target install
 
+    # See the matching step in build-linux.yml: a static link of two backends
+    # that each bundle a SAT engine corrupts field offsets silently.
+    - name: Check for duplicate SAT engines
+      run: ./scripts/check-duplicate-sat-engines.py --verbose build/deps/install
+
     - name: Run tests
       run: ctest --test-dir build --parallel 4 --output-on-failure
