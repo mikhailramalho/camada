@@ -65,21 +65,21 @@ set(CAMADA_CVC5_MACOS_ARM64_URL
 # Windows release zip merges them into cvc5.lib without shipping standalone .lib
 # files, so MSVC fails with LNK1104 trying to find cadical.lib.
 
-# Only the static combination of both backends is broken: a shared build gives
-# each library its own CaDiCaL, so the default turns the source build on exactly
-# where it is needed and leaves every other configuration on the prebuilt
-# archive, which is far cheaper to fetch.
-if(NOT BUILD_SHARED_LIBS
-   AND CAMADA_SOLVER_BITWUZLA_ENABLE STREQUAL "ON"
-   AND CAMADA_SOLVER_CVC5_ENABLE STREQUAL "ON")
-  set(_camada_shared_cadical_default ON)
+# Enabling both backends is what triggers the clash, in either link mode, so the
+# source build below is not optional: there is no configuration where linking
+# two incompatible CaDiCaLs is the right answer. BUILD_SHARED_LIBS does not help
+# the way it helps a consumer linking two ready-made shared objects -- the
+# Bitwuzla and CVC5 prebuilts are static archives whichever way Camada is built,
+# so both CaDiCaLs land in libcamada.so too and one of them wins there as well.
+# Measured on a shared build: libcamada.so carried CaDiCaL 2.1.2 only, with
+# CVC5's elevate API absent, the same mismatch and merely not yet fatal on the
+# inputs tried.
+if(CAMADA_SOLVER_BITWUZLA_ENABLE STREQUAL "ON" AND CAMADA_SOLVER_CVC5_ENABLE
+                                                   STREQUAL "ON")
+  set(CAMADA_SHARED_CADICAL ON)
 else()
-  set(_camada_shared_cadical_default OFF)
+  set(CAMADA_SHARED_CADICAL OFF)
 endif()
-option(
-  CAMADA_SHARED_CADICAL
-  "Build Bitwuzla from source against the same CaDiCaL CVC5 uses, so a static build of both does not link two incompatible copies"
-  ${_camada_shared_cadical_default})
 
 # CVC5 ships a patched CaDiCaL ("elevate"), Bitwuzla's prebuilt bundles stock
 # CaDiCaL inside libbitwuzla.a. A static link of both keeps one definition of
@@ -956,7 +956,7 @@ function(camada_setup_shared_cadical out_dir)
   set(cadical_stamp "${cadical_prefix}/camada-cadical.stamp")
   # Bump when the URL or the flags below change, so an install left by an older
   # recipe is rebuilt rather than silently reused.
-  set(cadical_recipe_version "1:${CAMADA_CADICAL_SHA256}")
+  set(cadical_recipe_version "3:${CAMADA_CADICAL_SHA256}")
 
   set(${out_dir}
       "${cadical_prefix}"
@@ -1002,6 +1002,30 @@ function(camada_setup_shared_cadical out_dir)
     SOURCE_DIR
     "${cadical_source_dir}")
 
+  # CVC5's flags, including the same feature probes: CaDiCaL guards these calls
+  # on the macros instead of detecting them, so a platform without closefrom()
+  # (macOS) fails to compile without -DNCLOSEFROM. -DQUIET is the load-bearing
+  # one for ABI compatibility and is not conditional. check_cxx_symbol_exists,
+  # not check_symbol_exists: Camada enables C as well as C++, so the plain form
+  # compiles the probe as C, where <cstdio> does not exist and every probe
+  # fails. CaDiCaL is C++, so ask the C++ compiler.
+  include(CheckCXXSymbolExists)
+  set(cadical_cxxflags "-fPIC -O3 -DNDEBUG -DQUIET -std=c++11")
+  check_cxx_symbol_exists("getc_unlocked" "cstdio"
+                          CAMADA_CADICAL_HAVE_UNLOCKED_IO)
+  if(NOT CAMADA_CADICAL_HAVE_UNLOCKED_IO)
+    string(APPEND cadical_cxxflags " -DNUNLOCKED")
+  endif()
+  check_cxx_symbol_exists("closefrom" "fcntl.h" CAMADA_CADICAL_HAVE_CLOSEFROM)
+  if(NOT CAMADA_CADICAL_HAVE_CLOSEFROM)
+    string(APPEND cadical_cxxflags " -DNCLOSEFROM")
+  endif()
+  # macOS headers are not necessarily under /usr/include any more.
+  if(CMAKE_OSX_SYSROOT)
+    string(APPEND cadical_cxxflags
+           " ${CMAKE_CXX_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
+  endif()
+
   # CaDiCaL's configure script is avoided the same way CVC5 avoids it: the
   # makefile template is instantiated directly, which also keeps the flags under
   # our control rather than the script's.
@@ -1010,8 +1034,8 @@ function(camada_setup_shared_cadical out_dir)
   file(READ "${cadical_source_dir}/makefile.in" cadical_makefile)
   string(REPLACE "@CXX@" "${CMAKE_CXX_COMPILER}" cadical_makefile
                  "${cadical_makefile}")
-  string(REPLACE "@CXXFLAGS@" "-fPIC -O3 -DNDEBUG -DQUIET -std=c++11"
-                 cadical_makefile "${cadical_makefile}")
+  string(REPLACE "@CXXFLAGS@" "${cadical_cxxflags}" cadical_makefile
+                 "${cadical_makefile}")
   string(REPLACE "@ROOT@" "${cadical_source_dir}" cadical_makefile
                  "${cadical_makefile}")
   string(REPLACE "@CONTRIB@" "no" cadical_makefile "${cadical_makefile}")
@@ -1049,7 +1073,7 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
   if(NOT meson_program OR NOT ninja_program)
     message(
       FATAL_ERROR
-        "Building Bitwuzla from source needs meson and ninja on PATH (CAMADA_SHARED_CADICAL is ON)."
+        "Building Bitwuzla from source needs meson and ninja on PATH. Camada builds it from source whenever the Bitwuzla and CVC5 backends are both enabled, so that they share one CaDiCaL; install them, or disable one of the two backends."
     )
   endif()
 

@@ -132,10 +132,11 @@ def main():
               file=sys.stderr)
         for archive, count in found:
             print(f"  {archive}  ({count} strong symbols)", file=sys.stderr)
-    print("\nA static link keeps one definition of each shared symbol while "
-          "every\nlibrary keeps the field offsets it was compiled with. Build "
-          "the backends\nagainst one copy of the engine -- for CaDiCaL, "
-          "configure with\n-DCAMADA_SHARED_CADICAL=ON.", file=sys.stderr)
+    print("\nA link keeps one definition of each shared symbol while every "
+          "library\nkeeps the field offsets it was compiled with. Build the "
+          "backends against\none copy of the engine; Camada does this for "
+          "CaDiCaL whenever the Bitwuzla\nand CVC5 backends are both enabled.",
+          file=sys.stderr)
     return 1
 
 
