@@ -115,16 +115,26 @@ if(_camada_download_yices
   endif()
 endif()
 
-# Hack needed for Ubuntu, since it is not linking with static libs from system
-if(DEFINED GMP_DIR)
+# Yices is built against GMP and its archive carries undefined __gmpz_*/__gmpq_*
+# references, so the link interface has to name it. The staged copy comes first:
+# camada_setup_yices() builds GMP itself when the host has none, and linking a
+# different GMP than Yices was compiled against is how subtle breakage starts.
+#
+# This replaces a block guarded on GMP_DIR, a variable nothing in the tree ever
+# set, so GMP was in practice never linked -- a build with Yices as the only
+# backend failed with undefined __gmpq_clear and friends.
+set(_camada_yices_staged_gmp "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+if(EXISTS "${_camada_yices_staged_gmp}")
+  list(APPEND CAMADA_YICES_LIB "${_camada_yices_staged_gmp}")
+else()
   find_library(
-    LIBGMP_CUSTOM gmp
-    NAMES libgmp.a
-    PATHS ${GMP_DIR}
-    PATH_SUFFIXES lib
-    NO_DEFAULT_PATH)
-  message(STATUS "Custom gmp for yices found: ${LIBGMP_CUSTOM}")
-  list(APPEND CAMADA_YICES_LIB "${LIBGMP_CUSTOM}")
+    LIBGMP_CUSTOM
+    NAMES gmp
+    HINTS ${GMP_DIR}
+    PATH_SUFFIXES lib)
+  if(LIBGMP_CUSTOM)
+    list(APPEND CAMADA_YICES_LIB "${LIBGMP_CUSTOM}")
+  endif()
 endif()
 
 # handle the QUIETLY and REQUIRED arguments and set YICES_FOUND to TRUE if all
