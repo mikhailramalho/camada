@@ -347,6 +347,7 @@ config_info_bool("Shared build" "${BUILD_SHARED_LIBS}")
 config_info("Download dependencies" "${CAMADA_DOWNLOAD_DEPENDENCIES}")
 
 config_info_bool("Solver Bitwuzla" "${CAMADA_SOLVER_BITWUZLA_ENABLE}")
+config_info_bool("Shared CaDiCaL" "${CAMADA_SHARED_CADICAL}")
 config_info_bool("Solver CVC5" "${CAMADA_SOLVER_CVC5_ENABLE}")
 config_info_bool("Solver MathSAT" "${CAMADA_SOLVER_MATHSAT_ENABLE}")
 config_info_bool("Solver STP" "${CAMADA_SOLVER_STP_ENABLE}")
