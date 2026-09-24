@@ -1228,7 +1228,10 @@ function(camada_build_cvc5_from_source)
     --name=${cvc5_build_name}
     --prefix=${CAMADA_DEPS_INSTALL_DIR}
     --dep-path=${CAMADA_CADICAL_PREFIX}
-    -DUSE_PYTHON_VENV=OFF
+    # USE_PYTHON_VENV is left at CVC5's default (ON): it builds a venv under the
+    # build tree and installs pyparsing there. Forcing it OFF makes CVC5
+    # pip-install into the system interpreter, which PEP 668 refuses on Homebrew
+    # and on recent Debian/Ubuntu ("externally-managed-environment").
     -DBUILD_BINDINGS_JAVA=OFF)
 
   # CVC5's configure generates Unix Makefiles, not Ninja. Bare `make -j` is
