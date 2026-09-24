@@ -72,7 +72,12 @@ endmacro()
 macro(_camada_declare_cvc5_link_targets)
   camada_setup_shared_cadical()
   _camada_declare_bare_link_target(cadical "${CAMADA_CADICAL_LIB}")
-  foreach(_camada_bare_lib IN ITEMS picpoly picpolyxx gmp mpfr)
+  # gmp comes from the one selection the whole build shares, rather than a
+  # search that could land on a different copy from the one the other backends
+  # link.
+  camada_gmp_library(_camada_cvc5_gmp_lib)
+  _camada_declare_bare_link_target(gmp "${_camada_cvc5_gmp_lib}")
+  foreach(_camada_bare_lib IN ITEMS picpoly picpolyxx mpfr)
     _camada_declare_bare_link_target(${_camada_bare_lib})
   endforeach()
 endmacro()

@@ -59,7 +59,7 @@ find_library(
   HINTS ${_camada_mathsat_hints}
   PATH_SUFFIXES lib bin)
 
-find_library(CAMADA_MATHSAT_GMP_LIB gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+camada_gmp_library(CAMADA_MATHSAT_GMP_LIB)
 find_path(
   CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
   HINTS ${_camada_mathsat_gmp_hints}
@@ -76,7 +76,7 @@ if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
     CAMADA_MATHSAT_LIB mathsat
     HINTS ${_camada_mathsat_hints}
     PATH_SUFFIXES lib bin)
-  find_library(CAMADA_MATHSAT_GMP_LIB gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+  camada_gmp_library(CAMADA_MATHSAT_GMP_LIB)
   find_path(
     CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
     HINTS ${_camada_mathsat_gmp_hints}

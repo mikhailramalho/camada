@@ -792,6 +792,48 @@ function(camada_setup_cryptominisat)
   file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
 endfunction()
 
+# One GMP for the whole build, and Camada always builds it.
+#
+# Using the system copy looks tempting, since CVC5 and the MathSAT prebuilt
+# already resolve GMP against it. But Yices absorbs GMP statically into
+# libyices.so, and a distribution's libgmp.a is normally compiled without -fPIC,
+# so that link fails with "relocation R_X86_64_PC32 against symbol
+# `__gmp_free_func' can not be used when making a shared object".
+#
+# Detecting which copies are safe was tried and dropped: try_compile and try_run
+# only link the members they reference, so both accepted the archive Yices then
+# rejected, even under --whole-archive; reading relocations does separate them,
+# but only by parsing GNU objdump and ELF relocation names, which do not carry
+# to macOS, where all four GMP-using backends are enabled.
+#
+# Building unconditionally is predictable everywhere and puts one archive on the
+# link line instead of two, which is the whole point.
+
+# One GMP for the whole build, and Camada builds it.
+#
+# The system copy looks tempting -- CVC5 and the MathSAT prebuilt already
+# resolve GMP against it -- but Yices absorbs GMP statically into libyices.so,
+# and a distribution's libgmp.a is normally compiled without -fPIC. That link
+# then fails with "relocation R_X86_64_PC32 against symbol `__gmp_free_func' can
+# not be used when making a shared object".
+#
+# Detecting that up front was tried and abandoned. try_compile and try_run only
+# link the archive members they reference, so both passed on the archive Yices
+# then rejected, even under --whole-archive. Reading relocations does separate
+# the two, but only by parsing GNU objdump and ELF relocation names, which do
+# not carry to the macOS leg where all four GMP-using backends are enabled.
+#
+function(camada_gmp_library out_var)
+  # camada_setup_gmp stages the archive when the choice was to build one, so the
+  # path returned here always exists by the time a caller links it. A caller
+  # that only asked for the path would otherwise get one that is not there yet,
+  # and fall back to whatever a search happens to find.
+  camada_setup_gmp()
+  set(${out_var}
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
+      PARENT_SCOPE)
+endfunction()
+
 function(camada_setup_gmp)
   set(gmp_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
   set(gmp_header "${CAMADA_DEPS_INSTALL_DIR}/include/gmp.h")
@@ -1124,6 +1166,13 @@ function(camada_setup_bitwuzla)
     camada_build_bitwuzla_from_source("${CAMADA_CADICAL_PREFIX}")
   endif()
 
+  # GMP is named the same way, and dropped from Requires: pkg-config would
+  # otherwise resolve `gmp` itself, against whichever copy the system provides,
+  # which is not necessarily the one the rest of the build links.
+  camada_gmp_library(bitwuzla_gmp_lib)
+  get_filename_component(bitwuzla_gmp_dir "${bitwuzla_gmp_lib}" DIRECTORY)
+  set(bitwuzla_gmp_flags " -L${bitwuzla_gmp_dir} -lgmp")
+
   # Bitwuzla is built against the shared CaDiCaL, so the pkg-config file has to
   # name it; meson writes its own absolute build-time path, which this rewrite
   # replaces.
@@ -1149,7 +1198,7 @@ function(camada_setup_bitwuzla)
                            DIRECTORY)
     file(
       WRITE "${bitwuzla_pc_file}"
-      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\nRequires: gmp >= 6.3, mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb${bitwuzla_cadical_flags}\nCflags: -I\${includedir}\n"
+      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\nRequires: mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb${bitwuzla_cadical_flags}${bitwuzla_gmp_flags}\nCflags: -I\${includedir}\n"
     )
   endforeach()
 endfunction()
@@ -1422,7 +1471,11 @@ function(camada_setup_yices)
     )
   endif()
 
-  camada_setup_gmp()
+  # Yices links GMP statically and is told exactly which archive to use, so it
+  # follows the build-wide choice rather than assuming a staged copy.
+  camada_gmp_library(yices_gmp_lib)
+  get_filename_component(yices_gmp_lib_dir "${yices_gmp_lib}" DIRECTORY)
+  set(yices_gmp_include_dir "${CAMADA_DEPS_INSTALL_DIR}/include")
   camada_fetch_git_source(
     yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir
     584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
@@ -1437,9 +1490,9 @@ function(camada_setup_yices)
     ./configure
     --prefix
     ${CAMADA_DEPS_INSTALL_DIR}
-    --with-static-gmp=${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a
-    CPPFLAGS=-I${CAMADA_DEPS_INSTALL_DIR}/include
-    LDFLAGS=-L${CAMADA_DEPS_INSTALL_DIR}/lib/)
+    --with-static-gmp=${yices_gmp_lib}
+    CPPFLAGS=-I${yices_gmp_include_dir}
+    LDFLAGS=-L${yices_gmp_lib_dir})
   camada_run_checked(
     WORKING_DIRECTORY
     "${yices_source_dir}"
