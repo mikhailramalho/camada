@@ -94,11 +94,17 @@ function(_camada_normalize_stp_target)
     endif()
     # On platforms where CMS's patched cadical/cadiback forks are not bundled
     # into libcryptominisat5.a (macOS), they are staged separately; cadiback
-    # references cadical symbols, so it must come first.
+    # references cadical symbols, so it must come first. CadiBack references
+    # CaDiCaL symbols, so it comes first and the shared CaDiCaL follows. CMS
+    # used to ship its own libcadical-cms.a here; every consumer now links the
+    # one shared build instead.
     set(_camada_stp_cadiback_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a")
     if(EXISTS "${_camada_stp_cadiback_lib}")
-      list(APPEND _camada_stp_dep_libs "${_camada_stp_cadiback_lib}"
-           "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
+      list(APPEND _camada_stp_dep_libs "${_camada_stp_cadiback_lib}")
+      camada_shared_cadical_prefix_lib(_camada_stp_shared_cadical)
+      if(EXISTS "${_camada_stp_shared_cadical}")
+        list(APPEND _camada_stp_dep_libs "${_camada_stp_shared_cadical}")
+      endif()
     endif()
     # CryptoMiniSat is built with GMP support unconditionally, so its archive
     # carries undefined __gmpz_* references. Nothing else on the STP path

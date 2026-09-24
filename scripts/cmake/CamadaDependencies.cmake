@@ -65,17 +65,21 @@ set(CAMADA_CVC5_MACOS_ARM64_URL
 # Windows release zip merges them into cvc5.lib without shipping standalone .lib
 # files, so MSVC fails with LNK1104 trying to find cadical.lib.
 
-# Enabling both backends is what triggers the clash, in either link mode, so the
-# source build below is not optional: there is no configuration where linking
-# two incompatible CaDiCaLs is the right answer. BUILD_SHARED_LIBS does not help
-# the way it helps a consumer linking two ready-made shared objects -- the
-# Bitwuzla and CVC5 prebuilts are static archives whichever way Camada is built,
-# so both CaDiCaLs land in libcamada.so too and one of them wins there as well.
-# Measured on a shared build: libcamada.so carried CaDiCaL 2.1.2 only, with
-# CVC5's elevate API absent, the same mismatch and merely not yet fatal on the
-# inputs tried.
-if(CAMADA_SOLVER_BITWUZLA_ENABLE STREQUAL "ON" AND CAMADA_SOLVER_CVC5_ENABLE
-                                                   STREQUAL "ON")
+# Three dependencies embed CaDiCaL: Bitwuzla, CVC5, and CryptoMiniSat (which STP
+# pulls in). Any two of them in one binary is the same clash -- one definition
+# survives the link while each library keeps the field offsets it was compiled
+# with -- so Camada builds one CaDiCaL and hands it to whichever of the three
+# are enabled. BUILD_SHARED_LIBS does not help the way it helps a consumer
+# linking two ready-made shared objects: these arrive as static archives
+# whichever way Camada is built, so every copy lands in libcamada.so too and one
+# of them wins there as well.
+#
+# Building it for a single consumer costs one small compile and keeps the
+# arrangement uniform, which matters more than the saving: the bug this prevents
+# is invisible at link time.
+if(CAMADA_SOLVER_BITWUZLA_ENABLE STREQUAL "ON"
+   OR CAMADA_SOLVER_CVC5_ENABLE STREQUAL "ON"
+   OR CAMADA_SOLVER_STP_ENABLE STREQUAL "ON")
   set(CAMADA_SHARED_CADICAL ON)
 else()
   set(CAMADA_SHARED_CADICAL OFF)
@@ -610,49 +614,59 @@ function(camada_prepare_cryptominisat_dependency_layout dependency_dir
   endif()
 endfunction()
 
-# -fno-gnu-unique for the whole CMS stack (GCC/ELF only): the archives get
-# merged into one relocatable object whose non-CMSat symbols are localized, and
-# objcopy cannot demote STB_GNU_UNIQUE symbols.
-if(APPLE)
-  set(CAMADA_CMS_EXTRA_CXX_FLAGS "")
-else()
-  set(CAMADA_CMS_EXTRA_CXX_FLAGS "-fno-gnu-unique")
-endif()
+# -fno-gnu-unique existed for the ld -r + objcopy bundling step, which could not
+# demote STB_GNU_UNIQUE symbols. That step is gone now that CaDiCaL is shared
+# and nothing needs localizing, so the flag has nothing left to do.
+set(CAMADA_CMS_EXTRA_CXX_FLAGS "")
 
-# CMS 5.11.x hard-requires meelgroup's patched cadical/cadiback forks and
-# expects them as sibling directories of the CMS source tree.
+# Where camada_setup_shared_cadical() unpacks and builds CaDiCaL. CMS and
+# CadiBack consume the source tree directly (headers from src/, the archive from
+# build/), so the path is derived in one place rather than reconstructed by each
+# caller.
+function(camada_shared_cadical_source_dir out_var)
+  get_filename_component(cadical_archive_name "${CAMADA_CADICAL_URL}" NAME)
+  string(REGEX REPLACE "\\.tar\\.gz$" "" cadical_tag_name
+                       "${cadical_archive_name}")
+  set(${out_var}
+      "${CAMADA_DEPS_SRC_DIR}/cadical-${cadical_tag_name}"
+      PARENT_SCOPE)
+endfunction()
+
+# The shared CaDiCaL archive every consumer links.
+function(camada_shared_cadical_prefix_lib out_var)
+  set(${out_var}
+      "${CAMADA_DEPS_DIR}/cadical/lib/libcadical.a"
+      PARENT_SCOPE)
+endfunction()
+
+# CMS 5.11.x locates CaDiCaL and CadiBack as sibling directories of its own
+# source tree -- find_library(cadical PATHS ../cadical/build/) -- and CadiBack
+# compiles against ../cadical/src. That is a weak enough contract to satisfy
+# with the CaDiCaL Camada already builds for Bitwuzla and CVC5, so the sibling
+# is a symlink to the shared source tree rather than a second fetch-and-build of
+# meelgroup's fork.
+#
+# Sharing it is the point: the fork is CaDiCaL 1.8.0 against the others' 2.1.3,
+# and two CaDiCaLs in one binary is the bug this whole mechanism exists to
+# prevent. CMS 5.11.22 and the CadiBack commit pinned below both need only
+# public CaDiCaL::Solver API -- 22 symbols, all present in the shared build --
+# and the fork's own additions are never called.
 function(camada_setup_cryptominisat_solver_deps cms_source_dir)
   get_filename_component(cms_parent_dir "${cms_source_dir}" DIRECTORY)
   set(cms_cadical_dir "${cms_parent_dir}/cadical")
   set(cms_cadiback_dir "${cms_parent_dir}/cadiback")
 
   if(NOT EXISTS "${cms_cadical_dir}/build/libcadical.a")
-    camada_fetch_git_source(cryptominisat_cadical meelgroup/cadical
-                            mate-only-libraries-1.8.0 cms_cadical_source_dir)
+    camada_setup_shared_cadical(camada_cms_cadical_prefix)
+    camada_shared_cadical_source_dir(camada_cms_cadical_src)
+    if(NOT EXISTS "${camada_cms_cadical_src}/build/libcadical.a")
+      message(
+        FATAL_ERROR
+          "The shared CaDiCaL build is missing its archive at ${camada_cms_cadical_src}/build/libcadical.a"
+      )
+    endif()
     camada_prepare_cryptominisat_dependency_layout("${cms_cadical_dir}"
-                                                   "${cms_cadical_source_dir}")
-    camada_run_checked(
-      WORKING_DIRECTORY
-      "${cms_cadical_dir}"
-      MESSAGE
-      "Configuring CryptoMiniSat CaDiCaL"
-      COMMAND
-      ${CMAKE_COMMAND}
-      -E
-      env
-      "CXXFLAGS=${CAMADA_CMS_EXTRA_CXX_FLAGS}"
-      ./configure
-      -fPIC
-      -O3)
-    camada_run_checked(
-      WORKING_DIRECTORY
-      "${cms_cadical_dir}/build"
-      MESSAGE
-      "Building CryptoMiniSat CaDiCaL"
-      COMMAND
-      make
-      -j
-      libcadical.a)
+                                                   "${camada_cms_cadical_src}")
   endif()
 
   if(NOT EXISTS "${cms_cadiback_dir}/libcadiback.a")
@@ -780,38 +794,23 @@ function(camada_setup_cryptominisat)
   set(cms_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libcryptominisat5.a")
   set(cms_cadical_lib "${cms_parent_dir}/cadical/build/libcadical.a")
   set(cms_cadiback_lib "${cms_parent_dir}/cadiback/libcadiback.a")
-  if(NOT APPLE)
-    # Merge CMS with its patched cadical/cadiback into one relocatable object
-    # and localize everything but the CMSat:: API. bitwuzla's and cvc5's static
-    # archives carry their own (vanilla) cadical objects, so any global CaDiCaL
-    # symbol left here would be a duplicate-definition error in the final link.
-    camada_run_checked(
-      WORKING_DIRECTORY
-      "${cms_build_dir}"
-      MESSAGE
-      "Bundling CryptoMiniSat with cadical/cadiback"
-      COMMAND
-      bash
-      -c
-      "nm --defined-only -g '${cms_lib}' | awk 'NF==3{print \$3}' | grep 5CMSat | sort -u > camada-cms-keep.syms && \
-       ld -r --force-group-allocation -o camada-cms-bundle.o --whole-archive '${cms_lib}' '${cms_cadiback_lib}' '${cms_cadical_lib}' --no-whole-archive && \
-       objcopy --keep-global-symbols=camada-cms-keep.syms camada-cms-bundle.o && \
-       rm -f '${cms_lib}' && ar rcs '${cms_lib}' camada-cms-bundle.o")
-  else()
-    # ponytail: no objcopy on macOS; stage the fork archives and let
-    # FindSTP.cmake link them after libcryptominisat5.a. Collides if another
-    # enabled backend bundles a conflicting cadical — bundle+localize with
-    # Mach-O tools if that ever happens on the mac CI. Renamed so it cannot
-    # clobber cvc5's staged libcadical.a.
-    file(COPY_FILE "${cms_cadiback_lib}"
-         "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a")
-    file(COPY_FILE "${cms_cadical_lib}"
-         "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
-    file(
-      APPEND "${cms_config}"
-      "\nset(CRYPTOMINISAT5_STATIC_LIBRARIES_DEPS \"${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a;${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a\")\n"
-    )
-  endif()
+  # CadiBack stays a separate archive that FindSTP.cmake links after
+  # libcryptominisat5.a. CaDiCaL itself is not staged here at all: every
+  # consumer links the shared build, so there is exactly one copy and nothing to
+  # hide.
+  #
+  # This replaces an ld -r + objcopy step that localized every CaDiCaL symbol in
+  # the CMS bundle, which existed only because CMS carried a second,
+  # incompatible CaDiCaL. Keeping it once CaDiCaL is shared actively breaks the
+  # build: Bitwuzla resolves CaDiCaL::Solver::solve and friends from the global
+  # symbol table, and a localized copy satisfies nobody.
+  file(COPY_FILE "${cms_cadiback_lib}"
+       "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a")
+  camada_shared_cadical_prefix_lib(camada_cms_shared_cadical_lib)
+  file(
+    APPEND "${cms_config}"
+    "\nset(CRYPTOMINISAT5_STATIC_LIBRARIES_DEPS \"${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a;${camada_cms_shared_cadical_lib}\")\n"
+  )
 
   # CMS's install exports cadical/cadiback CMake packages whose archives are
   # never installed, and hardcodes their absolute paths (one of them into the
