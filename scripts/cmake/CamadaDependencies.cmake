@@ -74,9 +74,12 @@ set(CAMADA_CVC5_MACOS_ARM64_URL
 # whichever way Camada is built, so every copy lands in libcamada.so too and one
 # of them wins there as well.
 #
-# Building it for a single consumer costs one small compile and keeps the
-# arrangement uniform, which matters more than the saving: the bug this prevents
-# is invisible at link time.
+# Every one of the three takes the shared build, including when it is the only
+# backend enabled. Building it unconditionally costs one small compile and
+# removes the alternative entirely: there is no configuration left where a
+# bundled CaDiCaL can reach the link, so there is nothing to reason about and
+# nothing to get wrong. The bug this prevents is invisible at link time, which
+# is exactly why it should not depend on which backends happen to be on.
 if(CAMADA_SOLVER_BITWUZLA_ENABLE STREQUAL "ON"
    OR CAMADA_SOLVER_CVC5_ENABLE STREQUAL "ON"
    OR CAMADA_SOLVER_STP_ENABLE STREQUAL "ON")
@@ -1234,10 +1237,17 @@ endfunction()
 # holds CVC5's copy. Idempotent, so running it on every configure is the point
 # rather than a cost.
 function(camada_point_cvc5_at_shared_cadical)
-  set(camada_shared_cadical "${CAMADA_DEPS_DIR}/cadical/lib/libcadical.a")
   set(cvc5_targets_file
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Targets.cmake")
-  if(NOT EXISTS "${camada_shared_cadical}" OR NOT EXISTS "${cvc5_targets_file}")
+  if(NOT EXISTS "${cvc5_targets_file}")
+    return()
+  endif()
+  # Build the shared CaDiCaL if nothing has yet: CVC5 can be the only backend
+  # enabled, in which case no other setup function has run. It is idempotent and
+  # stamped, so asking here costs nothing when it already exists.
+  camada_setup_shared_cadical(camada_cvc5_cadical_prefix)
+  set(camada_shared_cadical "${camada_cvc5_cadical_prefix}/lib/libcadical.a")
+  if(NOT EXISTS "${camada_shared_cadical}")
     return()
   endif()
   file(READ "${cvc5_targets_file}" cvc5_targets_contents)
