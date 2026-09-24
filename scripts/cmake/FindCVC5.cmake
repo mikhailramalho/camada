@@ -34,17 +34,29 @@ macro(_camada_declare_bare_link_target _name)
   if(NOT TARGET ${_name})
     set(_camada_bare_path "${ARGN}")
     if(NOT _camada_bare_path)
+      # find_library caches its result, which would both leak the name into
+      # CMakeCache.txt and short-circuit a later search after the archive moves.
+      # The imported target is what carries the path from here on.
       find_library(
         _camada_bare_path_${_name}
         NAMES ${_name}
         HINTS ${_camada_cvc5_lib_hints})
       set(_camada_bare_path "${_camada_bare_path_${_name}}")
+      unset(_camada_bare_path_${_name} CACHE)
     endif()
-    if(EXISTS "${_camada_bare_path}")
+    if(NOT EXISTS "${_camada_bare_path}")
+      # Without a target the bare name degrades to -l${_name}, which resolves
+      # against the linker's default search path or not at all -- a late link
+      # error, or silently the wrong copy. Say so here instead.
+      message(
+        WARNING
+          "CVC5 names ${_name} in its link interface but no archive was found;"
+          " the link will fall back to -l${_name}.")
+    else()
       add_library(${_name} UNKNOWN IMPORTED GLOBAL)
       set_target_properties(${_name} PROPERTIES IMPORTED_LOCATION
                                                 "${_camada_bare_path}")
-      if(_name STREQUAL "cadical")
+      if("${_name}" STREQUAL "cadical")
         set_target_properties(
           cadical PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
                              "${CAMADA_CADICAL_PREFIX}/include")
@@ -53,23 +65,23 @@ macro(_camada_declare_bare_link_target _name)
   endif()
 endmacro()
 
-# Called after each find_package(cvc5): once for a tree where CaDiCaL is already
-# built, and again after camada_setup_cvc5() builds it when nothing else has.
+# CaDiCaL has to exist before its target can point at it, so this runs once CVC5
+# has been found -- by then camada_setup_cvc5() has built both, or an external
+# CVC5 was already installed. Running it before that would warn about archives
+# nothing has built yet.
 macro(_camada_declare_cvc5_link_targets)
+  camada_setup_shared_cadical()
   _camada_declare_bare_link_target(cadical "${CAMADA_CADICAL_LIB}")
   foreach(_camada_bare_lib IN ITEMS picpoly picpolyxx gmp mpfr)
     _camada_declare_bare_link_target(${_camada_bare_lib})
   endforeach()
 endmacro()
 
-_camada_declare_cvc5_link_targets()
-
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
 
 if(NOT CVC5_FOUND AND _camada_download_cvc5)
   camada_setup_cvc5()
-  _camada_declare_cvc5_link_targets()
   find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
   set(CVC5_FOUND ${cvc5_FOUND})
 endif()
@@ -94,6 +106,10 @@ if(CVC5_FOUND)
   if(CVC5_VERSION VERSION_LESS CVC5_MIN_VERSION)
     message(FATAL_ERROR "Expected version ${CVC5_MIN_VERSION} or greater")
   endif()
+
+  # After every path that can settle on a CVC5 install, including the
+  # version-floor rebuild above.
+  _camada_declare_cvc5_link_targets()
 
   # The same names CVC5 exports bare, now as resolved paths for Camada's own
   # link line. _camada_declare_cvc5_link_targets already resolved each one, so

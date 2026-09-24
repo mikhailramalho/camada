@@ -9,6 +9,8 @@ function(check_yices_version yices_include yices_lib)
   if(_camada_yices_probe_gmp)
     list(APPEND _camada_yices_probe_libs "${_camada_yices_probe_gmp}")
   endif()
+  # find_library caches, so the result outlives this function unless released.
+  unset(_camada_yices_probe_gmp CACHE)
 
   try_run(
     YICES_RETURNCODE YICES_COMPILED ${CMAKE_BINARY_DIR}

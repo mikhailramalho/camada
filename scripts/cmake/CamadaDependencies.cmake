@@ -205,6 +205,9 @@ function(camada_find_gmp_header out_var)
   set(${out_var}
       "${_camada_gmp_header_dir}"
       PARENT_SCOPE)
+  # find_path caches, so release the entry rather than leaving the lookup pinned
+  # in CMakeCache.txt for the life of the build directory.
+  unset(_camada_gmp_header_dir CACHE)
 endfunction()
 
 function(camada_find_program_with_prefixes out_var program_name)
@@ -647,15 +650,28 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # cadiback's plain-text VERSION file collides with libc++'s <version> on a
     # case-insensitive filesystem, because Apple Clang searches the compilation
     # directory for angle-bracket includes. Nothing reads the file now, so it is
-    # emptied outright instead of being emptied after generate had run.
+    # emptied outright instead of being emptied after generate had run. VERSION
+    # is emptied before config.hpp is written, and config.hpp written last:
+    # cadiback's rule is `config.hpp: generate VERSION makefile`, so leaving
+    # VERSION the newer file sends make back through ./generate, which fails
+    # outright on a tarball. The comment marker also identifies a tree that has
+    # already been through here, whose VERSION no longer holds a version to
+    # read.
+    set(cms_cadiback_marker "// Emptied by Camada")
     file(READ "${cms_cadiback_dir}/VERSION" cms_cadiback_version)
     string(STRIP "${cms_cadiback_version}" cms_cadiback_version)
+    if(cms_cadiback_version MATCHES "^${cms_cadiback_marker}")
+      file(STRINGS "${cms_cadiback_dir}/config.hpp" cms_cadiback_version_line
+           REGEX "^#define VERSION ")
+      string(REGEX REPLACE "^#define VERSION \"(.*)\"$" "\\1"
+                           cms_cadiback_version "${cms_cadiback_version_line}")
+    endif()
+    file(WRITE "${cms_cadiback_dir}/VERSION"
+         "${cms_cadiback_marker}: shadows libc++'s <version> on macOS.\n")
     file(
       WRITE "${cms_cadiback_dir}/config.hpp"
       "#define VERSION \"${cms_cadiback_version}\"\n#define GITID \"${CAMADA_CADIBACK_REVISION}\"\n#define BUILD \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\"\n"
     )
-    file(WRITE "${cms_cadiback_dir}/VERSION"
-         "// Emptied by Camada: shadows libc++'s <version> on macOS.\n")
 
     camada_run_checked(
       WORKING_DIRECTORY
@@ -1156,8 +1172,7 @@ function(camada_build_cvc5_from_source)
 
   # --dep-path, not -DCMAKE_PREFIX_PATH: configure.sh appends its own empty
   # -DCMAKE_PREFIX_PATH= after any the caller passes, which silently discards
-  # it. USE_PYTHON_VENV=OFF keeps --auto-download from requiring python3-venv,
-  # which is not otherwise a Camada build dependency.
+  # it.
   camada_run_checked(
     WORKING_DIRECTORY
     "${cvc5_source_dir}"
