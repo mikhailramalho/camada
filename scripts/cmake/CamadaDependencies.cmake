@@ -1254,6 +1254,23 @@ function(camada_setup_cvc5)
     SOURCE_DIR
     "${cvc5_root_dir}")
   camada_stage_prebuilt_tree("${cvc5_root_dir}")
+
+  # CVC5's prebuilt ships its own libcadical.a and its exported targets name it
+  # by bare name, so -lcadical resolves to the staged copy. When Bitwuzla was
+  # built from source against the shared CaDiCaL, that leaves two exported
+  # CaDiCaLs in one binary -- the arrangement this mechanism exists to prevent.
+  # Both are the same source built with the same flags, so point CVC5 at the
+  # shared archive and drop the redundant copy.
+  set(camada_shared_cadical "${CAMADA_DEPS_DIR}/cadical/lib/libcadical.a")
+  set(cvc5_targets_file
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Targets.cmake")
+  if(EXISTS "${camada_shared_cadical}" AND EXISTS "${cvc5_targets_file}")
+    file(READ "${cvc5_targets_file}" cvc5_targets_contents)
+    string(REPLACE "LINK_ONLY:cadical>" "LINK_ONLY:${camada_shared_cadical}>"
+                   cvc5_targets_contents "${cvc5_targets_contents}")
+    file(WRITE "${cvc5_targets_file}" "${cvc5_targets_contents}")
+    file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical.a")
+  endif()
   file(READ "${cvc5_config}" cvc5_config_contents)
   string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
                  cvc5_config_contents "${cvc5_config_contents}")
