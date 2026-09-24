@@ -29,7 +29,10 @@ jobs:
         path: |
           .build-release/deps
           .build-release/_deps
-        key: ${{ runner.os }}-release-deps-v2
+        # Keyed on the dependency recipes, like the build workflows: a fixed
+        # key never invalidates, so a recipe change kept restoring a tree
+        # built by the previous one. No prefix fallback, for the same reason.
+        key: ${{ runner.os }}-release-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
 
     - name: Generate release
       run: python3 ./scripts/release.py
@@ -55,7 +58,10 @@ jobs:
         path: |
           .build-release/deps
           .build-release/_deps
-        key: ${{ runner.os }}-release-deps-v2
+        # Keyed on the dependency recipes, like the build workflows: a fixed
+        # key never invalidates, so a recipe change kept restoring a tree
+        # built by the previous one. No prefix fallback, for the same reason.
+        key: ${{ runner.os }}-release-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
 
     - name: Generate release
       shell: pwsh
@@ -95,7 +101,10 @@ jobs:
         path: |
           .build-release/deps
           .build-release/_deps
-        key: ${{ runner.os }}-release-deps-v2
+        # Keyed on the dependency recipes, like the build workflows: a fixed
+        # key never invalidates, so a recipe change kept restoring a tree
+        # built by the previous one. No prefix fallback, for the same reason.
+        key: ${{ runner.os }}-release-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
 
     - name: Generate release
       run: python3 ./scripts/release.py
