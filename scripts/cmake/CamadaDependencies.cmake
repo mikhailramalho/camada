@@ -44,26 +44,14 @@ set(CAMADA_Z3_WINDOWS_X86_64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-x64-win.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Windows x86_64")
-set(CAMADA_CVC5_LINUX_X86_64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-Linux-x86_64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for Linux x86_64")
-set(CAMADA_CVC5_LINUX_AARCH64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-Linux-arm64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for Linux aarch64")
-set(CAMADA_CVC5_MACOS_X86_64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-macOS-x86_64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for macOS x86_64")
-set(CAMADA_CVC5_MACOS_ARM64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-macOS-arm64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for macOS arm64")
-# No Windows prebuilt for CVC5: cvc5Targets.cmake lists cadical, picpoly,
-# picpolyxx, and gmp as bare-name INTERFACE_LINK_LIBRARIES, but the static
-# Windows release zip merges them into cvc5.lib without shipping standalone .lib
-# files, so MSVC fails with LNK1104 trying to find cadical.lib.
+set(CAMADA_CVC5_GIT_TAG
+    "cvc5-1.4.0"
+    CACHE STRING "CVC5 tag built from source against the shared CaDiCaL")
+
+# CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
+# prebuilt URLs to pin. It stays disabled on Windows, as it was under the
+# prebuilt: that archive merged its dependencies into cvc5.lib without shipping
+# the standalone .lib files its exported targets name.
 
 # Three dependencies embed CaDiCaL: Bitwuzla, CVC5, and CryptoMiniSat (which STP
 # pulls in). Any two in one binary is the same clash -- one definition survives
@@ -1190,67 +1178,102 @@ endfunction()
 # Called from both paths through camada_setup_cvc5: a restored dependency cache
 # returns before staging ever runs, and a tree cached before this fix still
 # holds CVC5's copy. Idempotent, so running it on every configure is the point
-# rather than a cost.
-function(camada_point_cvc5_at_shared_cadical)
-  set(cvc5_targets_file
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Targets.cmake")
-  if(NOT EXISTS "${cvc5_targets_file}")
-    return()
+# rather than a cost. CVC5 is built from source so it links the shared CaDiCaL
+# instead of the copy its prebuilt archive ships. That removes the last consumer
+# carrying its own, and with it the rewrite of CVC5's installed
+# cvc5Targets.cmake that used to redirect a bare `cadical` link name onto the
+# shared archive.
+#
+# Poly and SymFPU are fetched by CVC5's own --auto-download: Poly is enabled by
+# default and the prebuilt shipped it, so leaving it on keeps CVC5's arithmetic
+# unchanged. SymFPU is header-only and instantiated inside each consumer's own
+# namespace, so it cannot collide the way CaDiCaL did.
+function(camada_build_cvc5_from_source)
+  camada_find_program_with_prefixes(cvc5_make_program make)
+  if(NOT cvc5_make_program)
+    message(
+      FATAL_ERROR
+        "Building CVC5 from source needs make on PATH; install it or disable the CVC5 backend."
+    )
   endif()
-  # This runs on every configure, so do nothing unless the export still names
-  # the bare `cadical`: an already-patched tree costs one read. Otherwise build
-  # the shared CaDiCaL if nothing has yet -- CVC5 can be the only backend
-  # enabled, in which case no other setup function has run.
+
   camada_setup_shared_cadical()
-  file(READ "${cvc5_targets_file}" cvc5_targets_contents)
-  string(FIND "${cvc5_targets_contents}" "LINK_ONLY:cadical>" cvc5_bare_cadical)
-  if(cvc5_bare_cadical EQUAL -1)
-    return()
-  endif()
-  string(REPLACE "LINK_ONLY:cadical>" "LINK_ONLY:${CAMADA_CADICAL_LIB}>"
-                 cvc5_targets_contents "${cvc5_targets_contents}")
-  file(WRITE "${cvc5_targets_file}" "${cvc5_targets_contents}")
-  file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical.a")
+  camada_fetch_git_source(cvc5src cvc5/cvc5 "${CAMADA_CVC5_GIT_TAG}"
+                          cvc5_source_dir)
+  set(cvc5_build_name camada)
+  set(cvc5_build_dir "${cvc5_source_dir}/${cvc5_build_name}")
+  file(REMOVE_RECURSE "${cvc5_build_dir}")
+
+  # --dep-path, not -DCMAKE_PREFIX_PATH: configure.sh appends its own empty
+  # -DCMAKE_PREFIX_PATH= after any the caller passes, which silently discards
+  # it. USE_PYTHON_VENV=OFF keeps --auto-download from requiring python3-venv,
+  # which is not otherwise a Camada build dependency.
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${cvc5_source_dir}"
+    MESSAGE
+    "Configuring CVC5 against the shared CaDiCaL"
+    COMMAND
+    ./configure.sh
+    # 1.4.0 requires an explicit build type and dropped `production`;
+    # `unrestricted` is documented as the equivalent, and matches what the
+    # prebuilt archive was configured with.
+    unrestricted
+    --static
+    --auto-download
+    --name=${cvc5_build_name}
+    --prefix=${CAMADA_DEPS_INSTALL_DIR}
+    --dep-path=${CAMADA_CADICAL_PREFIX}
+    -DUSE_PYTHON_VENV=OFF
+    -DBUILD_BINDINGS_JAVA=OFF)
+
+  # CVC5's configure generates Unix Makefiles, not Ninja.
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${cvc5_build_dir}"
+    MESSAGE
+    "Building CVC5"
+    COMMAND
+    "${cvc5_make_program}"
+    -j)
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${cvc5_build_dir}"
+    MESSAGE
+    "Installing CVC5"
+    COMMAND
+    "${cvc5_make_program}"
+    install)
 endfunction()
 
 function(camada_setup_cvc5)
   set(cvc5_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Config.cmake")
-  if(EXISTS "${cvc5_config}")
-    file(READ "${cvc5_config}" cvc5_config_contents)
-    string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
-                   cvc5_config_contents "${cvc5_config_contents}")
-    file(WRITE "${cvc5_config}" "${cvc5_config_contents}")
-    camada_point_cvc5_at_shared_cadical()
-    return()
+  # Recipe stamp in the shape the other source builds use: a stable filename
+  # holding a version string, compared by content. An install left by the
+  # prebuilt recipe carries its own libcadical.a, so it has to be rebuilt rather
+  # than reused.
+  set(cvc5_stamp "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/camada-cvc5.stamp")
+  set(cvc5_recipe_version "${CAMADA_CVC5_GIT_TAG}:shared-cadical")
+  if(EXISTS "${cvc5_config}" AND EXISTS "${cvc5_stamp}")
+    file(READ "${cvc5_stamp}" cvc5_stamp_contents)
+    string(STRIP "${cvc5_stamp_contents}" cvc5_stamp_contents)
+    if(cvc5_stamp_contents STREQUAL cvc5_recipe_version)
+      return()
+    endif()
   endif()
 
   camada_ensure_deps_dirs()
-  camada_select_prebuilt_url(cvc5_url CVC5)
+  camada_build_cvc5_from_source()
 
-  get_filename_component(cvc5_archive_name "${cvc5_url}" NAME)
-  string(REGEX REPLACE "\\.zip$" "" cvc5_root_dir_name "${cvc5_archive_name}")
-  set(cvc5_archive "${CAMADA_DEPS_SRC_DIR}/${cvc5_archive_name}")
-  set(cvc5_root_dir "${CAMADA_DEPS_SRC_DIR}/${cvc5_root_dir_name}")
+  # The prebuilt recipe staged CVC5's own CaDiCaL beside the library; a tree
+  # migrating from it must not keep that second copy.
+  file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical.a")
 
-  camada_download_file("${cvc5_url}" "${cvc5_archive}")
-  camada_extract_archive(
-    ARCHIVE_PATH
-    "${cvc5_archive}"
-    DESTINATION_DIR
-    "${CAMADA_DEPS_SRC_DIR}"
-    MARKER_PATH
-    "${cvc5_root_dir}"
-    ARCHIVE_URL
-    "${cvc5_url}"
-    SOURCE_DIR
-    "${cvc5_root_dir}")
-  camada_stage_prebuilt_tree("${cvc5_root_dir}")
-
-  camada_point_cvc5_at_shared_cadical()
   file(READ "${cvc5_config}" cvc5_config_contents)
   string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
                  cvc5_config_contents "${cvc5_config_contents}")
   file(WRITE "${cvc5_config}" "${cvc5_config_contents}")
+  file(WRITE "${cvc5_stamp}" "${cvc5_recipe_version}\n")
 endfunction()
 
 function(camada_setup_stp)

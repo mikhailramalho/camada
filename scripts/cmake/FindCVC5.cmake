@@ -9,16 +9,34 @@ set(_camada_cvc5_hints
     $ENV{HOME}/cvc5)
 camada_should_download_dependency(_camada_download_cvc5 TRUE)
 
-# Before find_package: a dependency tree that is already staged -- a warm CI
-# cache, or any second configure -- never re-enters camada_setup_cvc5(), so the
-# repair has to happen on the path that always runs. Idempotent.
-camada_point_cvc5_at_shared_cadical()
+# CVC5's exported targets name CaDiCaL by bare name ($<LINK_ONLY:cadical>).
+# CMake resolves a bare name against a target of that name when one exists and
+# otherwise emits -lcadical, so declaring the imported target makes the export
+# resolve to the shared archive on its own. The prebuilt recipe instead rewrote
+# CVC5's installed cvc5Targets.cmake, keyed on a literal substring that a
+# differently-formatted export would have stopped matching silently.
+#
+# Called twice: once here for a tree where CaDiCaL is already built, and again
+# after camada_setup_cvc5(), which builds it when nothing else has.
+macro(_camada_declare_cadical_target)
+  if(NOT TARGET cadical AND EXISTS "${CAMADA_CADICAL_LIB}")
+    add_library(cadical STATIC IMPORTED GLOBAL)
+    set_target_properties(
+      cadical
+      PROPERTIES IMPORTED_LOCATION "${CAMADA_CADICAL_LIB}"
+                 INTERFACE_INCLUDE_DIRECTORIES
+                 "${CAMADA_CADICAL_PREFIX}/include")
+  endif()
+endmacro()
+
+_camada_declare_cadical_target()
 
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
 
 if(NOT CVC5_FOUND AND _camada_download_cvc5)
   camada_setup_cvc5()
+  _camada_declare_cadical_target()
   find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
   set(CVC5_FOUND ${cvc5_FOUND})
 endif()
@@ -50,12 +68,15 @@ if(CVC5_FOUND)
       ${CAMADA_CVC5_DIR}/lib ${CAMADA_CVC5_DIR}/lib64)
   # gmp is here because cvc5::cvc5's interface pulls it in by bare name; once
   # the link switches to resolved paths below, it must be resolved too (it may
-  # only exist as a system library, hence no HINTS restraint).
-  foreach(_camada_cvc5_extra_lib_name IN ITEMS cadical picpoly picpolyxx gmp)
-    # CaDiCaL is the shared build every consumer links, not CVC5's own copy: two
-    # on one link line is the clash the duplicate-engine check rejects.
-    if(_camada_cvc5_extra_lib_name STREQUAL "cadical"
-       AND EXISTS "${CAMADA_CADICAL_LIB}")
+  # only exist as a system library, hence no HINTS restraint). mpfr is here
+  # because CVC5 1.4.0 turns on CVC5_USE_MPFR for floating-point constant
+  # folding; 1.3.4 did not, so the prebuilt never needed it named.
+  foreach(_camada_cvc5_extra_lib_name IN ITEMS cadical picpoly picpolyxx gmp
+                                               mpfr)
+    # CaDiCaL is the shared build. CVC5 is compiled against it and stages none
+    # of its own, so name the archive directly rather than letting find_library
+    # pick up whatever copy happens to be installed.
+    if(_camada_cvc5_extra_lib_name STREQUAL "cadical")
       list(APPEND CAMADA_CVC5_EXTRA_LIBS "${CAMADA_CADICAL_LIB}")
       continue()
     endif()
