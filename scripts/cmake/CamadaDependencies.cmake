@@ -47,6 +47,10 @@ set(CAMADA_Z3_WINDOWS_X86_64_URL
 set(CAMADA_CVC5_GIT_TAG
     "cvc5-1.4.0"
     CACHE STRING "CVC5 tag built from source against the shared CaDiCaL")
+# Identifies the recipe, not just the version: a tree staged by the prebuilt
+# recipe at this same tag must still be rebuilt, because it carries its own
+# libcadical.a.
+set(CAMADA_CVC5_RECIPE_VERSION "${CAMADA_CVC5_GIT_TAG}:shared-cadical")
 
 # CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
 # prebuilt URLs to pin. It stays disabled on Windows, as it was under the
@@ -1246,6 +1250,30 @@ function(camada_build_cvc5_from_source)
     install)
 endfunction()
 
+# TRUE when the downloaded CVC5 install is absent or was staged by a recipe
+# other than the current one -- the prebuilt, or an older source build. A
+# restored dependency cache is the case that matters: the prefix fallback in CI
+# restores whatever tree the previous key left, and that tree's cvc5Config.cmake
+# satisfies find_package and the minimum-version floor, so nothing else notices
+# the recipe changed underneath it.
+function(camada_cvc5_needs_rebuild out_var)
+  set(config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Config.cmake")
+  set(stamp "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/camada-cvc5.stamp")
+  if(EXISTS "${config}" AND EXISTS "${stamp}")
+    file(READ "${stamp}" contents)
+    string(STRIP "${contents}" contents)
+    if(contents STREQUAL "${CAMADA_CVC5_RECIPE_VERSION}")
+      set(${out_var}
+          FALSE
+          PARENT_SCOPE)
+      return()
+    endif()
+  endif()
+  set(${out_var}
+      TRUE
+      PARENT_SCOPE)
+endfunction()
+
 function(camada_setup_cvc5)
   set(cvc5_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Config.cmake")
   # Recipe stamp in the shape the other source builds use: a stable filename
@@ -1253,13 +1281,9 @@ function(camada_setup_cvc5)
   # prebuilt recipe carries its own libcadical.a, so it has to be rebuilt rather
   # than reused.
   set(cvc5_stamp "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/camada-cvc5.stamp")
-  set(cvc5_recipe_version "${CAMADA_CVC5_GIT_TAG}:shared-cadical")
-  if(EXISTS "${cvc5_config}" AND EXISTS "${cvc5_stamp}")
-    file(READ "${cvc5_stamp}" cvc5_stamp_contents)
-    string(STRIP "${cvc5_stamp_contents}" cvc5_stamp_contents)
-    if(cvc5_stamp_contents STREQUAL cvc5_recipe_version)
-      return()
-    endif()
+  camada_cvc5_needs_rebuild(cvc5_rebuild)
+  if(NOT cvc5_rebuild)
+    return()
   endif()
 
   camada_ensure_deps_dirs()
@@ -1273,7 +1297,7 @@ function(camada_setup_cvc5)
   string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
                  cvc5_config_contents "${cvc5_config_contents}")
   file(WRITE "${cvc5_config}" "${cvc5_config_contents}")
-  file(WRITE "${cvc5_stamp}" "${cvc5_recipe_version}\n")
+  file(WRITE "${cvc5_stamp}" "${CAMADA_CVC5_RECIPE_VERSION}\n")
 endfunction()
 
 function(camada_setup_stp)

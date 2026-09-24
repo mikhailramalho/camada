@@ -31,6 +31,18 @@ endmacro()
 
 _camada_declare_cadical_target()
 
+# A downloaded install that a different recipe staged has to be rebuilt before
+# find_package is allowed to accept it. Its cvc5Config.cmake is valid and its
+# version clears the floor below, so nothing downstream would ever notice --
+# this is how CI kept linking a cached prebuilt after the recipe changed.
+if(_camada_download_cvc5)
+  camada_cvc5_needs_rebuild(_camada_cvc5_stale)
+  if(_camada_cvc5_stale)
+    camada_setup_cvc5()
+    _camada_declare_cadical_target()
+  endif()
+endif()
+
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
 
