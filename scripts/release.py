@@ -141,6 +141,15 @@ if __name__ == '__main__':
         solver_archives.extend(
             copy_release_dependency("**/libbitwuzla*.a", deps_install_dir,
                                     release_lib_dir))
+        # Bitwuzla is built against the shared CaDiCaL rather than bundling
+        # its own, so the package has to ship it. It lives outside
+        # deps/install on purpose (see CAMADA_CADICAL_PREFIX), and comes
+        # after Bitwuzla on the link line because Bitwuzla references it.
+        solver_archives.extend(
+            copy_release_dependency(
+                "lib/libcadical.a",
+                str(release_build_dir / "deps" / "cadical"),
+                release_lib_dir))
     if is_windows:
         # Z3 on Windows ships `bin/libz3.lib` (import lib) and
         # `bin/libz3.dll` (runtime). Pull the import lib into release/lib
