@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install -y cmake linux-libc-dev ninja-build gperf doxygen pkg-config libgmp-dev libmpfr-dev python3
+      run: sudo apt-get update && sudo apt-get install -y cmake linux-libc-dev meson ninja-build gperf doxygen pkg-config libgmp-dev libmpfr-dev python3
 
     - name: Cache release deps
       uses: actions/cache@v4
@@ -81,7 +81,7 @@ jobs:
     - name: Install Dependencies
       # mpfr is needed because Bitwuzla's FP backend calls mpfr_* directly
       # and scripts/release.py adds -lmpfr to the install's link interface.
-      run: brew install gmp mpfr cmake ninja automake boost zlib bison flex doxygen libtool pkg-config gettext texinfo python3
+      run: brew install gmp mpfr cmake meson ninja automake boost zlib bison flex doxygen libtool pkg-config gettext texinfo python3
 
     - name: Configure Homebrew Environment
       run: |

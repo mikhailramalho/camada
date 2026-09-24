@@ -92,13 +92,12 @@ function(_camada_normalize_stp_target)
     if(EXISTS "${_camada_stp_abc_lib}")
       list(APPEND _camada_stp_dep_libs "${_camada_stp_abc_lib}")
     endif()
-    # On platforms where CMS's patched cadical/cadiback forks are not bundled
-    # into libcryptominisat5.a (macOS), they are staged separately; cadiback
-    # references cadical symbols, so it must come first.
+    # CadiBack references CaDiCaL symbols, so it comes first and the shared
+    # CaDiCaL follows.
     set(_camada_stp_cadiback_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadiback.a")
     if(EXISTS "${_camada_stp_cadiback_lib}")
       list(APPEND _camada_stp_dep_libs "${_camada_stp_cadiback_lib}"
-           "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
+           "${CAMADA_CADICAL_LIB}")
     endif()
     # CryptoMiniSat is built with GMP support unconditionally, so its archive
     # carries undefined __gmpz_* references. Nothing else on the STP path
@@ -145,6 +144,13 @@ if(NOT CAMADA_SOLVER_STP_DIR AND NOT CAMADA_STP_DIR)
       CACHE PATH "Cleared stale STP cache entry" FORCE)
   list(APPEND _camada_stp_find_args NO_CMAKE_PACKAGE_REGISTRY
        NO_CMAKE_SYSTEM_PACKAGE_REGISTRY)
+endif()
+
+# Migrate our cached CMS/CadiBack before importing their exported targets.
+if(EXISTS
+   "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake"
+)
+  camada_setup_cryptominisat()
 endif()
 
 find_package(cryptominisat5 CONFIG QUIET HINTS ${_camada_stp_hints})
