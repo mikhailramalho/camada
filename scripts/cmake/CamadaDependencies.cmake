@@ -1231,15 +1231,22 @@ function(camada_build_cvc5_from_source)
     -DUSE_PYTHON_VENV=OFF
     -DBUILD_BINDINGS_JAVA=OFF)
 
-  # CVC5's configure generates Unix Makefiles, not Ninja.
+  # CVC5's configure generates Unix Makefiles, not Ninja. Bare `make -j` is
+  # unbounded: make starts every ready target at once, and a few hundred
+  # concurrent cc1plus instances exhaust a 16 GB CI runner long before the build
+  # finishes (SIGTERM, ~85s in). Bound it by processor count.
+  cmake_host_system_information(RESULT cvc5_jobs QUERY NUMBER_OF_LOGICAL_CORES)
+  if(NOT cvc5_jobs OR cvc5_jobs LESS 1)
+    set(cvc5_jobs 1)
+  endif()
   camada_run_checked(
     WORKING_DIRECTORY
     "${cvc5_build_dir}"
     MESSAGE
-    "Building CVC5"
+    "Building CVC5 with ${cvc5_jobs} job(s)"
     COMMAND
     "${cvc5_make_program}"
-    -j)
+    -j${cvc5_jobs})
   camada_run_checked(
     WORKING_DIRECTORY
     "${cvc5_build_dir}"
