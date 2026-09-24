@@ -115,9 +115,12 @@ Downloaded sources and locally installed solver artifacts are stored under
 `<build-dir>/deps/src` and `<build-dir>/deps/install`.
 
 When CMake downloads dependencies itself:
-- `Bitwuzla` uses the prebuilt static release archive from `0.9.1`.
+- `Bitwuzla` uses a source build from `0.9.1`.
 - `Z3` uses the prebuilt release archive from `z3-4.13.3`.
-- `CVC5` uses the prebuilt static release archive from `cvc5-1.3.4`.
+- `CVC5` uses a source build from `cvc5-1.4.0`.
+- `CaDiCaL` uses a source build, shared by every backend that needs it:
+  Bitwuzla, CVC5 and STP link one copy, because two copies built with
+  different flags disagree on `CaDiCaL::Internal`'s layout.
 - `Yices` uses a source build.
 - `GMP` uses a source build when it is needed by downloaded dependencies and no
   suitable staged copy is already available.
