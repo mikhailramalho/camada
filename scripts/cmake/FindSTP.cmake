@@ -100,6 +100,21 @@ function(_camada_normalize_stp_target)
       list(APPEND _camada_stp_dep_libs "${_camada_stp_cadiback_lib}"
            "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
     endif()
+    # CryptoMiniSat is built with GMP support unconditionally, so its archive
+    # carries undefined __gmpz_* references. Nothing else on the STP path
+    # provides GMP: a build with every other backend disabled failed to link
+    # until now, and a full build only worked because CVC5 happened to stage
+    # libgmp.a alongside. Name it here rather than rely on that.
+    camada_setup_gmp()
+    set(_camada_stp_gmp_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+    if(EXISTS "${_camada_stp_gmp_lib}")
+      list(APPEND _camada_stp_dep_libs "${_camada_stp_gmp_lib}")
+    else()
+      find_library(_camada_stp_system_gmp NAMES gmp)
+      if(_camada_stp_system_gmp)
+        list(APPEND _camada_stp_dep_libs "${_camada_stp_system_gmp}")
+      endif()
+    endif()
     set_property(TARGET stp PROPERTY INTERFACE_LINK_LIBRARIES
                                      "${_camada_stp_dep_libs}")
     if(_camada_stp_lib)

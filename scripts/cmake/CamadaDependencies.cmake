@@ -871,7 +871,13 @@ function(camada_setup_gmp)
     --prefix=${CAMADA_DEPS_INSTALL_DIR}
     --disable-shared
     ABI=64
-    CFLAGS=-fPIC
+    # -std=gnu17: GCC 14 defaults to C23, where GMP's own "long long
+    # reliability" probe no longer compiles -- it declares `void g(){}` and then
+    # calls it with six arguments, which C23 rejects outright. Every compiler
+    # probe then fails and configure stops with "could not find a working
+    # compiler", so a host without a system GMP could not build any backend that
+    # needs one.
+    CFLAGS=-fPIC\ -std=gnu17
     CPPFLAGS=-DPIC)
   camada_run_checked(
     WORKING_DIRECTORY
