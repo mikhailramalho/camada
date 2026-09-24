@@ -23,17 +23,6 @@ jobs:
     - name: Install Dependencies
       run: sudo apt-get update && sudo apt-get install -y cmake linux-libc-dev meson ninja-build gperf doxygen pkg-config libgmp-dev libmpfr-dev python3
 
-    - name: Cache release deps
-      uses: actions/cache@v4
-      with:
-        path: |
-          .build-release/deps
-          .build-release/_deps
-        # Keyed on the dependency recipes, like the build workflows: a fixed
-        # key never invalidates, so a recipe change kept restoring a tree
-        # built by the previous one. No prefix fallback, for the same reason.
-        key: ${{ runner.os }}-release-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
-
     - name: Generate release
       run: python3 ./scripts/release.py
 
@@ -51,17 +40,6 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
-
-    - name: Cache release deps
-      uses: actions/cache@v4
-      with:
-        path: |
-          .build-release/deps
-          .build-release/_deps
-        # Keyed on the dependency recipes, like the build workflows: a fixed
-        # key never invalidates, so a recipe change kept restoring a tree
-        # built by the previous one. No prefix fallback, for the same reason.
-        key: ${{ runner.os }}-release-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
 
     - name: Generate release
       shell: pwsh
@@ -94,17 +72,6 @@ jobs:
         echo "CPPFLAGS=-I$(brew --prefix gmp)/include" >> $GITHUB_ENV
         echo "LDFLAGS=-L$(brew --prefix gmp)/lib" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$(brew --prefix gmp)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig" >> $GITHUB_ENV
-
-    - name: Cache release deps
-      uses: actions/cache@v4
-      with:
-        path: |
-          .build-release/deps
-          .build-release/_deps
-        # Keyed on the dependency recipes, like the build workflows: a fixed
-        # key never invalidates, so a recipe change kept restoring a tree
-        # built by the previous one. No prefix fallback, for the same reason.
-        key: ${{ runner.os }}-release-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
 
     - name: Generate release
       run: python3 ./scripts/release.py

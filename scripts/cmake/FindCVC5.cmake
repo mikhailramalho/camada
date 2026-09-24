@@ -93,8 +93,27 @@ if(CVC5_FOUND)
                        "${cvc5_VERSION}")
 
   set(CVC5_MIN_VERSION "1.0.8")
-  if(CVC5_VERSION VERSION_LESS CVC5_MIN_VERSION AND _camada_download_cvc5)
-    camada_setup_cvc5()
+  # A downloaded install is rebuilt when it predates the tag Camada builds, not
+  # merely when it fails the minimum: the tree left by the prebuilt recipe is
+  # 1.3.4, which clears the floor, so nothing would otherwise replace it and the
+  # backend would keep linking the CaDiCaL that prebuilt carried. An external
+  # CVC5 the user pointed at is left alone -- only the floor applies to it.
+  string(REGEX REPLACE "^cvc5-" "" _camada_cvc5_recipe_version
+                       "${CAMADA_CVC5_GIT_TAG}")
+  # A plain prefix test, not MATCHES: the install path is a path, and as a regex
+  # its dots and slashes would not mean what they look like.
+  set(_camada_cvc5_is_downloaded FALSE)
+  string(FIND "${cvc5_DIR}" "${CAMADA_DEPS_INSTALL_DIR}" _camada_cvc5_dir_pos)
+  if(_camada_cvc5_dir_pos EQUAL 0)
+    set(_camada_cvc5_is_downloaded TRUE)
+  endif()
+  if(_camada_download_cvc5
+     AND (CVC5_VERSION VERSION_LESS CVC5_MIN_VERSION
+          OR (CVC5_VERSION VERSION_LESS _camada_cvc5_recipe_version
+              AND _camada_cvc5_is_downloaded)))
+    # FORCE: camada_setup_cvc5 returns early on any existing install, which is
+    # exactly the tree being replaced here.
+    camada_setup_cvc5(FORCE)
     find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
     set(CVC5_FOUND ${cvc5_FOUND})
     if(CVC5_FOUND)

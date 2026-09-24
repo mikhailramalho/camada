@@ -47,6 +47,9 @@ set(CAMADA_Z3_WINDOWS_X86_64_URL
 set(CAMADA_CVC5_GIT_TAG
     "cvc5-1.4.0"
     CACHE STRING "CVC5 tag built from source against the shared CaDiCaL")
+set(CAMADA_CVC5_SHA256
+    "06c65b30693d1abf7c1393b497c799950de2833457920b9433da8e418bce9113"
+    CACHE STRING "Expected SHA256 of the CVC5 source archive")
 # Baked into cadiback's config.hpp, which Camada writes itself; see
 # camada_setup_cryptominisat_solver_deps.
 set(CAMADA_CADIBACK_REVISION "69255f55e411207c4bdea02c6c2ab1ef29740ce1")
@@ -103,6 +106,9 @@ set(CAMADA_BITWUZLA_GIT_TAG
     CACHE
       STRING
       "Bitwuzla tag used when building it from source against a shared CaDiCaL")
+set(CAMADA_BITWUZLA_SHA256
+    "42707f38900a20bb18108e426ba667560d1fd2ccce0d4f75aa60439b546488b4"
+    CACHE STRING "Expected SHA256 of the Bitwuzla source archive")
 
 # Bitwuzla is always built from source (see camada_setup_bitwuzla), so there is
 # no prebuilt URL to pin. It is not built on Windows: the Windows CI leg leaves
@@ -567,8 +573,21 @@ endfunction()
 function(camada_fetch_git_source package_name repository git_tag out_var)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
-  cpmaddpackage(NAME ${package_name} DOWNLOAD_ONLY YES URL
-                "https://github.com/${repository}/archive/${git_tag}.tar.gz")
+  # A fifth argument pins the archive's SHA256. A clone verified the object
+  # against the ref; a tarball has no such check, and a tag can be repointed at
+  # different content. The revisions given as commit SHAs are content-addressed
+  # already and pass nothing here.
+  if(ARGC GREATER 4)
+    set(url_hash_arg URL_HASH SHA256=${ARGV4})
+  endif()
+  cpmaddpackage(
+    NAME
+    ${package_name}
+    DOWNLOAD_ONLY
+    YES
+    URL
+    "https://github.com/${repository}/archive/${git_tag}.tar.gz"
+    ${url_hash_arg})
   set(${out_var}
       "${${package_name}_SOURCE_DIR}"
       PARENT_SCOPE)
@@ -1028,8 +1047,9 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
     )
   endif()
 
-  camada_fetch_git_source(bitwuzla bitwuzla/bitwuzla
-                          "${CAMADA_BITWUZLA_GIT_TAG}" bitwuzla_source_dir)
+  camada_fetch_git_source(
+    bitwuzla bitwuzla/bitwuzla "${CAMADA_BITWUZLA_GIT_TAG}" bitwuzla_source_dir
+    "${CAMADA_BITWUZLA_SHA256}")
   set(bitwuzla_build_dir "${bitwuzla_source_dir}/build-camada")
   file(REMOVE_RECURSE "${bitwuzla_build_dir}")
 
@@ -1155,6 +1175,16 @@ endfunction()
 # unchanged. SymFPU is header-only and instantiated inside each consumer's own
 # namespace, so it cannot collide the way CaDiCaL did.
 function(camada_build_cvc5_from_source)
+  # configure.sh is a POSIX shell script and the build wants a Unix make, so say
+  # that plainly rather than failing later on a missing make, which names the
+  # wrong cause. The prebuilt recipe had no Windows archive and refused here
+  # too; the source build inherits that.
+  if(WIN32)
+    message(
+      FATAL_ERROR
+        "The CVC5 backend cannot be built on Windows; configure with -DCAMADA_SOLVER_CVC5_ENABLE=OFF."
+    )
+  endif()
   camada_find_program_with_prefixes(cvc5_make_program make)
   if(NOT cvc5_make_program)
     message(
@@ -1165,7 +1195,7 @@ function(camada_build_cvc5_from_source)
 
   camada_setup_shared_cadical()
   camada_fetch_git_source(cvc5src cvc5/cvc5 "${CAMADA_CVC5_GIT_TAG}"
-                          cvc5_source_dir)
+                          cvc5_source_dir "${CAMADA_CVC5_SHA256}")
   set(cvc5_build_name camada)
   set(cvc5_build_dir "${cvc5_source_dir}/${cvc5_build_name}")
   file(REMOVE_RECURSE "${cvc5_build_dir}")
@@ -1221,9 +1251,12 @@ function(camada_build_cvc5_from_source)
     install)
 endfunction()
 
+# FORCE rebuilds an install that is already present, for a tree staged by an
+# older recipe: its cvc5Config.cmake is valid, so the existence check alone
+# would keep it and the CaDiCaL it was built against.
 function(camada_setup_cvc5)
   set(cvc5_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Config.cmake")
-  if(EXISTS "${cvc5_config}")
+  if(EXISTS "${cvc5_config}" AND NOT "FORCE" IN_LIST ARGN)
     return()
   endif()
 
@@ -1270,7 +1303,9 @@ function(camada_setup_stp)
   )
 
   camada_setup_minisat()
-  camada_fetch_git_source(stpsrc stp/stp 2.4.1 stp_source_dir)
+  camada_fetch_git_source(
+    stpsrc stp/stp 2.4.1 stp_source_dir
+    6f8bca3612e3d61868450dbf7771897b2a909f446e8de460bdf31f13a6cd0318)
 
   # STP keeps ABC and mimalloc as submodules and add_subdirectory()s both, but a
   # source tarball carries no submodules. Fetch each at the revision STP 2.4.1
@@ -1388,7 +1423,9 @@ function(camada_setup_yices)
   endif()
 
   camada_setup_gmp()
-  camada_fetch_git_source(yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir)
+  camada_fetch_git_source(
+    yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir
+    584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
   camada_run_checked(WORKING_DIRECTORY "${yices_source_dir}" MESSAGE
                      "Preparing Yices" COMMAND autoreconf)
   camada_run_checked(
