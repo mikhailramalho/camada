@@ -9,67 +9,69 @@ set(_camada_cvc5_hints
     $ENV{HOME}/cvc5)
 camada_should_download_dependency(_camada_download_cvc5 TRUE)
 
-# CVC5's exported targets name CaDiCaL by bare name ($<LINK_ONLY:cadical>).
-# CMake resolves a bare name against a target of that name when one exists and
-# otherwise emits -lcadical, so declaring the imported target makes the export
-# resolve to the shared archive on its own. The prebuilt recipe instead rewrote
-# CVC5's installed cvc5Targets.cmake, keyed on a literal substring that a
-# differently-formatted export would have stopped matching silently.
+# Where a bare link name is searched for, both when declaring imported targets
+# for CVC5's export and when building CAMADA_CVC5_EXTRA_LIBS below.
+set(_camada_cvc5_lib_hints
+    ${CAMADA_DEPS_INSTALL_DIR}/lib ${CAMADA_DEPS_INSTALL_DIR}/lib64
+    ${CAMADA_SOLVER_CVC5_DIR}/lib ${CAMADA_SOLVER_CVC5_DIR}/lib64
+    ${CAMADA_CVC5_DIR}/lib ${CAMADA_CVC5_DIR}/lib64)
+
+# CVC5's export names its static dependencies by bare name
+# ($<LINK_ONLY:cadical>, picpoly, picpolyxx, gmp, mpfr). CMake resolves a bare
+# name against a target of that name when one exists and otherwise emits
+# -lcadical, which leaves the archive to the linker's default search path: that
+# resolves on Linux, where these sit in /usr/lib, and fails on Homebrew, whose
+# /opt/homebrew/lib is not searched ("library 'mpfr' not found"). Declaring an
+# imported target per name makes the export resolve on its own. The prebuilt
+# recipe instead rewrote CVC5's installed cvc5Targets.cmake, keyed on a literal
+# substring that a differently-formatted export would have stopped matching
+# silently.
 #
-# Called twice: once here for a tree where CaDiCaL is already built, and again
-# after camada_setup_cvc5(), which builds it when nothing else has.
-macro(_camada_declare_cadical_target)
-  if(NOT TARGET cadical AND EXISTS "${CAMADA_CADICAL_LIB}")
-    add_library(cadical STATIC IMPORTED GLOBAL)
-    set_target_properties(
-      cadical
-      PROPERTIES IMPORTED_LOCATION "${CAMADA_CADICAL_LIB}"
-                 INTERFACE_INCLUDE_DIRECTORIES
-                 "${CAMADA_CADICAL_PREFIX}/include")
+# CaDiCaL passes its archive explicitly: it must be the one shared build, not
+# whatever copy find_library turns up, since a second CaDiCaL is the layout
+# clash this whole arrangement exists to prevent. The rest are searched for.
+macro(_camada_declare_bare_link_target _name)
+  if(NOT TARGET ${_name})
+    set(_camada_bare_path "${ARGN}")
+    if(NOT _camada_bare_path)
+      find_library(
+        _camada_bare_path_${_name}
+        NAMES ${_name}
+        HINTS ${_camada_cvc5_lib_hints})
+      set(_camada_bare_path "${_camada_bare_path_${_name}}")
+    endif()
+    if(EXISTS "${_camada_bare_path}")
+      add_library(${_name} UNKNOWN IMPORTED GLOBAL)
+      set_target_properties(${_name} PROPERTIES IMPORTED_LOCATION
+                                                "${_camada_bare_path}")
+      if(_name STREQUAL "cadical")
+        set_target_properties(
+          cadical PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
+                             "${CAMADA_CADICAL_PREFIX}/include")
+      endif()
+    endif()
   endif()
 endmacro()
 
-# CVC5 exports picpoly, picpolyxx, gmp and mpfr by bare name too. Unlike cadical
-# they have no imported target, so CMake passes them through as -lpicpoly ...
-# -lmpfr and leaves them to the linker's default search path. That resolves on
-# Linux, where they sit in /usr/lib, and fails on Homebrew, whose
-# /opt/homebrew/lib is not searched by default: "library 'mpfr' not found". Give
-# each one an imported target pointing at the resolved archive, so the bare name
-# in the export resolves the way cadical's does.
-macro(_camada_declare_cvc5_bare_link_targets)
+# Called after each find_package(cvc5): once for a tree where CaDiCaL is already
+# built, and again after camada_setup_cvc5() builds it when nothing else has.
+macro(_camada_declare_cvc5_link_targets)
+  _camada_declare_bare_link_target(cadical "${CAMADA_CADICAL_LIB}")
   foreach(_camada_bare_lib IN ITEMS picpoly picpolyxx gmp mpfr)
-    if(NOT TARGET ${_camada_bare_lib})
-      find_library(
-        _camada_bare_lib_path_${_camada_bare_lib}
-        NAMES ${_camada_bare_lib}
-        HINTS ${CAMADA_DEPS_INSTALL_DIR}/lib ${CAMADA_DEPS_INSTALL_DIR}/lib64)
-      if(_camada_bare_lib_path_${_camada_bare_lib})
-        add_library(${_camada_bare_lib} UNKNOWN IMPORTED GLOBAL)
-        set_target_properties(
-          ${_camada_bare_lib}
-          PROPERTIES IMPORTED_LOCATION
-                     "${_camada_bare_lib_path_${_camada_bare_lib}}")
-      endif()
-    endif()
+    _camada_declare_bare_link_target(${_camada_bare_lib})
   endforeach()
 endmacro()
 
-_camada_declare_cadical_target()
+_camada_declare_cvc5_link_targets()
 
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
-if(CVC5_FOUND)
-  _camada_declare_cvc5_bare_link_targets()
-endif()
 
 if(NOT CVC5_FOUND AND _camada_download_cvc5)
   camada_setup_cvc5()
-  _camada_declare_cadical_target()
+  _camada_declare_cvc5_link_targets()
   find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
   set(CVC5_FOUND ${cvc5_FOUND})
-  if(CVC5_FOUND)
-    _camada_declare_cvc5_bare_link_targets()
-  endif()
 endif()
 
 set(CAMADA_CVC5_EXTRA_LIBS "")
@@ -93,32 +95,18 @@ if(CVC5_FOUND)
     message(FATAL_ERROR "Expected version ${CVC5_MIN_VERSION} or greater")
   endif()
 
-  set(_camada_cvc5_lib_hints
-      ${CAMADA_DEPS_INSTALL_DIR}/lib ${CAMADA_DEPS_INSTALL_DIR}/lib64
-      ${CAMADA_SOLVER_CVC5_DIR}/lib ${CAMADA_SOLVER_CVC5_DIR}/lib64
-      ${CAMADA_CVC5_DIR}/lib ${CAMADA_CVC5_DIR}/lib64)
-  # gmp is here because cvc5::cvc5's interface pulls it in by bare name; once
-  # the link switches to resolved paths below, it must be resolved too (it may
-  # only exist as a system library, hence no HINTS restraint). mpfr is here
-  # because CVC5 1.4.0 turns on CVC5_USE_MPFR for floating-point constant
-  # folding; 1.3.4 did not, so the prebuilt never needed it named.
+  # The same names CVC5 exports bare, now as resolved paths for Camada's own
+  # link line. _camada_declare_cvc5_link_targets already resolved each one, so
+  # read the location back off the imported target instead of searching again.
   foreach(_camada_cvc5_extra_lib_name IN ITEMS cadical picpoly picpolyxx gmp
                                                mpfr)
-    # CaDiCaL is the shared build. CVC5 is compiled against it and stages none
-    # of its own, so name the archive directly rather than letting find_library
-    # pick up whatever copy happens to be installed.
-    if(_camada_cvc5_extra_lib_name STREQUAL "cadical")
-      list(APPEND CAMADA_CVC5_EXTRA_LIBS "${CAMADA_CADICAL_LIB}")
-      continue()
+    if(TARGET ${_camada_cvc5_extra_lib_name})
+      get_target_property(_camada_cvc5_extra_lib ${_camada_cvc5_extra_lib_name}
+                          IMPORTED_LOCATION)
+      if(_camada_cvc5_extra_lib)
+        list(APPEND CAMADA_CVC5_EXTRA_LIBS "${_camada_cvc5_extra_lib}")
+      endif()
     endif()
-    find_library(
-      _camada_cvc5_extra_lib
-      NAMES ${_camada_cvc5_extra_lib_name}
-      HINTS ${_camada_cvc5_lib_hints})
-    if(_camada_cvc5_extra_lib)
-      list(APPEND CAMADA_CVC5_EXTRA_LIBS "${_camada_cvc5_extra_lib}")
-    endif()
-    unset(_camada_cvc5_extra_lib CACHE)
   endforeach()
 
   # cvc5's export names its build configuration "PRODUCTION", so the location

@@ -50,12 +50,6 @@ set(CAMADA_CVC5_GIT_TAG
 # Baked into cadiback's config.hpp, which Camada writes itself; see
 # camada_setup_cryptominisat_solver_deps.
 set(CAMADA_CADIBACK_REVISION "69255f55e411207c4bdea02c6c2ab1ef29740ce1")
-# The submodule revisions STP 2.4.1 pins under lib/, fetched separately because
-# tarballs carry no submodules.
-set(CAMADA_STP_abc_REPOSITORY "berkeley-abc/abc")
-set(CAMADA_STP_abc_REVISION "95393064368b7c05da4d6f0264fc3419c175c7cb")
-set(CAMADA_STP_mimalloc_REPOSITORY "microsoft/mimalloc")
-set(CAMADA_STP_mimalloc_REVISION "30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe")
 
 # CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
 # prebuilt URLs to pin. It stays disabled on Windows, as it was under the
@@ -645,8 +639,9 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # ./generate: that script reads the commit out of .git, and a source tarball
     # has none ("generate: error: could not find '.git' directory"). All three
     # defines are known without it -- the version from cadiback's VERSION file,
-    # the commit from the revision pinned above, the build string from the
-    # makefile's COMPILE line.
+    # the commit from the revision pinned above. BUILD only reaches a banner
+    # line ("Compiled with '%s'"), so it names the compiler rather than scraping
+    # the makefile's COMPILE flags for a string nothing parses.
     #
     # It also settles a macOS problem the generate path needed a workaround for:
     # cadiback's plain-text VERSION file collides with libc++'s <version> on a
@@ -655,16 +650,9 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # emptied outright instead of being emptied after generate had run.
     file(READ "${cms_cadiback_dir}/VERSION" cms_cadiback_version)
     string(STRIP "${cms_cadiback_version}" cms_cadiback_version)
-    file(READ "${cms_cadiback_dir}/makefile" cms_cadiback_makefile)
-    string(REGEX MATCH "COMPILE=[^\n]*" cms_cadiback_compile
-                 "${cms_cadiback_makefile}")
-    string(REGEX REPLACE "^COMPILE=" "" cms_cadiback_compile
-                         "${cms_cadiback_compile}")
-    string(REGEX REPLACE " -I.*" "" cms_cadiback_compile
-                         "${cms_cadiback_compile}")
     file(
       WRITE "${cms_cadiback_dir}/config.hpp"
-      "#define VERSION \"${cms_cadiback_version}\"\n#define GITID \"${CAMADA_CADIBACK_REVISION}\"\n#define BUILD \"${cms_cadiback_compile}\"\n"
+      "#define VERSION \"${cms_cadiback_version}\"\n#define GITID \"${CAMADA_CADIBACK_REVISION}\"\n#define BUILD \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\"\n"
     )
     file(WRITE "${cms_cadiback_dir}/VERSION"
          "// Emptied by Camada: shadows libc++'s <version> on macOS.\n")
@@ -1237,6 +1225,19 @@ function(camada_setup_cvc5)
   file(WRITE "${cvc5_config}" "${cvc5_config_contents}")
 endfunction()
 
+# Populates one of STP's submodule directories from its own tarball. A tarball
+# fetch brings no submodules, and STP add_subdirectory()s these, so the
+# directory has to hold the real source rather than the empty placeholder the
+# archive carries.
+function(camada_place_stp_submodule destination package repository revision)
+  if(EXISTS "${destination}/CMakeLists.txt")
+    return()
+  endif()
+  camada_fetch_git_source(${package} ${repository} ${revision} source_dir)
+  file(REMOVE_RECURSE "${destination}")
+  file(COPY "${source_dir}/" DESTINATION "${destination}")
+endfunction()
+
 function(camada_setup_stp)
   camada_setup_cryptominisat()
   set(stp_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/STP/STPConfig.cmake")
@@ -1258,19 +1259,14 @@ function(camada_setup_stp)
 
   # STP keeps ABC and mimalloc as submodules and add_subdirectory()s both, but a
   # source tarball carries no submodules. Fetch each at the revision STP 2.4.1
-  # pins and populate its directory, so the tree matches a checkout with `git
-  # submodule update --init`.
-  foreach(stp_submodule IN ITEMS abc mimalloc)
-    set(stp_submodule_dir "${stp_source_dir}/lib/extlib-${stp_submodule}")
-    if(NOT EXISTS "${stp_submodule_dir}/CMakeLists.txt")
-      camada_fetch_git_source(
-        stp${stp_submodule} "${CAMADA_STP_${stp_submodule}_REPOSITORY}"
-        "${CAMADA_STP_${stp_submodule}_REVISION}" stp_submodule_source_dir)
-      file(REMOVE_RECURSE "${stp_submodule_dir}")
-      file(COPY "${stp_submodule_source_dir}/"
-           DESTINATION "${stp_submodule_dir}")
-    endif()
-  endforeach()
+  # pins, so the tree matches a checkout with `git submodule update --init`.
+  camada_place_stp_submodule(
+    "${stp_source_dir}/lib/extlib-abc" stpabc berkeley-abc/abc
+    95393064368b7c05da4d6f0264fc3419c175c7cb)
+  camada_place_stp_submodule(
+    "${stp_source_dir}/lib/extlib-mimalloc" stpmimalloc microsoft/mimalloc
+    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe)
+
   if(APPLE)
     file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
     string(
