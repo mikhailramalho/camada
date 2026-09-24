@@ -9,6 +9,11 @@ set(_camada_cvc5_hints
     $ENV{HOME}/cvc5)
 camada_should_download_dependency(_camada_download_cvc5 TRUE)
 
+# Before find_package: a dependency tree that is already staged -- a warm CI
+# cache, or any second configure -- never re-enters camada_setup_cvc5(), so the
+# repair has to happen on the path that always runs. Idempotent.
+camada_point_cvc5_at_shared_cadical()
+
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
 
