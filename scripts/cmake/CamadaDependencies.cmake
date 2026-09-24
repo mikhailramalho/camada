@@ -620,8 +620,12 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
   set(cms_cadical_dir "${cms_parent_dir}/cadical")
   set(cms_cadiback_dir "${cms_parent_dir}/cadiback")
 
+  # Above the guard, not inside it: the sibling link can already exist while the
+  # archive it points at has been deleted, and the link line below names that
+  # archive either way. The call is stamped, so a current build returns after
+  # three EXISTS and a small read.
+  camada_setup_shared_cadical()
   if(NOT EXISTS "${cms_cadical_dir}/build/libcadical.a")
-    camada_setup_shared_cadical()
     camada_prepare_cryptominisat_dependency_layout("${cms_cadical_dir}"
                                                    "${CAMADA_CADICAL_SRC_DIR}")
   endif()
@@ -691,13 +695,20 @@ function(camada_setup_cryptominisat)
   set(cms_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake"
   )
-  # Version stamp so a stale CMS (e.g. 5.6.3 from an older checkout) in an
-  # existing build directory is rebuilt instead of silently reused.
+  # Recipe stamp, same shape as CaDiCaL's and Yices': one stable filename
+  # holding the recipe version, so a bump rebuilds rather than leaving an
+  # orphaned stamp behind. Older installs built CMS against a private CaDiCaL
+  # fork, so both it and CadiBack must be rebuilt against the shared one.
   set(cms_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/camada-cms-5.11.22.stamp"
-  )
+      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/camada-cms.stamp")
+  set(cms_recipe_version "5.11.22:shared-cadical")
+  camada_setup_shared_cadical()
   if(EXISTS "${cms_config}" AND EXISTS "${cms_stamp}")
-    return()
+    file(READ "${cms_stamp}" cms_stamp_contents)
+    string(STRIP "${cms_stamp_contents}" cms_stamp_contents)
+    if(cms_stamp_contents STREQUAL cms_recipe_version)
+      return()
+    endif()
   endif()
 
   camada_ensure_deps_dirs()
@@ -735,6 +746,11 @@ function(camada_setup_cryptominisat)
     -DNOZLIB=ON
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     -DCMAKE_BUILD_TYPE=Release
+    # Pin the flags empty rather than inherit CXXFLAGS from the environment:
+    # CadiBack's configure hardcodes its own compile line, so a flag that
+    # changes mangling (-D_GLIBCXX_DEBUG, -stdlib=libc++) would reach CMS and
+    # not CadiBack, and the two would fail to link together.
+    -DCMAKE_CXX_FLAGS=
     -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR})
   camada_run_checked(WORKING_DIRECTORY "${cms_build_dir}" MESSAGE
                      "Building CryptoMiniSat" COMMAND ninja)
@@ -771,7 +787,8 @@ function(camada_setup_cryptominisat)
                        "${cms_targets_contents}")
   file(WRITE "${cms_targets_file}" "${cms_targets_contents}")
 
-  file(TOUCH "${cms_stamp}")
+  file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
+  file(WRITE "${cms_stamp}" "${cms_recipe_version}\n")
 endfunction()
 
 function(camada_setup_gmp)
@@ -1081,6 +1098,22 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
     -Dtesting=disabled)
   camada_run_checked(WORKING_DIRECTORY "${bitwuzla_build_dir}" MESSAGE
                      "Building Bitwuzla" COMMAND "${ninja_program}")
+  # Meson may install into a different libdir than the old prebuilt. Remove its
+  # archives and pkg-config files so discovery cannot select that copy.
+  file(
+    GLOB
+    bitwuzla_old_files
+    "${CAMADA_DEPS_INSTALL_DIR}/lib/libbitwuzla*.a"
+    "${CAMADA_DEPS_INSTALL_DIR}/lib/*/libbitwuzla*.a"
+    "${CAMADA_DEPS_INSTALL_DIR}/lib64/libbitwuzla*.a"
+    "${CAMADA_DEPS_INSTALL_DIR}/lib64/*/libbitwuzla*.a"
+    "${CAMADA_DEPS_INSTALL_DIR}/lib/pkgconfig/bitwuzla.pc"
+    "${CAMADA_DEPS_INSTALL_DIR}/lib/*/pkgconfig/bitwuzla.pc"
+    "${CAMADA_DEPS_INSTALL_DIR}/lib64/pkgconfig/bitwuzla.pc"
+    "${CAMADA_DEPS_INSTALL_DIR}/lib64/*/pkgconfig/bitwuzla.pc")
+  if(bitwuzla_old_files)
+    file(REMOVE ${bitwuzla_old_files})
+  endif()
   camada_run_checked(
     WORKING_DIRECTORY
     "${bitwuzla_build_dir}"
@@ -1098,10 +1131,23 @@ endfunction()
 # bundles its own CaDiCaL, which would be a second copy in any build that also
 # enables CVC5 or STP.
 function(camada_setup_bitwuzla)
-  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
+  set(bitwuzla_stamp
+      "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/camada-bitwuzla.stamp")
+  set(bitwuzla_recipe_version "${CAMADA_BITWUZLA_GIT_TAG}:shared-cadical")
+  set(bitwuzla_stamp_current FALSE)
+  if(EXISTS "${bitwuzla_stamp}")
+    file(READ "${bitwuzla_stamp}" bitwuzla_stamp_contents)
+    string(STRIP "${bitwuzla_stamp_contents}" bitwuzla_stamp_contents)
+    if(bitwuzla_stamp_contents STREQUAL bitwuzla_recipe_version)
+      set(bitwuzla_stamp_current TRUE)
+    endif()
+  endif()
+  camada_setup_shared_cadical()
+  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h"
+     OR NOT bitwuzla_stamp_current)
     camada_ensure_deps_dirs()
-    camada_setup_shared_cadical()
     camada_build_bitwuzla_from_source("${CAMADA_CADICAL_PREFIX}")
+    file(WRITE "${bitwuzla_stamp}" "${bitwuzla_recipe_version}\n")
   endif()
 
   # Bitwuzla is built against the shared CaDiCaL, so the pkg-config file has to
@@ -1113,10 +1159,7 @@ function(camada_setup_bitwuzla)
   # whichever target happens to consume the raw flags rather than to everything
   # that links Bitwuzla. camada-regression picked it up and camada-bench did
   # not, so a Bitwuzla-only build failed on undefined CaDiCaL::Solver symbols.
-  set(bitwuzla_cadical_flags "")
-  if(EXISTS "${CAMADA_CADICAL_LIB}")
-    set(bitwuzla_cadical_flags " -L${CAMADA_CADICAL_PREFIX}/lib -lcadical")
-  endif()
+  set(bitwuzla_cadical_flags " -L${CAMADA_CADICAL_PREFIX}/lib -lcadical")
 
   file(
     GLOB
@@ -1158,12 +1201,12 @@ function(camada_point_cvc5_at_shared_cadical)
   # the bare `cadical`: an already-patched tree costs one read. Otherwise build
   # the shared CaDiCaL if nothing has yet -- CVC5 can be the only backend
   # enabled, in which case no other setup function has run.
+  camada_setup_shared_cadical()
   file(READ "${cvc5_targets_file}" cvc5_targets_contents)
   string(FIND "${cvc5_targets_contents}" "LINK_ONLY:cadical>" cvc5_bare_cadical)
   if(cvc5_bare_cadical EQUAL -1)
     return()
   endif()
-  camada_setup_shared_cadical()
   string(REPLACE "LINK_ONLY:cadical>" "LINK_ONLY:${CAMADA_CADICAL_LIB}>"
                  cvc5_targets_contents "${cvc5_targets_contents}")
   file(WRITE "${cvc5_targets_file}" "${cvc5_targets_contents}")
@@ -1211,6 +1254,7 @@ function(camada_setup_cvc5)
 endfunction()
 
 function(camada_setup_stp)
+  camada_setup_cryptominisat()
   set(stp_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/STP/STPConfig.cmake")
   # libabc-pic.a is staged by this function for STP >= 2.4.0 only, so its
   # presence also distinguishes a current install from a stale 2.3.x one left
@@ -1226,7 +1270,6 @@ function(camada_setup_stp)
   )
 
   camada_setup_minisat()
-  camada_setup_cryptominisat()
   camada_fetch_git_source(stpsrc stp/stp 2.4.1 stp_source_dir)
   if(APPLE)
     file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)

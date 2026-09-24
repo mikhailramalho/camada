@@ -146,6 +146,13 @@ if(NOT CAMADA_SOLVER_STP_DIR AND NOT CAMADA_STP_DIR)
        NO_CMAKE_SYSTEM_PACKAGE_REGISTRY)
 endif()
 
+# Migrate our cached CMS/CadiBack before importing their exported targets.
+if(EXISTS
+   "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake"
+)
+  camada_setup_cryptominisat()
+endif()
+
 find_package(cryptominisat5 CONFIG QUIET HINTS ${_camada_stp_hints})
 find_package(minisat CONFIG QUIET HINTS ${_camada_stp_hints})
 _camada_repair_stp_targets_file()
