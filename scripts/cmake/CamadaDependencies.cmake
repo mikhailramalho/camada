@@ -47,10 +47,6 @@ set(CAMADA_Z3_WINDOWS_X86_64_URL
 set(CAMADA_CVC5_GIT_TAG
     "cvc5-1.4.0"
     CACHE STRING "CVC5 tag built from source against the shared CaDiCaL")
-# Identifies the recipe, not just the version: a tree staged by the prebuilt
-# recipe at this same tag must still be rebuilt, because it carries its own
-# libcadical.a.
-set(CAMADA_CVC5_RECIPE_VERSION "${CAMADA_CVC5_GIT_TAG}:shared-cadical")
 
 # CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
 # prebuilt URLs to pin. It stays disabled on Windows, as it was under the
@@ -62,10 +58,10 @@ set(CAMADA_CVC5_RECIPE_VERSION "${CAMADA_CVC5_GIT_TAG}:shared-cadical")
 # the link while each library keeps the field offsets it was compiled with -- so
 # Camada builds one CaDiCaL and every consumer links it, including when it is
 # the only backend enabled. Each consumer's setup asks for it directly;
-# camada_setup_shared_cadical() is stamped, so the first request builds it and
-# the rest return at once. BUILD_SHARED_LIBS does not avoid the clash: these
-# arrive as static archives whichever way Camada is built, so every copy would
-# land in libcamada.so too.
+# camada_setup_shared_cadical() returns at once once the archive exists, so the
+# first request builds it and the rest are cheap. BUILD_SHARED_LIBS does not
+# avoid the clash: these arrive as static archives whichever way Camada is
+# built, so every copy would land in libcamada.so too.
 
 # CVC5 ships a patched CaDiCaL ("elevate"), Bitwuzla's prebuilt bundles stock
 # CaDiCaL inside libbitwuzla.a. A static link of both keeps one definition of
@@ -614,8 +610,7 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
 
   # Above the guard, not inside it: the sibling link can already exist while the
   # archive it points at has been deleted, and the link line below names that
-  # archive either way. The call is stamped, so a current build returns after
-  # three EXISTS and a small read.
+  # archive either way. A current build returns after two EXISTS.
   camada_setup_shared_cadical()
   if(NOT EXISTS "${cms_cadical_dir}/build/libcadical.a")
     camada_prepare_cryptominisat_dependency_layout("${cms_cadical_dir}"
@@ -687,20 +682,9 @@ function(camada_setup_cryptominisat)
   set(cms_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake"
   )
-  # Recipe stamp, same shape as CaDiCaL's and Yices': one stable filename
-  # holding the recipe version, so a bump rebuilds rather than leaving an
-  # orphaned stamp behind. Older installs built CMS against a private CaDiCaL
-  # fork, so both it and CadiBack must be rebuilt against the shared one.
-  set(cms_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/camada-cms.stamp")
-  set(cms_recipe_version "5.11.22:shared-cadical")
   camada_setup_shared_cadical()
-  if(EXISTS "${cms_config}" AND EXISTS "${cms_stamp}")
-    file(READ "${cms_stamp}" cms_stamp_contents)
-    string(STRIP "${cms_stamp_contents}" cms_stamp_contents)
-    if(cms_stamp_contents STREQUAL cms_recipe_version)
-      return()
-    endif()
+  if(EXISTS "${cms_config}")
+    return()
   endif()
 
   camada_ensure_deps_dirs()
@@ -780,7 +764,6 @@ function(camada_setup_cryptominisat)
   file(WRITE "${cms_targets_file}" "${cms_targets_contents}")
 
   file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
-  file(WRITE "${cms_stamp}" "${cms_recipe_version}\n")
 endfunction()
 
 function(camada_setup_gmp)
@@ -867,9 +850,7 @@ endfunction()
 function(camada_setup_minisat)
   set(minisat_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat/minisatConfig.cmake")
-  set(minisat_source_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat/camada-source-build.stamp")
-  if(EXISTS "${minisat_config}" AND EXISTS "${minisat_source_stamp}")
+  if(EXISTS "${minisat_config}")
     return()
   endif()
 
@@ -924,7 +905,6 @@ function(camada_setup_minisat)
     WRITE "${minisat_config}"
     "if(NOT TARGET minisat)\n  add_library(minisat STATIC IMPORTED)\n  set_target_properties(minisat PROPERTIES IMPORTED_LOCATION \"${CAMADA_DEPS_INSTALL_DIR}/lib/libminisat.a\" INTERFACE_INCLUDE_DIRECTORIES \"${CAMADA_DEPS_INSTALL_DIR}/include\")\nendif()\n"
   )
-  file(WRITE "${minisat_source_stamp}" "1\n")
 endfunction()
 
 # Builds the CaDiCaL that both Bitwuzla and CVC5 link against, with the same
@@ -935,19 +915,8 @@ function(camada_setup_shared_cadical)
   set(cadical_prefix "${CAMADA_CADICAL_PREFIX}")
   set(cadical_lib "${CAMADA_CADICAL_LIB}")
   set(cadical_header "${cadical_prefix}/include/cadical/cadical.hpp")
-  set(cadical_stamp "${cadical_prefix}/camada-cadical.stamp")
-  # Bump when the URL or the flags below change, so an install left by an older
-  # recipe is rebuilt rather than silently reused.
-  set(cadical_recipe_version "3:${CAMADA_CADICAL_SHA256}")
-
   if(EXISTS "${cadical_lib}" AND EXISTS "${cadical_header}")
-    if(EXISTS "${cadical_stamp}")
-      file(READ "${cadical_stamp}" cadical_stamp_contents)
-      string(STRIP "${cadical_stamp_contents}" cadical_stamp_contents)
-      if(cadical_stamp_contents STREQUAL cadical_recipe_version)
-        return()
-      endif()
-    endif()
+    return()
   endif()
 
   camada_ensure_deps_dirs()
@@ -1034,7 +1003,6 @@ function(camada_setup_shared_cadical)
   file(COPY "${cadical_source_dir}/src/cadical.hpp"
             "${cadical_source_dir}/src/tracer.hpp"
        DESTINATION "${cadical_prefix}/include/cadical")
-  file(WRITE "${cadical_stamp}" "${cadical_recipe_version}\n")
 endfunction()
 
 # Builds Bitwuzla from source against the shared CaDiCaL. Bitwuzla's
@@ -1123,23 +1091,10 @@ endfunction()
 # bundles its own CaDiCaL, which would be a second copy in any build that also
 # enables CVC5 or STP.
 function(camada_setup_bitwuzla)
-  set(bitwuzla_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/camada-bitwuzla.stamp")
-  set(bitwuzla_recipe_version "${CAMADA_BITWUZLA_GIT_TAG}:shared-cadical")
-  set(bitwuzla_stamp_current FALSE)
-  if(EXISTS "${bitwuzla_stamp}")
-    file(READ "${bitwuzla_stamp}" bitwuzla_stamp_contents)
-    string(STRIP "${bitwuzla_stamp_contents}" bitwuzla_stamp_contents)
-    if(bitwuzla_stamp_contents STREQUAL bitwuzla_recipe_version)
-      set(bitwuzla_stamp_current TRUE)
-    endif()
-  endif()
   camada_setup_shared_cadical()
-  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h"
-     OR NOT bitwuzla_stamp_current)
+  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
     camada_ensure_deps_dirs()
     camada_build_bitwuzla_from_source("${CAMADA_CADICAL_PREFIX}")
-    file(WRITE "${bitwuzla_stamp}" "${bitwuzla_recipe_version}\n")
   endif()
 
   # Bitwuzla is built against the shared CaDiCaL, so the pkg-config file has to
@@ -1260,39 +1215,9 @@ function(camada_build_cvc5_from_source)
     install)
 endfunction()
 
-# TRUE when the downloaded CVC5 install is absent or was staged by a recipe
-# other than the current one -- the prebuilt, or an older source build. A
-# restored dependency cache is the case that matters: the prefix fallback in CI
-# restores whatever tree the previous key left, and that tree's cvc5Config.cmake
-# satisfies find_package and the minimum-version floor, so nothing else notices
-# the recipe changed underneath it.
-function(camada_cvc5_needs_rebuild out_var)
-  set(config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Config.cmake")
-  set(stamp "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/camada-cvc5.stamp")
-  if(EXISTS "${config}" AND EXISTS "${stamp}")
-    file(READ "${stamp}" contents)
-    string(STRIP "${contents}" contents)
-    if(contents STREQUAL "${CAMADA_CVC5_RECIPE_VERSION}")
-      set(${out_var}
-          FALSE
-          PARENT_SCOPE)
-      return()
-    endif()
-  endif()
-  set(${out_var}
-      TRUE
-      PARENT_SCOPE)
-endfunction()
-
 function(camada_setup_cvc5)
   set(cvc5_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Config.cmake")
-  # Recipe stamp in the shape the other source builds use: a stable filename
-  # holding a version string, compared by content. An install left by the
-  # prebuilt recipe carries its own libcadical.a, so it has to be rebuilt rather
-  # than reused.
-  set(cvc5_stamp "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/camada-cvc5.stamp")
-  camada_cvc5_needs_rebuild(cvc5_rebuild)
-  if(NOT cvc5_rebuild)
+  if(EXISTS "${cvc5_config}")
     return()
   endif()
 
@@ -1307,7 +1232,6 @@ function(camada_setup_cvc5)
   string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
                  cvc5_config_contents "${cvc5_config_contents}")
   file(WRITE "${cvc5_config}" "${cvc5_config_contents}")
-  file(WRITE "${cvc5_stamp}" "${CAMADA_CVC5_RECIPE_VERSION}\n")
 endfunction()
 
 function(camada_setup_stp)
@@ -1406,30 +1330,14 @@ function(camada_setup_yices)
   set(yices_header "${CAMADA_DEPS_INSTALL_DIR}/include/yices.h")
   set(yices_shared_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so")
   set(yices_shared_soname "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so.2.7.0")
-  set(yices_source_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices/camada-source-build.stamp")
-  # Bump when the configure flags below change, so an install left by an older
-  # recipe is rebuilt rather than silently reused: the stamp used to record only
-  # that a source build had happened, not which one.
-  set(yices_recipe_version "1")
-  set(yices_stamp_current FALSE)
-  if(EXISTS "${yices_source_stamp}")
-    file(READ "${yices_source_stamp}" yices_stamp_contents)
-    string(STRIP "${yices_stamp_contents}" yices_stamp_contents)
-    if(yices_stamp_contents STREQUAL yices_recipe_version)
-      set(yices_stamp_current TRUE)
-    endif()
-  endif()
   if(BUILD_SHARED_LIBS
      AND EXISTS "${yices_shared_lib}"
-     AND EXISTS "${yices_header}"
-     AND yices_stamp_current)
+     AND EXISTS "${yices_header}")
     return()
   endif()
   if(NOT BUILD_SHARED_LIBS
      AND EXISTS "${yices_lib}"
-     AND EXISTS "${yices_header}"
-     AND yices_stamp_current)
+     AND EXISTS "${yices_header}")
     if(EXISTS "${yices_shared_soname}" AND NOT EXISTS "${yices_shared_lib}")
       file(CREATE_LINK "${yices_shared_soname}" "${yices_shared_lib}" SYMBOLIC)
     endif()
@@ -1490,7 +1398,6 @@ function(camada_setup_yices)
     make
     install)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices")
-  file(WRITE "${yices_source_stamp}" "${yices_recipe_version}\n")
 endfunction()
 
 function(camada_setup_z3)

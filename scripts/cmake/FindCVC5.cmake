@@ -29,28 +29,47 @@ macro(_camada_declare_cadical_target)
   endif()
 endmacro()
 
-_camada_declare_cadical_target()
+# CVC5 exports picpoly, picpolyxx, gmp and mpfr by bare name too. Unlike cadical
+# they have no imported target, so CMake passes them through as -lpicpoly ...
+# -lmpfr and leaves them to the linker's default search path. That resolves on
+# Linux, where they sit in /usr/lib, and fails on Homebrew, whose
+# /opt/homebrew/lib is not searched by default: "library 'mpfr' not found". Give
+# each one an imported target pointing at the resolved archive, so the bare name
+# in the export resolves the way cadical's does.
+macro(_camada_declare_cvc5_bare_link_targets)
+  foreach(_camada_bare_lib IN ITEMS picpoly picpolyxx gmp mpfr)
+    if(NOT TARGET ${_camada_bare_lib})
+      find_library(
+        _camada_bare_lib_path_${_camada_bare_lib}
+        NAMES ${_camada_bare_lib}
+        HINTS ${CAMADA_DEPS_INSTALL_DIR}/lib ${CAMADA_DEPS_INSTALL_DIR}/lib64)
+      if(_camada_bare_lib_path_${_camada_bare_lib})
+        add_library(${_camada_bare_lib} UNKNOWN IMPORTED GLOBAL)
+        set_target_properties(
+          ${_camada_bare_lib}
+          PROPERTIES IMPORTED_LOCATION
+                     "${_camada_bare_lib_path_${_camada_bare_lib}}")
+      endif()
+    endif()
+  endforeach()
+endmacro()
 
-# A downloaded install that a different recipe staged has to be rebuilt before
-# find_package is allowed to accept it. Its cvc5Config.cmake is valid and its
-# version clears the floor below, so nothing downstream would ever notice --
-# this is how CI kept linking a cached prebuilt after the recipe changed.
-if(_camada_download_cvc5)
-  camada_cvc5_needs_rebuild(_camada_cvc5_stale)
-  if(_camada_cvc5_stale)
-    camada_setup_cvc5()
-    _camada_declare_cadical_target()
-  endif()
-endif()
+_camada_declare_cadical_target()
 
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
+if(CVC5_FOUND)
+  _camada_declare_cvc5_bare_link_targets()
+endif()
 
 if(NOT CVC5_FOUND AND _camada_download_cvc5)
   camada_setup_cvc5()
   _camada_declare_cadical_target()
   find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
   set(CVC5_FOUND ${cvc5_FOUND})
+  if(CVC5_FOUND)
+    _camada_declare_cvc5_bare_link_targets()
+  endif()
 endif()
 
 set(CAMADA_CVC5_EXTRA_LIBS "")
