@@ -9,6 +9,11 @@ set(_camada_cvc5_hints
     $ENV{HOME}/cvc5)
 camada_should_download_dependency(_camada_download_cvc5 TRUE)
 
+# Before find_package: a dependency tree that is already staged -- a warm CI
+# cache, or any second configure -- never re-enters camada_setup_cvc5(), so the
+# repair has to happen on the path that always runs. Idempotent.
+camada_point_cvc5_at_shared_cadical()
+
 find_package(cvc5 CONFIG QUIET HINTS ${_camada_cvc5_hints})
 set(CVC5_FOUND ${cvc5_FOUND})
 
@@ -47,6 +52,19 @@ if(CVC5_FOUND)
   # the link switches to resolved paths below, it must be resolved too (it may
   # only exist as a system library, hence no HINTS restraint).
   foreach(_camada_cvc5_extra_lib_name IN ITEMS cadical picpoly picpolyxx gmp)
+    # When Bitwuzla was built from source against a shared CaDiCaL, that build
+    # is the one the binary must use. CVC5's prebuilt ships its own archive of
+    # the same source and flags, so both are ABI-compatible and either would
+    # work -- but leaving both on the link line puts two CaDiCaL implementations
+    # in one binary, which is the arrangement this whole mechanism exists to
+    # prevent and which the duplicate-engine check now rejects. Prefer the
+    # shared build so exactly one copy is exported.
+    if(_camada_cvc5_extra_lib_name STREQUAL "cadical"
+       AND EXISTS "${CAMADA_DEPS_DIR}/cadical/lib/libcadical.a")
+      list(APPEND CAMADA_CVC5_EXTRA_LIBS
+           "${CAMADA_DEPS_DIR}/cadical/lib/libcadical.a")
+      continue()
+    endif()
     find_library(
       _camada_cvc5_extra_lib
       NAMES ${_camada_cvc5_extra_lib_name}

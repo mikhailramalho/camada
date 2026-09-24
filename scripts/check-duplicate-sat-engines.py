@@ -37,33 +37,52 @@ SAT_ENGINES = {
 }
 
 
-def strong_symbols(archive):
-    """Defined, non-weak symbols. Weak ones are inline/template definitions
-    that the linker is meant to merge, so they are not a conflict."""
+def _nm(archive, globals_only):
+    args = ["nm", "--defined-only"] + (["-g"] if globals_only else [])
     try:
-        out = subprocess.run(
-            ["nm", "-g", "--defined-only", str(archive)],
-            capture_output=True, text=True, check=False).stdout
+        return subprocess.run(args + [str(archive)],
+                              capture_output=True, text=True,
+                              check=False).stdout
     except FileNotFoundError:
         sys.exit("error: nm not found; this check needs binutils")
 
+
+def strong_symbols(archive, globals_only=True):
+    """Defined, non-weak symbols. Weak ones are inline/template definitions
+    that the linker is meant to merge, so they are not a conflict.
+
+    globals_only=False also returns file-local symbols, which is how a
+    deliberately localized copy of an engine is detected: objcopy demotes
+    T to t, and the whole point of doing that is that the linker can no
+    longer confuse it with anyone else's copy."""
     symbols = set()
-    for line in out.splitlines():
+    for line in _nm(archive, globals_only).splitlines():
         fields = line.split()
-        # "<addr> <type> <name>"; weak/vague linkage is V, W, u, or v.
-        if len(fields) >= 3 and fields[-2] in ("T", "D", "B", "R"):
+        # "<addr> <type> <name>"; weak/vague linkage is V, W, u, v. Local
+        # definitions are the lowercase forms of the same letters.
+        if len(fields) >= 3 and fields[-2] in ("T", "D", "B", "R",
+                                               "t", "d", "b", "r"):
             symbols.add(fields[-1])
     return symbols
 
 
 def engines_in(archive):
-    """Which SAT engines this archive defines, and how many symbols each."""
-    symbols = strong_symbols(archive)
+    """Which SAT engines this archive defines, how many symbols each, and
+    whether those symbols are exported or localized.
+
+    A localized copy is not a conflict: the linker cannot substitute it for
+    anyone else's, which is the whole reason a build localizes one. Camada
+    does exactly this for CryptoMiniSat's CaDiCaL fork, which would otherwise
+    collide with the one Bitwuzla and CVC5 share."""
+    exported = strong_symbols(archive)
+    everything = strong_symbols(archive, globals_only=False)
     found = {}
     for engine, pattern in SAT_ENGINES.items():
-        count = sum(1 for s in symbols if pattern.match(s))
-        if count:
-            found[engine] = count
+        total = sum(1 for s in everything if pattern.match(s))
+        if not total:
+            continue
+        shown = sum(1 for s in exported if pattern.match(s))
+        found[engine] = (total, shown > 0)
     return found
 
 
@@ -72,13 +91,29 @@ def _digest(archive):
     return hashlib.sha256(archive.read_bytes()).hexdigest()
 
 
+# Intermediate build trees hold the same archive again under its source
+# directory -- deps/src/<pkg>/build/, _deps/<pkg>-src/build/ -- and those
+# copies are never linked, only their staged results are. Counting them
+# reports a conflict for every dependency Camada builds from source.
+_BUILD_SCRATCH = ("/deps/src/", "/_deps/")
+
+
 def collect(paths):
-    """Expand directories to the archives under them; keep files as given."""
+    """Expand directories to the archives under them; keep files as given.
+
+    Archives under an intermediate build tree are skipped: a directory
+    explicitly named on the command line is always searched, so an
+    intermediate can still be inspected deliberately."""
     archives = []
     for path in paths:
         p = pathlib.Path(path)
         if p.is_dir():
-            archives.extend(sorted(p.rglob("*.a")))
+            root = str(p.resolve())
+            for found in sorted(p.rglob("*.a")):
+                rest = str(found.resolve())[len(root):]
+                if any(marker in rest for marker in _BUILD_SCRATCH):
+                    continue
+                archives.append(found)
         elif p.is_file():
             archives.append(p)
         else:
@@ -100,35 +135,44 @@ def main():
     if not archives:
         sys.exit("error: no static archives found")
 
-    # engine -> [(archive, symbol count)]
+    # engine -> [(archive, symbol count, exported?)]
     providers = {}
     for archive in archives:
-        for engine, count in engines_in(archive).items():
-            providers.setdefault(engine, []).append((archive, count))
+        for engine, (count, exported) in engines_in(archive).items():
+            providers.setdefault(engine, []).append((archive, count, exported))
 
     if args.verbose:
         for engine in sorted(providers):
             print(f"{engine}:")
-            for archive, count in providers[engine]:
-                print(f"  {archive}  ({count} symbols)")
+            for archive, count, exported in providers[engine]:
+                note = "" if exported else "  [localized, cannot collide]"
+                print(f"  {archive}  ({count} symbols){note}")
 
     sys.stdout.flush()
 
-    # Byte-identical archives are one engine staged twice, not two
+    # Only exported copies can collide. A localized one is invisible to the
+    # linker's symbol resolution, so it cannot be substituted for another
+    # library's copy however much its layout differs.
+    #
+    # Byte-identical archives are one engine staged twice rather than two
     # implementations: the link picks one and every offset still agrees.
-    # Only distinct content can corrupt a layout.
     conflicts = {}
     for engine, found in providers.items():
-        digests = {_digest(a) for a, _ in found}
+        exported = [(a, c) for a, c, is_exported in found if is_exported]
+        digests = {_digest(a) for a, _ in exported}
         if len(digests) > 1:
-            conflicts[engine] = found
+            conflicts[engine] = exported
     if not conflicts:
+        localized = sum(1 for f in providers.values()
+                        for _, _, is_exported in f if not is_exported)
+        extra = (f", {localized} localized copy/copies ignored"
+                 if localized else "")
         print(f"OK: {len(archives)} archive(s) checked, "
-              f"no SAT engine provided more than once")
+              f"no SAT engine exported more than once{extra}")
         return 0
 
     for engine, found in sorted(conflicts.items()):
-        print(f"\nERROR: {engine} is defined by {len(found)} archives:",
+        print(f"\nERROR: {engine} is exported by {len(found)} archives:",
               file=sys.stderr)
         for archive, count in found:
             print(f"  {archive}  ({count} strong symbols)", file=sys.stderr)

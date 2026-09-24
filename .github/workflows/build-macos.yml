@@ -49,7 +49,7 @@ jobs:
     # See the matching step in build-linux.yml: a static link of two backends
     # that each bundle a SAT engine corrupts field offsets silently.
     - name: Check for duplicate SAT engines
-      run: ./scripts/check-duplicate-sat-engines.py --verbose build/deps/install
+      run: ./scripts/check-duplicate-sat-engines.py --verbose build
 
     - name: Run tests
       run: ctest --test-dir build --parallel 4 --output-on-failure
