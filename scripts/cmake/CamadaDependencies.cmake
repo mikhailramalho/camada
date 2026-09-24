@@ -47,6 +47,15 @@ set(CAMADA_Z3_WINDOWS_X86_64_URL
 set(CAMADA_CVC5_GIT_TAG
     "cvc5-1.4.0"
     CACHE STRING "CVC5 tag built from source against the shared CaDiCaL")
+# Baked into cadiback's config.hpp, which Camada writes itself; see
+# camada_setup_cryptominisat_solver_deps.
+set(CAMADA_CADIBACK_REVISION "69255f55e411207c4bdea02c6c2ab1ef29740ce1")
+# The submodule revisions STP 2.4.1 pins under lib/, fetched separately because
+# tarballs carry no submodules.
+set(CAMADA_STP_abc_REPOSITORY "berkeley-abc/abc")
+set(CAMADA_STP_abc_REVISION "95393064368b7c05da4d6f0264fc3419c175c7cb")
+set(CAMADA_STP_mimalloc_REPOSITORY "microsoft/mimalloc")
+set(CAMADA_STP_mimalloc_REVISION "30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe")
 
 # CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
 # prebuilt URLs to pin. It stays disabled on Windows, as it was under the
@@ -550,24 +559,19 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
   )
 endfunction()
 
+# Fetches a source tree at one tag or commit. A tarball rather than a clone: the
+# whole history is downloaded otherwise for a single revision, and CVC5's is
+# over 200k objects. GitHub serves archive/<ref>.tar.gz for a tag or a commit
+# SHA alike, so every caller converts unchanged.
+#
+# Tarballs carry no submodules. The only caller that had any is CryptoMiniSat,
+# whose four are test utilities (OutputCheck, cnf-utils, sha1-sat, licensecheck)
+# referenced from tests/ and never from the library build.
 function(camada_fetch_git_source package_name repository git_tag out_var)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
-  if(package_name STREQUAL "cryptominisat")
-    set(git_submodules_arg GIT_SUBMODULES)
-  endif()
-  cpmaddpackage(
-    NAME
-    ${package_name}
-    DOWNLOAD_ONLY
-    YES
-    GITHUB_REPOSITORY
-    ${repository}
-    GIT_TAG
-    ${git_tag}
-    ${git_submodules_arg}
-    GIT_PROGRESS
-    TRUE)
+  cpmaddpackage(NAME ${package_name} DOWNLOAD_ONLY YES URL
+                "https://github.com/${repository}/archive/${git_tag}.tar.gz")
   set(${out_var}
       "${${package_name}_SOURCE_DIR}"
       PARENT_SCOPE)
@@ -622,8 +626,8 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # contemporary main commit whose CadiBack::doit() signature still matches
     # CMS 5.11.22's backbone.cpp (2024-06-07).
     camada_fetch_git_source(
-      cryptominisat_cadiback meelgroup/cadiback
-      69255f55e411207c4bdea02c6c2ab1ef29740ce1 cms_cadiback_source_dir)
+      cryptominisat_cadiback meelgroup/cadiback "${CAMADA_CADIBACK_REVISION}"
+      cms_cadiback_source_dir)
     camada_prepare_cryptominisat_dependency_layout("${cms_cadiback_dir}"
                                                    "${cms_cadiback_source_dir}")
     camada_run_checked(
@@ -637,34 +641,33 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
       env
       "CXXFLAGS=-fPIC"
       ./configure)
-    # cadiback ships a plain-text VERSION file holding "0.2.1". Apple Clang
-    # searches the compilation directory for angle-bracket includes, so on a
-    # case-insensitive filesystem the libc++ chain <algorithm> -> ... ->
-    # <cstddef> -> #include <version> finds that file and the build dies on
-    # "./version:1:1: expected unqualified-id". Swapping the implicit -I for
-    # -iquote does not stop it.
+    # config.hpp is written here rather than by `make config.hpp`, which runs
+    # ./generate: that script reads the commit out of .git, and a source tarball
+    # has none ("generate: error: could not find '.git' directory"). All three
+    # defines are known without it -- the version from cadiback's VERSION file,
+    # the commit from the revision pinned above, the build string from the
+    # makefile's COMPILE line.
     #
-    # Only ./generate reads the file, and only to bake the string into
-    # config.hpp, so generate that header first and then replace the contents
-    # with a comment, which is valid C++ if anything does include it. The file
-    # itself has to stay: make lists it as a prerequisite of config.hpp and
-    # refuses to build when it is missing, timestamps notwithstanding.
-    camada_run_checked(
-      WORKING_DIRECTORY
-      "${cms_cadiback_dir}"
-      MESSAGE
-      "Generating CryptoMiniSat CadiBack config"
-      COMMAND
-      make
-      config.hpp)
-    if(EXISTS "${cms_cadiback_dir}/VERSION")
-      file(WRITE "${cms_cadiback_dir}/VERSION"
-           "// Emptied by Camada once config.hpp captured the version.\n")
-      # Rewriting VERSION makes it newer than config.hpp, which would send make
-      # straight back through ./generate and bake this comment in as the version
-      # string. Touch the header so the rule stays satisfied.
-      file(TOUCH_NOCREATE "${cms_cadiback_dir}/config.hpp")
-    endif()
+    # It also settles a macOS problem the generate path needed a workaround for:
+    # cadiback's plain-text VERSION file collides with libc++'s <version> on a
+    # case-insensitive filesystem, because Apple Clang searches the compilation
+    # directory for angle-bracket includes. Nothing reads the file now, so it is
+    # emptied outright instead of being emptied after generate had run.
+    file(READ "${cms_cadiback_dir}/VERSION" cms_cadiback_version)
+    string(STRIP "${cms_cadiback_version}" cms_cadiback_version)
+    file(READ "${cms_cadiback_dir}/makefile" cms_cadiback_makefile)
+    string(REGEX MATCH "COMPILE=[^\n]*" cms_cadiback_compile
+                 "${cms_cadiback_makefile}")
+    string(REGEX REPLACE "^COMPILE=" "" cms_cadiback_compile
+                         "${cms_cadiback_compile}")
+    string(REGEX REPLACE " -I.*" "" cms_cadiback_compile
+                         "${cms_cadiback_compile}")
+    file(
+      WRITE "${cms_cadiback_dir}/config.hpp"
+      "#define VERSION \"${cms_cadiback_version}\"\n#define GITID \"${CAMADA_CADIBACK_REVISION}\"\n#define BUILD \"${cms_cadiback_compile}\"\n"
+    )
+    file(WRITE "${cms_cadiback_dir}/VERSION"
+         "// Emptied by Camada: shadows libc++'s <version> on macOS.\n")
 
     camada_run_checked(
       WORKING_DIRECTORY
@@ -1252,6 +1255,22 @@ function(camada_setup_stp)
 
   camada_setup_minisat()
   camada_fetch_git_source(stpsrc stp/stp 2.4.1 stp_source_dir)
+
+  # STP keeps ABC and mimalloc as submodules and add_subdirectory()s both, but a
+  # source tarball carries no submodules. Fetch each at the revision STP 2.4.1
+  # pins and populate its directory, so the tree matches a checkout with `git
+  # submodule update --init`.
+  foreach(stp_submodule IN ITEMS abc mimalloc)
+    set(stp_submodule_dir "${stp_source_dir}/lib/extlib-${stp_submodule}")
+    if(NOT EXISTS "${stp_submodule_dir}/CMakeLists.txt")
+      camada_fetch_git_source(
+        stp${stp_submodule} "${CAMADA_STP_${stp_submodule}_REPOSITORY}"
+        "${CAMADA_STP_${stp_submodule}_REVISION}" stp_submodule_source_dir)
+      file(REMOVE_RECURSE "${stp_submodule_dir}")
+      file(COPY "${stp_submodule_source_dir}/"
+           DESTINATION "${stp_submodule_dir}")
+    endif()
+  endforeach()
   if(APPLE)
     file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
     string(
