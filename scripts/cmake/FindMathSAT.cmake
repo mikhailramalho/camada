@@ -14,8 +14,9 @@ function(check_mathsat_version mathsat_include mathsat_lib)
   try_run(
     MATHSAT_RETURNCODE MATHSAT_COMPILED ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/scripts/cmake/try_mathsat.cpp
-    COMPILE_DEFINITIONS ${_camada_mathsat_compile_definitions} LINK_LIBRARIES
-                        -L${mathsat_lib_path} ${mathsat_lib} ${gmp}
+    COMPILE_DEFINITIONS
+      ${_camada_mathsat_compile_definitions} LINK_LIBRARIES
+      -L${mathsat_lib_path} ${mathsat_lib} ${CAMADA_MATHSAT_GMP_LIB}
     COMPILE_OUTPUT_VARIABLE MATHSAT_COMPILE_OUTPUT
     RUN_OUTPUT_VARIABLE MATHSAT_RUN_OUTPUT)
 
@@ -58,7 +59,7 @@ find_library(
   HINTS ${_camada_mathsat_hints}
   PATH_SUFFIXES lib bin)
 
-find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+find_library(CAMADA_MATHSAT_GMP_LIB gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
 find_path(
   CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
   HINTS ${_camada_mathsat_gmp_hints}
@@ -75,7 +76,7 @@ if((NOT CAMADA_MATHSAT_INCLUDE_DIR OR NOT CAMADA_MATHSAT_LIB)
     CAMADA_MATHSAT_LIB mathsat
     HINTS ${_camada_mathsat_hints}
     PATH_SUFFIXES lib bin)
-  find_library(gmp gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
+  find_library(CAMADA_MATHSAT_GMP_LIB gmp PATHS ${CAMADA_DEPS_INSTALL_DIR})
   find_path(
     CAMADA_MATHSAT_GMP_INCLUDE_DIR gmp.h
     HINTS ${_camada_mathsat_gmp_hints}
@@ -128,7 +129,7 @@ if(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin"
 endif()
 
 # Alright, now create a list with MathSAT and it's dependencies.
-list(APPEND CAMADA_MATHSAT_LIB "${gmp}")
+list(APPEND CAMADA_MATHSAT_LIB "${CAMADA_MATHSAT_GMP_LIB}")
 
 # handle the QUIETLY and REQUIRED arguments and set MATHSAT_FOUND to TRUE if all
 # listed variables are TRUE

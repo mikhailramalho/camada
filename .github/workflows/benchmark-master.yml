@@ -35,10 +35,9 @@ jobs:
             build/deps
             build/_deps
           key: ${{ runner.os }}-bench-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
-          # Same prefix fallback (and downgrade caveat) as the build
-          # workflows' deps cache.
-          restore-keys: |
-            ${{ runner.os }}-bench-deps-
+          # No prefix fallback, as in the build workflows' deps cache: a miss
+          # rebuilds every dependency rather than restoring a tree whose
+          # contents no longer match the recipe.
 
       - name: Configure Camada
         run: >

@@ -44,36 +44,30 @@ set(CAMADA_Z3_WINDOWS_X86_64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-x64-win.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Windows x86_64")
-set(CAMADA_CVC5_LINUX_X86_64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-Linux-x86_64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for Linux x86_64")
-set(CAMADA_CVC5_LINUX_AARCH64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-Linux-arm64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for Linux aarch64")
-set(CAMADA_CVC5_MACOS_X86_64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-macOS-x86_64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for macOS x86_64")
-set(CAMADA_CVC5_MACOS_ARM64_URL
-    "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.4/cvc5-macOS-arm64-static.zip"
-    CACHE STRING
-          "URL used to download the prebuilt cvc5 archive for macOS arm64")
-# No Windows prebuilt for CVC5: cvc5Targets.cmake lists cadical, picpoly,
-# picpolyxx, and gmp as bare-name INTERFACE_LINK_LIBRARIES, but the static
-# Windows release zip merges them into cvc5.lib without shipping standalone .lib
-# files, so MSVC fails with LNK1104 trying to find cadical.lib.
+set(CAMADA_CVC5_GIT_TAG
+    "cvc5-1.4.0"
+    CACHE STRING "CVC5 tag built from source against the shared CaDiCaL")
+set(CAMADA_CVC5_SHA256
+    "06c65b30693d1abf7c1393b497c799950de2833457920b9433da8e418bce9113"
+    CACHE STRING "Expected SHA256 of the CVC5 source archive")
+# Baked into cadiback's config.hpp, which Camada writes itself; see
+# camada_setup_cryptominisat_solver_deps.
+set(CAMADA_CADIBACK_REVISION "69255f55e411207c4bdea02c6c2ab1ef29740ce1")
+
+# CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
+# prebuilt URLs to pin. It stays disabled on Windows, as it was under the
+# prebuilt: that archive merged its dependencies into cvc5.lib without shipping
+# the standalone .lib files its exported targets name.
 
 # Three dependencies embed CaDiCaL: Bitwuzla, CVC5, and CryptoMiniSat (which STP
 # pulls in). Any two in one binary is the same clash -- one definition survives
 # the link while each library keeps the field offsets it was compiled with -- so
 # Camada builds one CaDiCaL and every consumer links it, including when it is
 # the only backend enabled. Each consumer's setup asks for it directly;
-# camada_setup_shared_cadical() is stamped, so the first request builds it and
-# the rest return at once. BUILD_SHARED_LIBS does not avoid the clash: these
-# arrive as static archives whichever way Camada is built, so every copy would
-# land in libcamada.so too.
+# camada_setup_shared_cadical() returns at once once the archive exists, so the
+# first request builds it and the rest are cheap. BUILD_SHARED_LIBS does not
+# avoid the clash: these arrive as static archives whichever way Camada is
+# built, so every copy would land in libcamada.so too.
 
 # CVC5 ships a patched CaDiCaL ("elevate"), Bitwuzla's prebuilt bundles stock
 # CaDiCaL inside libbitwuzla.a. A static link of both keeps one definition of
@@ -112,6 +106,9 @@ set(CAMADA_BITWUZLA_GIT_TAG
     CACHE
       STRING
       "Bitwuzla tag used when building it from source against a shared CaDiCaL")
+set(CAMADA_BITWUZLA_SHA256
+    "42707f38900a20bb18108e426ba667560d1fd2ccce0d4f75aa60439b546488b4"
+    CACHE STRING "Expected SHA256 of the Bitwuzla source archive")
 
 # Bitwuzla is always built from source (see camada_setup_bitwuzla), so there is
 # no prebuilt URL to pin. It is not built on Windows: the Windows CI leg leaves
@@ -214,6 +211,9 @@ function(camada_find_gmp_header out_var)
   set(${out_var}
       "${_camada_gmp_header_dir}"
       PARENT_SCOPE)
+  # find_path caches, so release the entry rather than leaving the lookup pinned
+  # in CMakeCache.txt for the life of the build directory.
+  unset(_camada_gmp_header_dir CACHE)
 endfunction()
 
 function(camada_find_program_with_prefixes out_var program_name)
@@ -562,24 +562,32 @@ function(camada_select_mathsat_prebuilt_info output_url_var output_archive_var
   )
 endfunction()
 
+# Fetches a source tree at one tag or commit. A tarball rather than a clone: the
+# whole history is downloaded otherwise for a single revision, and CVC5's is
+# over 200k objects. GitHub serves archive/<ref>.tar.gz for a tag or a commit
+# SHA alike, so every caller converts unchanged.
+#
+# Tarballs carry no submodules. The only caller that had any is CryptoMiniSat,
+# whose four are test utilities (OutputCheck, cnf-utils, sha1-sat, licensecheck)
+# referenced from tests/ and never from the library build.
 function(camada_fetch_git_source package_name repository git_tag out_var)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
-  if(package_name STREQUAL "cryptominisat")
-    set(git_submodules_arg GIT_SUBMODULES)
+  # A fifth argument pins the archive's SHA256. A clone verified the object
+  # against the ref; a tarball has no such check, and a tag can be repointed at
+  # different content. The revisions given as commit SHAs are content-addressed
+  # already and pass nothing here.
+  if(ARGC GREATER 4)
+    set(url_hash_arg URL_HASH SHA256=${ARGV4})
   endif()
   cpmaddpackage(
     NAME
     ${package_name}
     DOWNLOAD_ONLY
     YES
-    GITHUB_REPOSITORY
-    ${repository}
-    GIT_TAG
-    ${git_tag}
-    ${git_submodules_arg}
-    GIT_PROGRESS
-    TRUE)
+    URL
+    "https://github.com/${repository}/archive/${git_tag}.tar.gz"
+    ${url_hash_arg})
   set(${out_var}
       "${${package_name}_SOURCE_DIR}"
       PARENT_SCOPE)
@@ -622,8 +630,7 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
 
   # Above the guard, not inside it: the sibling link can already exist while the
   # archive it points at has been deleted, and the link line below names that
-  # archive either way. The call is stamped, so a current build returns after
-  # three EXISTS and a small read.
+  # archive either way. A current build returns after two EXISTS.
   camada_setup_shared_cadical()
   if(NOT EXISTS "${cms_cadical_dir}/build/libcadical.a")
     camada_prepare_cryptominisat_dependency_layout("${cms_cadical_dir}"
@@ -635,8 +642,8 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # contemporary main commit whose CadiBack::doit() signature still matches
     # CMS 5.11.22's backbone.cpp (2024-06-07).
     camada_fetch_git_source(
-      cryptominisat_cadiback meelgroup/cadiback
-      69255f55e411207c4bdea02c6c2ab1ef29740ce1 cms_cadiback_source_dir)
+      cryptominisat_cadiback meelgroup/cadiback "${CAMADA_CADIBACK_REVISION}"
+      cms_cadiback_source_dir)
     camada_prepare_cryptominisat_dependency_layout("${cms_cadiback_dir}"
                                                    "${cms_cadiback_source_dir}")
     camada_run_checked(
@@ -650,34 +657,40 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
       env
       "CXXFLAGS=-fPIC"
       ./configure)
-    # cadiback ships a plain-text VERSION file holding "0.2.1". Apple Clang
-    # searches the compilation directory for angle-bracket includes, so on a
-    # case-insensitive filesystem the libc++ chain <algorithm> -> ... ->
-    # <cstddef> -> #include <version> finds that file and the build dies on
-    # "./version:1:1: expected unqualified-id". Swapping the implicit -I for
-    # -iquote does not stop it.
+    # config.hpp is written here rather than by `make config.hpp`, which runs
+    # ./generate: that script reads the commit out of .git, and a source tarball
+    # has none ("generate: error: could not find '.git' directory"). All three
+    # defines are known without it -- the version from cadiback's VERSION file,
+    # the commit from the revision pinned above. BUILD only reaches a banner
+    # line ("Compiled with '%s'"), so it names the compiler rather than scraping
+    # the makefile's COMPILE flags for a string nothing parses.
     #
-    # Only ./generate reads the file, and only to bake the string into
-    # config.hpp, so generate that header first and then replace the contents
-    # with a comment, which is valid C++ if anything does include it. The file
-    # itself has to stay: make lists it as a prerequisite of config.hpp and
-    # refuses to build when it is missing, timestamps notwithstanding.
-    camada_run_checked(
-      WORKING_DIRECTORY
-      "${cms_cadiback_dir}"
-      MESSAGE
-      "Generating CryptoMiniSat CadiBack config"
-      COMMAND
-      make
-      config.hpp)
-    if(EXISTS "${cms_cadiback_dir}/VERSION")
-      file(WRITE "${cms_cadiback_dir}/VERSION"
-           "// Emptied by Camada once config.hpp captured the version.\n")
-      # Rewriting VERSION makes it newer than config.hpp, which would send make
-      # straight back through ./generate and bake this comment in as the version
-      # string. Touch the header so the rule stays satisfied.
-      file(TOUCH_NOCREATE "${cms_cadiback_dir}/config.hpp")
+    # It also settles a macOS problem the generate path needed a workaround for:
+    # cadiback's plain-text VERSION file collides with libc++'s <version> on a
+    # case-insensitive filesystem, because Apple Clang searches the compilation
+    # directory for angle-bracket includes. Nothing reads the file now, so it is
+    # emptied outright instead of being emptied after generate had run. VERSION
+    # is emptied before config.hpp is written, and config.hpp written last:
+    # cadiback's rule is `config.hpp: generate VERSION makefile`, so leaving
+    # VERSION the newer file sends make back through ./generate, which fails
+    # outright on a tarball. The comment marker also identifies a tree that has
+    # already been through here, whose VERSION no longer holds a version to
+    # read.
+    set(cms_cadiback_marker "// Emptied by Camada")
+    file(READ "${cms_cadiback_dir}/VERSION" cms_cadiback_version)
+    string(STRIP "${cms_cadiback_version}" cms_cadiback_version)
+    if(cms_cadiback_version MATCHES "^${cms_cadiback_marker}")
+      file(STRINGS "${cms_cadiback_dir}/config.hpp" cms_cadiback_version_line
+           REGEX "^#define VERSION ")
+      string(REGEX REPLACE "^#define VERSION \"(.*)\"$" "\\1"
+                           cms_cadiback_version "${cms_cadiback_version_line}")
     endif()
+    file(WRITE "${cms_cadiback_dir}/VERSION"
+         "${cms_cadiback_marker}: shadows libc++'s <version> on macOS.\n")
+    file(
+      WRITE "${cms_cadiback_dir}/config.hpp"
+      "#define VERSION \"${cms_cadiback_version}\"\n#define GITID \"${CAMADA_CADIBACK_REVISION}\"\n#define BUILD \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\"\n"
+    )
 
     camada_run_checked(
       WORKING_DIRECTORY
@@ -695,20 +708,9 @@ function(camada_setup_cryptominisat)
   set(cms_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/cryptominisat5Config.cmake"
   )
-  # Recipe stamp, same shape as CaDiCaL's and Yices': one stable filename
-  # holding the recipe version, so a bump rebuilds rather than leaving an
-  # orphaned stamp behind. Older installs built CMS against a private CaDiCaL
-  # fork, so both it and CadiBack must be rebuilt against the shared one.
-  set(cms_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cryptominisat5/camada-cms.stamp")
-  set(cms_recipe_version "5.11.22:shared-cadical")
   camada_setup_shared_cadical()
-  if(EXISTS "${cms_config}" AND EXISTS "${cms_stamp}")
-    file(READ "${cms_stamp}" cms_stamp_contents)
-    string(STRIP "${cms_stamp_contents}" cms_stamp_contents)
-    if(cms_stamp_contents STREQUAL cms_recipe_version)
-      return()
-    endif()
+  if(EXISTS "${cms_config}")
+    return()
   endif()
 
   camada_ensure_deps_dirs()
@@ -788,7 +790,6 @@ function(camada_setup_cryptominisat)
   file(WRITE "${cms_targets_file}" "${cms_targets_contents}")
 
   file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical-cms.a")
-  file(WRITE "${cms_stamp}" "${cms_recipe_version}\n")
 endfunction()
 
 function(camada_setup_gmp)
@@ -875,9 +876,7 @@ endfunction()
 function(camada_setup_minisat)
   set(minisat_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat/minisatConfig.cmake")
-  set(minisat_source_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat/camada-source-build.stamp")
-  if(EXISTS "${minisat_config}" AND EXISTS "${minisat_source_stamp}")
+  if(EXISTS "${minisat_config}")
     return()
   endif()
 
@@ -932,7 +931,6 @@ function(camada_setup_minisat)
     WRITE "${minisat_config}"
     "if(NOT TARGET minisat)\n  add_library(minisat STATIC IMPORTED)\n  set_target_properties(minisat PROPERTIES IMPORTED_LOCATION \"${CAMADA_DEPS_INSTALL_DIR}/lib/libminisat.a\" INTERFACE_INCLUDE_DIRECTORIES \"${CAMADA_DEPS_INSTALL_DIR}/include\")\nendif()\n"
   )
-  file(WRITE "${minisat_source_stamp}" "1\n")
 endfunction()
 
 # Builds the CaDiCaL that both Bitwuzla and CVC5 link against, with the same
@@ -943,19 +941,8 @@ function(camada_setup_shared_cadical)
   set(cadical_prefix "${CAMADA_CADICAL_PREFIX}")
   set(cadical_lib "${CAMADA_CADICAL_LIB}")
   set(cadical_header "${cadical_prefix}/include/cadical/cadical.hpp")
-  set(cadical_stamp "${cadical_prefix}/camada-cadical.stamp")
-  # Bump when the URL or the flags below change, so an install left by an older
-  # recipe is rebuilt rather than silently reused.
-  set(cadical_recipe_version "3:${CAMADA_CADICAL_SHA256}")
-
   if(EXISTS "${cadical_lib}" AND EXISTS "${cadical_header}")
-    if(EXISTS "${cadical_stamp}")
-      file(READ "${cadical_stamp}" cadical_stamp_contents)
-      string(STRIP "${cadical_stamp_contents}" cadical_stamp_contents)
-      if(cadical_stamp_contents STREQUAL cadical_recipe_version)
-        return()
-      endif()
-    endif()
+    return()
   endif()
 
   camada_ensure_deps_dirs()
@@ -1042,7 +1029,6 @@ function(camada_setup_shared_cadical)
   file(COPY "${cadical_source_dir}/src/cadical.hpp"
             "${cadical_source_dir}/src/tracer.hpp"
        DESTINATION "${cadical_prefix}/include/cadical")
-  file(WRITE "${cadical_stamp}" "${cadical_recipe_version}\n")
 endfunction()
 
 # Builds Bitwuzla from source against the shared CaDiCaL. Bitwuzla's
@@ -1061,8 +1047,9 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
     )
   endif()
 
-  camada_fetch_git_source(bitwuzla bitwuzla/bitwuzla
-                          "${CAMADA_BITWUZLA_GIT_TAG}" bitwuzla_source_dir)
+  camada_fetch_git_source(
+    bitwuzla bitwuzla/bitwuzla "${CAMADA_BITWUZLA_GIT_TAG}" bitwuzla_source_dir
+    "${CAMADA_BITWUZLA_SHA256}")
   set(bitwuzla_build_dir "${bitwuzla_source_dir}/build-camada")
   file(REMOVE_RECURSE "${bitwuzla_build_dir}")
 
@@ -1131,23 +1118,10 @@ endfunction()
 # bundles its own CaDiCaL, which would be a second copy in any build that also
 # enables CVC5 or STP.
 function(camada_setup_bitwuzla)
-  set(bitwuzla_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/camada-bitwuzla.stamp")
-  set(bitwuzla_recipe_version "${CAMADA_BITWUZLA_GIT_TAG}:shared-cadical")
-  set(bitwuzla_stamp_current FALSE)
-  if(EXISTS "${bitwuzla_stamp}")
-    file(READ "${bitwuzla_stamp}" bitwuzla_stamp_contents)
-    string(STRIP "${bitwuzla_stamp_contents}" bitwuzla_stamp_contents)
-    if(bitwuzla_stamp_contents STREQUAL bitwuzla_recipe_version)
-      set(bitwuzla_stamp_current TRUE)
-    endif()
-  endif()
   camada_setup_shared_cadical()
-  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h"
-     OR NOT bitwuzla_stamp_current)
+  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
     camada_ensure_deps_dirs()
     camada_build_bitwuzla_from_source("${CAMADA_CADICAL_PREFIX}")
-    file(WRITE "${bitwuzla_stamp}" "${bitwuzla_recipe_version}\n")
   endif()
 
   # Bitwuzla is built against the shared CaDiCaL, so the pkg-config file has to
@@ -1190,67 +1164,126 @@ endfunction()
 # Called from both paths through camada_setup_cvc5: a restored dependency cache
 # returns before staging ever runs, and a tree cached before this fix still
 # holds CVC5's copy. Idempotent, so running it on every configure is the point
-# rather than a cost.
-function(camada_point_cvc5_at_shared_cadical)
-  set(cvc5_targets_file
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Targets.cmake")
-  if(NOT EXISTS "${cvc5_targets_file}")
-    return()
+# rather than a cost. CVC5 is built from source so it links the shared CaDiCaL
+# instead of the copy its prebuilt archive ships. That removes the last consumer
+# carrying its own, and with it the rewrite of CVC5's installed
+# cvc5Targets.cmake that used to redirect a bare `cadical` link name onto the
+# shared archive.
+#
+# Poly and SymFPU are fetched by CVC5's own --auto-download: Poly is enabled by
+# default and the prebuilt shipped it, so leaving it on keeps CVC5's arithmetic
+# unchanged. SymFPU is header-only and instantiated inside each consumer's own
+# namespace, so it cannot collide the way CaDiCaL did.
+function(camada_build_cvc5_from_source)
+  # configure.sh is a POSIX shell script and the build wants a Unix make, so say
+  # that plainly rather than failing later on a missing make, which names the
+  # wrong cause. The prebuilt recipe had no Windows archive and refused here
+  # too; the source build inherits that.
+  if(WIN32)
+    message(
+      FATAL_ERROR
+        "The CVC5 backend cannot be built on Windows; configure with -DCAMADA_SOLVER_CVC5_ENABLE=OFF."
+    )
   endif()
-  # This runs on every configure, so do nothing unless the export still names
-  # the bare `cadical`: an already-patched tree costs one read. Otherwise build
-  # the shared CaDiCaL if nothing has yet -- CVC5 can be the only backend
-  # enabled, in which case no other setup function has run.
+  camada_find_program_with_prefixes(cvc5_make_program make)
+  if(NOT cvc5_make_program)
+    message(
+      FATAL_ERROR
+        "Building CVC5 from source needs make on PATH; install it or disable the CVC5 backend."
+    )
+  endif()
+
   camada_setup_shared_cadical()
-  file(READ "${cvc5_targets_file}" cvc5_targets_contents)
-  string(FIND "${cvc5_targets_contents}" "LINK_ONLY:cadical>" cvc5_bare_cadical)
-  if(cvc5_bare_cadical EQUAL -1)
-    return()
+  camada_fetch_git_source(cvc5src cvc5/cvc5 "${CAMADA_CVC5_GIT_TAG}"
+                          cvc5_source_dir "${CAMADA_CVC5_SHA256}")
+  set(cvc5_build_name camada)
+  set(cvc5_build_dir "${cvc5_source_dir}/${cvc5_build_name}")
+  file(REMOVE_RECURSE "${cvc5_build_dir}")
+
+  # --dep-path, not -DCMAKE_PREFIX_PATH: configure.sh appends its own empty
+  # -DCMAKE_PREFIX_PATH= after any the caller passes, which silently discards
+  # it.
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${cvc5_source_dir}"
+    MESSAGE
+    "Configuring CVC5 against the shared CaDiCaL"
+    COMMAND
+    ./configure.sh
+    # 1.4.0 requires an explicit build type and dropped `production`;
+    # `unrestricted` is documented as the equivalent, and matches what the
+    # prebuilt archive was configured with.
+    unrestricted
+    --static
+    --auto-download
+    --name=${cvc5_build_name}
+    --prefix=${CAMADA_DEPS_INSTALL_DIR}
+    --dep-path=${CAMADA_CADICAL_PREFIX}
+    # USE_PYTHON_VENV is left at CVC5's default (ON): it builds a venv under the
+    # build tree and installs pyparsing there. Forcing it OFF makes CVC5
+    # pip-install into the system interpreter, which PEP 668 refuses on Homebrew
+    # and on recent Debian/Ubuntu ("externally-managed-environment").
+    -DBUILD_BINDINGS_JAVA=OFF)
+
+  # CVC5's configure generates Unix Makefiles, not Ninja. Bare `make -j` is
+  # unbounded: make starts every ready target at once, and a few hundred
+  # concurrent cc1plus instances exhaust a 16 GB CI runner long before the build
+  # finishes (SIGTERM, ~85s in). Bound it by processor count.
+  cmake_host_system_information(RESULT cvc5_jobs QUERY NUMBER_OF_LOGICAL_CORES)
+  if(NOT cvc5_jobs OR cvc5_jobs LESS 1)
+    set(cvc5_jobs 1)
   endif()
-  string(REPLACE "LINK_ONLY:cadical>" "LINK_ONLY:${CAMADA_CADICAL_LIB}>"
-                 cvc5_targets_contents "${cvc5_targets_contents}")
-  file(WRITE "${cvc5_targets_file}" "${cvc5_targets_contents}")
-  file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical.a")
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${cvc5_build_dir}"
+    MESSAGE
+    "Building CVC5 with ${cvc5_jobs} job(s)"
+    COMMAND
+    "${cvc5_make_program}"
+    -j${cvc5_jobs})
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${cvc5_build_dir}"
+    MESSAGE
+    "Installing CVC5"
+    COMMAND
+    "${cvc5_make_program}"
+    install)
 endfunction()
 
+# FORCE rebuilds an install that is already present, for a tree staged by an
+# older recipe: its cvc5Config.cmake is valid, so the existence check alone
+# would keep it and the CaDiCaL it was built against.
 function(camada_setup_cvc5)
   set(cvc5_config "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/cvc5/cvc5Config.cmake")
-  if(EXISTS "${cvc5_config}")
-    file(READ "${cvc5_config}" cvc5_config_contents)
-    string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
-                   cvc5_config_contents "${cvc5_config_contents}")
-    file(WRITE "${cvc5_config}" "${cvc5_config_contents}")
-    camada_point_cvc5_at_shared_cadical()
+  if(EXISTS "${cvc5_config}" AND NOT "FORCE" IN_LIST ARGN)
     return()
   endif()
 
   camada_ensure_deps_dirs()
-  camada_select_prebuilt_url(cvc5_url CVC5)
+  camada_build_cvc5_from_source()
 
-  get_filename_component(cvc5_archive_name "${cvc5_url}" NAME)
-  string(REGEX REPLACE "\\.zip$" "" cvc5_root_dir_name "${cvc5_archive_name}")
-  set(cvc5_archive "${CAMADA_DEPS_SRC_DIR}/${cvc5_archive_name}")
-  set(cvc5_root_dir "${CAMADA_DEPS_SRC_DIR}/${cvc5_root_dir_name}")
+  # The prebuilt recipe staged CVC5's own CaDiCaL beside the library; a tree
+  # migrating from it must not keep that second copy.
+  file(REMOVE "${CAMADA_DEPS_INSTALL_DIR}/lib/libcadical.a")
 
-  camada_download_file("${cvc5_url}" "${cvc5_archive}")
-  camada_extract_archive(
-    ARCHIVE_PATH
-    "${cvc5_archive}"
-    DESTINATION_DIR
-    "${CAMADA_DEPS_SRC_DIR}"
-    MARKER_PATH
-    "${cvc5_root_dir}"
-    ARCHIVE_URL
-    "${cvc5_url}"
-    SOURCE_DIR
-    "${cvc5_root_dir}")
-  camada_stage_prebuilt_tree("${cvc5_root_dir}")
-
-  camada_point_cvc5_at_shared_cadical()
   file(READ "${cvc5_config}" cvc5_config_contents)
   string(REPLACE "set(CVC5_BINDINGS_JAVA ON)" "set(CVC5_BINDINGS_JAVA OFF)"
                  cvc5_config_contents "${cvc5_config_contents}")
   file(WRITE "${cvc5_config}" "${cvc5_config_contents}")
+endfunction()
+
+# Populates one of STP's submodule directories from its own tarball. A tarball
+# fetch brings no submodules, and STP add_subdirectory()s these, so the
+# directory has to hold the real source rather than the empty placeholder the
+# archive carries.
+function(camada_place_stp_submodule destination package repository revision)
+  if(EXISTS "${destination}/CMakeLists.txt")
+    return()
+  endif()
+  camada_fetch_git_source(${package} ${repository} ${revision} source_dir)
+  file(REMOVE_RECURSE "${destination}")
+  file(COPY "${source_dir}/" DESTINATION "${destination}")
 endfunction()
 
 function(camada_setup_stp)
@@ -1270,7 +1303,20 @@ function(camada_setup_stp)
   )
 
   camada_setup_minisat()
-  camada_fetch_git_source(stpsrc stp/stp 2.4.1 stp_source_dir)
+  camada_fetch_git_source(
+    stpsrc stp/stp 2.4.1 stp_source_dir
+    6f8bca3612e3d61868450dbf7771897b2a909f446e8de460bdf31f13a6cd0318)
+
+  # STP keeps ABC and mimalloc as submodules and add_subdirectory()s both, but a
+  # source tarball carries no submodules. Fetch each at the revision STP 2.4.1
+  # pins, so the tree matches a checkout with `git submodule update --init`.
+  camada_place_stp_submodule(
+    "${stp_source_dir}/lib/extlib-abc" stpabc berkeley-abc/abc
+    95393064368b7c05da4d6f0264fc3419c175c7cb)
+  camada_place_stp_submodule(
+    "${stp_source_dir}/lib/extlib-mimalloc" stpmimalloc microsoft/mimalloc
+    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe)
+
   if(APPLE)
     file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
     string(
@@ -1349,30 +1395,14 @@ function(camada_setup_yices)
   set(yices_header "${CAMADA_DEPS_INSTALL_DIR}/include/yices.h")
   set(yices_shared_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so")
   set(yices_shared_soname "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so.2.7.0")
-  set(yices_source_stamp
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices/camada-source-build.stamp")
-  # Bump when the configure flags below change, so an install left by an older
-  # recipe is rebuilt rather than silently reused: the stamp used to record only
-  # that a source build had happened, not which one.
-  set(yices_recipe_version "1")
-  set(yices_stamp_current FALSE)
-  if(EXISTS "${yices_source_stamp}")
-    file(READ "${yices_source_stamp}" yices_stamp_contents)
-    string(STRIP "${yices_stamp_contents}" yices_stamp_contents)
-    if(yices_stamp_contents STREQUAL yices_recipe_version)
-      set(yices_stamp_current TRUE)
-    endif()
-  endif()
   if(BUILD_SHARED_LIBS
      AND EXISTS "${yices_shared_lib}"
-     AND EXISTS "${yices_header}"
-     AND yices_stamp_current)
+     AND EXISTS "${yices_header}")
     return()
   endif()
   if(NOT BUILD_SHARED_LIBS
      AND EXISTS "${yices_lib}"
-     AND EXISTS "${yices_header}"
-     AND yices_stamp_current)
+     AND EXISTS "${yices_header}")
     if(EXISTS "${yices_shared_soname}" AND NOT EXISTS "${yices_shared_lib}")
       file(CREATE_LINK "${yices_shared_soname}" "${yices_shared_lib}" SYMBOLIC)
     endif()
@@ -1393,7 +1423,9 @@ function(camada_setup_yices)
   endif()
 
   camada_setup_gmp()
-  camada_fetch_git_source(yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir)
+  camada_fetch_git_source(
+    yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir
+    584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
   camada_run_checked(WORKING_DIRECTORY "${yices_source_dir}" MESSAGE
                      "Preparing Yices" COMMAND autoreconf)
   camada_run_checked(
@@ -1433,7 +1465,6 @@ function(camada_setup_yices)
     make
     install)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices")
-  file(WRITE "${yices_source_stamp}" "${yices_recipe_version}\n")
 endfunction()
 
 function(camada_setup_z3)
