@@ -813,10 +813,33 @@ function(camada_gmp_library out_var)
   # Stages the archive if it is not there yet, so the path always exists by the
   # time a caller links it; a caller given only a path would otherwise fall back
   # to whatever a search happens to find.
-  camada_setup_gmp()
+  #
+  # Gated like every other dependency: building GMP is a download, and
+  # CAMADA_DOWNLOAD_DEPENDENCIES=OFF -- the default -- means the host provides
+  # its own. Falling back to a plain search there keeps an air-gapped or
+  # distro-packaged configure working, as it did before GMP was centralised. It
+  # is permissive because GMP is a transitive dependency of the backends rather
+  # than a backend a user asked for.
+  camada_should_download_dependency(_camada_gmp_download TRUE)
+  if(_camada_gmp_download)
+    camada_setup_gmp()
+    set(${out_var}
+        "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
+        PARENT_SCOPE)
+    return()
+  endif()
+
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+    set(${out_var}
+        "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
+        PARENT_SCOPE)
+    return()
+  endif()
+  find_library(_camada_gmp_system NAMES gmp)
   set(${out_var}
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
+      "${_camada_gmp_system}"
       PARENT_SCOPE)
+  unset(_camada_gmp_system CACHE)
 endfunction()
 
 function(camada_setup_gmp)
