@@ -1476,6 +1476,17 @@ function(camada_setup_yices)
   camada_gmp_library(yices_gmp_lib)
   get_filename_component(yices_gmp_lib_dir "${yices_gmp_lib}" DIRECTORY)
   set(yices_gmp_include_dir "${CAMADA_DEPS_INSTALL_DIR}/include")
+  # Yices absorbs GMP statically, so its shared library would export GMP as well
+  # as its own API, competing with every other provider in the process. Its link
+  # honours LDFLAGS, so the version script goes in there rather than patching
+  # its makefile. GNU ld and lld only: Apple's linker has no --version-script,
+  # so macOS keeps the plain flags.
+  set(yices_ldflags "-L${yices_gmp_lib_dir}")
+  if(NOT APPLE)
+    set(yices_ldflags
+        "${yices_ldflags} -Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/yices.map"
+    )
+  endif()
   camada_fetch_git_source(
     yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir
     584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
@@ -1492,7 +1503,7 @@ function(camada_setup_yices)
     ${CAMADA_DEPS_INSTALL_DIR}
     --with-static-gmp=${yices_gmp_lib}
     CPPFLAGS=-I${yices_gmp_include_dir}
-    LDFLAGS=-L${yices_gmp_lib_dir})
+    LDFLAGS=${yices_ldflags})
   camada_run_checked(
     WORKING_DIRECTORY
     "${yices_source_dir}"

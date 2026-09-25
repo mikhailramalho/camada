@@ -1,0 +1,24 @@
+# Only Camada's own API leaves libcamada.so.
+#
+# The shared library statically absorbs the backends it links (CVC5, Bitwuzla,
+# STP, MathSAT) and, with them, their GMP and CaDiCaL. Exporting those makes
+# libcamada.so a provider of symbols it does not own: a process that also loads
+# a real libgmp.so, or the Yices shared library, then has several definitions
+# of __gmpz_init and friends, and ELF interposition picks one by load order.
+# They agree today only because every copy happens to be GMP 6.3.0.
+#
+# Restricting the dynamic table keeps those copies private to this library, so
+# nothing outside can bind to them and nothing outside can override them.
+{
+  global:
+    # Camada's C++ API.
+    *camada*;
+    # Typeinfo and vtables for the public classes, which a consumer needs in
+    # order to derive from SMTSolver or catch a Camada exception across the
+    # library boundary.
+    _ZTIN6camada*;
+    _ZTSN6camada*;
+    _ZTVN6camada*;
+  local:
+    *;
+};

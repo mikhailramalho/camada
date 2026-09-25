@@ -225,6 +225,33 @@ set_target_properties(
              SOVERSION ${CAMADA_VER_MAJOR}
              PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_PUB_HDR}")
 
+# A shared Camada absorbs the static backends, and their GMP and CaDiCaL with
+# them. Exporting those would make libcamada.so a provider of symbols it does
+# not own, so a process that also loads a real libgmp.so gets several
+# definitions of __gmpz_init and resolves them by load order. Restrict the
+# dynamic table to Camada's own API; see src/camada.map.
+#
+# GNU ld and lld only, which covers the Linux legs. Apple's linker has no
+# --version-script (its -exported_symbols_list takes a different format) and the
+# check below simply leaves macOS as it is.
+if(BUILD_SHARED_LIBS
+   AND NOT APPLE
+   AND NOT WIN32)
+  include(CheckLinkerFlag)
+  set(_camada_version_script
+      "${CMAKE_CURRENT_SOURCE_DIR}/${LIBRARY_TARGET_NAME}.map")
+  check_linker_flag(CXX "LINKER:--version-script=${_camada_version_script}"
+                    CAMADA_HAVE_VERSION_SCRIPT)
+  if(CAMADA_HAVE_VERSION_SCRIPT)
+    target_link_options(${LIBRARY_TARGET_NAME} PRIVATE
+                        "LINKER:--version-script=${_camada_version_script}")
+    set_property(
+      TARGET ${LIBRARY_TARGET_NAME}
+      APPEND
+      PROPERTY LINK_DEPENDS "${_camada_version_script}")
+  endif()
+endif()
+
 # Specify include directories for both compilation and installation process. The
 # $<INSTALL_PREFIX> generator expression is useful to ensure to create
 # relocatable configuration files, see
