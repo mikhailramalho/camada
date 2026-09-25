@@ -104,15 +104,9 @@ function(_camada_normalize_stp_target)
     # provides GMP: a build with every other backend disabled failed to link
     # until now, and a full build only worked because CVC5 happened to stage
     # libgmp.a alongside. Name it here rather than rely on that.
-    camada_setup_gmp()
-    set(_camada_stp_gmp_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+    camada_gmp_library(_camada_stp_gmp_lib)
     if(EXISTS "${_camada_stp_gmp_lib}")
       list(APPEND _camada_stp_dep_libs "${_camada_stp_gmp_lib}")
-    else()
-      find_library(_camada_stp_system_gmp NAMES gmp)
-      if(_camada_stp_system_gmp)
-        list(APPEND _camada_stp_dep_libs "${_camada_stp_system_gmp}")
-      endif()
     endif()
     set_property(TARGET stp PROPERTY INTERFACE_LINK_LIBRARIES
                                      "${_camada_stp_dep_libs}")
