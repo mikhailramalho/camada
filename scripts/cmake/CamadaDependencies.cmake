@@ -809,29 +809,37 @@ endfunction()
 # Building unconditionally is predictable everywhere and puts one archive on the
 # link line instead of two, which is the whole point.
 
-# One GMP for the whole build, and Camada builds it.
-#
-# The system copy looks tempting -- CVC5 and the MathSAT prebuilt already
-# resolve GMP against it -- but Yices absorbs GMP statically into libyices.so,
-# and a distribution's libgmp.a is normally compiled without -fPIC. That link
-# then fails with "relocation R_X86_64_PC32 against symbol `__gmp_free_func' can
-# not be used when making a shared object".
-#
-# Detecting that up front was tried and abandoned. try_compile and try_run only
-# link the archive members they reference, so both passed on the archive Yices
-# then rejected, even under --whole-archive. Reading relocations does separate
-# the two, but only by parsing GNU objdump and ELF relocation names, which do
-# not carry to the macOS leg where all four GMP-using backends are enabled.
-#
 function(camada_gmp_library out_var)
-  # camada_setup_gmp stages the archive when the choice was to build one, so the
-  # path returned here always exists by the time a caller links it. A caller
-  # that only asked for the path would otherwise get one that is not there yet,
-  # and fall back to whatever a search happens to find.
-  camada_setup_gmp()
+  # Stages the archive if it is not there yet, so the path always exists by the
+  # time a caller links it; a caller given only a path would otherwise fall back
+  # to whatever a search happens to find.
+  #
+  # Gated like every other dependency: building GMP is a download, and
+  # CAMADA_DOWNLOAD_DEPENDENCIES=OFF -- the default -- means the host provides
+  # its own. Falling back to a plain search there keeps an air-gapped or
+  # distro-packaged configure working, as it did before GMP was centralised. It
+  # is permissive because GMP is a transitive dependency of the backends rather
+  # than a backend a user asked for.
+  camada_should_download_dependency(_camada_gmp_download TRUE)
+  if(_camada_gmp_download)
+    camada_setup_gmp()
+    set(${out_var}
+        "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
+        PARENT_SCOPE)
+    return()
+  endif()
+
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+    set(${out_var}
+        "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
+        PARENT_SCOPE)
+    return()
+  endif()
+  find_library(_camada_gmp_system NAMES gmp)
   set(${out_var}
-      "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
+      "${_camada_gmp_system}"
       PARENT_SCOPE)
+  unset(_camada_gmp_system CACHE)
 endfunction()
 
 function(camada_setup_gmp)

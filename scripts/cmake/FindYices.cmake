@@ -118,26 +118,13 @@ if(_camada_download_yices
 endif()
 
 # Yices is built against GMP and its archive carries undefined __gmpz_*/__gmpq_*
-# references, so the link interface has to name it. The staged copy comes first:
-# camada_setup_yices() builds GMP itself when the host has none, and linking a
-# different GMP than Yices was compiled against is how subtle breakage starts.
-#
-# This replaces a block guarded on GMP_DIR, a variable nothing in the tree ever
-# set, so GMP was in practice never linked -- a build with Yices as the only
-# backend failed with undefined __gmpq_clear and friends.
-set(_camada_yices_staged_gmp "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
-if(EXISTS "${_camada_yices_staged_gmp}")
-  list(APPEND CAMADA_YICES_LIB "${_camada_yices_staged_gmp}")
-else()
-  find_library(
-    LIBGMP_CUSTOM
-    NAMES gmp
-    HINTS ${GMP_DIR}
-    PATH_SUFFIXES lib)
-  if(LIBGMP_CUSTOM)
-    list(APPEND CAMADA_YICES_LIB "${LIBGMP_CUSTOM}")
-  endif()
-endif()
+# references, so the link interface has to name it. camada_gmp_library gives the
+# one archive every backend shares and stages it if it is not built yet, which
+# also settles the case of Yices being the only enabled backend: an earlier
+# version guarded this on GMP_DIR, a variable nothing in the tree ever set, and
+# that build failed with undefined __gmpq_clear and friends.
+camada_gmp_library(_camada_yices_gmp)
+list(APPEND CAMADA_YICES_LIB "${_camada_yices_gmp}")
 
 # handle the QUIETLY and REQUIRED arguments and set YICES_FOUND to TRUE if all
 # listed variables are TRUE
