@@ -809,25 +809,10 @@ endfunction()
 # Building unconditionally is predictable everywhere and puts one archive on the
 # link line instead of two, which is the whole point.
 
-# One GMP for the whole build, and Camada builds it.
-#
-# The system copy looks tempting -- CVC5 and the MathSAT prebuilt already
-# resolve GMP against it -- but Yices absorbs GMP statically into libyices.so,
-# and a distribution's libgmp.a is normally compiled without -fPIC. That link
-# then fails with "relocation R_X86_64_PC32 against symbol `__gmp_free_func' can
-# not be used when making a shared object".
-#
-# Detecting that up front was tried and abandoned. try_compile and try_run only
-# link the archive members they reference, so both passed on the archive Yices
-# then rejected, even under --whole-archive. Reading relocations does separate
-# the two, but only by parsing GNU objdump and ELF relocation names, which do
-# not carry to the macOS leg where all four GMP-using backends are enabled.
-#
 function(camada_gmp_library out_var)
-  # camada_setup_gmp stages the archive when the choice was to build one, so the
-  # path returned here always exists by the time a caller links it. A caller
-  # that only asked for the path would otherwise get one that is not there yet,
-  # and fall back to whatever a search happens to find.
+  # Stages the archive if it is not there yet, so the path always exists by the
+  # time a caller links it; a caller given only a path would otherwise fall back
+  # to whatever a search happens to find.
   camada_setup_gmp()
   set(${out_var}
       "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a"
