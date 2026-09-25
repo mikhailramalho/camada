@@ -30,6 +30,7 @@
 #include <cvc5/cvc5_kind.h>
 #include <cvc5/cvc5_types.h>
 #include <optional>
+#include <set>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -1297,13 +1298,63 @@ std::string CVC5Solver::getSolverNameAndVersion() const {
   return std::string("CVC5 v").append(Context.getVersion());
 }
 
-void CVC5Solver::dumpImpl(std::string &Out) {
-  Out.clear();
-  auto const &assertions = Context.getAssertions();
-  for (auto const &a : assertions) {
-    Out += a.toString();
-    Out += "\n";
+// The declarations a standalone script needs are not recoverable from cvc5's
+// assertion list directly: they are recovered by walking the asserted terms
+// and collecting every CONSTANT leaf.
+static void collectCVC5Symbols(const cvc5::Term &T, std::set<cvc5::Term> &Seen,
+                               std::vector<cvc5::Term> &Out) {
+  if (!Seen.insert(T).second)
+    return;
+  if (T.getKind() == cvc5::Kind::CONSTANT) {
+    Out.push_back(T);
+    return;
   }
+  for (const cvc5::Term &Child : T)
+    collectCVC5Symbols(Child, Seen, Out);
+}
+
+void CVC5Solver::dumpImpl(std::string &Out) {
+  // A replayable script, not a bare term list: without the declarations and
+  // the (assert ...) wrappers the output cannot be fed back to any solver,
+  // which is the only reason to dump it.
+  std::set<cvc5::Term> Seen;
+  std::vector<cvc5::Term> Symbols;
+  auto const &Assertions = Context.getAssertions();
+  for (auto const &A : Assertions)
+    collectCVC5Symbols(A, Seen, Symbols);
+
+  Out.clear();
+  Out += "(set-info :smt-lib-version 2.6)\n";
+  // The logic the solver actually runs under, asked of cvc5 rather than
+  // guessed: isLogicSet() guards getLogic(), which asserts otherwise. Falls
+  // back to the caller's choice, and emits nothing when neither knows -- a
+  // script with no (set-logic) replays against a solver that defaults
+  // sensibly, where a made-up one would name a fragment nothing agreed to.
+  if (Context.isLogicSet())
+    Out += "(set-logic " + Context.getLogic() + ")\n";
+  else if (!logic().empty())
+    Out += "(set-logic " + logic() + ")\n";
+
+  for (const cvc5::Term &Sym : Symbols) {
+    cvc5::Sort Srt = Sym.getSort();
+    if (Srt.isFunction()) {
+      Out += "(declare-fun " + Sym.toString() + " (";
+      const std::vector<cvc5::Sort> Dom = Srt.getFunctionDomainSorts();
+      for (std::size_t I = 0; I < Dom.size(); ++I) {
+        if (I != 0)
+          Out += " ";
+        Out += Dom[I].toString();
+      }
+      Out += ") " + Srt.getFunctionCodomainSort().toString() + ")\n";
+    } else {
+      Out += "(declare-const " + Sym.toString() + " " + Srt.toString() + ")\n";
+    }
+  }
+
+  for (auto const &A : Assertions)
+    Out += "(assert " + A.toString() + ")\n";
+
+  Out += "(check-sat)\n";
 }
 
 void CVC5Solver::dumpModelImpl(std::string &Out) {
