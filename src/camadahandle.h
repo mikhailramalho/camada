@@ -152,15 +152,8 @@ protected:
 
 private:
   CAMADA_ALWAYS_INLINE void validate() const {
-#if CAMADA_CHECKED_HANDLES
-    if (Ptr && State &&
-        State->Generation.load(std::memory_order_relaxed) == Generation)
-      return;
-#else
-    if (Ptr)
-      return;
-#endif
-    reportInvalid();
+    if (!isValid())
+      reportInvalid();
   }
 
   // Cold slow path — kept out of the inlined fast path so every dereference

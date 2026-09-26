@@ -59,15 +59,9 @@ public:
 
   void dump(std::string &Out) const override {
     Out = "(CamadaAckArray";
-    std::string SubOut;
-    getIndexSort()->dump(SubOut);
-    if (!SubOut.empty() && SubOut.back() == '\n')
-      SubOut.pop_back();
-    Out += " " + SubOut;
-    getElementSort()->dump(SubOut);
-    if (!SubOut.empty() && SubOut.back() == '\n')
-      SubOut.pop_back();
-    Out += " " + SubOut + ")\n";
+    appendDumped(Out, *getIndexSort());
+    appendDumped(Out, *getElementSort());
+    Out += ")\n";
   }
 
 private:

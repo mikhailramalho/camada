@@ -59,6 +59,16 @@ static inline std::string toTwosComplementBin(int64_t Value, unsigned Width) {
   return Bits;
 }
 
+// Appends " " plus Child's dump() without its trailing newline, so the
+// parts of a composite dump share one line.
+template <typename T> void appendDumped(std::string &Out, const T &Child) {
+  std::string ChildOut;
+  Child.dump(ChildOut);
+  if (!ChildOut.empty() && ChildOut.back() == '\n')
+    ChildOut.pop_back();
+  Out += " " + ChildOut;
+}
+
 class SMTSolverImpl : public SMTSolver {
 public:
   /// Initialises the options the common layer itself consumes, so each
@@ -176,8 +186,6 @@ protected:
   ObjectArena SortArena;
   ObjectArena ExprArena;
   std::array<SMTExprRef, 2> CachedBoolExprs;
-  SMTExprRef CachedBVOne1Expr;
-  std::array<SMTExprRef, 5> CachedSmallBVZeroExprs;
   std::array<SMTExprRef, 5> CachedRMBVExprs;
   std::array<std::vector<SMTExprRef>, 3> CachedSmallBVExprs;
   SMTSortRef CachedBoolSort;
@@ -369,6 +377,7 @@ protected:
                                     const SMTExprRef &Index);
   SMTResult<ArrayModel> ackArrayModel(const SMTExprRef &Array);
   void noteAckBVConstBits(const SMTExprRef &Exp, const std::string &Bits);
+  void noteAckBVConstBits(const SMTExprRef &Exp, int64_t Value);
 
   // --- IEEE bit-pattern shadow for mkIEEEFPToBV ---
   // fp.to_ieee_bv is underspecified at NaN: the FP sort has one NaN value
@@ -572,7 +581,6 @@ public:
   /// Ackermann read, a lazy array default's first select at an index, an
   /// FP-to-BV tie's uninterpreted function, an int-to-BV fresh variable)
   /// leaves the model with no value for it, so the model genuinely dies.
-  /// Two call sites qualify today; eight do not.
   void addInternalConstraint(const SMTExprRef &Exp);
   SMTExprRef mkBVAdd(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final;
@@ -827,6 +835,8 @@ public:
                            const SMTExprRef &Value) override final;
   SMTExprRef mkApply(const SMTExprRef &Function,
                      const std::vector<SMTExprRef> &Args) override final;
+  void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
+                                 const SMTExprRef &Body);
   SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
                       const SMTExprRef &Body) override final;
   SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
@@ -972,11 +982,6 @@ protected:
                                         const SMTSortRef &);
 
   virtual SMTSortRef mkTupleSortImpl(const std::vector<SMTSortRef> &);
-
-  /// Backends that natively support SMT-LIB datatypes (z3, cvc5, smtlib)
-  /// override this to true. Other backends (bitwuzla, mathsat, stp,
-  /// yices) inherit the default false and route tuple operations through
-  /// the Camada-managed lowering in camadatuple.cpp.
 
   /// SMT-LIB one-shot ack deadline; meaningless elsewhere.
   unsigned oneShotModelAckTimeoutMs() const {
@@ -1251,6 +1256,11 @@ protected:
   virtual SMTExprRef mkFPToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                   const SMTExprRef &R);
 
+  /// Shared body of mkSBVToFPImpl/mkUBVToFPImpl (camadafp.cpp).
+  SMTExprRef bvToFPCore(const SMTExprRef &From, const SMTExprRef &Magnitude,
+                        const SMTExprRef &SgnBit, const SMTSortRef &To,
+                        const SMTExprRef &R, SMTExprKind Kind);
+
   virtual SMTExprRef mkSBVToFPImpl(const SMTExprRef &From, const SMTSortRef &To,
                                    const SMTExprRef &R);
 
@@ -1403,8 +1413,6 @@ protected:
 
   /// Only dispatched right after checkSatAssumingImpl returned UNSAT for a
   /// non-empty assumption set (the wrapper answers the trivial cases).
-  /// Native backends map the solver's core back to the SMTExprRefs stored
-  /// in LastAssumptions.
   virtual SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl();
 
   /// Backend feature bits for everything supports() cannot answer from

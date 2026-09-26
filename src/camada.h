@@ -736,12 +736,12 @@ public:
                                  const SMTSortRef &To) = 0;
 
   /// Converts a fixed-point value to an integer bit-vector of the given
-  /// width, rounding toward zero (the direction TR 18037 specifies for
-  /// fixed-point to integer conversion).
+  /// width, rounding under Mode (FXPRM::TowardZero is the direction TR
+  /// 18037 specifies for fixed-point to integer conversion).
   virtual SMTExprRef mkFXPToBV(const SMTExprRef &Exp, unsigned ToWidth,
                                FXPRM Mode) = 0;
 
-  /// True iff the toward-zero integer part does not fit the target
+  /// True iff the integer part rounded under Mode does not fit the target
   /// integer type's range: [0, 2^w-1] for an unsigned target,
   /// two's-complement bounds for a signed one. The plain mkFXPToBV needs
   /// no signedness parameter — its value bits are the integral part mod
@@ -750,7 +750,7 @@ public:
   virtual SMTExprRef mkFXPToBVOverflow(const SMTExprRef &Exp, unsigned ToWidth,
                                        bool ToSigned, FXPRM Mode) = 0;
 
-  /// Saturating fixed-point to integer conversion (round toward zero,
+  /// Saturating fixed-point to integer conversion (round under Mode,
   /// then clamp to the TARGET integer type's range — a negative source
   /// clamps to zero for an unsigned target.
   virtual SMTExprRef mkFXPToBVSat(const SMTExprRef &Exp, unsigned ToWidth,
@@ -855,15 +855,16 @@ public:
                                RM R) = 0;
 
   /// Converts a floating-point value to a fixed-point value, rounding
-  /// toward zero — C's float-to-fixed direction, which differs from
-  /// fixed-to-fixed narrowing (floor); both pinned by the execution
-  /// oracle. The value is meaningful only under the negation of
+  /// under Mode (FXPRM::TowardZero is C's float-to-fixed direction, which
+  /// differs from fixed-to-fixed narrowing's floor; both pinned by the
+  /// execution oracle). The value is meaningful only under the negation of
   /// mkFPToFXPOverflow (out-of-range, infinity, and NaN stay UB in C).
   virtual SMTExprRef mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
                                FXPRM Mode) = 0;
 
   /// True iff the float-to-fixed conversion is undefined: NaN, +-infinity,
-  /// or the toward-zero result lies outside the target format's range.
+  /// or the result rounded under Mode lies outside the target format's
+  /// range.
   virtual SMTExprRef mkFPToFXPOverflow(const SMTExprRef &Exp,
                                        const SMTSortRef &To, FXPRM Mode) = 0;
 
