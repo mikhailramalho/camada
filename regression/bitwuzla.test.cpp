@@ -196,7 +196,7 @@ TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   REQUIRE(solver->supports(SolverFeature::NativeFloatingPoint));
   REQUIRE(solver->supports(SolverFeature::NativeRoundToAway));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
-  REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
+  REQUIRE(solver->supports(SolverFeature::NativeConstantArrays));
   // The capability is present either way; core extraction is opt-in at
   // construction because producing unsat assumptions slows every check,
   // so a default context reports the capability but leaves it disabled.
@@ -238,20 +238,19 @@ TEST_CASE("Deep tuple/array nesting Bitwuzla test", "[Bitwuzla]") {
 
 // Registered per backend: nested constant arrays now lower lazily too,
 // so the per-leaf constant arrays of a tuple-array initializer can nest.
+// Lazy on Bitwuzla: a native constant array used as an array element always
+// reaches its array solver, which answers UNKNOWN for CONST_ARRAY terms.
 TEST_CASE("Nested constant tuple arrays Bitwuzla test", "[Bitwuzla]") {
   auto solver = camada::createBitwuzlaSolver();
-  tuple_array_const_nested(solver);
+  tuple_array_const_nested(solver, camada::ConstArrayLowering::Lazy);
 }
 
 // Registered per backend, not in tests(): array_of(array_of(v)) needs a
 // nested array sort, which STP's BV-only array theory lacks.
+// Lazy only: see the tuple variant above.
 TEST_CASE("Nested constant arrays Bitwuzla test", "[Bitwuzla]") {
   auto solver = camada::createBitwuzlaSolver();
-  nested_const_array_semantics(solver);
-  solver->reset();
   nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver);
   solver->reset();
   nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }
