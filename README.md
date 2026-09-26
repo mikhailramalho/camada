@@ -24,7 +24,7 @@ Current encoded/common-layer features:
   without a native `((as const ...))` operator
 - tuple lowering for backends without native datatype support (native
   datatypes on CVC5, Z3, and the SMT-LIB pipe; per-field decomposition
-  elsewhere, with some remaining gaps such as arrays of tuples)
+  elsewhere, where arrays indexed by a tuple sort are not yet supported)
 - bit-vector overflow predicates, assumption-based solving with unsat
   assumptions, per-check wall-clock timeouts, sparse array model
   extraction, and a queryable capability API (`supports(SolverFeature)`)
@@ -65,9 +65,18 @@ Camada uses CMake as its build system. Follow these steps to build and install t
 
 ### Prerequisites
 
-- CMake (Version 3.15 or higher)
+- CMake (Version 3.24 or higher)
 - C++ Compiler (Supporting C++17)
-- Any of the supported solvers
+- Any of the supported solvers, or the tools below to let Camada build them
+
+Building dependencies from source (`CAMADA_DOWNLOAD_DEPENDENCIES`) also needs:
+
+- `meson` and `ninja` (Bitwuzla)
+- `make` and `python3` with the `venv` module (CVC5, which installs its Python
+  build dependencies into a venv under its own build tree)
+- `autoconf`, `automake`, `libtool`, `m4` and `texinfo` (GMP, Yices)
+- `gperf` (Yices), `flex` and `bison` (STP)
+- MPFR, as a system library (CVC5 and Bitwuzla link it)
 
 ### Build and Install
 ```bash
@@ -96,6 +105,12 @@ Useful configure options:
 - `-DCAMADA_SOLVER_<NAME>_ENABLE=IFAVAILABLE/ON/OFF` to control enabled
   backends
 
+A shared `libcamada` statically absorbs the backends that ship only static
+archives, along with their GMP and CaDiCaL. On Linux a version script keeps
+those private, so the library exports Camada's API and nothing else, and a
+process that also loads its own `libgmp.so` gets no competing definitions.
+macOS still exports them (issue #224).
+
 ### Downloading Supported Solvers
 
 Camada can now download and build missing solver dependencies during CMake
@@ -122,8 +137,10 @@ When CMake downloads dependencies itself:
   Bitwuzla, CVC5 and STP link one copy, because two copies built with
   different flags disagree on `CaDiCaL::Internal`'s layout.
 - `Yices` uses a source build.
-- `GMP` uses a source build when it is needed by downloaded dependencies and no
-  suitable staged copy is already available.
+- `GMP` uses a source build, and every backend links that one copy (STP and
+  MathSAT by path, Yices through `--with-static-gmp`, CVC5 and Bitwuzla through
+  their exported link interfaces). With `CAMADA_DOWNLOAD_DEPENDENCIES=OFF`
+  the host's GMP is used instead.
 - `MathSAT` uses the vendor-provided prebuilt archive from `5.6.17` on
   Linux. macOS stays pinned to `5.6.16`: the `5.6.17` macOS tarball ships
   `libmathsat.a` as a plain `ar` archive of fat Mach-O objects, a layout
@@ -131,8 +148,15 @@ When CMake downloads dependencies itself:
 - `STP` still falls back to a source build of `2.4.1`. The `2.4.1` GitHub
   release only ships a standalone `stp` executable, not the headers and
   libraries that Camada needs to link against the STP C++ API.
-- `CryptoMiniSat`, `Minisat`, and CryptoMiniSat's patched `CaDiCaL`/`CadiBack`
-  forks still build from source as part of the STP dependency chain.
+- `CryptoMiniSat`, `Minisat`, and `CadiBack` build from source as part of the
+  STP dependency chain. CryptoMiniSat links the shared `CaDiCaL` rather than a
+  fork of its own.
+- `CVC5` is not built on Windows; configuring with it enabled there stops with
+  an error.
+
+Sources are fetched as release tarballs rather than git clones. Those named by
+a tag are pinned by SHA256; those named by a commit are content-addressed by
+the commit itself.
 
 The `<build-dir>/deps/install` directory will contain the staged solver headers,
 libraries, and auxiliary artifacts, and Camada will use them from this
@@ -317,12 +341,21 @@ Camada currently provides public APIs for:
   (`getArrayValues`)
 - a queryable capability API (`supports(SolverFeature)`) so callers can
   select backends without discovering gaps through errors
+- backend identity (`getSolverKind()`), for choices no capability bit can
+  express, such as picking an encoding by measured backend performance;
+  prefer `supports()` for anything a backend can or cannot do
+- formula dumps (`dump()`): an SMT-LIB script (declarations, `(assert ...)`,
+  `(check-sat)`) on most backends, with no `(set-logic ...)` since Camada does
+  not track the fragment a formula ended up in. Yices prints Yices syntax and
+  STP prints the CVC language, as neither API has an SMT-LIB writer
 
 Array support is currently partial in the larger structured-data sense:
 
 - plain SMT arrays are supported
 - backend-specific array gaps such as `Array<Idx, Bool>` are handled
-- arrays of tuples remain part of the unfinished tuple work
+- arrays with tuple elements are supported everywhere; arrays indexed by a
+  tuple sort are not yet supported on backends without native datatypes
+  (issue #17)
 
 ## Backend Feature Parity
 
@@ -351,7 +384,7 @@ even if it lacks native floating-point support.
 common BV path, and native `ROUND_TO_AWAY` is unsupported.
 
 <sup>2</sup> Via Camada's per-field tuple lowering rather than native
-datatypes; some gaps remain (e.g. arrays of tuples). Query
+datatypes; arrays indexed by a tuple sort are not yet supported. Query
 `supports(SolverFeature::NativeTuples)` to tell the two apart.
 
 <sup>3</sup> POSIX only, enforced through a process-global SIGALRM timer —
