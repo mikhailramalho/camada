@@ -32,6 +32,7 @@ TEST_CASE("Unsupported UF STP test", "[STP]") {
 TEST_CASE("STP feature capabilities", "[STP]") {
   auto solver = camada::createSTPSolver();
   using camada::SolverFeature;
+  REQUIRE(solver->getSolverKind() == camada::SolverKind::STP);
   REQUIRE_FALSE(solver->supports(SolverFeature::IntRealArithmetic));
   REQUIRE_FALSE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE_FALSE(solver->supports(SolverFeature::UninterpretedFunctions));

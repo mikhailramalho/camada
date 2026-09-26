@@ -294,6 +294,7 @@ protected:
   void popImpl(unsigned nscopes) override;
 
   std::string getSolverNameAndVersion() const override;
+  SolverKind getSolverKind() const override { return SolverKind::Yices; }
 
   void dumpImpl(std::string &Out) override;
 

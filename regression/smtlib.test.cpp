@@ -379,6 +379,7 @@ TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
   std::string Path = makeTempPath();
   auto solver = std::make_unique<camada::SMTLIBSolver>(Path);
   using camada::SolverFeature;
+  REQUIRE(solver->getSolverKind() == camada::SolverKind::SMTLIB);
   REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
   REQUIRE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
