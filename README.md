@@ -3,681 +3,118 @@
 
 # Camada
 
-Camada ("layer" in Portuguese) is a permissively licensed C++17 wrapper for
-multiple SMT solvers. It exposes a unified API across:
+Camada ("layer" in Portuguese) is a permissively licensed C++17 wrapper that
+exposes one API over several SMT solvers: Bitwuzla, CVC5, MathSAT, STP, Yices,
+Z3, and any external solver speaking SMT-LIB v2 on stdin/stdout.
 
-- Bitwuzla
-- CVC5
-- MathSAT
-- STP
-- Yices
-- Z3
-- SMT-LIB (any external solver speaking SMT-LIB v2 on stdin/stdout)
+It makes switching solvers cheap, and fills gaps where a backend is missing
+part of the SMT-LIB surface:
 
-The library is designed to make solver switching cheap while still filling
-feature gaps in backends that are missing parts of the SMT-LIB surface.
+- floating-point encoded over bit-vectors, for backends without native FP or
+  on request (`FPEncoding::BV`)
+- constant arrays lowered lazily where a backend has no usable native one
+- tuples lowered per field where a backend has no datatypes
+- fixed-point arithmetic, overflow predicates, assumption-based solving,
+  timeouts, and sparse array models on every backend
+- an opt-in Ackermann array encoding, for when a backend's array solver is
+  the bottleneck
+- `supports(SolverFeature)` to ask what a backend can do, and
+  `getSolverKind()` to ask which backend it is
 
-Current encoded/common-layer features:
+Camada grew out of [ESBMC](https://github.com/esbmc/esbmc)'s solver backend, so
+some choices, such as IEEE-754 NaN payload handling, favour verifying C code.
 
-- floating-point fallback via bit-vector encoding
-- array support, including lazily lowered constant arrays for backends
-  without a native `((as const ...))` operator
-- tuple lowering for backends without native datatype support (native
-  datatypes on CVC5, Z3, and the SMT-LIB pipe; per-field decomposition
-  elsewhere, where arrays indexed by a tuple sort are not yet supported)
-- bit-vector overflow predicates, assumption-based solving with unsat
-  assumptions, per-check wall-clock timeouts, sparse array model
-  extraction, and a queryable capability API (`supports(SolverFeature)`)
-- fixed-point arithmetic (TR 18037-shaped: values plus undefined-behavior
-  predicates for overflow and division by zero), encoded over bit-vectors
-  in the common layer, so it works on every backend
-- a `SolverConfig` object on every `create*Solver()` factory holding the
-  construction-frozen options: the array encoding, the tuple lowering
-  (Camada per-field lowering can be forced even on native-datatype
-  backends), unsat-assumption production, a caller-chosen logic (SMT-LIB,
-  Yices, MathSAT), and the SMT-LIB one-shot ack deadline
-- an opt-in Ackermann array encoding (`SolverConfig::Arrays =
-  ArrayEncoding::Ackermann`): arrays never reach the
-  backend — every select becomes a fresh element variable tied by
-  congruence axioms, stores/ites are lowered structurally, and equality
-  uses a witness-index encoding. Quantifier-free formulas only; the mode
-  forces the Camada tuple encoding, and rejects nested arrays and
-  array-sorted UF signatures. Useful where a backend's array decision
-  procedure is the bottleneck
+## Building
 
-## What Camada Is
+Requires CMake 3.24 and a C++17 compiler.
 
-Camada is intentionally a thin common layer:
-
-- solver-specific wrappers live in the backend classes
-- common behavior and missing-feature encodings live in the shared layer
-- expressions and sorts are solver-owned handles
-
-This makes it practical to:
-
-- switch solvers without rewriting the calling code
-- route unsupported features through common-layer encodings
-- keep backend-specific quirks contained in one place
-
-## Building and Installing
-
-Camada uses CMake as its build system. Follow these steps to build and install the library:
-
-### Prerequisites
-
-- CMake (Version 3.24 or higher)
-- C++ Compiler (Supporting C++17)
-- Any of the supported solvers, or the tools below to let Camada build them
-
-Building dependencies from source (`CAMADA_DOWNLOAD_DEPENDENCIES`) also needs:
-
-- `meson` and `ninja` (Bitwuzla)
-- `make` and `python3` with the `venv` module (CVC5, which installs its Python
-  build dependencies into a venv under its own build tree)
-- `autoconf`, `automake`, `libtool`, `m4` and `texinfo` (GMP, Yices)
-- `gperf` (Yices), `flex` and `bison` (STP)
-- MPFR, as a system library (CVC5 and Bitwuzla link it)
-
-### Build and Install
 ```bash
-# Clone the Camada repository
 git clone https://github.com/mikhailramalho/camada.git
 cd camada
-
-# Run CMake to configure the project
-cmake -S . -B build
-
-# Build the library
+cmake -S . -B build -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL
 cmake --build build
-
-# Install Camada
 cmake --install build
 ```
 
-Useful configure options:
+`CAMADA_DOWNLOAD_DEPENDENCIES=ALL` downloads and builds the solvers it cannot
+find (`PERMISSIVE` limits that to permissively licensed ones, `OFF` uses only
+what is installed). Backends are toggled with
+`-DCAMADA_SOLVER_<NAME>_ENABLE=IFAVAILABLE/ON/OFF`.
 
-- `-DCMAKE_BUILD_TYPE=Release`
-- `-DBUILD_SHARED_LIBS=ON/OFF`
-- `-DENABLE_WARNINGS=ON/OFF` (default: ON; adds `-Wall -Wextra -pedantic`)
-- `-DENABLE_WERROR=ON/OFF` (default: OFF; treat warnings as errors — used by CI)
-- `-DCAMADA_ENABLE_REGRESSION=ON/OFF`
-- `-DCAMADA_DOWNLOAD_DEPENDENCIES=ALL`
-- `-DCAMADA_SOLVER_<NAME>_ENABLE=IFAVAILABLE/ON/OFF` to control enabled
-  backends
+Building the solvers from source needs extra tools (meson, autotools, flex,
+bison and more). See [docs/building.md](docs/building.md) for those, the full
+list of options, and how each dependency is fetched.
 
-A shared `libcamada` statically absorbs the backends that ship only static
-archives, along with their GMP and CaDiCaL. On Linux a version script keeps
-those private, so the library exports Camada's API and nothing else, and a
-process that also loads its own `libgmp.so` gets no competing definitions.
-macOS still exports them (issue #224).
-
-### Downloading Supported Solvers
-
-Camada can now download and build missing solver dependencies during CMake
-configure, following the same general approach used in ESBMC:
-```bash
-cmake -S . -B build -DCAMADA_DOWNLOAD_DEPENDENCIES=ALL
-cmake --build build
-```
-
-`CAMADA_DOWNLOAD_DEPENDENCIES` accepts three modes:
-- `OFF`: do not download dependencies.
-- `ALL`: download all supported solver dependencies.
-- `PERMISSIVE`: download only solvers with permissive licenses
-  (`Bitwuzla`, `CVC5`, `STP`, and `Z3`).
-
-Downloaded sources and locally installed solver artifacts are stored under
-`<build-dir>/deps/src` and `<build-dir>/deps/install`.
-
-When CMake downloads dependencies itself:
-- `Bitwuzla` uses a source build from `0.9.1`.
-- `Z3` uses the prebuilt release archive from `z3-4.13.3`.
-- `CVC5` uses a source build from `cvc5-1.4.0`.
-- `CaDiCaL` uses a source build, shared by every backend that needs it:
-  Bitwuzla, CVC5 and STP link one copy, because two copies built with
-  different flags disagree on `CaDiCaL::Internal`'s layout.
-- `Yices` uses a source build.
-- `GMP` uses a source build, and every backend links that one copy (STP and
-  MathSAT by path, Yices through `--with-static-gmp`, CVC5 and Bitwuzla through
-  their exported link interfaces). With `CAMADA_DOWNLOAD_DEPENDENCIES=OFF`
-  the host's GMP is used instead.
-- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.17` on
-  Linux. macOS stays pinned to `5.6.16`: the `5.6.17` macOS tarball ships
-  `libmathsat.a` as a plain `ar` archive of fat Mach-O objects, a layout
-  Apple's `ld` rejects.
-- `STP` still falls back to a source build of `2.4.1`. The `2.4.1` GitHub
-  release only ships a standalone `stp` executable, not the headers and
-  libraries that Camada needs to link against the STP C++ API.
-- `CryptoMiniSat`, `Minisat`, and `CadiBack` build from source as part of the
-  STP dependency chain. CryptoMiniSat links the shared `CaDiCaL` rather than a
-  fork of its own.
-- `CVC5` is not built on Windows; configuring with it enabled there stops with
-  an error.
-
-Sources are fetched as release tarballs rather than git clones. Those named by
-a tag are pinned by SHA256; those named by a commit are content-addressed by
-the commit itself.
-
-The `<build-dir>/deps/install` directory will contain the staged solver headers,
-libraries, and auxiliary artifacts, and Camada will use them from this
-location during the build.
-
-## Supported backends
-
-| Backend    | Minimum version | Native floating-point support |
-| ---------- | :-------------: | :-------------: |
-| [Bitwuzla](https://bitwuzla.github.io/)    |  0.9.1          | ✔️<sup>1</sup> |
-| [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️<sup>1</sup> |
-| [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>2</sup> |
-| [STP](https://stp.github.io/)              |  2.4.0          |   |
-| [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
-| [Z3](https://github.com/Z3Prover/z3)       |  4.13.3         | ✔️ |
-| SMT-LIB (any external solver) | n/a | depends on child |
-
-<sup>1</sup> Bitwuzla and CVC5 restrict which *formats* native FP accepts,
-because both word-blast through SymFPU, whose algorithms assume
-`exponentWidth <= significandWidth`. Bitwuzla takes the four IEEE-754
-interchange formats (binary16, binary32, binary64, binary128); CVC5 takes
-only binary32 and binary64. Everything else needs an experimental flag
-(`--fp-exp` on CVC5, a `--fpexp` build option on Bitwuzla), which Camada
-does not enable — see the format table below. Z3 and MathSAT accept any
-format natively.
-
-<sup>2</sup> `fp.fma` and `fp.rem` are bit-blasted when using MathSAT because
-it does not support these operations natively. `ROUND_TO_AWAY` is also not
-supported by the native MathSAT floating-point API and aborts with an error if
-requested (query `SolverFeature::NativeRoundToAway` before building the mode,
-or use `FPEncoding::BV`).
-
-#### Native floating-point formats
-
-`FPEncoding::Native` support by format, measured against the pinned
-versions above. `FPEncoding::BV` works for every format on every backend,
-including STP and Yices, and is what Camada's own tests use for anything
-outside binary32/binary64.
-
-| Format               | Z3 | CVC5 | Bitwuzla | MathSAT |
-| -------------------- | :-: | :-: | :-: | :-: |
-| binary16 (5, 10)     | ✔️ |    | ✔️ | ✔️ |
-| binary32 (8, 23)     | ✔️ | ✔️ | ✔️ | ✔️ |
-| binary64 (11, 52)    | ✔️ | ✔️ | ✔️ | ✔️ |
-| binary128 (15, 112)  | ✔️ |    | ✔️ | ✔️ |
-| bfloat16 (8, 7)      | ✔️ |    |    | ✔️ |
-| anything else        | ✔️ |    |    | ✔️ |
-
-### SMT-LIB backend
-
-In addition to the six native bindings above, Camada also ships an SMT-LIB
-backend that drives any external solver speaking standard SMT-LIB on
-stdin/stdout — z3, cvc5, or anything else that honors the
-`(set-option :print-success true)` contract. The child is spawned with
-`execvp(argv[0], argv)` — no shell is involved, so individual argv entries
-can contain spaces or other characters without escaping concerns. Use it via:
-
-```cpp
-// The factory reports an SMTError when the child cannot be started -- the
-// host is out of descriptors or process slots -- rather than aborting.
-auto created = camada::createSMTLIBSolver({"z3", "-in"});
-if (!created)
-  return handle(created.error());
-const auto &solver = created.value();
-// ... build a problem with the usual mk*/addConstraint API ...
-auto result = solver->check();          // sat / unsat / unknown
-auto value = solver->getBV(symbol);     // round-trips through (get-value ...)
-```
-
-A fourth, **one-shot** mode serves solvers that read a complete formula
-file and print a verdict instead of speaking interactive SMT-LIB
-(Mallob-style distributed solvers, ML-based solvers):
-
-```cpp
-auto solver = std::make_unique<camada::SMTLIBSolver>(
-    camada::SMTLIBOneShotTag{}, "/tmp/formula.smt2",
-    "mallob -mono=%f -mono-app=SMT",   // %f = shell-quoted formula path
-    {"z3", "-in"});                    // optional model solver for get-value
-```
-
-The script (including `(check-sat)`) is written to the formula file, the
-shell command runs on it once, and stdout is scanned with a strict
-per-line verdict parser (`sat`/`unsat`/`unknown` and the SAT-competition
-`s ...` forms; the last verdict wins; a verdict from a signal-killed
-command is discarded). Because the one-shot process cannot answer
-`(get-value)`, an optional interactive model solver receives the same
-script in parallel and serves models after a `sat` verdict — its own
-verdict is exposed via `oneShotModelVerdict()` so callers can detect a
-diverging model solver. The command runs in its own process group and a
-spawn-time callback hands out the pgid for the caller's signal/timeout
-teardown paths. One `check()` per solver; no-verdict runs return UNKNOWN
-with the command, exit status, and output tail retrievable via
-`oneShotDiagnostics()`. Unlike every other mode, the command template is
-executed **via a shell** — do not build it from untrusted input.
-
-A two-argument form also tees the emitted SMT-LIB script to a file, useful
-when you want both an interactive answer and a reproducer to share:
-
-```cpp
-auto created = camada::createSMTLIBSolver(
-    {"cvc5", "--lang", "smt2", "--incremental"}, "session.smt2");
-// Also reports rather than aborts when the script file cannot be opened.
-```
-
-Verified child solvers (the regression suite drives each one through the
-shared fixtures from `tests.h`):
-
-| Solver       | Argv                                                            | Notes |
-| ------------ | --------------------------------------------------------------- | ----- |
-| z3           | `{"z3", "-in"}`                                                 | default |
-| cvc5         | `{"cvc5", "--lang", "smt2", "--incremental", "--arrays-exp"}`   | `--incremental` is required for `(push)` / `(pop)`. `--arrays-exp` enables `((as const ...))` const-array literals. |
-| bitwuzla     | `{"bitwuzla"}`                                                  | speaks SMT-LIB on stdin without extra flags |
-| yices-smt2   | `{"yices-smt2", "--incremental"}`                               | `--incremental` is required for `(push)` / `(pop)`. No floating-point support — callers using native FP get an `unsupported` from the child. Use `FPEncoding::BV` to route every FP op through the common-layer bit-blast path, which works against yices. |
-| mathsat      | `{"mathsat"}`                                                   | the CLI binary, not the C library; staged under `<build>/deps/src/mathsat-<version>-linux-x86_64/bin/mathsat` |
-| stp          | `{"stp"}`                                                       | STP ≥ 2.4.0 only (older releases die on SMT-LIB2 commands they do not implement). BV/Bool/plain-array fragment: rejects `(set-logic ALL)` (Camada falls back to `QF_AUFBV`), answers `unsupported` to `:global-declarations` (symbols declared inside a `(push)` die with their scope), `:produce-unsat-assumptions`, and `(check-sat-assuming ...)` (Camada routes through the push/assert/check/pop fallback), rejects `((as const ...))`, and only supports `(get-value ...)` on declared symbols. Use `FPEncoding::BV` for FP. |
-
-The Camada preamble unconditionally sends `(set-option :print-success true)`,
-`(set-option :produce-models true)`,
-`(set-option :produce-unsat-assumptions true)` (a child answering
-`unsupported` still solves normally; only `getUnsatAssumptions` degrades,
-and `supports(SolverFeature::UnsatAssumptions)` reflects the child's
-answer),
-`(set-option :global-declarations true)` (`unsupported` is tolerated, with
-the scope caveat above), `(set-info :status unknown)`, and
-`(set-logic ALL)` (with one fallback attempt at `QF_AUFBV` for children
-that only accept concrete logic names) at startup, so any solver that
-honors the SMT-LIB option contract should work. Every `SMTLIBSolver`
-constructor also accepts an optional `Logic` string: when non-empty it is
-emitted verbatim in place of `ALL`, with no negotiation — a child that
-rejects a caller-chosen logic is a fatal error rather than a silent
-downgrade. The choice survives `reset()`. Other solvers should be
-straightforward to plug in via the `createSMTLIBSolver(argv)` factory.
-
-Caveats:
-
-- `mkIEEEFPToBV` is scoped to the current `(push)`/`(pop)` level. SMT-LIB
-  has no portable same-encoding `fp→bv` op, so the backend materializes a
-  fresh BV symbol and constrains it via the inverse direction — the
-  constraint is unwound by `(pop)`, same as the cvc5 and bitwuzla native
-  backends.
-- The child is spawned with `execvp`, so argv strings are interpreted
-  verbatim by the kernel — not by a shell. Spaces, quotes, and `$` in
-  individual argv entries are safe, but you cannot rely on shell
-  redirection or environment expansion.
-
-The backend covers the full Camada surface: BV/Bool, arrays, native
-floating-point (FP arithmetic, predicates, conversions, and `(_ +oo …)` /
-`(_ NaN …)` / `(fp …)` model parsing), Int/Real, uninterpreted functions,
-quantifiers, and tuples (via `(declare-datatypes ...)`). Capability subsetting
-is per-solver — for example yices-smt2 doesn't speak native FP and bitwuzla
-doesn't speak Int/Real or tuples — and the regression matrix exercises only
-the operations each child supports. Callers that need FP against a child
-solver that doesn't speak it should ask Camada for `FPEncoding::BV` at
-sort-construction time — that routes every FP op through the common-layer
-bit-blast path and emits BV-only SMT-LIB.
-
-## API Overview
-
-Camada currently provides public APIs for:
-
-- booleans
-- bit-vectors
-- integers and reals
-- floating-point
-- rounding modes
-- fixed-point arithmetic (`mkFXP*`: TR 18037-shaped values, comparisons,
-  conversions, and undefined-behavior predicates for overflow and division
-  by zero; mixed formats compute in the common full-precision format;
-  always encoded over bit-vectors, so available on every backend)
-- arrays
-- uninterpreted functions
-- quantifiers on supporting backends
-- incremental solving (`push`/`pop`)
-- assumption-based solving (`checkSatAssuming`) with unsat-assumption
-  extraction (`getUnsatAssumptions`)
-- per-check wall-clock timeouts (`setTimeout`; checks that hit the limit
-  return `UNKNOWN`)
-- bit-vector overflow predicates (`mkBVSAddOverflow`/`mkBVUAddOverflow`,
-  `mkBVSSubOverflow`/`mkBVUSubOverflow`, `mkBVSMulOverflow`/`mkBVUMulOverflow`,
-  `mkBVSDivOverflow`, `mkBVNegOverflow`)
-- model queries for supported value kinds, including sparse array models
-  (`getArrayValues`)
-- a queryable capability API (`supports(SolverFeature)`) so callers can
-  select backends without discovering gaps through errors
-- backend identity (`getSolverKind()`), for choices no capability bit can
-  express, such as picking an encoding by measured backend performance;
-  prefer `supports()` for anything a backend can or cannot do
-- formula dumps (`dump()`): an SMT-LIB script (declarations, `(assert ...)`,
-  `(check-sat)`) on most backends, with no `(set-logic ...)` since Camada does
-  not track the fragment a formula ended up in. Yices prints Yices syntax and
-  STP prints the CVC language, as neither API has an SMT-LIB writer
-
-Array support is currently partial in the larger structured-data sense:
-
-- plain SMT arrays are supported
-- backend-specific array gaps such as `Array<Idx, Bool>` are handled
-- arrays with tuple elements are supported everywhere; arrays indexed by a
-  tuple sort are not yet supported on backends without native datatypes
-  (issue #17)
-
-## Backend Feature Parity
-
-The table below summarizes the current public-API coverage at a glance.
-`BV FP` means the backend can use Camada's bit-vector floating-point encoding
-even if it lacks native floating-point support.
+## Backend support
 
 | Feature | Bitwuzla | CVC5 | MathSAT | STP | Yices | Z3 |
 | ------- | :------: | :--: | :-----: | :-: | :---: | :-: |
-| Booleans | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
-| Bit-vectors | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Minimum version | 0.9.1 | 1.0.8 | 5.6.3 | 2.4.0 | 2.6.1 | 4.13.3 |
+| Bit-vectors, booleans, arrays | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Integers / reals |   | ✔️ | ✔️ |   | ✔️ | ✔️ |
-| Native FP | ✔️ | ✔️ | ✔️<sup>1</sup> |   |   | ✔️ |
-| BV FP encoding | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
-| Fixed-point (encoded) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
-| Arrays | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Native FP | ✔️<sup>1</sup> | ✔️<sup>1</sup> | ✔️<sup>2</sup> |   |   | ✔️ |
+| FP over bit-vectors | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Uninterpreted functions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
-| Tuples | ✔️<sup>2</sup> | ✔️ | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️<sup>2</sup> | ✔️ |
+| Native tuples |   | ✔️ |   |   |   | ✔️ |
+| Native constant arrays | ✔️<sup>3</sup> | ✔️ | ✔️ |   |   | ✔️ |
 | Quantifiers | ✔️ | ✔️ |   |   |   | ✔️ |
-| Overflow predicates | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
-| Unsat assumptions | ✔️<sup>5</sup> | ✔️<sup>5</sup> | ✔️ |   | ✔️ | ✔️ |
-| Timeouts (`setTimeout`) | ✔️ | ✔️ | ✔️ | ✔️<sup>4</sup> | ✔️<sup>3</sup> | ✔️ |
-| Array models (`getArrayValues`) | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
+| Unsat assumptions | ✔️<sup>4</sup> | ✔️<sup>4</sup> | ✔️ |   | ✔️ | ✔️ |
+| Array models | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 
-<sup>1</sup> On `MathSAT`, `fp.fma` and `fp.rem` are lowered through the
-common BV path, and native `ROUND_TO_AWAY` is unsupported.
+Everything not native is still available through Camada's own lowering, so
+tuples and constant arrays work on every backend.
 
-<sup>2</sup> Via Camada's per-field tuple lowering rather than native
-datatypes; arrays indexed by a tuple sort are not yet supported. Query
-`supports(SolverFeature::NativeTuples)` to tell the two apart.
+<sup>1</sup> Only some formats: SymFPU underneath assumes
+`exponentWidth <= significandWidth`.
+<sup>2</sup> `fp.fma` and `fp.rem` go through the bit-vector path;
+`ROUND_TO_AWAY` is unsupported.
+<sup>3</sup> Returns UNKNOWN when a constant array survives Bitwuzla's
+preprocessing; `ConstArrayLowering::Lazy` avoids it.
+<sup>4</sup> Opt-in at creation (`SolverConfig::UseUnsatAssumptions`).
 
-<sup>3</sup> POSIX only, enforced through a process-global SIGALRM timer —
-at most one timed Yices check may run at a time process-wide.
+Per-backend caveats, the FP format table, and the SMT-LIB pipe backend are in
+[docs/backends.md](docs/backends.md).
 
-<sup>4</sup> STP's native time budget is whole seconds for the entire
-query; millisecond limits round up to the next second.
-
-<sup>5</sup> Opt-in at solver creation: producing unsat assumptions slows
-every check on these backends and the option is frozen at context
-creation, so `createBitwuzlaSolver`/`createCVC5Solver` default it off —
-set `SolverConfig::UseUnsatAssumptions = true` to extract cores.
-`checkSatAssuming` itself works regardless. `supports()` reports the
-capability either way, since it describes the backend rather than the
-context; ask `produceUnsatAssumptions()` whether a given solver has it
-enabled.
-
-The last four rows (and any platform splits) are queryable at runtime via
-`supports(SolverFeature)`; `checkSatAssuming` itself works on every
-backend through a push/assert/check/pop fallback — the unsat-assumptions
-row covers `getUnsatAssumptions`. On STP, `getArrayValues` still answers
-for lazily lowered constant arrays, which the common layer handles.
-
-## Backend Caveats
-
-Camada tries to hide backend differences where practical, but a few solver
-limitations still matter in day-to-day use.
-
-- `MathSAT`
-  - `reset()` recreates the solver environment internally so symbol names can
-    be reused safely across resets.
-  - quantified solving is not supported by MathSAT, so Camada treats
-    quantifiers as unsupported on this backend.
-  - native floating-point support has gaps: `fp.fma` and `fp.rem` are lowered
-    through the common bit-vector path, and `ROUND_TO_AWAY` is not supported by
-    the native MathSAT FP API.
-- `STP`
-  - only the bit-vector / array fragment is a natural fit. Integer, real,
-    quantifier, and native floating-point support are not available.
-  - constant arrays and boolean arrays are adapted internally by the wrapper,
-    so some behavior is implemented through backend-specific lowering.
-  - constant arrays use Camada's lazy lowering (the default-value axiom is
-    instantiated at each index the formula observes), so they work at any
-    index width.
-- `Yices`
-  - there is no native floating-point support, so FP always goes through
-    Camada's bit-vector encoding.
-  - constant arrays use Camada's lazy lowering: the Yices lambda encoding
-    was found unsound (context reasoning over lambda terms is incomplete —
-    a symbolic-index read of the default could satisfy formulas it should
-    refute), a limitation smt-switch independently refuses to support.
-  - global Yices initialization/teardown is hardened for multiple wrappers, but
-    simultaneously live Yices solver instances can still collide on shared
-    symbol names.
-  - `setTimeout` is enforced with a process-global SIGALRM timer plus
-    `yices_stop_search` (Yices has no native time limit), so it is POSIX-only
-    and at most one timed Yices check may run at a time process-wide.
-- `Bitwuzla`
-  - integers and reals are not supported.
-  - quantifiers are available, but the strongest coverage in Camada is still in
-    the quantifier-free fragments.
-  - constant arrays are native. Bitwuzla 0.9.1's array solver cannot reason
-    about a constant array itself and answers UNKNOWN ("Equality over
-    constant arrays not fully supported yet") when one reaches it; it works
-    because preprocessing usually substitutes the constant array away, which
-    covers `symbol = array_of(v)` and reads through it. Comparing two constant
-    arrays with different defaults, a constant array behind a case split, or
-    a constant array used as an array element (`array_of(array_of(v))`)
-    returns UNKNOWN. Pass `ConstArrayLowering::Lazy` for those; it is always
-    correct but asserts one axiom per observed index, which is slow in
-    incremental use.
-- `CVC5` and `Z3`
-  - these are currently the most complete backends for the public Camada API.
-
-## Recommended Usage
-
-- Prefer `CVC5` or `Z3` if you want the broadest feature coverage with the
-  fewest backend-specific caveats.
-- Prefer `Bitwuzla` or `STP` for bit-vector-heavy workloads.
-- Prefer `Bitwuzla` when you also need native floating-point.
-- Prefer `STP` when you only need the bit-vector/array fragment.
-- Use `MathSAT` when you need its quantifier-free feature set, but not
-  quantifiers, and be cautious with native floating-point edge cases.
-- Use explicit `FPEncoding` when creating floating-point and rounding-mode
-  sorts/constants so the chosen native-vs-BV representation is obvious at the
-  call site.
-- Treat each solver instance as thread-confined. Camada does not support
-  concurrent use of a single solver object from multiple threads. Handles
-  (`SMTExprRef`, `SMTSortRef`) are safe to read from any thread as long as
-  the owning solver outlives the read — see *Handle Lifetime* below.
-
-## Design Notes
-
-### Handle Lifetime
-
-Expression and sort handles are solver-owned. Any `SMTExprRef` or `SMTSortRef`
-obtained from a solver becomes invalid after:
-
-- `solver->reset()`
-- solver destruction
-
-Handles must not be reused across those boundaries. Misuse is detected rather
-than silently corrupted: each handle carries a generation tag from the owning
-solver, and dereferencing a stale, null, or moved-from handle aborts via
-`fatalError()` with a diagnostic message instead of reading freed memory.
-
-The liveness check is race-free: a handle held by one thread can be safely
-dereferenced or queried with `isValid()` while the owning solver is reset or
-destroyed on another thread, and the stale handle will deterministically
-abort. This does not make the solver itself thread-safe — see *Recommended
-Usage* for the threading contract.
-
-### Floating-Point Fallback
-
-If a backend lacks native floating-point support, Camada can encode FP
-operations through bit-vectors in the common layer.
-
-This behavior can also be forced on supported solvers by constructing FP/RM
-sorts and constants with `FPEncoding::BV` instead of `FPEncoding::Native`.
-
-For example:
-
-```cpp
-auto fp64sort = solver->mkFPSort(11, 52, camada::FPEncoding::BV);
-auto roundingMode =
-    solver->mkRM(camada::RM::ROUND_TO_MINUS_INF, camada::FPEncoding::BV);
-```
-
-This is useful for:
-
-- backend parity testing
-- benchmarking the common FP encoding layer
-- working around backend-specific native-FP gaps
-
-### Tuples
-
-Tuples use native datatypes on `CVC5`, `Z3`, and the SMT-LIB pipe; every
-other backend routes tuple operations through Camada's per-field lowering.
-
-For example:
-
-```cpp
-auto tupleSort = solver->mkTupleSort({solver->mkBoolSort(), solver->mkBVSort(8)});
-auto tupleValue = solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(5, 8)});
-auto second = solver->mkTupleSelect(tupleValue, 1);
-```
-
-### Backend-Specific Adaptation
-
-Camada also smooths over backend quirks where practical. For example:
-
-- MathSAT and STP now lower `Array<Idx, Bool>` through backend `Array<Idx, BV1>`
-  representations internally
-- STP and Yices constant arrays use Camada's lazy lowering (a fresh array
-  symbol whose default-value axiom is instantiated at each observed index);
-  `ConstArrayLowering::Lazy` forces the same lowering on any backend
-- MathSAT native FP still falls back for unsupported operations such as
-  `fp.rem`
-
-### Caching Philosophy
-
-Camada does some solver-local caching, but it is intentionally narrow.
-
-The goal is to keep the wrapper lightweight, not to implement a full-blown
-global expression cache for every sort and node shape. The built-in caching is
-focused on cases where reuse is very frequent and the cache overhead is low,
-such as:
-
-- canonical sorts per solver generation
-- common symbols
-- boolean constants
-- a small set of high-hit-rate bit-vector and floating-point helper constants
-
-This means Camada does not try to intern every generated expression or sort.
-If a client needs broader structural caching, it is expected to build that at a
-higher layer on top of Camada, with the application owning the larger
-expression cache while Camada stays focused on backend adaptation and
-common-layer encodings.
-
-Symbols are cached by `(name, sort)` for the solver's lifetime, so `mkSymbol`
-returns the same handle even across `push`/`pop`. This matches every supported
-backend's actual C/C++ API behavior — terms outlive the assertion-stack scope
-that introduced them — but it diverges from strict SMT-LIB semantics where a
-`(declare-const)` inside a pushed scope is removed on pop. Code that relies on
-fresh-symbol-per-scope should call `solver->reset()` between scopes instead.
-
-## Implementation Details
-
-Camada is designed as a wrapper library to simplify the usage of multiple SMT solvers. It provides a common interface for interacting with these solvers, allowing developers to switch between them seamlessly without changing their codebase.
-
-Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbmc) so some of the implementation decisions were geared towards the verification of C programs. In particular:
-- `mkFPNeg` now accepts `FPNegBehavior`.
-- The default, `FPNegBehavior::FlipSignBit`, preserves the full IEEE payload and only toggles the sign bit, including on `NaN`s.
-- `FPNegBehavior::PreserveNaNPayload` follows the SMT floating-point standard and leaves `NaN`s unchanged.
-- The distinction is only observable under `FPEncoding::BV`, where an FP value is its bit pattern. On a native FP sort both behaviors give that solver's canonical `NaN`, losing the operand's payload and sign; use `FPEncoding::BV` when the `NaN` bit pattern matters.
-
-Camada's own FP-over-BV encoding also follows IEEE-754's recommended `NaN` handling rather than SMT-LIB's, which matters when a formula reads the bits of a `NaN` result:
-- An operation with a `NaN` operand returns *that operand's* payload, with the significand's leading bit forced to 1: propagated per IEEE-754 6.2, quieted per 6.2.3. With two `NaN` operands the first one wins. This is what every hardware FPU does; SMT-LIB has a single abstract `NaN` and says nothing about payloads.
-- `fp.abs` keeps the payload and clears the sign without quieting, since IEEE-754 treats it as a non-computational bit manipulation.
-- Invalid operations on non-`NaN` operands (`0/0`, `inf - inf`, `sqrt` of a negative) build a fresh `NaN`, as there is no input payload to carry.
-- `fp.to_fp` is the exception: it currently builds a fresh `NaN` rather than repositioning the payload into the target format's significand (see issue #195).
-- All of this is only observable through raw bits under `FPEncoding::BV`; a native FP sort has one abstract `NaN`, so no `check()` result depends on it.
-
-## Usage Example
+## Example
 
 ```cpp
 #include <camada/camada.h>
 
 int main() {
-  // Create a solver instance (example using Z3)
   auto solver = camada::createZ3Solver();
 
-  // Choose the floating-point encoding explicitly.
-  camada::SMTSortRef fp64sort =
-      solver->mkFPSort(11, 52, camada::FPEncoding::Native);
-  camada::SMTExprRef roundingMode =
-      solver->mkRM(camada::RM::ROUND_TO_MINUS_INF,
-                   camada::FPEncoding::Native);
+  auto bv8 = solver->mkBVSort(8);
+  auto x = solver->mkSymbol("x", bv8);
+  auto y = solver->mkSymbol("y", bv8);
 
-  camada::SMTExprRef x = solver->mkSymbol("x", fp64sort);
-  camada::SMTExprRef y = solver->mkSymbol("y", fp64sort);
-  camada::SMTExprRef r = solver->mkSymbol("r", fp64sort);
+  // x + y == 7 and x > y (unsigned)
+  solver->addConstraint(
+      solver->mkEqual(solver->mkBVAdd(x, y), solver->mkBVFromDec(7, 8)));
+  solver->addConstraint(solver->mkBVUgt(x, y));
 
-  camada::SMTExprRef xV = solver->mkFPFromBin(
-      "0111011101100100111000010001001010111000010010111000100101001010", 11,
-      camada::FPEncoding::Native);
-  camada::SMTExprRef yV = solver->mkFPFromBin(
-      "0100100101001110001001011011001100110001111010011101010010000001", 11,
-      camada::FPEncoding::Native);
-  camada::SMTExprRef rV = solver->mkFPFromBin(
-      "0111111111101111111111111111111111111111111111111111111111111111", 11,
-      camada::FPEncoding::Native);
-
-  camada::SMTExprRef xE = solver->mkEqual(x, xV);
-  camada::SMTExprRef yE = solver->mkEqual(y, yV);
-  camada::SMTExprRef rE = solver->mkEqual(r, rV);
-
-  solver->addConstraint(xE);
-  solver->addConstraint(yE);
-  solver->addConstraint(rE);
-
-  camada::SMTExprRef mul = solver->mkFPMul(x, y, roundingMode);
-  camada::SMTExprRef eq = solver->mkEqual(mul, r);
-  camada::SMTExprRef notEq = solver->mkNot(eq);
-
-  solver->addConstraint(notEq);
-  camada::CheckResult result = solver->check();
-
-  if (result == camada::CheckResult::SAT) {
-    /* Query the model for the value of the exprs */
-
-    /* Dump the model */
+  if (solver->check() == camada::CheckResult::SAT) {
+    auto xv = solver->getBV(x); // SMTResult<...>: reports, never aborts
     solver->dumpModel();
-
-  } else if (result == camada::CheckResult::UNSAT) {
-    /* The formula is unsatisfiable */
-  } else if (result == camada::CheckResult::UNKNOWN) {
-    /* Timeout (see setTimeout) or the solver gave up on the formula */
   }
 }
 ```
 
-## More Examples
+Expressions and sorts belong to the solver that made them and die on
+`reset()` or destruction; using a stale handle aborts with a diagnostic rather
+than reading freed memory. A solver is not safe to share between threads. See
+[docs/design.md](docs/design.md) for these contracts, the FP fallback, caching,
+and NaN handling.
 
-The regression tests are also a good source of small usage examples:
-
-- [`regression/simple.test.h`](regression/simple.test.h)
-- [`regression/array.test.h`](regression/array.test.h)
-- [`regression/fp.test.h`](regression/fp.test.h)
-- [`regression/tuple.test.h`](regression/tuple.test.h)
-
-Backend-specific feature coverage is also demonstrated in:
-
-- [`regression/cvc5.test.cpp`](regression/cvc5.test.cpp)
-- [`regression/mathsat.test.cpp`](regression/mathsat.test.cpp)
-- [`regression/yices.test.cpp`](regression/yices.test.cpp)
-- [`regression/z3.test.cpp`](regression/z3.test.cpp)
+The regression tests are the best source of further examples, starting with
+[`regression/simple.test.h`](regression/simple.test.h),
+[`array.test.h`](regression/array.test.h),
+[`fp.test.h`](regression/fp.test.h) and
+[`tuple.test.h`](regression/tuple.test.h).
 
 ## Benchmarking
 
-Camada includes a standalone benchmark driver:
-
-- [`regression/bench/main.cpp`](regression/bench/main.cpp)
-- [`scripts/compare-bench.py`](scripts/compare-bench.py)
-
-Typical local workflow:
-
-```bash
-schedtool -a 5 -n 20 -e ./build/bin/camada-bench bitwuzla 200
-python3 scripts/compare-bench.py ./build/bin/camada-bench 200
-```
-
-This runs repeated pinned benchmark samples, computes medians, and compares the
-result against [`scripts/baseline.txt`](scripts/baseline.txt).
-The benchmark output also records retained RSS (`rss_after_kb` and
-`rss_delta_kb`) alongside timing data.
+`build/bin/camada-bench <solver> <iterations>` runs the benchmark driver
+([`regression/bench/main.cpp`](regression/bench/main.cpp)).
+[`scripts/compare-bench.py`](scripts/compare-bench.py) compares medians
+against a baseline, which `--write-baseline` records first (to
+`scripts/baseline.txt` by default).
