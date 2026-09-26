@@ -1371,6 +1371,9 @@ void MathSATSolver::dumpImpl(std::string &Out) {
     msat_free(tmp);
   }
   msat_free(asserted_formulas);
+  // msat_to_smtlib2 emits each assertion with its own declarations, so the
+  // script is self-contained; it just never asks the solver anything.
+  Out += "(check-sat)\n";
 }
 
 void MathSATSolver::dumpModelImpl(std::string &Out) {

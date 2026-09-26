@@ -1214,7 +1214,21 @@ public:
   /// Returns the solver name and version
   virtual std::string getSolverNameAndVersion() const = 0;
 
-  /// Dump formula
+  /// Dump the asserted formula, to stderr or into Out.
+  ///
+  /// Most backends emit an SMT-LIB script: declarations for every symbol the
+  /// assertions mention, each assertion wrapped in (assert ...), and a
+  /// trailing (check-sat). No (set-logic ...) is emitted, because Camada does
+  /// not track the fragment a formula ended up in and will not invent one; a
+  /// consumer replaying the script against a solver that demands the command
+  /// has to prepend the logic it wants.
+  ///
+  /// Two backends print their own language instead, because their API offers
+  /// no SMT-LIB writer: Yices prints Yices syntax ((bitvector 8), 0b0111,
+  /// bv-add, arrays as functions) and STP prints the CVC language. Those
+  /// dumps are for reading and for replaying against that same solver, not
+  /// for feeding to another one. Use the SMT-LIB backend for a portable
+  /// script.
   virtual void dump() = 0;
   virtual void dump(std::string &Out) = 0;
 
