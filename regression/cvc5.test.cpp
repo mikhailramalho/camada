@@ -199,6 +199,7 @@ CAMADA_CVC5_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
 TEST_CASE("CVC5 feature capabilities", "[CVC5]") {
   auto solver = camada::createCVC5Solver();
   using camada::SolverFeature;
+  REQUIRE(solver->getSolverKind() == camada::SolverKind::CVC5);
   REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
   REQUIRE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));

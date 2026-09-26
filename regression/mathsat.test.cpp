@@ -268,6 +268,7 @@ CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
 TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
   auto solver = camada::createMathSATSolver();
   using camada::SolverFeature;
+  REQUIRE(solver->getSolverKind() == camada::SolverKind::MathSAT);
   REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
   REQUIRE_FALSE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));

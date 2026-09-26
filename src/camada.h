@@ -1214,6 +1214,10 @@ public:
   /// Returns the solver name and version
   virtual std::string getSolverNameAndVersion() const = 0;
 
+  /// Which backend this is. Compare against this rather than parsing
+  /// getSolverNameAndVersion(), whose text is for humans.
+  virtual SolverKind getSolverKind() const = 0;
+
   /// Dump the asserted formula, to stderr or into Out.
   ///
   /// Most backends emit an SMT-LIB script: declarations for every symbol the

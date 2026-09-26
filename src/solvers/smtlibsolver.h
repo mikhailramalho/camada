@@ -535,6 +535,7 @@ public:
   std::string PreambleError;
 
   std::string getSolverNameAndVersion() const override;
+  SolverKind getSolverKind() const override { return SolverKind::SMTLIB; }
 
 public:
   /// Test-only: parse a `(get-value ...)` Int-typed model value into a

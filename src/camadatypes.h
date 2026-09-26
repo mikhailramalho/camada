@@ -197,6 +197,20 @@ enum class UnknownReason : std::uint8_t {
   NotApplicable,
 };
 
+/// Which backend a solver is. For consumers that choose between equivalent
+/// encodings by measured backend performance, which no capability bit can
+/// express; prefer supports(SolverFeature) for anything a backend can or
+/// cannot do. The SMT-LIB pipeline reports SMTLIB whatever child it drives.
+enum class SolverKind : std::uint8_t {
+  Bitwuzla,
+  CVC5,
+  MathSAT,
+  SMTLIB,
+  STP,
+  Yices,
+  Z3,
+};
+
 /// Capabilities a backend may or may not implement, queryable through
 /// SMTSolver::supports() instead of discovering them through aborts or
 /// UnsupportedOperation errors.

@@ -274,6 +274,7 @@ CAMADA_Z3_SMTLIB_SHARED_TEST("ack_array_tests [Ackermann]",
 TEST_CASE("Z3 feature capabilities", "[Z3]") {
   auto solver = camada::createZ3Solver();
   using camada::SolverFeature;
+  REQUIRE(solver->getSolverKind() == camada::SolverKind::Z3);
   REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
   REQUIRE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));

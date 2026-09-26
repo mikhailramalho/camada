@@ -190,6 +190,7 @@ CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
 TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   auto solver = camada::createBitwuzlaSolver();
   using camada::SolverFeature;
+  REQUIRE(solver->getSolverKind() == camada::SolverKind::Bitwuzla);
   REQUIRE_FALSE(solver->supports(SolverFeature::IntRealArithmetic));
   REQUIRE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
