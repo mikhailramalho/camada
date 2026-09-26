@@ -237,16 +237,20 @@ protected:
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
 
-  // Bitwuzla 0.9.x answers UNKNOWN (with an "Equality over constant
-  // arrays not fully supported yet" warning) for any formula that
-  // equates a constant array with another array — including the common
-  // `symbol = ((as const ...) v)` pattern — so the common layer lowers
-  // constant arrays lazily instead (nativeConstArraySupport() below) and
-  // this override is unreachable.
+  // Native constant arrays. Bitwuzla 0.9.1's array solver cannot reason
+  // about a CONST_ARRAY term: it answers UNKNOWN ("Equality over constant
+  // arrays not fully supported yet") whenever one reaches it. It only works
+  // because preprocessing usually substitutes the constant array away first,
+  // which covers `symbol = ((as const ...) v)` and selects over it. When it
+  // cannot -- two constant arrays with different defaults compared, or a
+  // constant array behind a case split -- check() returns UNKNOWN. The lazy
+  // lowering (ConstArrayLowering::Lazy) has no such gap but asserts one
+  // axiom per observed index, which is what made incremental ESBMC runs
+  // slow, so native is the default and Lazy stays available per call.
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 
-  bool nativeConstArraySupport() const override { return false; }
+  bool nativeConstArraySupport() const override { return true; }
   SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                               const SMTSortRef &To) override;
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;

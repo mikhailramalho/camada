@@ -431,12 +431,14 @@ inline void tuple_array_const(
 // initializers of the outer one. Registered per backend: lazily lowered
 // constant arrays cannot nest (bitwuzla/yices/stp abort), so this runs
 // only where constant arrays are native.
-inline void tuple_array_const_nested(const camada::SMTSolverRef &solver) {
+inline void tuple_array_const_nested(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
   auto bv4 = solver->mkBVSort(4);
   auto init =
       solver->mkTuple({solver->mkBool(true), solver->mkBVFromDec(5, 8)});
-  auto innerConst = solver->mkArrayConst(bv4, init);
-  auto outerConst = solver->mkArrayConst(bv4, innerConst);
+  auto innerConst = solver->mkArrayConst(bv4, init, Lowering);
+  auto outerConst = solver->mkArrayConst(bv4, innerConst, Lowering);
 
   auto i = solver->mkSymbol("i", bv4);
   auto j = solver->mkSymbol("j", bv4);
