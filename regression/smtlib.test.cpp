@@ -433,12 +433,24 @@ std::vector<std::string> z3ModelArgv() {
   return {};
 }
 
-// Fork-and-expect-abort, local copy of the tests.h helper (this file does
-// not include the shared fixture headers).
-template <typename Fn> void requireAborts(Fn &&Body) {
+// Fork-and-expect-abort, local copy of the tests.h helpers (this file does
+// not include the shared fixture headers). With Expected, the child's stderr
+// must name it: a checked-STL assertion also aborts, so the signal alone
+// cannot tell camada's diagnostic from undefined behaviour.
+template <typename Fn>
+void requireAborts(Fn &&Body, const char *Expected = nullptr) {
+  std::string Path;
+  if (Expected)
+    Path = makeTempPath();
   ::pid_t Pid = ::fork();
   REQUIRE(Pid >= 0);
   if (Pid == 0) {
+    if (Expected) {
+      std::freopen(Path.c_str(), "w", stderr);
+      std::setvbuf(stderr, nullptr, _IONBF, 0); // abort() does not flush
+      // Catch2's SIGABRT handler would resume the runner in the child.
+      std::signal(SIGABRT, SIG_DFL);
+    }
     Body();
     std::_Exit(0);
   }
@@ -446,6 +458,13 @@ template <typename Fn> void requireAborts(Fn &&Body) {
   REQUIRE(::waitpid(Pid, &Status, 0) == Pid);
   REQUIRE(WIFSIGNALED(Status));
   REQUIRE(WTERMSIG(Status) == SIGABRT);
+  if (Expected) {
+    std::ifstream In(Path);
+    std::stringstream Out;
+    Out << In.rdbuf();
+    std::remove(Path.c_str());
+    REQUIRE(Out.str().find(Expected) != std::string::npos);
+  }
 }
 
 } // namespace
@@ -867,6 +886,18 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
     const std::string Error = solver.setupError();
     REQUIRE_FALSE(Error.empty());
     REQUIRE(Error.find("NOT_A_LOGIC") != std::string::npos);
+  }
+  // A solver half-built on an unopenable output path never ran
+  // initializeCommonSingletons, so the small-literal caches are empty. A
+  // common-layer fallback that reads them (bvredor reads the 1-bit one and
+  // zero) must abort on the null handle, not index past the end of an empty
+  // cache.
+  {
+    camada::SMTLIBSolver solver("/nonexistent-camada-dir/out.smt2");
+    REQUIRE_FALSE(solver.setupError().empty());
+    auto x = solver.mkSymbol("x", solver.mkBVSort(8));
+    requireAborts([&]() { (void)solver.mkBVRedOr(x); },
+                  "Dereferencing null expression handle");
   }
   // ... and through the factory it is an SMTError rather than an abort.
   {

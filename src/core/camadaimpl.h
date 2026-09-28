@@ -539,6 +539,7 @@ protected:
   }
 
 public:
+  SMTExprRef cachedSmallBVExpr(int64_t Value, unsigned Width) const;
   SMTExprRef getBVZero1Expr() const;
   SMTExprRef getBVOne1Expr() const;
   SMTExprRef getBVZero2Expr() const;

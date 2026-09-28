@@ -438,24 +438,33 @@ static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
 
 } // namespace
 
+// The caches are empty until initializeCommonSingletons runs, which a
+// half-built SMTLIBSolver never does. Answer a null handle then, which aborts
+// with a diagnostic on use, rather than indexing past the end.
+SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
+                                            unsigned Width) const {
+  const auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Value)];
+  return Width < Cache.size() ? Cache[Width] : SMTExprRef{};
+}
+
 SMTExprRef SMTSolverImpl::getBVZero1Expr() const {
-  return CachedSmallBVExprs[cachedSmallBVExprIndex(0)][1];
+  return cachedSmallBVExpr(0, 1);
 }
 
 SMTExprRef SMTSolverImpl::getBVOne1Expr() const {
-  return CachedSmallBVExprs[cachedSmallBVExprIndex(1)][1];
+  return cachedSmallBVExpr(1, 1);
 }
 
 SMTExprRef SMTSolverImpl::getBVZero2Expr() const {
-  return CachedSmallBVExprs[cachedSmallBVExprIndex(0)][2];
+  return cachedSmallBVExpr(0, 2);
 }
 
 SMTExprRef SMTSolverImpl::getBVZero3Expr() const {
-  return CachedSmallBVExprs[cachedSmallBVExprIndex(0)][3];
+  return cachedSmallBVExpr(0, 3);
 }
 
 SMTExprRef SMTSolverImpl::getBVZero4Expr() const {
-  return CachedSmallBVExprs[cachedSmallBVExprIndex(0)][4];
+  return cachedSmallBVExpr(0, 4);
 }
 
 SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
