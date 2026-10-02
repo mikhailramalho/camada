@@ -409,6 +409,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
 
   RESETANDTEST(check_sat_assuming_semantics);
   RESETANDTEST(narrow_bv_decimal_model_value);
+  RESETANDTEST(wide_negative_bv_decimal);
   RESETANDTEST(shared_subterm_model_value);
   RESETANDTEST(wide_bv_decimal_model_value);
   RESETANDTEST(incremental_push_pop);
@@ -417,6 +418,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array);
   RESETANDTEST(array_const_store_semantics);
   RESETANDTEST(bool_array_const_store_semantics);
+  RESETANDTEST(const_array_nonliteral_initializer);
   RESETANDTEST(array_const_survives_push_pop);
   RESETANDTEST(wide_index_const_array_semantics);
   RESETANDTEST(const_array_select_survives_pop);
@@ -496,6 +498,8 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_sqrt_host_oracle, BVFP);
   RESETANDARGTEST(fp_fma_host_oracle, NativeFP);
   RESETANDARGTEST(fp_fma_host_oracle, BVFP);
+  RESETANDARGTEST(fp_fma_rounding_modes, NativeFP);
+  RESETANDARGTEST(fp_fma_rounding_modes, BVFP);
   RESETANDARGTEST(fp_muldiv_subnormal_host_oracle, NativeFP);
   RESETANDARGTEST(fp_muldiv_subnormal_host_oracle, BVFP);
   RESETANDARGTEST(fp_tointegral_large_values, NativeFP);

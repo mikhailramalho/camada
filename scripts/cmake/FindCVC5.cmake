@@ -53,7 +53,9 @@ macro(_camada_declare_bare_link_target _name)
           "CVC5 names ${_name} in its link interface but no archive was found;"
           " the link will fall back to -l${_name}.")
     else()
-      add_library(${_name} UNKNOWN IMPORTED GLOBAL)
+      # Not GLOBAL: a consumer that add_subdirectory()s Camada and links its own
+      # gmp must not have that name bound to this archive.
+      add_library(${_name} UNKNOWN IMPORTED)
       set_target_properties(${_name} PROPERTIES IMPORTED_LOCATION
                                                 "${_camada_bare_path}")
       if("${_name}" STREQUAL "cadical")
@@ -108,7 +110,8 @@ if(CVC5_FOUND)
   # A plain prefix test, not MATCHES: the install path is a path, and as a regex
   # its dots and slashes would not mean what they look like.
   set(_camada_cvc5_is_downloaded FALSE)
-  string(FIND "${cvc5_DIR}" "${CAMADA_DEPS_INSTALL_DIR}" _camada_cvc5_dir_pos)
+  # The trailing slash keeps ".../install-mine" from matching ".../install".
+  string(FIND "${cvc5_DIR}" "${CAMADA_DEPS_INSTALL_DIR}/" _camada_cvc5_dir_pos)
   if(_camada_cvc5_dir_pos EQUAL 0)
     set(_camada_cvc5_is_downloaded TRUE)
   endif()

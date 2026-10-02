@@ -829,6 +829,49 @@ inline void fp_fma_host_oracle(const camada::SMTSolverRef &solver,
   }
 }
 
+// FMA under each directed rounding mode, with a literal mode. The exact
+// result sits half way between two floats, so every mode picks a side and a
+// backend that ignored the mode (MathSAT's FMA once ran its symbolic
+// rounding-mode chain over the literal and rounded every case down) fails
+// at least one of them. Round to away is left out: MathSAT has no such mode.
+inline void fp_fma_rounding_modes(const camada::SMTSolverRef &solver,
+                                  camada::FPEncoding Encoding) {
+  const float Tiny = std::ldexp(1.0f, -24);
+  const float Up = std::nextafter(1.0f, 2.0f);
+  struct Case {
+    float X, Y, Z;
+    camada::RM Mode;
+    float Want;
+  };
+  const Case Cases[] = {
+      {Tiny, 1.0f, 1.0f, camada::RM::ROUND_TO_EVEN, 1.0f},
+      {Tiny, 1.0f, 1.0f, camada::RM::ROUND_TO_PLUS_INF, Up},
+      {Tiny, 1.0f, 1.0f, camada::RM::ROUND_TO_MINUS_INF, 1.0f},
+      {Tiny, 1.0f, 1.0f, camada::RM::ROUND_TO_ZERO, 1.0f},
+      {-Tiny, 1.0f, -1.0f, camada::RM::ROUND_TO_EVEN, -1.0f},
+      {-Tiny, 1.0f, -1.0f, camada::RM::ROUND_TO_PLUS_INF, -1.0f},
+      {-Tiny, 1.0f, -1.0f, camada::RM::ROUND_TO_MINUS_INF, -Up},
+      {-Tiny, 1.0f, -1.0f, camada::RM::ROUND_TO_ZERO, -1.0f},
+  };
+
+  // Read the result from the model: refuting the negated equality missed it.
+  for (const Case &C : Cases) {
+    solver->reset();
+    auto res = solver->mkSymbol("res", solver->mkFP32Sort(Encoding));
+    solver->addConstraint(
+        solver->mkEqual(res, solver->mkFPFMA(solver->mkFP32(C.X, Encoding),
+                                             solver->mkFP32(C.Y, Encoding),
+                                             solver->mkFP32(C.Z, Encoding),
+                                             solver->mkRM(C.Mode, Encoding))));
+    INFO("fma(" << C.X << ", " << C.Y << ", " << C.Z << ") mode "
+                << static_cast<int>(C.Mode));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto Got = solver->getFP32(res);
+    REQUIRE(Got);
+    REQUIRE(Got.value() == C.Want);
+  }
+}
+
 inline void fp_addsub_host_oracle(const camada::SMTSolverRef &solver,
                                   camada::FPEncoding Encoding) {
   // Addition and subtraction against the host FPU. The conformance

@@ -1095,8 +1095,14 @@ SMTExprRef CVC5Solver::mkRealImpl(int64_t num, int64_t den) {
 
 SMTExprRef CVC5Solver::mkBVFromDecImpl(const int64_t Int,
                                        const SMTSortRef &Sort) {
-  return makeExprRef<CVC5Expr>(SMTExprKind::BVConst, &Context, Sort,
-                               Terms.mkBitVector(Sort->getWidth(), Int));
+  // mkBitVector takes an unsigned value, so a negative one above 64 bits
+  // would be zero-extended. Go through the sign-extended bit string instead.
+  const unsigned Width = Sort->getWidth();
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVConst, &Context, Sort,
+      Int < 0 && Width > 64
+          ? Terms.mkBitVector(Width, toTwosComplementBin(Int, Width), 2)
+          : Terms.mkBitVector(Width, Int));
 }
 
 SMTExprRef CVC5Solver::mkBVFromBinImpl(const std::string &Int,
@@ -1188,11 +1194,18 @@ SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 
 SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
+  // CVC5's constant array takes only a value, so a symbol or a computed
+  // initializer is lowered the way a backend without native ones would.
+  const cvc5::Term &Init = toSolverExpr<CVC5Expr>(*InitValue).Expr;
+  if (!(Init.isBooleanValue() || Init.isBitVectorValue() ||
+        Init.isIntegerValue() || Init.isRealValue() ||
+        Init.isFloatingPointValue() || Init.isRoundingModeValue() ||
+        Init.isConstArray()))
+    return mkLazyConstArray(IndexSort, InitValue);
   const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
   return makeExprRef<CVC5Expr>(
       SMTExprKind::ArrayConst, &Context, sort,
-      Terms.mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort,
-                         toSolverExpr<CVC5Expr>(*InitValue).Expr));
+      Terms.mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort, Init));
 }
 
 SMTExprRef CVC5Solver::mkForallImpl(const std::vector<SMTExprRef> &Vars,

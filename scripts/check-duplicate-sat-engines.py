@@ -37,33 +37,38 @@ SAT_ENGINES = {
 }
 
 
-def _nm(archive, globals_only):
-    args = ["nm", "--defined-only"] + (["-g"] if globals_only else [])
+def _nm(archive):
     try:
-        return subprocess.run(args + [str(archive)],
-                              capture_output=True, text=True,
-                              check=False).stdout
+        result = subprocess.run(["nm", "--defined-only", str(archive)],
+                                capture_output=True, text=True, check=False)
     except FileNotFoundError:
         sys.exit("error: nm not found; this check needs binutils")
+    # An archive nm cannot read has no symbols as far as the output goes, which
+    # would pass it as clean. Refuse instead of guessing.
+    if result.returncode != 0:
+        sys.exit(f"error: nm failed on {archive}: {result.stderr.strip()}")
+    return result.stdout
 
 
-def strong_symbols(archive, globals_only=True):
-    """Defined, non-weak symbols. Weak ones are inline/template definitions
-    that the linker is meant to merge, so they are not a conflict.
+def strong_symbols(archive):
+    """The defined, non-weak symbols of an archive, as (exported, everything).
 
-    globals_only=False also returns file-local symbols, which is how a
-    deliberately localized copy of an engine is detected: objcopy demotes
-    T to t, and the whole point of doing that is that the linker can no
-    longer confuse it with anyone else's copy."""
-    symbols = set()
-    for line in _nm(archive, globals_only).splitlines():
+    Weak ones are inline/template definitions that the linker is meant to
+    merge, so they are not a conflict. nm marks a file-local definition with
+    the lowercase form of its type letter, so one pass yields both sets.
+    `everything` is how a deliberately localized copy of an engine is
+    detected: objcopy demotes T to t, and the whole point of doing that is
+    that the linker can no longer confuse it with anyone else's copy."""
+    exported, everything = set(), set()
+    for line in _nm(archive).splitlines():
         fields = line.split()
-        # "<addr> <type> <name>"; weak/vague linkage is V, W, u, v. Local
-        # definitions are the lowercase forms of the same letters.
+        # "<addr> <type> <name>"; weak/vague linkage is V, W, u, v.
         if len(fields) >= 3 and fields[-2] in ("T", "D", "B", "R",
                                                "t", "d", "b", "r"):
-            symbols.add(fields[-1])
-    return symbols
+            everything.add(fields[-1])
+            if fields[-2].isupper():
+                exported.add(fields[-1])
+    return exported, everything
 
 
 def engines_in(archive):
@@ -74,8 +79,7 @@ def engines_in(archive):
     anyone else's, which is the whole reason a build localizes one. Camada
     does exactly this for CryptoMiniSat's CaDiCaL fork, which would otherwise
     collide with the one Bitwuzla and CVC5 share."""
-    exported = strong_symbols(archive)
-    everything = strong_symbols(archive, globals_only=False)
+    exported, everything = strong_symbols(archive)
     found = {}
     for engine, pattern in SAT_ENGINES.items():
         total = sum(1 for s in everything if pattern.match(s))
@@ -108,10 +112,15 @@ def collect(paths):
     for path in paths:
         p = pathlib.Path(path)
         if p.is_dir():
-            root = str(p.resolve())
+            root = p.resolve()
             for found in sorted(p.rglob("*.a")):
-                rest = str(found.resolve())[len(root):]
-                if any(marker in rest for marker in _BUILD_SCRATCH):
+                target = found.resolve()
+                # A symlink can point outside root (CryptoMiniSat's sibling
+                # layout does), where "relative to root" means nothing: judge
+                # such a target by its own path.
+                rest = (target.relative_to(root) if target.is_relative_to(root)
+                        else target).as_posix()
+                if any(marker in f"/{rest}" for marker in _BUILD_SCRATCH):
                     continue
                 archives.append(found)
         elif p.is_file():
