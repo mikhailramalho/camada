@@ -111,12 +111,14 @@ if __name__ == '__main__':
         pass
     else:
         cmake_args.insert(2, "-GNinja")
+        # CMAKE_<LANG>_FLAGS, not CMAKE_<LANG>_FLAGS_RELEASE: setting the
+        # latter replaces CMake's default "-O3 -DNDEBUG" instead of adding to it.
         path_remap_flag = f"-ffile-prefix-map={curr_dir}=."
         debug_remap_flag = f"-fdebug-prefix-map={curr_dir}=."
         cmake_args.append(
-            f"-DCMAKE_C_FLAGS_RELEASE={path_remap_flag} {debug_remap_flag}")
+            f"-DCMAKE_C_FLAGS={path_remap_flag} {debug_remap_flag}")
         cmake_args.append(
-            f"-DCMAKE_CXX_FLAGS_RELEASE={path_remap_flag} {debug_remap_flag}")
+            f"-DCMAKE_CXX_FLAGS={path_remap_flag} {debug_remap_flag}")
 
     run_command(cmake_args)
 
