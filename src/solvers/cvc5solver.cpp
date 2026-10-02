@@ -1195,10 +1195,16 @@ SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
   const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
-  return makeExprRef<CVC5Expr>(
-      SMTExprKind::ArrayConst, &Context, sort,
-      Terms.mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort,
-                         toSolverExpr<CVC5Expr>(*InitValue).Expr));
+  try {
+    return makeExprRef<CVC5Expr>(
+        SMTExprKind::ArrayConst, &Context, sort,
+        Terms.mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort,
+                           toSolverExpr<CVC5Expr>(*InitValue).Expr));
+  } catch (const cvc5::CVC5ApiException &) {
+    // CVC5's constant array takes only a value, so a symbol or a computed
+    // initializer is lowered the way a backend without native ones would.
+    return mkLazyConstArray(IndexSort, InitValue);
+  }
 }
 
 SMTExprRef CVC5Solver::mkForallImpl(const std::vector<SMTExprRef> &Vars,

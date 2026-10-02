@@ -418,6 +418,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array);
   RESETANDTEST(array_const_store_semantics);
   RESETANDTEST(bool_array_const_store_semantics);
+  RESETANDTEST(const_array_nonliteral_initializer);
   RESETANDTEST(array_const_survives_push_pop);
   RESETANDTEST(wide_index_const_array_semantics);
   RESETANDTEST(const_array_select_survives_pop);

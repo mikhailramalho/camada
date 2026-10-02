@@ -73,6 +73,28 @@ inline void array_const_store_semantics(
   REQUIRE(read_other_res.value() == "10101010");
 }
 
+// The initializer need not be a literal. CVC5's native constant array only
+// takes a value and used to throw on a symbol or a computed term, so Auto has
+// to pick a lowering that every initializer works with.
+inline void
+const_array_nonliteral_initializer(const camada::SMTSolverRef &solver) {
+  auto indexsort = solver->mkBVSort(3);
+  auto elemsort = solver->mkBVSort(8);
+  auto idx = solver->mkSymbol("idx", indexsort);
+
+  auto sym = solver->mkSymbol("init_sym", elemsort);
+  auto computed = solver->mkBVAdd(sym, solver->mkBVFromDec(3, elemsort));
+
+  for (const auto &init : {sym, computed}) {
+    auto arr = solver->mkArrayConst(indexsort, init);
+    solver->push();
+    solver->addConstraint(
+        solver->mkNot(solver->mkEqual(solver->mkArraySelect(arr, idx), init)));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+    solver->pop();
+  }
+}
+
 inline void bool_array_const_store_semantics(
     const camada::SMTSolverRef &solver,
     camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
