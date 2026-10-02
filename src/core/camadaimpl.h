@@ -194,6 +194,11 @@ protected:
   std::array<SMTSortRef, 2> CachedRMSorts;
   std::unordered_map<SymbolExprCacheKey, SMTExprRef, SymbolExprCacheKeyHash>
       SymbolExprCache;
+  // The first sort each user symbol name was made with. A later sort under the
+  // same name gets an alias (see mkSymbol), since backends keep one sort per
+  // name.
+  std::unordered_map<std::string, const SMTSort *> SymbolNameSort;
+  unsigned SymbolAliasCounter = 0;
   std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
                      FPSpecialExprCacheKeyHash>
       FPSpecialExprCache;

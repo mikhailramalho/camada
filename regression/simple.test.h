@@ -424,6 +424,60 @@ inline void narrow_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
   REQUIRE(bin3.value() == "111");
 }
 
+// One name used with two sorts is two symbols. Backends keep a single sort
+// per name: STP merges same-named symbols, MathSAT and SMT-LIB redeclare and
+// abort, so the common layer has to keep the two apart.
+inline void symbol_name_reuse_across_sorts(const camada::SMTSolverRef &solver) {
+  auto x8 = solver->mkSymbol("x", solver->mkBVSort(8));
+  auto x16 = solver->mkSymbol("x", solver->mkBVSort(16));
+  auto xb = solver->mkSymbol("x", solver->mkBoolSort());
+  REQUIRE(x8.get() != x16.get());
+  solver->addConstraint(solver->mkEqual(x8, solver->mkBVFromDec(1, 8)));
+  solver->addConstraint(solver->mkEqual(x16, solver->mkBVFromDec(300, 16)));
+  solver->addConstraint(xb);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Got8 = solver->getBV(x8);
+  auto Got16 = solver->getBV(x16);
+  auto GotB = solver->getBool(xb);
+  REQUIRE(Got8);
+  REQUIRE(Got16);
+  REQUIRE(GotB);
+  REQUIRE(Got8.value() == 1);
+  REQUIRE(Got16.value() == 300);
+  REQUIRE(GotB.value());
+  // Floating-point sorts are sorts like any other: two formats, and the same
+  // format in both encodings, under one name are separate symbols, and so is a
+  // bit-vector of the same width.
+  auto f16 =
+      solver->mkSymbol("x", solver->mkFPSort(5, 10, camada::FPEncoding::BV));
+  auto f32 = solver->mkSymbol("x", solver->mkFP32Sort(camada::FPEncoding::BV));
+  auto b32 = solver->mkSymbol("x", solver->mkBVSort(32));
+  solver->addConstraint(
+      solver->mkFPEqual(f32, solver->mkFP32(1.5f, camada::FPEncoding::BV)));
+  solver->addConstraint(solver->mkEqual(b32, solver->mkBVFromDec(7, 32)));
+  solver->addConstraint(solver->mkNot(solver->mkFPIsNaN(f16)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto GotF32 = solver->getFP32(f32);
+  auto GotB32 = solver->getBV(b32);
+  REQUIRE(GotF32);
+  REQUIRE(GotB32);
+  REQUIRE(GotF32.value() == 1.5f);
+  REQUIRE(GotB32.value() == 7);
+  if (solver->supports(camada::SolverFeature::NativeFloatingPoint)) {
+    auto n32 =
+        solver->mkSymbol("x", solver->mkFP32Sort(camada::FPEncoding::Native));
+    solver->addConstraint(solver->mkFPEqual(
+        n32, solver->mkFP32(2.5f, camada::FPEncoding::Native)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto GotN32 = solver->getFP32(n32);
+    REQUIRE(GotN32);
+    REQUIRE(GotN32.value() == 2.5f);
+    REQUIRE(solver->getFP32(f32).value() == 1.5f);
+  }
+  // The same name and sort is still the same symbol.
+  REQUIRE(solver->mkSymbol("x", solver->mkBVSort(16)).get() == x16.get());
+}
+
 // A negative decimal literal wider than 64 bits is sign-extended: the value
 // is a 64-bit integer, so the bits above 64 are copies of its sign. CVC5's
 // bit-vector constructor takes an unsigned value and once zero-extended them.
