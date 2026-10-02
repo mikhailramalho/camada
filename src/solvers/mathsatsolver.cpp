@@ -773,7 +773,7 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
     roundingMode = bvRM(RM::ROUND_TO_MINUS_INF);
   else if (msat_term_is_fp_roundingmode_zero(Context, RTerm))
     roundingMode = bvRM(RM::ROUND_TO_ZERO);
-  else
+  else {
     // The chain is exhaustive: MathSAT has no round-to-away term at all
     // (mkRMImpl fatalErrors on it, and there is no
     // msat_make_fp_roundingmode_away), so a native rounding-mode sort has
@@ -784,22 +784,24 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
                  "MathSAT gained a native round-to-away mode: the rounding "
                  "chain below needs an explicit RNA arm, since its default "
                  "would silently map RNA to truncation");
-  //
-  // KNOWN LIMITATION: a symbolic rounding mode still rounds incorrectly,
-  // whichever arm it takes. Verified: with `rm` constrained equal to
-  // ROUND_TO_PLUS_INF, mkFPFMA(2^-24, 1.0, 1.0, rm) yields the round-down
-  // result, while the same case with a literal RTP is correct. The fault
-  // is in MathSAT's model evaluator mis-evaluating the equalities this
-  // chain tests, so no term-level encoding fixes it; resolving it needs
-  // either a rejection at the API boundary or an encoding that avoids
-  // rounding-mode atoms entirely (see issue #177).
-  roundingMode = mkIte(
-      mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native)),
-      bvRM(RM::ROUND_TO_EVEN),
-      mkIte(mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native)),
+    //
+    // KNOWN LIMITATION: a symbolic rounding mode still rounds incorrectly,
+    // whichever arm it takes. Verified: with `rm` constrained equal to
+    // ROUND_TO_PLUS_INF, mkFPFMA(2^-24, 1.0, 1.0, rm) yields the round-down
+    // result, while the same case with a literal RTP is correct. The fault
+    // is in MathSAT's model evaluator mis-evaluating the equalities this
+    // chain tests, so no term-level encoding fixes it; resolving it needs
+    // either a rejection at the API boundary or an encoding that avoids
+    // rounding-mode atoms entirely (see issue #177).
+    roundingMode = mkIte(
+        mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native)),
+        bvRM(RM::ROUND_TO_EVEN),
+        mkIte(
+            mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native)),
             bvRM(RM::ROUND_TO_PLUS_INF),
             mkIte(mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF, FPEncoding::Native)),
                   bvRM(RM::ROUND_TO_MINUS_INF), bvRM(RM::ROUND_TO_ZERO))));
+  }
 
   // We can call the conversion API directly here because the arguments were
   // already checked
