@@ -319,3 +319,20 @@ TEST_CASE("Foreign handle rejection Z3 test", "[Z3]") {
   auto b = camada::createZ3Solver();
   foreign_handle_rejected(a, b);
 }
+
+// Z3 4.13 throws "invalid extract application" from check() on this query once
+// a scope is open. An exception is the backend failing to run the query, which
+// camada reports as UNKNOWN, not a throw that ends the host.
+TEST_CASE("Z3 internal exceptions surface as UNKNOWN", "[Z3]") {
+  auto solver = camada::createZ3Solver();
+  solver->push();
+  auto b = solver->mkSymbol("b", solver->mkBVSort(1));
+  auto f = solver->mkSBVToFP(
+      b, solver->mkFP32Sort(camada::FPEncoding::Native),
+      solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::Native));
+  solver->addConstraint(
+      solver->mkFPLt(f, solver->mkFP32(0.0f, camada::FPEncoding::Native)));
+  // A fixed Z3 may decide this; only an UNKNOWN has to carry its reason.
+  if (solver->check() == camada::CheckResult::UNKNOWN)
+    REQUIRE(solver->reasonUnknown() == camada::UnknownReason::BackendError);
+}
