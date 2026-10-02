@@ -445,6 +445,35 @@ inline void symbol_name_reuse_across_sorts(const camada::SMTSolverRef &solver) {
   REQUIRE(Got8.value() == 1);
   REQUIRE(Got16.value() == 300);
   REQUIRE(GotB.value());
+  // Floating-point sorts are sorts like any other: two formats, and the same
+  // format in both encodings, under one name are separate symbols, and so is a
+  // bit-vector of the same width.
+  auto f16 =
+      solver->mkSymbol("x", solver->mkFPSort(5, 10, camada::FPEncoding::BV));
+  auto f32 = solver->mkSymbol("x", solver->mkFP32Sort(camada::FPEncoding::BV));
+  auto b32 = solver->mkSymbol("x", solver->mkBVSort(32));
+  solver->addConstraint(
+      solver->mkFPEqual(f32, solver->mkFP32(1.5f, camada::FPEncoding::BV)));
+  solver->addConstraint(solver->mkEqual(b32, solver->mkBVFromDec(7, 32)));
+  solver->addConstraint(solver->mkNot(solver->mkFPIsNaN(f16)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto GotF32 = solver->getFP32(f32);
+  auto GotB32 = solver->getBV(b32);
+  REQUIRE(GotF32);
+  REQUIRE(GotB32);
+  REQUIRE(GotF32.value() == 1.5f);
+  REQUIRE(GotB32.value() == 7);
+  if (solver->supports(camada::SolverFeature::NativeFloatingPoint)) {
+    auto n32 =
+        solver->mkSymbol("x", solver->mkFP32Sort(camada::FPEncoding::Native));
+    solver->addConstraint(solver->mkFPEqual(
+        n32, solver->mkFP32(2.5f, camada::FPEncoding::Native)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto GotN32 = solver->getFP32(n32);
+    REQUIRE(GotN32);
+    REQUIRE(GotN32.value() == 2.5f);
+    REQUIRE(solver->getFP32(f32).value() == 1.5f);
+  }
   // The same name and sort is still the same symbol.
   REQUIRE(solver->mkSymbol("x", solver->mkBVSort(16)).get() == x16.get());
 }
