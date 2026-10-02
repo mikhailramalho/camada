@@ -854,8 +854,7 @@ inline void fp_fma_rounding_modes(const camada::SMTSolverRef &solver,
       {-Tiny, 1.0f, -1.0f, camada::RM::ROUND_TO_ZERO, -1.0f},
   };
 
-  // Read the result back from the model: the wrong arm showed up there, while
-  // refuting the negated equality stayed correct.
+  // Read the result from the model: refuting the negated equality missed it.
   for (const Case &C : Cases) {
     solver->reset();
     auto res = solver->mkSymbol("res", solver->mkFP32Sort(Encoding));

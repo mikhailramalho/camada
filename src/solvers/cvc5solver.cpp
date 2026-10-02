@@ -1194,17 +1194,18 @@ SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
 
 SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
-  const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
-  try {
-    return makeExprRef<CVC5Expr>(
-        SMTExprKind::ArrayConst, &Context, sort,
-        Terms.mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort,
-                           toSolverExpr<CVC5Expr>(*InitValue).Expr));
-  } catch (const cvc5::CVC5ApiException &) {
-    // CVC5's constant array takes only a value, so a symbol or a computed
-    // initializer is lowered the way a backend without native ones would.
+  // CVC5's constant array takes only a value, so a symbol or a computed
+  // initializer is lowered the way a backend without native ones would.
+  const cvc5::Term &Init = toSolverExpr<CVC5Expr>(*InitValue).Expr;
+  if (!(Init.isBooleanValue() || Init.isBitVectorValue() ||
+        Init.isIntegerValue() || Init.isRealValue() ||
+        Init.isFloatingPointValue() || Init.isRoundingModeValue() ||
+        Init.isConstArray()))
     return mkLazyConstArray(IndexSort, InitValue);
-  }
+  const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::ArrayConst, &Context, sort,
+      Terms.mkConstArray(toSolverSort<CVC5Sort>(*sort).Sort, Init));
 }
 
 SMTExprRef CVC5Solver::mkForallImpl(const std::vector<SMTExprRef> &Vars,
