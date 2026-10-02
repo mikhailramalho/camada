@@ -536,6 +536,7 @@ void SMTSolverImpl::clearExprCaches() {
   for (auto &Cache : CachedSmallBVExprs)
     Cache.clear();
   SymbolExprCache.clear();
+  SymbolNameSort.clear();
   FPSpecialExprCache.clear();
   FPConstExprCache.clear();
   LazyConstArrayRoots.clear();
@@ -2201,7 +2202,21 @@ SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
   fatalErrorIf(Name.compare(0, 9, "__CAMADA_") == 0,
                "Symbol names with the reserved __CAMADA_ prefix are not "
                "permitted; rename the symbol");
-  return mkSymbolUnchecked(Name, Sort);
+  SymbolExprCacheKey Key{Sort.get(), Name};
+  if (auto Cached = SymbolExprCache.find(Key); Cached != SymbolExprCache.end())
+    return Cached->second;
+  // Backends keep one sort per name: STP merges same-named symbols, MathSAT
+  // and SMT-LIB abort on a redeclaration. A name already made with another
+  // sort therefore gets a backend name of its own, in the reserved space so it
+  // cannot meet a user symbol. The first sort keeps the plain name.
+  auto [Owner, First] = SymbolNameSort.try_emplace(Name, Sort.get());
+  if (First || Owner->second == Sort.get())
+    return mkSymbolUnchecked(Name, Sort);
+  SMTExprRef theExp = mkSymbolUnchecked(
+      "__CAMADA_alias" + std::to_string(SymbolAliasCounter++) + "_" + Name,
+      Sort);
+  SymbolExprCache.emplace(std::move(Key), theExp);
+  return theExp;
 }
 
 SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,

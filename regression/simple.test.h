@@ -424,6 +424,31 @@ inline void narrow_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
   REQUIRE(bin3.value() == "111");
 }
 
+// One name used with two sorts is two symbols. Backends keep a single sort
+// per name: STP merges same-named symbols, MathSAT and SMT-LIB redeclare and
+// abort, so the common layer has to keep the two apart.
+inline void symbol_name_reuse_across_sorts(const camada::SMTSolverRef &solver) {
+  auto x8 = solver->mkSymbol("x", solver->mkBVSort(8));
+  auto x16 = solver->mkSymbol("x", solver->mkBVSort(16));
+  auto xb = solver->mkSymbol("x", solver->mkBoolSort());
+  REQUIRE(x8.get() != x16.get());
+  solver->addConstraint(solver->mkEqual(x8, solver->mkBVFromDec(1, 8)));
+  solver->addConstraint(solver->mkEqual(x16, solver->mkBVFromDec(300, 16)));
+  solver->addConstraint(xb);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Got8 = solver->getBV(x8);
+  auto Got16 = solver->getBV(x16);
+  auto GotB = solver->getBool(xb);
+  REQUIRE(Got8);
+  REQUIRE(Got16);
+  REQUIRE(GotB);
+  REQUIRE(Got8.value() == 1);
+  REQUIRE(Got16.value() == 300);
+  REQUIRE(GotB.value());
+  // The same name and sort is still the same symbol.
+  REQUIRE(solver->mkSymbol("x", solver->mkBVSort(16)).get() == x16.get());
+}
+
 // A negative decimal literal wider than 64 bits is sign-extended: the value
 // is a 64-bit integer, so the bits above 64 are copies of its sign. CVC5's
 // bit-vector constructor takes an unsigned value and once zero-extended them.

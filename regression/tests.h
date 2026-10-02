@@ -410,6 +410,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(check_sat_assuming_semantics);
   RESETANDTEST(narrow_bv_decimal_model_value);
   RESETANDTEST(wide_negative_bv_decimal);
+  RESETANDTEST(symbol_name_reuse_across_sorts);
   RESETANDTEST(shared_subterm_model_value);
   RESETANDTEST(wide_bv_decimal_model_value);
   RESETANDTEST(incremental_push_pop);
@@ -446,6 +447,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(lazy_array_equality_reached_defaults, LazyArrays);
   RESETANDTEST(const_array_lowering_interop);
   RESETANDTEST(tuple_semantics);
+  RESETANDTEST(tuple_symbol_name_reuse_across_sorts);
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_update_semantics);
   RESETANDTEST(tuple_structural_equality);

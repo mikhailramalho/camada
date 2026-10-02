@@ -37,6 +37,29 @@ inline void tuple_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(bv_res.value() == 42);
 }
 
+// Two tuple sorts under one symbol name are two symbols. The lowering names
+// each field after the tuple, so without telling the sorts apart both tuples
+// shared a first field and these constraints contradicted each other.
+inline void
+tuple_symbol_name_reuse_across_sorts(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto t1 = solver->mkSymbol("t", solver->mkTupleSort({bv8, bv8}));
+  auto t2 =
+      solver->mkSymbol("t", solver->mkTupleSort({bv8, solver->mkBoolSort()}));
+  auto first1 = solver->mkTupleSelect(t1, 0);
+  auto first2 = solver->mkTupleSelect(t2, 0);
+  solver->addConstraint(solver->mkEqual(first1, solver->mkBVFromDec(1, 8)));
+  solver->addConstraint(solver->mkEqual(first2, solver->mkBVFromDec(2, 8)));
+  solver->addConstraint(solver->mkTupleSelect(t2, 1));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Got1 = solver->getBV(first1);
+  auto Got2 = solver->getBV(first2);
+  REQUIRE(Got1);
+  REQUIRE(Got2);
+  REQUIRE(Got1.value() == 1);
+  REQUIRE(Got2.value() == 2);
+}
+
 // Bool + BV + Int — only run against backends with Int support
 // (z3, cvc5). Kept separate so the Int-free fixture above can run on
 // every backend via the shared tests(solver) runner.
