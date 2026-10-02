@@ -998,10 +998,11 @@ inline void fxp_exp_exhaustive(const camada::SMTSolverRef &solver) {
   }
 }
 
-// Correctly-rounded fixed-point square root: nearest, ties to even.
-// The loop yields the floor and leaves N as the remainder S - R*R, and
-// the true root exceeds the midpoint exactly when that remainder is
-// greater than R, since (R + 1/2)^2 = R*R + R + 1/4.
+// Correctly-rounded fixed-point square root to nearest. The loop yields the
+// floor R of sqrt(S); the true root is above the midpoint R + 1/2 exactly when
+// 4*S > (2R + 1)^2. That is never an equality (odd against even), so a square
+// root has no ties and every nearest mode agrees. In particular S = R*R + R
+// is below the midpoint, since (R + 1/2)^2 = R*R + R + 1/4.
 inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
   const uint64_t S = Raw << F.FracBits;
   uint64_t N = S;
@@ -1016,8 +1017,7 @@ inline uint64_t refSqrt(const RefFormat &F, uint64_t Raw) {
       R >>= 1;
     Bit >>= 2;
   }
-  const uint64_t Rem = S - R * R;
-  if (Rem > R || (Rem == R && (R & 1)))
+  if (4 * S > (2 * R + 1) * (2 * R + 1))
     ++R;
   // The round-up can carry past the format maximum (sqrt of the largest
   // all-fraction value rounds up to exactly 1.0, which the format cannot
@@ -1055,13 +1055,12 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
   // enumerated. Correct rounding to nearest means the true root lies
   // within half an ulp of r, i.e. between the two midpoints:
   //
-  //     (2r - 1)^2 <= 4*x + 1   and   4*x <= (2r + 1)^2
+  //     (2r - 1)^2 < 4*x   and   4*x < (2r + 1)^2
   //
-  // at the format's scale. The `+ 1` on the lower bound matters: a tie
-  // rounded UP sits exactly one below (2r-1)^2, since 4*x is an integer
-  // and the midpoint squared is not. Ties satisfy both bounds either
-  // way, so this admits both directions; the exhaustive loop above is
-  // what pins ties-to-even.
+  // at the format's scale. Both are strict because each side is odd
+  // against even, so a root is never exactly half way between two values.
+  // A `<=` with a `+ 1` on the lower bound used to stand here; it admitted
+  // the value one above the right one whenever x = r*r - r.
   {
     solver->reset();
     unsigned W = 12, N = 6, Wide = 2 * (W + N) + 6;
@@ -1084,10 +1083,9 @@ inline void fxp_sqrt_semantics(const camada::SMTSolverRef &solver) {
     camada::SMTExprRef RIsZero =
         solver->mkEqual(Rx, solver->mkBVFromDec(0, Wide));
     camada::SMTExprRef LoOk =
-        solver->mkOr(RIsZero, solver->mkBVUle(solver->mkBVMul(Lo, Lo),
-                                              solver->mkBVAdd(FourX, One)));
+        solver->mkOr(RIsZero, solver->mkBVUlt(solver->mkBVMul(Lo, Lo), FourX));
     camada::SMTExprRef Holds =
-        solver->mkAnd(LoOk, solver->mkBVUle(FourX, solver->mkBVMul(Hi, Hi)));
+        solver->mkAnd(LoOk, solver->mkBVUlt(FourX, solver->mkBVMul(Hi, Hi)));
     camada::SMTExprRef NonNeg = solver->mkNot(solver->mkFXPLt(
         X, solver->mkFXPFromBin(refBits(RefFormat{W, N, true}, 0),
                                 solver->mkFXPSort(W, N, true))));

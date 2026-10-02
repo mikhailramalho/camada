@@ -1354,7 +1354,9 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
   // exactly, so every mode is an adjustment from the floor. The true root
   // lies above the midpoint between Root and Root+1 exactly when
   // Rem > Root, since (Root + 1/2)^2 = Root^2 + Root + 1/4 and Rem is an
-  // integer; it is an exact tie when Rem == Root.
+  // integer. Rem == Root is below the midpoint, not on it: the midpoint
+  // squared is never an integer, so a square root has no ties and every
+  // nearest mode rounds up on the same condition.
   //
   // A square root is never exactly representable unless Rem == 0, so the
   // directed modes only need to know whether the result is inexact.
@@ -1374,16 +1376,10 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
     break;
   case FXPRM::NearestTiesTowardPositive:
   case FXPRM::NearestTiesAwayFromZero:
-    // The root is non-negative, so both tie directions round up. The
-    // Rem != 0 guard matters at Root == 0: an exact zero would otherwise
-    // satisfy Rem >= Root and round up to one.
-    RoundUp = mkAnd(mkNot(RemZero), mkBVUge(Rem, Root));
+  case FXPRM::NearestTiesToEven:
+    // Rem > Root implies Rem != 0, so an exact root never rounds up.
+    RoundUp = mkBVUgt(Rem, Root);
     break;
-  case FXPRM::NearestTiesToEven: {
-    SMTExprRef RootOdd = mkEqual(mkBVExtract(0, 0, Root), mkBVFromDec(1, 1));
-    RoundUp = mkOr(mkBVUgt(Rem, Root), mkAnd(mkEqual(Rem, Root), RootOdd));
-    break;
-  }
   }
   Root = mkIte(RoundUp, mkBVAdd(Root, One), Root);
 
