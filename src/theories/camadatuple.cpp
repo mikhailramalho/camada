@@ -49,14 +49,8 @@ public:
 
   void dump(std::string &Out) const override {
     Out = "(CamadaTuple";
-    for (const auto &E : getTupleElementSorts()) {
-      Out += " ";
-      std::string ElemOut;
-      E->dump(ElemOut);
-      if (!ElemOut.empty() && ElemOut.back() == '\n')
-        ElemOut.pop_back();
-      Out += ElemOut;
-    }
+    for (const auto &E : getTupleElementSorts())
+      appendDumped(Out, *E);
     Out += ")\n";
   }
 
@@ -101,14 +95,8 @@ public:
       return;
     case SMTExprKind::TupleConst: {
       Out = "(CamadaTupleValue";
-      for (const auto &E : Elements) {
-        Out += " ";
-        std::string ElemOut;
-        E->dump(ElemOut);
-        if (!ElemOut.empty() && ElemOut.back() == '\n')
-          ElemOut.pop_back();
-        Out += ElemOut;
-      }
+      for (const auto &E : Elements)
+        appendDumped(Out, *E);
       Out += ")\n";
       return;
     }
@@ -189,14 +177,8 @@ public:
 
   void dump(std::string &Out) const override {
     Out = "(CamadaTupleArray";
-    for (const auto &L : LeafSorts) {
-      Out += " ";
-      std::string LeafOut;
-      L->dump(LeafOut);
-      if (!LeafOut.empty() && LeafOut.back() == '\n')
-        LeafOut.pop_back();
-      Out += LeafOut;
-    }
+    for (const auto &L : LeafSorts)
+      appendDumped(Out, *L);
     Out += ")\n";
   }
 
@@ -222,14 +204,8 @@ public:
 
   void dump(std::string &Out) const override {
     Out = "(CamadaTupleArray";
-    for (const auto &L : LeafArrays) {
-      Out += " ";
-      std::string LeafOut;
-      L->dump(LeafOut);
-      if (!LeafOut.empty() && LeafOut.back() == '\n')
-        LeafOut.pop_back();
-      Out += LeafOut;
-    }
+    for (const auto &L : LeafArrays)
+      appendDumped(Out, *L);
     Out += ")\n";
   }
 
@@ -595,10 +571,6 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   // assembly depends on: it re-reads each index once per leaf, so an
   // unmemoized version costs (leaves * entries)^2 backend queries -- three
   // seconds for an 800-entry four-field array.
-  auto indexBitsOf = [&Solver](const SMTExprRef &Idx) {
-    return Solver.lazyIndexModelBits(Idx);
-  };
-
   // The defined indexes are the union across leaves, canonicalized by
   // model value — aliased indexes across leaves merge to one tuple entry.
   // Keep the first index expression seen for each value; iteration order
@@ -608,7 +580,7 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   std::unordered_set<std::string> SeenIndexBits;
   for (const ArrayModel &M : LeafModels) {
     for (const auto &Entry : M.Entries) {
-      const std::string Bits = indexBitsOf(Entry.first);
+      const std::string Bits = Solver.lazyIndexModelBits(Entry.first);
       if (Bits.empty())
         return SMTError{SMTErrorCode::BackendError, Array->getBackendKind(),
                         "Could not canonicalize a tuple-array model index"};
@@ -628,7 +600,7 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
     std::unordered_map<std::string, SMTExprRef> ByBits;
     ByBits.reserve(M.Entries.size());
     for (const auto &Entry : M.Entries)
-      ByBits.emplace(indexBitsOf(Entry.first), Entry.second);
+      ByBits.emplace(Solver.lazyIndexModelBits(Entry.first), Entry.second);
     LeafByBits.push_back(std::move(ByBits));
   }
   auto leafValueAt = [&](std::size_t Leaf, const std::string &Bits,

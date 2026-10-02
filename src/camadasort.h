@@ -287,6 +287,10 @@ inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {
              RHSValid = static_cast<bool>(RHS);
   if (!LHSValid || !RHSValid)
     return LHSValid == RHSValid;
+  // Sorts are hash-consed per solver, so the same handle is the common case
+  // in every binary wrapper's sort check; skip the structural walk for it.
+  if (LHS.get() == RHS.get())
+    return true;
   return (*LHS == *RHS);
 }
 

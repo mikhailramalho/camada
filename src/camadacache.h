@@ -117,14 +117,18 @@ struct SmallTupleSortCacheKey {
   }
 };
 
+// Boost-style hash combine over a sort pointer.
+inline void combineSortHash(std::size_t &Hash, const SMTSort *Sort) {
+  auto Ptr = reinterpret_cast<std::uintptr_t>(Sort);
+  Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL + (Hash << 6) +
+                                   (Hash >> 2));
+}
+
 struct TupleSortCacheKeyHash {
   std::size_t operator()(const TupleSortCacheKey &Key) const {
     std::size_t Hash = 1469598103934665603ULL;
-    for (const SMTSort *Sort : Key.ElementSorts) {
-      auto Ptr = reinterpret_cast<std::uintptr_t>(Sort);
-      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
-                                       (Hash << 6) + (Hash >> 2));
-    }
+    for (const SMTSort *Sort : Key.ElementSorts)
+      combineSortHash(Hash, Sort);
     return Hash;
   }
 };
@@ -133,11 +137,8 @@ struct FunctionSortCacheKeyHash {
   std::size_t operator()(const FunctionSortCacheKey &Key) const {
     std::size_t Hash = reinterpret_cast<std::uintptr_t>(Key.CodomainSort) *
                        1469598103934665603ULL;
-    for (const SMTSort *Sort : Key.DomainSorts) {
-      auto Ptr = reinterpret_cast<std::uintptr_t>(Sort);
-      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
-                                       (Hash << 6) + (Hash >> 2));
-    }
+    for (const SMTSort *Sort : Key.DomainSorts)
+      combineSortHash(Hash, Sort);
     return Hash;
   }
 };
@@ -145,11 +146,8 @@ struct FunctionSortCacheKeyHash {
 struct SmallTupleSortCacheKeyHash {
   std::size_t operator()(const SmallTupleSortCacheKey &Key) const {
     std::size_t Hash = 1469598103934665603ULL ^ Key.Size;
-    for (uint8_t I = 0; I < Key.Size; ++I) {
-      auto Ptr = reinterpret_cast<std::uintptr_t>(Key.ElementSorts[I]);
-      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
-                                       (Hash << 6) + (Hash >> 2));
-    }
+    for (uint8_t I = 0; I < Key.Size; ++I)
+      combineSortHash(Hash, Key.ElementSorts[I]);
     return Hash;
   }
 };
@@ -175,11 +173,8 @@ struct SmallFunctionSortCacheKeyHash {
     std::size_t Hash = reinterpret_cast<std::uintptr_t>(Key.CodomainSort) *
                        1469598103934665603ULL;
     Hash ^= Key.Size;
-    for (uint8_t I = 0; I < Key.Size; ++I) {
-      auto Ptr = reinterpret_cast<std::uintptr_t>(Key.DomainSorts[I]);
-      Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL +
-                                       (Hash << 6) + (Hash >> 2));
-    }
+    for (uint8_t I = 0; I < Key.Size; ++I)
+      combineSortHash(Hash, Key.DomainSorts[I]);
     return Hash;
   }
 };

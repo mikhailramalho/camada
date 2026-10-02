@@ -266,8 +266,6 @@ protected:
   virtual bool equal_to(SMTExpr const &other) const = 0;
 
 private:
-  void setKind(SMTExprKind TheKind) { Kind = TheKind; }
-
   SMTExprKind Kind = SMTExprKind::Unknown;
 
   friend class SMTSolverImpl;
