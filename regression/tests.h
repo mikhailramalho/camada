@@ -501,6 +501,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_fma_host_oracle, BVFP);
   RESETANDARGTEST(fp_fma_rounding_modes, NativeFP);
   RESETANDARGTEST(fp_fma_rounding_modes, BVFP);
+  RESETANDTEST(native_encoding_sort_identity);
   RESETANDARGTEST(fp_muldiv_subnormal_host_oracle, NativeFP);
   RESETANDARGTEST(fp_muldiv_subnormal_host_oracle, BVFP);
   RESETANDARGTEST(fp_tointegral_large_values, NativeFP);

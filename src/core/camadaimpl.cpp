@@ -610,7 +610,16 @@ SMTSortRef SMTSolverImpl::mkBVSort(const unsigned BitWidth) {
   return theSort;
 }
 
+// A backend without native floating-point has only the BV encoding, so asking
+// it for Native is a spelling of BV. Left alone, the two would be cached as
+// separate sorts and every map keyed on a sort pointer would split.
+FPEncoding SMTSolverImpl::effectiveFPEncoding(FPEncoding Encoding) const {
+  return supports(SolverFeature::NativeFloatingPoint) ? Encoding
+                                                      : FPEncoding::BV;
+}
+
 SMTSortRef SMTSolverImpl::mkRMSort(FPEncoding Encoding) {
+  Encoding = effectiveFPEncoding(Encoding);
   SMTSortRef &CachedSort = CachedRMSorts[fpEncodingIndex(Encoding)];
   if (CachedSort)
     return CachedSort;
@@ -626,6 +635,7 @@ SMTSortRef SMTSolverImpl::mkRMSort(FPEncoding Encoding) {
 SMTSortRef SMTSolverImpl::mkFPSort(const unsigned ExpWidth,
                                    const unsigned SigWidth,
                                    FPEncoding Encoding) {
+  Encoding = effectiveFPEncoding(Encoding);
   fatalErrorIf(ExpWidth == 0, "Floating-point exponent width must be non-zero");
   fatalErrorIf(SigWidth == 0,
                "Floating-point significand width must be non-zero");

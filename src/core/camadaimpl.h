@@ -553,6 +553,7 @@ public:
   SMTSortRef mkIntSort() override final;
   SMTSortRef mkRealSort() override final;
   SMTSortRef mkBVSort(const unsigned BitWidth) override final;
+  FPEncoding effectiveFPEncoding(FPEncoding Encoding) const;
   SMTSortRef mkRMSort(FPEncoding Encoding) override final;
   SMTSortRef mkFPSort(const unsigned ExpWidth, const unsigned SigWidth,
                       FPEncoding Encoding) override final;

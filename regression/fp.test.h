@@ -872,6 +872,31 @@ inline void fp_fma_rounding_modes(const camada::SMTSolverRef &solver,
   }
 }
 
+// FPEncoding::Native on a backend with no native FP is the BV encoding, so the
+// two spellings are one sort. They used to be two cached sorts, which split
+// every map keyed on a sort pointer: a symbol made with either was a different
+// symbol, and an array of one did not accept the other's literals.
+inline void native_encoding_sort_identity(const camada::SMTSolverRef &solver) {
+  constexpr auto Native = camada::FPEncoding::Native;
+  constexpr auto BV = camada::FPEncoding::BV;
+  // The sort a literal carries is the sort the factory returns.
+  REQUIRE(solver->mkFP32(1.0f, Native)->Sort.get() ==
+          solver->mkFP32Sort(Native).get());
+  REQUIRE(solver->mkRM(camada::RM::ROUND_TO_EVEN, Native)->Sort.get() ==
+          solver->mkRMSort(Native).get());
+  if (solver->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+
+  REQUIRE(solver->mkFP32Sort(Native).get() == solver->mkFP32Sort(BV).get());
+  REQUIRE(solver->mkRMSort(Native).get() == solver->mkRMSort(BV).get());
+  // One symbol, so two different values for it are a contradiction.
+  auto x = solver->mkSymbol("x", solver->mkFP32Sort(Native));
+  auto y = solver->mkSymbol("x", solver->mkFP32(1.0f, Native)->Sort);
+  solver->addConstraint(solver->mkFPEqual(x, solver->mkFP32(1.0f, Native)));
+  solver->addConstraint(solver->mkFPEqual(y, solver->mkFP32(2.0f, Native)));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+}
+
 inline void fp_addsub_host_oracle(const camada::SMTSolverRef &solver,
                                   camada::FPEncoding Encoding) {
   // Addition and subtraction against the host FPU. The conformance
