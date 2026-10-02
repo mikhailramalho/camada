@@ -424,6 +424,27 @@ inline void narrow_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
   REQUIRE(bin3.value() == "111");
 }
 
+// A negative decimal literal wider than 64 bits is sign-extended: the value
+// is a 64-bit integer, so the bits above 64 are copies of its sign. CVC5's
+// bit-vector constructor takes an unsigned value and once zero-extended them.
+inline void wide_negative_bv_decimal(const camada::SMTSolverRef &solver) {
+  for (unsigned Width : {65u, 100u, 128u}) {
+    solver->reset();
+    auto Sort = solver->mkBVSort(Width);
+    auto MinusOne = solver->mkBVFromDec(-1, Sort);
+    auto MinusTwo = solver->mkBVFromDec(-2, Sort);
+    INFO("width " << Width);
+    // The same value built from bits, so no model parsing is involved.
+    solver->addConstraint(solver->mkNot(solver->mkAnd(
+        solver->mkEqual(MinusOne,
+                        solver->mkBVFromBin(std::string(Width, '1'), Sort)),
+        solver->mkEqual(
+            MinusTwo,
+            solver->mkBVFromBin(std::string(Width - 1, '1') + "0", Sort)))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
+}
+
 // Pin model parsing for bit-vector widths above 64. Solvers that emit BV
 // model values in the `(_ bv<n> <w>)` decimal form (mathsat is the canonical
 // example over the SMT-LIB pipe) need an arbitrary-precision decimal-to-

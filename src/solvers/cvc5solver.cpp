@@ -1095,8 +1095,14 @@ SMTExprRef CVC5Solver::mkRealImpl(int64_t num, int64_t den) {
 
 SMTExprRef CVC5Solver::mkBVFromDecImpl(const int64_t Int,
                                        const SMTSortRef &Sort) {
-  return makeExprRef<CVC5Expr>(SMTExprKind::BVConst, &Context, Sort,
-                               Terms.mkBitVector(Sort->getWidth(), Int));
+  // mkBitVector takes an unsigned value, so a negative one above 64 bits
+  // would be zero-extended. Go through the sign-extended bit string instead.
+  const unsigned Width = Sort->getWidth();
+  return makeExprRef<CVC5Expr>(
+      SMTExprKind::BVConst, &Context, Sort,
+      Int < 0 && Width > 64
+          ? Terms.mkBitVector(Width, toTwosComplementBin(Int, Width), 2)
+          : Terms.mkBitVector(Width, Int));
 }
 
 SMTExprRef CVC5Solver::mkBVFromBinImpl(const std::string &Int,
