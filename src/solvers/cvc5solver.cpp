@@ -1148,8 +1148,9 @@ SMTExprRef CVC5Solver::mkRMImpl(const RM &R) {
     e = Terms.mkRoundingMode(cvc5::RoundingMode::ROUND_TOWARD_ZERO);
     break;
   }
-  return makeExprRef<CVC5Expr>(SMTExprKind::RMConst, &Context, mkRMSortImpl(),
-                               e);
+  // The cached sort, so a literal carries the sort mkRMSort returns.
+  return makeExprRef<CVC5Expr>(SMTExprKind::RMConst, &Context,
+                               mkRMSort(FPEncoding::Native), e);
 }
 
 SMTExprRef CVC5Solver::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,

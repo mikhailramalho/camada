@@ -404,6 +404,50 @@ array_model_across_assumption_checks(const camada::SMTSolverRef &solver) {
   REQUIRE(Second.value().Entries.size() == 2);
 }
 
+// getArrayElement hands back an element in the array's element sort. STP and
+// Yices rebuild it from model bits, and used to read a BV-encoded FP, a
+// fixed-point or a BV rounding-mode element as a plain bit-vector, which then
+// failed the sort check.
+inline void array_element_typed_sorts(const camada::SMTSolverRef &solver) {
+  constexpr auto BV = camada::FPEncoding::BV;
+  const auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, 8); };
+  // reset() kills every handle, so each case builds its sort and value after
+  // it, through the two callbacks.
+  const auto elementOf = [&](auto MakeSort, auto MakeValue) {
+    solver->reset();
+    const camada::SMTSortRef ElemSort = MakeSort();
+    auto arr = solver->mkSymbol(
+        "arr", solver->mkArraySort(solver->mkBVSort(8), ElemSort));
+    solver->addConstraint(
+        solver->mkEqual(solver->mkArraySelect(arr, idx(1)), MakeValue()));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto Element = arrayElement(solver, arr, idx(1));
+    REQUIRE(Element->Sort == ElemSort);
+    return Element;
+  };
+
+  auto FP = elementOf([&] { return solver->mkFP32Sort(BV); },
+                      [&] { return solver->mkFP32(1.5f, BV); });
+  auto Float = solver->getFP32(FP);
+  REQUIRE(Float);
+  REQUIRE(Float.value() == 1.5f);
+
+  auto Fixed = solver->getFXP(
+      elementOf([&] { return solver->mkFXPSort(16, 8, true); },
+                [&] {
+                  return solver->mkFXPFromRawBV(solver->mkBVFromDec(0x0180, 16),
+                                                solver->mkFXPSort(16, 8, true));
+                }));
+  REQUIRE(Fixed);
+  REQUIRE(Fixed.value().RawBits == "0000000110000000");
+
+  auto Rounding = solver->getRM(
+      elementOf([&] { return solver->mkRMSort(BV); },
+                [&] { return solver->mkRM(camada::RM::ROUND_TO_ZERO, BV); }));
+  REQUIRE(Rounding);
+  REQUIRE(Rounding.value() == camada::RM::ROUND_TO_ZERO);
+}
+
 inline void array_model_values(const camada::SMTSolverRef &solver) {
   auto indexsort = solver->mkBVSort(8);
   auto arr = solver->mkSymbol("arr", solver->mkArraySort(indexsort, indexsort));

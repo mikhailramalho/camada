@@ -41,7 +41,9 @@ namespace camada {
 ///
 /// - Native: use the backend's native floating-point sort (`Float32Sort`
 ///   in z3, `mkFloatingPoint` in cvc5, etc.). Requires native FP
-///   support in the backend; fastest path on solvers that have it.
+///   support in the backend; fastest path on solvers that have it. On a
+///   backend without it (`SolverFeature::NativeFloatingPoint`) Native is
+///   the BV encoding, with the same sorts and symbols.
 /// - BV: bit-blast every FP value into a fixed-width bit-vector and
 ///   emulate the IEEE-754 operations through Camada's common-layer
 ///   encoder. The only path available on backends without native FP
