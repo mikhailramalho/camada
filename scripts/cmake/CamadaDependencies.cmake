@@ -575,8 +575,8 @@ function(camada_fetch_git_source package_name repository git_tag out_var)
   set(FETCHCONTENT_QUIET FALSE)
   # A fifth argument pins the archive's SHA256. A clone verified the object
   # against the ref; a tarball has no such check, and a tag can be repointed at
-  # different content. The revisions given as commit SHAs are content-addressed
-  # already and pass nothing here.
+  # different content. A full commit SHA is content-addressed already, but the
+  # tarball GitHub builds from it is not checked, so pin it as well.
   if(ARGC GREATER 4)
     set(url_hash_arg URL_HASH SHA256=${ARGV4})
   endif()
@@ -725,8 +725,9 @@ function(camada_setup_cryptominisat)
     "${CMAKE_BINARY_DIR}/_deps/cadical"
     "${CMAKE_BINARY_DIR}/_deps/cadiback")
   # 5.11.22 is the version STP 2.4.0 bumped its CI to (stp/stp#493).
-  camada_fetch_git_source(cryptominisat msoos/cryptominisat 5.11.22
-                          cms_source_dir)
+  camada_fetch_git_source(
+    cryptominisat msoos/cryptominisat 5.11.22 cms_source_dir
+    e39f3a066a979e6033efb95b8732912a0888654aabc375b999ad85674c7abf44)
   camada_setup_cryptominisat_solver_deps("${cms_source_dir}")
   get_filename_component(cms_parent_dir "${cms_source_dir}" DIRECTORY)
 
@@ -861,7 +862,11 @@ function(camada_setup_gmp)
   endif()
 
   camada_ensure_deps_dirs()
-  camada_fetch_git_source(gmp gmp-mirror/gmp 141ed4f98a50 gmp_source_dir)
+  # The full SHA, not the abbreviation: GitHub resolves a prefix server-side, so
+  # it could stop being unambiguous. The mirror is not upstream, hence the hash.
+  camada_fetch_git_source(
+    gmp gmp-mirror/gmp 141ed4f98a50e4a3c1a95a1758cb599b7499ac39 gmp_source_dir
+    53b961ec4277f5d12f02a6d1cf26c7d1578198625c52a114885a88f12c1855f4)
 
   camada_run_checked(
     WORKING_DIRECTORY
@@ -931,7 +936,9 @@ function(camada_setup_minisat)
   endif()
 
   camada_ensure_deps_dirs()
-  camada_fetch_git_source(minisat msoos/minisat 2.2.1 minisat_source_dir)
+  camada_fetch_git_source(
+    minisat msoos/minisat 2.2.1 minisat_source_dir
+    2cd8e9282d0f50f6bdac2cd001c95f66c1de9b2dec61391652c68729c347290f)
   set(minisat_prefix "${CAMADA_DEPS_INSTALL_DIR}")
 
   if(APPLE)
