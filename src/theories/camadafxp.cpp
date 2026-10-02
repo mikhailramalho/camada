@@ -1176,17 +1176,21 @@ const ExpFormatBound *findExpBound(const FXPFormat &F) {
 // width is cheap here.
 constexpr unsigned ExpGuardBits = 32;
 
-// floor(ln2 * 2^Prec) as a Width-bit binary string, computed exactly from
-// ln2 = sum_{k>=1} 1/(k*2^k). The series is truncated where its terms fall
-// below the last bit kept, so the result is exact for any Prec; deriving
-// it here rather than hard-coding digits keeps the constant tied to the
-// intermediate width the caller actually uses.
+// floor(ln2 * 2^Prec) as a Width-bit binary string, from
+// ln2 = sum_{k>=1} 1/(k*2^k). Every term is floored by its long division, so
+// summing at Prec bits would leave the constant up to Prec units short, which
+// is enough to misround the last bit of exp() near the end of a wide format.
+// The series is summed with ln2ExtraBits more bits instead, so those losses
+// land below the last bit kept.
+constexpr unsigned ln2ExtraBits = 32;
+
 std::string ln2Bits(unsigned Width, unsigned Prec) {
-  std::vector<uint32_t> Acc(Width / 32 + 2, 0);
-  for (unsigned K = 1; K <= Prec; ++K) {
-    // Term = 2^(Prec-K) / K, by long division over the limbs.
+  const unsigned Total = Prec + ln2ExtraBits;
+  std::vector<uint32_t> Acc(std::max(Width, Total) / 32 + 2, 0);
+  for (unsigned K = 1; K <= Total; ++K) {
+    // Term = 2^(Total-K) / K, by long division over the limbs.
     std::vector<uint32_t> T(Acc.size(), 0);
-    unsigned Bit = Prec - K;
+    unsigned Bit = Total - K;
     T[Bit / 32] = 1u << (Bit % 32);
     uint64_t Rem = 0;
     for (size_t I = T.size(); I-- > 0;) {
@@ -1202,9 +1206,11 @@ std::string ln2Bits(unsigned Width, unsigned Prec) {
     }
   }
   std::string Bits(Width, '0');
-  for (unsigned I = 0; I < Width; ++I)
-    if ((Acc[I / 32] >> (I % 32)) & 1)
+  for (unsigned I = 0; I < Width; ++I) {
+    const unsigned J = I + ln2ExtraBits;
+    if ((Acc[J / 32] >> (J % 32)) & 1)
       Bits[Width - 1 - I] = '1';
+  }
   return Bits;
 }
 

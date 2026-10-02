@@ -931,6 +931,18 @@ inline void fxp_exp_semantics(const camada::SMTSolverRef &solver) {
   }
 }
 
+// A 64-bit input where ln2 summed at only the intermediate's width, with each
+// series term floored, was 40 units short and exp() came out one ulp high. The
+// expected raw is exp(x) * 2^31 rounded to nearest even in 800-bit arithmetic
+// (x = 47594572390 / 2^31).
+inline void fxp_exp_wide_rounding(const camada::SMTSolverRef &solver) {
+  RefFormat F{64, 31, true};
+  solver->addConstraint(
+      solver->mkFXPEqual(solver->mkFXPExp(mkConst(solver, F, 47594572390ULL)),
+                         mkConst(solver, F, 9061011618151610625ULL)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
 // Every input of both 16-bit _Accum formats, against the host reference.
 // One backend only: see fxp_exp_semantics.
 inline void fxp_exp_exhaustive(const camada::SMTSolverRef &solver) {
@@ -1409,6 +1421,7 @@ using camada_fxp_test::fxp_conversion_matrix;
 using camada_fxp_test::fxp_exhaustive_semantics;
 using camada_fxp_test::fxp_exp_exhaustive;
 using camada_fxp_test::fxp_exp_semantics;
+using camada_fxp_test::fxp_exp_wide_rounding;
 using camada_fxp_test::fxp_fp_conversion_semantics;
 using camada_fxp_test::fxp_mixed_format_semantics;
 using camada_fxp_test::fxp_model_and_constructs;

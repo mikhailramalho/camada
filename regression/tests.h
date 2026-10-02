@@ -534,6 +534,7 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_abs_countls_semantics);
   RESETANDTEST(fxp_sqrt_semantics);
   RESETANDTEST(fxp_exp_semantics);
+  RESETANDTEST(fxp_exp_wide_rounding);
   RESETANDTEST(fxp_round_semantics);
   RESETANDTEST(fxp_oracle_semantics);
   RESETANDTEST(fxp_oracle_mixed_semantics);
