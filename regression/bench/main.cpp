@@ -128,6 +128,10 @@ bool backendSupportsTuples(const std::string &backend) {
 // STP has no uninterpreted functions; mkFunctionSort aborts there.
 bool backendSupportsUF(const std::string &backend) { return backend != "stp"; }
 
+bool backendSupportsUnsatAssumptions(const std::string &backend) {
+  return backend != "stp" && backend != "smtlib";
+}
+
 // Optional substring filter on benchmark case names (third CLI argument).
 // Empty means "run everything".
 std::string caseFilter;
@@ -358,6 +362,36 @@ void benchmarkTupleSortCacheHit(camada::SMTSolver &solver,
 
   for (std::size_t i = 0; i < iterations; ++i)
     sink += solver.mkTupleSort(elements)->getTupleElementSorts().size();
+
+  (void)sink;
+}
+
+void benchmarkUnsatAssumptionCore(camada::SMTSolver &solver,
+                                  std::size_t iterations) {
+  constexpr std::size_t CoreSize = 64;
+  auto false_expr = solver.mkBool(false);
+  std::vector<camada::SMTExprRef> assumptions;
+  assumptions.reserve(CoreSize);
+
+  auto all_assumptions = solver.mkBool(true);
+  for (std::size_t i = 0; i < CoreSize; ++i) {
+    auto assumption =
+        solver.mkSymbol("core_assumption_" + std::to_string(i),
+                        solver.mkBoolSort());
+    assumptions.push_back(assumption);
+    all_assumptions = solver.mkAnd(all_assumptions, assumption);
+  }
+  solver.addConstraint(solver.mkEqual(all_assumptions, false_expr));
+
+  volatile std::size_t sink = 0;
+  for (std::size_t i = 0; i < iterations; ++i) {
+    if (solver.checkSatAssuming(assumptions) != camada::CheckResult::UNSAT)
+      throw std::runtime_error("Expected UNSAT in unsat-assumption benchmark");
+    auto core = solver.getUnsatAssumptions();
+    if (!core)
+      throw std::runtime_error("Unsat assumptions are not available");
+    sink += core.value().size();
+  }
 
   (void)sink;
 }
@@ -703,6 +737,14 @@ int main(int argc, char **argv) {
     if (backendSupportsTuples(backend))
       runCase(backend, "tuple_sort_cache_hit", iterations,
               benchmarkTupleSortCacheHit);
+    if (backendSupportsUnsatAssumptions(backend)) {
+      // Core production is opt-in at construction and may slow the engine,
+      // so enable it only for this case.
+      solverConfig.UseUnsatAssumptions = true;
+      runCase(backend, "unsat_assumption_core", iterations,
+              benchmarkUnsatAssumptionCore);
+      solverConfig.UseUnsatAssumptions = false;
+    }
     runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
     runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
     runCase(backend, "fp_div_only", iterations, benchmarkFPDivOnly);

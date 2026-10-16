@@ -28,6 +28,8 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <set>
+#include <unordered_set>
 
 namespace camada {
 
@@ -2543,15 +2545,13 @@ SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
   // Normalize across backends: a duplicated assumption must not yield a
   // duplicated core entry (activation-literal lowerings mint one literal
   // per position, so their raw cores can repeat an expression).
+  auto &RawCore = Core.value();
   std::vector<SMTExprRef> Deduped;
-  for (SMTExprRef &Assumption : Core.value()) {
-    bool Seen = false;
-    for (const SMTExprRef &Kept : Deduped)
-      if (&*Kept == &*Assumption) {
-        Seen = true;
-        break;
-      }
-    if (!Seen)
+  Deduped.reserve(RawCore.size());
+  std::unordered_set<const SMTExpr *> Seen;
+  Seen.reserve(RawCore.size());
+  for (SMTExprRef &Assumption : RawCore) {
+    if (Seen.insert(&*Assumption).second)
       Deduped.push_back(std::move(Assumption));
   }
   return Deduped;
