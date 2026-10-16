@@ -25,30 +25,35 @@ set(CAMADA_DEPS_INSTALL_DIR
     "${CAMADA_DEPS_DIR}/install"
     CACHE PATH "Directory used to install downloaded solver dependencies")
 
+# Z3 prebuilts through 5.1 ship a static libz3.a on Linux and macOS; from 5.3.0
+# (the release that moved the build to CMake only) they ship the shared library
+# alone, as Windows always has (libz3.lib + libz3.dll). scripts/release.py
+# bundles whichever the archive provides. 5.3.0 is also the first release with
+# the fp.rem truncation and fp.fma rounding fixes.
 set(CAMADA_Z3_LINUX_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-x64-glibc-2.35.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-glibc-2.39.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux x86_64")
 set(CAMADA_Z3_LINUX_AARCH64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-arm64-glibc-2.34.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-arm64-glibc-2.38.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Linux aarch64")
 set(CAMADA_Z3_MACOS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-x64-osx-13.7.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-osx-13.3.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for macOS x86_64")
 set(CAMADA_Z3_MACOS_ARM64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-arm64-osx-13.7.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-arm64-osx-13.3.zip"
     CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-x64-win.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-win.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Windows x86_64")
 set(CAMADA_CVC5_GIT_TAG
-    "cvc5-1.4.0"
+    "cvc5-1.4.2"
     CACHE STRING "CVC5 tag built from source against the shared CaDiCaL")
 set(CAMADA_CVC5_SHA256
-    "06c65b30693d1abf7c1393b497c799950de2833457920b9433da8e418bce9113"
+    "795099b277bfa79a3c9a11c8d3fec780452031dc89ddcc170003963aa3521343"
     CACHE STRING "Expected SHA256 of the CVC5 source archive")
 # Baked into cadiback's config.hpp, which Camada writes itself; see
 # camada_setup_cryptominisat_solver_deps.
@@ -114,21 +119,23 @@ set(CAMADA_BITWUZLA_SHA256
 # no prebuilt URL to pin. It is not built on Windows: the Windows CI leg leaves
 # it disabled, as ESBMC does.
 set(CAMADA_MATHSAT_VERSION
-    "5.6.17"
+    "5.6.19"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
-# The 5.6.17 macOS tarball is mispackaged: libmathsat.a is a plain ar archive
-# whose members are fat (universal) Mach-O objects, a layout Apple's ld rejects
-# ("archive member ... not a mach-o file"). 5.6.16 shipped the correct lipo
-# format (a fat file of two thin archives), so macOS stays pinned there until
-# upstream fixes the packaging.
+# The 5.6.17 macOS tarball was mispackaged (a plain ar archive of fat Mach-O
+# members, which Apple's ld rejects), so macOS was pinned to 5.6.16 for a while.
+# 5.6.19 ships the correct lipo format again (a fat file of two thin archives,
+# verified by inspection), so the pin follows the main version. The separate
+# variable stays: the macOS tarball is a single universal archive with its own
+# naming scheme, and the next packaging accident will want to pin it
+# independently again.
 set(CAMADA_MATHSAT_MACOS_VERSION
-    "5.6.16"
+    "${CAMADA_MATHSAT_VERSION}"
     CACHE STRING "MathSAT release version used for the macOS prebuilts")
 set(CAMADA_MATHSAT_LINUX_X86_64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.17-linux-x86_64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.19-linux-x86_64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux x86_64")
 set(CAMADA_MATHSAT_LINUX_AARCH64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.17-linux-aarch64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.19-linux-aarch64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux aarch64")
 set(CAMADA_MATHSAT_MACOS_X86_64_URL
     "https://mathsat.fbk.eu/release/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos.tar.gz"

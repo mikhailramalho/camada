@@ -180,7 +180,7 @@ if(CAMADA_ENABLE_REGRESSION)
       GITHUB_REPOSITORY
       catchorg/Catch2
       VERSION
-      3.8.1
+      3.16.1
       OPTIONS
       "CATCH_INSTALL_DOCS OFF"
       "CATCH_INSTALL_EXTRAS ON")
