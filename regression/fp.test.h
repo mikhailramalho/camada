@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "camada.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -37,13 +36,9 @@ ieee_fp_to_bv_after_check_reports(const camada::SMTSolverRef &solver) {
 }
 
 inline void fp_native_bv_predicate_parity(const camada::SMTSolverRef &solver) {
-  const auto backend = solver->mkBool(true)->getBackendKind();
-  if (backend != camada::SMTBackendKind::Bitwuzla &&
-      backend != camada::SMTBackendKind::CVC5 &&
-      backend != camada::SMTBackendKind::MathSAT &&
-      backend != camada::SMTBackendKind::Z3) {
+  // Parity between the native and BV encodings needs a native one to compare.
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
     return;
-  }
 
   const auto check_predicate = [&](const std::string &name, auto predicate) {
     solver->reset();
@@ -120,13 +115,9 @@ inline void fp_neg_nan_payload_bits(const camada::SMTSolverRef &solver) {
 }
 
 inline void fp_neg_nan_native_bv_parity(const camada::SMTSolverRef &solver) {
-  const auto backend = solver->mkBool(true)->getBackendKind();
-  if (backend != camada::SMTBackendKind::Bitwuzla &&
-      backend != camada::SMTBackendKind::CVC5 &&
-      backend != camada::SMTBackendKind::MathSAT &&
-      backend != camada::SMTBackendKind::Z3) {
+  // Parity between the native and BV encodings needs a native one to compare.
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
     return;
-  }
 
   const auto check_neg = [&](const std::string &name,
                              camada::FPNegBehavior behavior) {
@@ -320,12 +311,10 @@ inline void fp_arithmetics(const camada::SMTSolverRef &solver,
 
 inline void fp_round_to_away(const camada::SMTSolverRef &solver,
                              camada::FPEncoding Encoding) {
-  auto one = solver->mkFP32(1.0f, Encoding);
   if (Encoding == camada::FPEncoding::Native &&
-      one->getBackendKind() == camada::SMTBackendKind::MathSAT) {
-    // MathSAT's native FP API does not support ROUND_TO_AWAY.
+      !solver->supports(camada::SolverFeature::NativeRoundToAway))
     return;
-  }
+  auto one = solver->mkFP32(1.0f, Encoding);
   auto half_ulp = solver->mkFP32(std::ldexp(1.0f, -24), Encoding);
   auto rne = solver->mkRM(camada::RM::ROUND_TO_EVEN, Encoding);
   auto rna = solver->mkRM(camada::RM::ROUND_TO_AWAY, Encoding);

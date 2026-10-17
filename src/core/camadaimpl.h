@@ -129,6 +129,11 @@ public:
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
 
+  /// Builds the symbol Key names (the cache lookup has already missed) and
+  /// records it. Split from mkSymbolUnchecked so mkSymbol, which has just
+  /// looked the same key up, does not look it up again.
+  SMTExprRef createSymbol(SymbolExprCacheKey Key, const SMTSortRef &Sort);
+
   /// The sorts lazyIndexModelBits can canonicalize. The Ackermann model
   /// walks compare indexes by those bits, so an index outside this set is
   /// a capability gap to report, not a failure to diagnose.

@@ -14,6 +14,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #if !defined(_WIN32)
 #include <sys/wait.h>
 #include <unistd.h>
@@ -44,30 +45,10 @@ inline void disable_core_dump() {
   solver->reset();                                                             \
   testname(solver, arg);
 
-template <typename Fn> inline void require_abort(Fn &&Body) {
-#if defined(_WIN32)
-  SKIP("Abort regression helper is not implemented on Windows");
-#else
-  const pid_t pid = fork();
-  REQUIRE(pid != -1);
-
-  if (pid == 0) {
-    disable_core_dump();
-    Body();
-    std::_Exit(0);
-  }
-
-  int status = 0;
-  REQUIRE(waitpid(pid, &status, 0) == pid);
-  REQUIRE(WIFSIGNALED(status));
-  REQUIRE(WTERMSIG(status) == SIGABRT);
-#endif
-}
-
-// Like require_abort, but returns what the aborting child wrote to stderr so
-// a test can assert on the diagnostic itself. A sort mismatch that aborts
-// with the right signal but an unhelpful message is still a bug for the
-// consumer trying to find which of its types mapped wrong.
+// Runs Body in a forked child and returns what the child wrote to stderr,
+// requiring that it die of SIGABRT. A sort mismatch that aborts with the right
+// signal but an unhelpful message is still a bug for the consumer trying to
+// find which of its types mapped wrong, so tests can assert on the diagnostic.
 //
 // The child writes to a temporary file rather than a pipe: other fixtures in
 // this suite fork too, and a pipe held open across those forks is inherited
@@ -110,6 +91,11 @@ template <typename Fn> inline std::string abort_message(Fn &&Body) {
   unlink(Path);
   return Out;
 #endif
+}
+
+// Requires that Body dies of SIGABRT.
+template <typename Fn> inline void require_abort(Fn &&Body) {
+  (void)abort_message(std::forward<Fn>(Body));
 }
 
 // Degenerate formats whose significand cannot be renormalized within the
@@ -594,18 +580,22 @@ inline void tests_fxp(const camada::SMTSolverRef &solver) {
 // Int/Real arithmetic, model queries and the Int<->BV bridge. Backends
 // whose contexts must be configured per logic (MathSAT, Yices) are matrix
 // exclusions and run the applicable fixtures from their own Arith cases.
-inline void tests_arith(const camada::SMTSolverRef &solver,
-                        bool include_symbolic_shift = true) {
+inline void tests_arith(const camada::SMTSolverRef &solver) {
   RESETANDTEST(int_arithmetic_semantics);
   RESETANDTEST(real_arithmetic_semantics);
   RESETANDTEST(arith_division_semantics);
   RESETANDTEST(arith_model_queries);
   RESETANDTEST(arith_conversion_semantics);
   RESETANDTEST(int_bv_conversion_semantics);
-  // RESETANDTEST is two statements, so it needs the braces.
-  if (include_symbolic_shift) {
-    RESETANDTEST(arith_symbolic_shift_semantics);
-  }
+}
+
+// The fixtures the "camada-tuples" matrix cell runs: a backend with native
+// datatypes forced onto Camada's per-field tuple lowering.
+inline void tests_camada_tuples(const camada::SMTSolverRef &solver) {
+  RESETANDTEST(tuple_semantics);
+  RESETANDTEST(tuple_with_array_field);
+  RESETANDTEST(tuple_array_semantics);
+  RESETANDTEST(tuple_update_semantics);
 }
 
 // Nested array shapes: the depth-5 tuple/array tower and nested constant
@@ -614,11 +604,9 @@ inline void tests_arith(const camada::SMTSolverRef &solver,
 // supports() gate); every other backend runs them.
 inline void tests_nesting(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_array_deep_nesting);
-  RESETANDARGTEST(tuple_array_const_nested, camada::ConstArrayLowering::Lazy);
-  RESETANDARGTEST(nested_const_array_semantics,
-                  camada::ConstArrayLowering::Lazy);
-  RESETANDARGTEST(nested_const_array_survives_pop,
-                  camada::ConstArrayLowering::Lazy);
+  RESETANDARGTEST(tuple_array_const_nested, LazyArrays);
+  RESETANDARGTEST(nested_const_array_semantics, LazyArrays);
+  RESETANDARGTEST(nested_const_array_survives_pop, LazyArrays);
 }
 
 // The same nested constant-array shapes under the eager (native) lowering.
@@ -631,8 +619,8 @@ inline void tests_nesting_native_const(const camada::SMTSolverRef &solver) {
   RESETANDTEST(nested_const_array_survives_pop);
 }
 
-// The whole shared suite, as the per-backend "Simple" and "Override" test
-// cases have always run it.
+// The whole shared suite, for the cases that run it under a custom backend
+// configuration.
 inline void tests(const camada::SMTSolverRef &solver) {
   tests_core(solver);
   tests_arrays(solver);

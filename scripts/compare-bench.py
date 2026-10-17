@@ -177,31 +177,17 @@ def sign_test_p_value(samples: list[float], baseline: float) -> float:
     return min(1.0, 2.0 * tail)
 
 
-def sign_test_zero(samples: list[float]) -> float:
-    gt = sum(1 for sample in samples if sample > 0.0)
-    lt = sum(1 for sample in samples if sample < 0.0)
-    n = gt + lt
-    if n == 0:
-        return 1.0
-
-    k = min(gt, lt)
-    tail = sum(math.comb(n, i) for i in range(0, k + 1)) / (2**n)
-    return min(1.0, 2.0 * tail)
-
-
 def pct_change(old: float, new: float) -> float:
-    return ((new - old) / old) * 100.0
+    return ((new - old) / old) * 100.0 if old != 0 else 0.0
+
+
+def verdict(old: float, new: float) -> str:
+    return "improved" if new < old else "regressed" if new > old else "unchanged"
 
 
 def format_change(name: str, baseline: float, new: float, p_value: float) -> str:
     delta = pct_change(baseline, new)
-    word = (
-        "improved"
-        if new < baseline
-        else "regressed"
-        if new > baseline
-        else "unchanged"
-    )
+    word = verdict(baseline, new)
     return (
         f"{name}: {word} "
         f"({baseline:.2f} -> {new:.2f} ns/iter, {delta:+.2f}%, p={p_value:.4f})"
@@ -212,13 +198,7 @@ def format_overall_change(
     baseline_total: float, current_total: float, p_value: float
 ) -> str:
     delta = pct_change(baseline_total, current_total)
-    word = (
-        "improved"
-        if current_total < baseline_total
-        else "regressed"
-        if current_total > baseline_total
-        else "unchanged"
-    )
+    word = verdict(baseline_total, current_total)
     return (
         f"Overall: {word} "
         f"({baseline_total:.2f} -> {current_total:.2f} total ns/iter, "
@@ -227,14 +207,8 @@ def format_overall_change(
 
 
 def format_memory_change(name: str, baseline: float, new: float) -> str:
-    delta = pct_change(baseline, new) if baseline != 0 else 0.0
-    word = (
-        "improved"
-        if new < baseline
-        else "regressed"
-        if new > baseline
-        else "unchanged"
-    )
+    delta = pct_change(baseline, new)
+    word = verdict(baseline, new)
     return (
         f"{name}: {word} "
         f"({baseline:.0f} -> {new:.0f} KiB retained RSS, {delta:+.2f}%)"
@@ -244,18 +218,8 @@ def format_memory_change(name: str, baseline: float, new: float) -> str:
 def format_overall_memory_change(
     baseline_total: float, current_total: float
 ) -> str:
-    delta = (
-        pct_change(baseline_total, current_total)
-        if baseline_total != 0
-        else 0.0
-    )
-    word = (
-        "improved"
-        if current_total < baseline_total
-        else "regressed"
-        if current_total > baseline_total
-        else "unchanged"
-    )
+    delta = pct_change(baseline_total, current_total)
+    word = verdict(baseline_total, current_total)
     return (
         f"Overall retained RSS: {word} "
         f"({baseline_total:.0f} -> {current_total:.0f} KiB, {delta:+.2f}%)"
@@ -302,7 +266,7 @@ def compare_and_print(
                 for base_run, cur_run in zip(baseline_runs, current_runs)
                 if name in base_run and name in cur_run
             ]
-            p_value = sign_test_zero(samples)
+            p_value = sign_test_p_value(samples, 0.0)
         if cur < old:
             improved.append(format_change(name, old, cur, p_value))
         elif cur > old:
@@ -345,7 +309,7 @@ def compare_and_print(
             )
             for base_run, cur_run in zip(baseline_runs, current_runs)
         ]
-        overall_p_value = sign_test_zero(total_samples)
+        overall_p_value = sign_test_p_value(total_samples, 0.0)
 
     print(format_overall_change(baseline_total, current_total, overall_p_value))
 
@@ -461,11 +425,14 @@ def main() -> int:
     if args.baseline_binary:
         if args.runs is None:
             runs_to_execute = DEFAULT_MIN_RUNS
-        for _ in range(args.warmups):
-            run_benchmark(
-                args.baseline_binary, args.iterations, args.cpu, args.case_filter
+        def run(binary: Path) -> dict[str, dict[str, object]]:
+            return run_benchmark(
+                binary, args.iterations, args.cpu, args.case_filter
             )
-            run_benchmark(args.binary, args.iterations, args.cpu, args.case_filter)
+
+        for _ in range(args.warmups):
+            run(args.baseline_binary)
+            run(args.binary)
 
         print(
             f"Running {runs_to_execute} paired A/B benchmarks on CPU {args.cpu}...",
@@ -474,26 +441,14 @@ def main() -> int:
         baseline_runs: list[dict[str, dict[str, object]]] = []
         current_runs: list[dict[str, dict[str, object]]] = []
         for i in range(runs_to_execute):
+            # Alternate which binary runs first, so neither always gets the
+            # warmer cache.
             if i % 2 == 0:
-                baseline_runs.append(
-                    run_benchmark(
-                        args.baseline_binary, args.iterations, args.cpu, args.case_filter
-                    )
-                )
-                current_runs.append(
-                    run_benchmark(
-                        args.binary, args.iterations, args.cpu, args.case_filter
-                    )
-                )
+                baseline_runs.append(run(args.baseline_binary))
+                current_runs.append(run(args.binary))
             else:
-                current_run = run_benchmark(
-                    args.binary, args.iterations, args.cpu, args.case_filter
-                )
-                baseline_run = run_benchmark(
-                    args.baseline_binary, args.iterations, args.cpu, args.case_filter
-                )
-                baseline_runs.append(baseline_run)
-                current_runs.append(current_run)
+                current_runs.append(run(args.binary))
+                baseline_runs.append(run(args.baseline_binary))
 
         baseline_medians = compute_medians(baseline_runs)
         current_medians = compute_medians(current_runs)

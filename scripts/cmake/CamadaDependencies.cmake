@@ -210,6 +210,19 @@ function(camada_run_checked)
   endif()
 endfunction()
 
+# The parallel job count for a from-source build: the logical core count, at
+# least 1. An unbounded parallel build starts every ready compile at once, and a
+# few hundred concurrent compiler processes exhaust a small CI runner.
+function(camada_job_count out_var)
+  cmake_host_system_information(RESULT jobs QUERY NUMBER_OF_LOGICAL_CORES)
+  if(NOT jobs OR jobs LESS 1)
+    set(jobs 1)
+  endif()
+  set(${out_var}
+      ${jobs}
+      PARENT_SCOPE)
+endfunction()
+
 function(camada_find_gmp_header out_var)
   find_path(
     _camada_gmp_header_dir gmp.h
@@ -1347,10 +1360,7 @@ function(camada_build_cvc5_from_source)
   # unbounded: make starts every ready target at once, and a few hundred
   # concurrent cc1plus instances exhaust a 16 GB CI runner long before the build
   # finishes (SIGTERM, ~85s in). Bound it by processor count.
-  cmake_host_system_information(RESULT cvc5_jobs QUERY NUMBER_OF_LOGICAL_CORES)
-  if(NOT cvc5_jobs OR cvc5_jobs LESS 1)
-    set(cvc5_jobs 1)
-  endif()
+  camada_job_count(cvc5_jobs)
   camada_run_checked(
     WORKING_DIRECTORY
     "${cvc5_build_dir}"
@@ -1679,12 +1689,7 @@ function(camada_build_z3_from_source)
     "${z3_generator}"
     ${z3_cmake_args})
 
-  # Bound the job count by processor count, as for CVC5: an unbounded parallel
-  # build starts every ready compile at once and exhausts a small CI runner.
-  cmake_host_system_information(RESULT z3_jobs QUERY NUMBER_OF_LOGICAL_CORES)
-  if(NOT z3_jobs OR z3_jobs LESS 1)
-    set(z3_jobs 1)
-  endif()
+  camada_job_count(z3_jobs)
   camada_run_checked(
     WORKING_DIRECTORY
     "${z3_source_dir}"

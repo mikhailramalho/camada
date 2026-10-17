@@ -2220,7 +2220,7 @@ SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
   // cannot meet a user symbol. The first sort keeps the plain name.
   auto [Owner, First] = SymbolNameSort.try_emplace(Name, Sort.get());
   if (First || Owner->second == Sort.get())
-    return mkSymbolUnchecked(Name, Sort);
+    return createSymbol(std::move(Key), Sort);
   SMTExprRef theExp = mkSymbolUnchecked(
       "__CAMADA_alias" + std::to_string(SymbolAliasCounter++) + "_" + Name,
       Sort);
@@ -2234,7 +2234,12 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   auto Cached = SymbolExprCache.find(Key);
   if (Cached != SymbolExprCache.end())
     return Cached->second;
+  return createSymbol(std::move(Key), Sort);
+}
 
+SMTExprRef SMTSolverImpl::createSymbol(SymbolExprCacheKey Key,
+                                       const SMTSortRef &Sort) {
+  const std::string &Name = Key.Name;
   SMTExprRef theExp;
   // Route tuple-typed symbols to the Camada-managed lowering on backends
   // without native datatype support.
