@@ -165,9 +165,21 @@ if __name__ == '__main__':
         copy_release_dependency("**/libz3.dll", deps_install_dir,
                                 release_bin_dir)
     else:
-        solver_archives.extend(
-            copy_release_dependency("**/libz3.a", deps_install_dir,
-                                    release_lib_dir))
+        # Z3 prebuilts through 5.1 ship a static libz3.a. From 5.3.0 they ship
+        # only the shared library on Linux and macOS, so fall back to bundling
+        # that, as Windows always has. It is linked by path from the exported
+        # target; CMake puts its directory on the consumer's rpath, so the
+        # staged tree stays relocatable.
+        try:
+            solver_archives.extend(
+                copy_release_dependency("**/libz3.a", deps_install_dir,
+                                        release_lib_dir))
+        except FileNotFoundError:
+            shared_z3 = ("bin/libz3.dylib" if sys.platform == "darwin"
+                         else "bin/libz3.so")
+            solver_archives.extend(
+                copy_release_dependency(shared_z3, deps_install_dir,
+                                        release_lib_dir))
     rewrite_release_link_interface(
         "./release/lib/cmake/camada/camadaTargets.cmake", solver_archives)
 
