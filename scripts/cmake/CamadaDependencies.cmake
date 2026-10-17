@@ -33,7 +33,17 @@ set(CAMADA_DEPS_INSTALL_DIR
 # and a release that bundles a shared libz3 is not what Camada's tarballs are
 # meant to be. 5.3.0 is also the first release with the fp.rem truncation and
 # fp.fma rounding fixes. Windows keeps the prebuilt: it has always shipped
-# libz3.lib + libz3.dll, and MSVC is not built from source here.
+# libz3.lib + libz3.dll, and MSVC is not built from source here. Catch2 for the
+# regression suite when no new-enough copy is installed. It is installed into
+# the deps prefix like a solver, so a cached deps tree (CI) skips the build, and
+# a bump here changes this file's hash, the CI cache key.
+set(CAMADA_CATCH2_GIT_TAG
+    "v3.16.1"
+    CACHE STRING "Catch2 tag built when no suitable Catch2 is installed")
+set(CAMADA_CATCH2_SHA256
+    "d16bd1b8b2364918bd472cb216394acb93bde6784890df0d91bccfb3f28d777d"
+    CACHE STRING "Expected SHA256 of the Catch2 source archive")
+
 set(CAMADA_Z3_GIT_TAG
     "z3-5.3.1"
     CACHE STRING "Z3 tag built from source (every platform but Windows)")
@@ -1629,7 +1639,22 @@ endfunction()
 #
 # Each variant keeps its build tree, configured --fresh so the initial cache
 # below always applies: a rebuild (a variant switch, the regression suite turned
-# on, a retried install) recompiles only what changed.
+# on, a retried install) recompiles only what changed. A CMake-built dependency
+# gets Camada's own toolchain and flags (so a release build's path remapping and
+# macOS deployment target reach it) through an initial-cache file: a ';' in -D
+# arguments splits them in camada_run_checked.
+function(camada_write_initial_cache path)
+  file(WRITE "${path}" "")
+  foreach(inherited IN ITEMS C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
+                             OSX_DEPLOYMENT_TARGET OSX_ARCHITECTURES)
+    if(CMAKE_${inherited})
+      file(APPEND "${path}"
+           "set(CMAKE_${inherited} [==[${CMAKE_${inherited}}]==] "
+           "CACHE STRING \"\" FORCE)\n")
+    endif()
+  endforeach()
+endfunction()
+
 function(camada_build_z3_from_source)
   camada_fetch_git_source(z3src Z3Prover/z3 "${CAMADA_Z3_GIT_TAG}"
                           z3_source_dir "${CAMADA_Z3_SHA256}")
@@ -1666,21 +1691,8 @@ function(camada_build_z3_from_source)
       # A tarball carries no git history to describe.
       -DZ3_INCLUDE_GIT_HASH=OFF
       -DZ3_INCLUDE_GIT_DESCRIBE=OFF)
-  # Z3 is built with Camada's own toolchain and flags (so a release build's path
-  # remapping and macOS deployment target reach it). They go in through an
-  # initial-cache file because a ';' in -D arguments splits them in
-  # camada_run_checked.
-  set(z3_initial_cache "${z3_source_dir}/camada-initial-cache.cmake")
-  file(WRITE "${z3_initial_cache}" "")
-  foreach(z3_inherited IN ITEMS C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
-                                OSX_DEPLOYMENT_TARGET OSX_ARCHITECTURES)
-    if(CMAKE_${z3_inherited})
-      file(APPEND "${z3_initial_cache}"
-           "set(CMAKE_${z3_inherited} [==[${CMAKE_${z3_inherited}}]==] "
-           "CACHE STRING \"\" FORCE)\n")
-    endif()
-  endforeach()
-  list(APPEND z3_cmake_args -C "${z3_initial_cache}")
+  camada_write_initial_cache("${z3_source_dir}/camada-initial-cache.cmake")
+  list(APPEND z3_cmake_args -C "${z3_source_dir}/camada-initial-cache.cmake")
 
   # Ninja when it is there (the Bitwuzla recipe needs it anyway): a Unix
   # Makefiles tree built with a wide -j once lost object directories under the
@@ -1928,4 +1940,68 @@ function(camada_setup_mathsat)
     file(COPY "${mathsat_source_dir}/include/"
          DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/include")
   endif()
+endfunction()
+
+function(camada_setup_catch2)
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/Catch2/Catch2Config.cmake")
+    return()
+  endif()
+  message(STATUS "Catch2 not found locally. Building it for regression.")
+  camada_ensure_deps_dirs()
+  camada_fetch_git_source(catch2src catchorg/Catch2 "${CAMADA_CATCH2_GIT_TAG}"
+                          catch2_source_dir "${CAMADA_CATCH2_SHA256}")
+  set(catch2_build_dir "${catch2_source_dir}/camada-build")
+  camada_write_initial_cache("${catch2_source_dir}/camada-initial-cache.cmake")
+  if(CMAKE_BUILD_TYPE)
+    set(catch2_build_type "${CMAKE_BUILD_TYPE}")
+  else()
+    set(catch2_build_type Release)
+  endif()
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${catch2_source_dir}"
+    MESSAGE
+    "Configuring Catch2"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --fresh
+    -S
+    "${catch2_source_dir}"
+    -B
+    "${catch2_build_dir}"
+    -G
+    "${CMAKE_GENERATOR}"
+    -C
+    "${catch2_source_dir}/camada-initial-cache.cmake"
+    -DCMAKE_BUILD_TYPE=${catch2_build_type}
+    -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
+    -DCMAKE_INSTALL_LIBDIR=lib
+    -DBUILD_TESTING=OFF
+    -DCATCH_INSTALL_DOCS=OFF
+    -DCATCH_INSTALL_EXTRAS=ON)
+  camada_job_count(catch2_jobs)
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${catch2_source_dir}"
+    MESSAGE
+    "Building Catch2 with ${catch2_jobs} job(s)"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --build
+    "${catch2_build_dir}"
+    --config
+    ${catch2_build_type}
+    --parallel
+    ${catch2_jobs})
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${catch2_source_dir}"
+    MESSAGE
+    "Installing Catch2"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --install
+    "${catch2_build_dir}"
+    --config
+    ${catch2_build_type})
 endfunction()
