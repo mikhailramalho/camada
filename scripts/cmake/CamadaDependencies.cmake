@@ -1624,17 +1624,26 @@ endfunction()
 # position-independent so it can land in a shared library. Z3 vendors no SAT
 # engine of its own to clash with the shared CaDiCaL, and uses its internal
 # multiprecision rather than GMP, so it adds nothing to the single-GMP story.
-# The z3 executable is built too: the SMT-LIB pipeline tests drive it.
+# The z3 executable is built only with the regression suite, whose SMT-LIB
+# pipeline tests drive it.
+#
+# Each variant keeps its build tree, configured --fresh so the initial cache
+# below always applies: a rebuild (a variant switch, the regression suite turned
+# on, a retried install) recompiles only what changed.
 function(camada_build_z3_from_source)
   camada_fetch_git_source(z3src Z3Prover/z3 "${CAMADA_Z3_GIT_TAG}"
                           z3_source_dir "${CAMADA_Z3_SHA256}")
-  set(z3_build_dir "${z3_source_dir}/camada-build")
-  file(REMOVE_RECURSE "${z3_build_dir}")
-
   if(BUILD_SHARED_LIBS)
     set(z3_shared ON)
+    set(z3_build_dir "${z3_source_dir}/camada-build-shared")
   else()
     set(z3_shared OFF)
+    set(z3_build_dir "${z3_source_dir}/camada-build-static")
+  endif()
+  if(CAMADA_ENABLE_REGRESSION)
+    set(z3_executable ON)
+  else()
+    set(z3_executable OFF)
   endif()
   if(APPLE)
     set(z3_rpath "@loader_path/../lib")
@@ -1651,7 +1660,7 @@ function(camada_build_z3_from_source)
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
       # The z3 executable has to find a shared libz3 beside the install.
       "-DCMAKE_INSTALL_RPATH=${z3_rpath}"
-      -DZ3_BUILD_EXECUTABLE=ON
+      -DZ3_BUILD_EXECUTABLE=${z3_executable}
       -DZ3_BUILD_TEST_EXECUTABLES=OFF
       -DZ3_ENABLE_EXAMPLE_TARGETS=OFF
       # A tarball carries no git history to describe.
@@ -1691,6 +1700,7 @@ function(camada_build_z3_from_source)
     "Configuring Z3"
     COMMAND
     "${CMAKE_COMMAND}"
+    --fresh
     -S
     "${z3_source_dir}"
     -B
@@ -1739,7 +1749,10 @@ function(camada_setup_z3)
     else()
       set(z3_installed "lib/libz3.a")
     endif()
-    if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/${z3_installed}")
+    if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/${z3_installed}"
+       AND (NOT CAMADA_ENABLE_REGRESSION OR EXISTS
+                                            "${CAMADA_DEPS_INSTALL_DIR}/bin/z3"
+           ))
       return()
     endif()
     camada_ensure_deps_dirs()
