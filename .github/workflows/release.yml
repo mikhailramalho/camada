@@ -27,6 +27,26 @@ jobs:
         name: release-linux
         path: ./camada-linux-x64.tar.gz
 
+  build-linux-arm64:
+    name: Build Linux arm64 Release
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Dependencies
+      run: sudo apt-get update && sudo apt-get install -y cmake linux-libc-dev meson ninja-build gperf doxygen pkg-config libgmp-dev libmpfr-dev python3
+
+    - name: Generate release
+      run: python3 ./scripts/release.py
+
+    - name: Create tarball
+      run: tar -C release -czvf camada-linux-arm64.tar.gz .
+
+      # Upload asset
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-linux-arm64
+        path: ./camada-linux-arm64.tar.gz
+
   build-macos:
     name: Build MacOS Release
     runs-on: macos-15
@@ -76,12 +96,18 @@ jobs:
   create-release:
     name: Upload Release Asset
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-linux-arm64, build-macos, build-windows]
     steps:
     - name: Download Linux Build
       uses: actions/download-artifact@v4
       with:
         name: release-linux
+        path: ./
+
+    - name: Download Linux arm64 Build
+      uses: actions/download-artifact@v4
+      with:
+        name: release-linux-arm64
         path: ./
 
     - name: Download Macos Build
@@ -116,6 +142,17 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./camada-linux-x64.tar.gz
         asset_name: camada-linux-x64.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload Release Asset (Linux arm64)
+      id: upload-release-asset-linux-arm64
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./camada-linux-arm64.tar.gz
+        asset_name: camada-linux-arm64.tar.gz
         asset_content_type: application/gzip
 
     - name: Upload Release Asset (MacOS)

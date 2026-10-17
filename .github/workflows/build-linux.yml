@@ -11,7 +11,11 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
     - uses: actions/checkout@v4
     - name: Install Dependencies
@@ -25,7 +29,7 @@ jobs:
         path: |
           build/deps
           build/_deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-deps-${{ hashFiles('scripts/cmake/CamadaDependencies.cmake') }}
         # No prefix fallback: an exact-key miss rebuilds every dependency from
         # scratch. The fallback used to restore the newest previous tree, but a
         # restored tree satisfies find_package and the minimum-version floor, so
