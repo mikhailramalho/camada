@@ -1149,10 +1149,9 @@ public:
   virtual UnknownReason reasonUnknown() const = 0;
 
   /// What the backend said about the failure behind reasonUnknown(), when it
-  /// said anything: the text of a Z3 exception, for instance. Empty whenever
-  /// reasonUnknown() is NotApplicable, and for a Timeout or Incomplete that
-  /// came with no message. Diagnostic only; the wording is the backend's own
-  /// and is not stable across versions.
+  /// said anything (the text of a Z3 exception, for instance); empty
+  /// otherwise, and always when reasonUnknown() is NotApplicable. Diagnostic
+  /// only: the wording is the backend's own.
   virtual std::string reasonUnknownDetail() const = 0;
 
   /// Set a wall-clock time limit, in milliseconds, applied to each

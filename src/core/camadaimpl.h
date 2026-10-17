@@ -467,8 +467,13 @@ protected:
 
   /// Set by the backend's checkImpl when it answers UNKNOWN; cleared by
   /// any check that decides, so a stale reason cannot be read back.
-  UnknownReason LastUnknownReason = UnknownReason::NotApplicable;
-  std::string LastUnknownDetail;
+  /// Why the last check answered UNKNOWN, and what the backend said about it.
+  /// One value, so nothing that saves or clears it can leave the two apart.
+  struct UnknownInfo {
+    UnknownReason Reason = UnknownReason::NotApplicable;
+    std::string Detail;
+  };
+  UnknownInfo LastUnknown;
 
   // --- Assumption-based solving ---
   // The assumptions of the most recent checkSatAssuming() call, kept so
@@ -503,16 +508,13 @@ protected:
   struct PreserveModelState {
     SMTSolverImpl &S;
     const bool Saved;
-    const UnknownReason SavedReason;
-    const std::string SavedDetail;
+    const UnknownInfo SavedUnknown;
     explicit PreserveModelState(SMTSolverImpl &Solver)
         : S(Solver), Saved(Solver.ModelAvailable),
-          SavedReason(Solver.LastUnknownReason),
-          SavedDetail(Solver.LastUnknownDetail) {}
+          SavedUnknown(Solver.LastUnknown) {}
     ~PreserveModelState() {
       S.ModelAvailable = Saved;
-      S.LastUnknownReason = SavedReason;
-      S.LastUnknownDetail = SavedDetail;
+      S.LastUnknown = SavedUnknown;
     }
   };
   /// The SMTError every model getter returns when no model is available.
@@ -922,10 +924,10 @@ public:
   CheckResult check() override final;
 
   UnknownReason reasonUnknown() const override final {
-    return LastUnknownReason;
+    return LastUnknown.Reason;
   }
   std::string reasonUnknownDetail() const override final {
-    return LastUnknownDetail;
+    return LastUnknown.Detail;
   }
 
 protected:
@@ -933,19 +935,11 @@ protected:
   /// not decide. Leaving it unset means Camada attributes the UNKNOWN to
   /// its own timeout, if one was configured, and to Incomplete otherwise.
   void noteUnknownReason(UnknownReason Reason, std::string Detail = {}) {
-    LastUnknownReason = Reason;
-    LastUnknownDetail = std::move(Detail);
-  }
-
-  /// Back to NotApplicable with no detail. Every place that ends the query
-  /// an unknown reason belonged to goes through here, so the two cannot drift.
-  void clearUnknownReason() {
-    LastUnknownReason = UnknownReason::NotApplicable;
-    LastUnknownDetail.clear();
+    LastUnknown = {Reason, std::move(Detail)};
   }
 
 private:
-  /// Settles LastUnknownReason once the backend has answered.
+  /// Settles LastUnknown once the backend has answered.
   CheckResult finishCheck(CheckResult Result);
 
 public:

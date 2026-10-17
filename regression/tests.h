@@ -417,7 +417,6 @@ inline constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
 
 // Booleans, bit-vectors, push/pop, models, symbols, solver contracts.
 inline void tests_core(const camada::SMTSolverRef &solver) {
-
   RESETANDTEST(equal_ten);
   RESETANDTEST(symbol_name_punctuation_distinct);
   RESETANDTEST(null_sort_handle_equality);
@@ -507,7 +506,6 @@ inline void tests_tuples(const camada::SMTSolverRef &solver) {
 
 // Floating-point, native and BV-encoded, including the host oracles.
 inline void tests_fp(const camada::SMTSolverRef &solver) {
-
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(ieee_fp_to_bv_after_check_reports);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
@@ -570,7 +568,6 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
 
 // Fixed-point: pure common-layer BV encoding, no backend gating needed.
 inline void tests_fxp(const camada::SMTSolverRef &solver) {
-
   RESETANDTEST(fxp_countls_narrow_target_rejected);
   RESETANDTEST(fxp_exhaustive_semantics);
   RESETANDTEST(fxp_boundary_overflow_semantics);

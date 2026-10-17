@@ -1637,11 +1637,10 @@ function(camada_build_z3_from_source)
       # A tarball carries no git history to describe.
       -DZ3_INCLUDE_GIT_HASH=OFF
       -DZ3_INCLUDE_GIT_DESCRIBE=OFF)
-  # Build with the toolchain and flags Camada itself was configured with, so a
-  # release build's path-prefix remapping (and a macOS deployment target) reach
-  # Z3 as well. They go in through an initial-cache file with bracket-quoted
-  # values: as -D arguments a ';' in the flags splits the argument in two on its
-  # way through camada_run_checked, whether or not it is escaped.
+  # Z3 is built with Camada's own toolchain and flags (so a release build's path
+  # remapping and macOS deployment target reach it). They go in through an
+  # initial-cache file because a ';' in -D arguments splits them in
+  # camada_run_checked.
   set(z3_initial_cache "${z3_source_dir}/camada-initial-cache.cmake")
   file(WRITE "${z3_initial_cache}" "")
   foreach(z3_inherited IN ITEMS C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS

@@ -527,7 +527,7 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   // reasonUnknown() is documented to report NotApplicable at any time other
   // than right after an UNKNOWN check, so the reason dies with the model
   // rather than outliving the query it belonged to.
-  clearUnknownReason();
+  LastUnknown = {};
   // Fires on everything that invalidates the current model (constraint,
   // check, push, pop, reset), which is exactly the lifetime of the index
   // bits and of the default values handed out for unconstrained
@@ -2336,10 +2336,10 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
+  const bool NativeOk =
+      nativeConstArraySupport() && nativeConstArrayAccepts(InitValue);
   if (Lowering == ConstArrayLowering::Auto)
-    Lowering = nativeConstArraySupport() && nativeConstArrayAccepts(InitValue)
-                   ? ConstArrayLowering::Native
-                   : ConstArrayLowering::Lazy;
+    Lowering = NativeOk ? ConstArrayLowering::Native : ConstArrayLowering::Lazy;
   // In Ackermann mode the lowering choice is moot (see below), so an
   // explicit Native request is not an error on backends without native
   // constant arrays.
@@ -2350,8 +2350,7 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   // An explicit Native is not quietly downgraded: the caller asked for the
   // backend operator, and the lazy lowering is a different term.
   fatalErrorIf(Lowering == ConstArrayLowering::Native &&
-                   nativeConstArraySupport() &&
-                   !nativeConstArrayAccepts(InitValue) &&
+                   nativeConstArraySupport() && !NativeOk &&
                    arrayMode() != ArrayEncoding::Ackermann,
                "This backend's native constant arrays take only a literal "
                "initializer; use ConstArrayLowering::Auto or Lazy");
@@ -2461,7 +2460,7 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
 }
 
 CheckResult SMTSolverImpl::check() {
-  // invalidateUnsatAssumptions() clears LastUnknownReason too. The sibling
+  // invalidateUnsatAssumptions() clears LastUnknown too. The sibling
   // in checkSatAssuming() does not have that luxury: it never calls this
   // hook, so it clears the reason itself.
   invalidateUnsatAssumptions();
@@ -2484,14 +2483,14 @@ CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
   // assumption-based check would resolve this model's indexes with the
   // previous model's values and silently merge or drop array entries.
   if (Result != CheckResult::UNKNOWN) {
-    clearUnknownReason();
+    LastUnknown = {};
     return Result;
   }
   // A backend that recognised the cause already recorded it. Otherwise
   // attribute the UNKNOWN to the limit Camada set, if there was one:
   // several backends report a deadline stop as a bare "unknown".
-  if (LastUnknownReason == UnknownReason::NotApplicable)
-    LastUnknownReason =
+  if (LastUnknown.Reason == UnknownReason::NotApplicable)
+    LastUnknown.Reason =
         TimeoutMs ? UnknownReason::Timeout : UnknownReason::Incomplete;
   return Result;
 }
@@ -2506,7 +2505,7 @@ SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
   // addConstraint/push/pop (the default fallback and the activation-literal
   // lowerings do), all of which invalidate the unsat-assumption state, so
   // record it only after the check completes.
-  clearUnknownReason();
+  LastUnknown = {};
   const CheckResult Result = finishCheck(
       Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions));
   UnsatAssumptionsValid = Result == CheckResult::UNSAT;
@@ -2527,8 +2526,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
     SMTSolverImpl &S;
     // Set once checkImpl() has answered; NotApplicable until then, so an
     // exception before that point restores nothing.
-    UnknownReason ReasonToRestore = UnknownReason::NotApplicable;
-    std::string DetailToRestore;
+    UnknownInfo UnknownToRestore;
     // A destructor is implicitly noexcept, and pop() can throw: it calls
     // popImpl() and then re-asserts the journaled lazy constraints, exactly
     // when the backend context may already be in an error state. Swallow
@@ -2547,8 +2545,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
       } else {
         S.pop();
       }
-      S.LastUnknownReason = ReasonToRestore;
-      S.LastUnknownDetail = DetailToRestore;
+      S.LastUnknown = UnknownToRestore;
     }
   } Guard{*this};
   for (const SMTExprRef &Assumption : Assumptions)
@@ -2559,8 +2556,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
   // before finishCheck() can read it. Have the guard carry it across the
   // teardown, or a precise BackendError is downgraded to the coarse
   // Timeout/Incomplete that finishCheck re-derives.
-  Guard.ReasonToRestore = LastUnknownReason;
-  Guard.DetailToRestore = LastUnknownDetail;
+  Guard.UnknownToRestore = LastUnknown;
   return Result;
 }
 
@@ -2639,7 +2635,7 @@ void SMTSolverImpl::reset() {
   // reasonUnknown() is documented to report NotApplicable at any time
   // other than right after an UNKNOWN check; a reset discards the query
   // the reason belonged to.
-  clearUnknownReason();
+  LastUnknown = {};
   resetImpl();
   initializeCommonSingletons();
   // resetImpl() may recreate the backend context, dropping any limit
