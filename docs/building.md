@@ -54,8 +54,10 @@ Downloaded sources and locally installed solver artifacts are stored under
 
 When CMake downloads dependencies itself:
 - `Bitwuzla` uses a source build from `0.9.1`.
-- `Z3` uses the prebuilt release archive from `z3-4.13.3`.
-- `CVC5` uses a source build from `cvc5-1.4.0`.
+- `Z3` uses a static source build of `z3-5.3.1` on Linux and macOS. The 5.3
+  prebuilts ship only a shared `libz3` there, and Camada's release tarballs
+  link Z3 statically. Windows uses the prebuilt `z3-5.3.1` archive.
+- `CVC5` uses a source build from `cvc5-1.4.2`.
 - `CaDiCaL` uses a source build, shared by every backend that needs it:
   Bitwuzla, CVC5 and STP link one copy, because two copies built with
   different flags disagree on `CaDiCaL::Internal`'s layout.
@@ -64,10 +66,10 @@ When CMake downloads dependencies itself:
   MathSAT by path, Yices through `--with-static-gmp`, CVC5 and Bitwuzla through
   their exported link interfaces). With `CAMADA_DOWNLOAD_DEPENDENCIES=OFF`
   the host's GMP is used instead.
-- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.17` on
-  Linux. macOS stays pinned to `5.6.16`: the `5.6.17` macOS tarball ships
-  `libmathsat.a` as a plain `ar` archive of fat Mach-O objects, a layout
-  Apple's `ld` rejects.
+- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.19`. (The
+  `5.6.17` macOS tarball shipped `libmathsat.a` as a plain `ar` archive of
+  fat Mach-O objects, a layout Apple's `ld` rejects, so macOS was pinned to
+  `5.6.16` until `5.6.19` restored the correct lipo format.)
 - `STP` still falls back to a source build of `2.4.1`. The `2.4.1` GitHub
   release only ships a standalone `stp` executable, not the headers and
   libraries that Camada needs to link against the STP C++ API.

@@ -177,7 +177,7 @@ if(${CAMADA_SOLVER_YICES_ENABLE})
 endif()
 
 if(${CAMADA_SOLVER_Z3_ENABLE})
-  list(APPEND _camada_backend_link_libs ${CAMADA_Z3_LIB})
+  list(APPEND _camada_backend_link_libs ${CAMADA_Z3_LINK_LIBRARIES})
   target_include_directories(
     ${LIBRARY_TARGET_NAME} PUBLIC "$<BUILD_INTERFACE:${CAMADA_Z3_INCLUDE_DIR}>")
   get_filename_component(CAMADA_Z3_LIB_DIR "${CAMADA_Z3_LIB}" DIRECTORY)

@@ -5,7 +5,7 @@
 # rules — the regular regression suite only validates the in-tree library, not
 # the installed package config.
 
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.24)
 project(camada-release-consumer LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)

@@ -52,10 +52,31 @@ int main() {
   if (run(camada::createZ3Solver(), "Z3") != 0)
     return 1;
   ++backends_exercised;
+
+  // Z3 5.3 registers its tactics through static initializers. Linked from a
+  // static archive the normal way, the linker drops the objects nothing else
+  // pulls in and about a fifth of the tactics silently disappear, even in a
+  // program that creates a solver. These are some of them.
+  try {
+    z3::context Ctx;
+    for (const char *Name :
+         {"ctx-solver-simplify", "elim-small-bv", "fm", "dt2bv", "eq2bv"})
+      z3::tactic Tactic(Ctx, Name);
+    std::cout << "Z3 tactics: ok\n";
+  } catch (const z3::exception &E) {
+    std::cerr << "Z3 tactics: " << E.msg() << "\n";
+    return 1;
+  }
 #endif
 
 #if CAMADA_HAVE_BITWUZLA
   if (run(camada::createBitwuzlaSolver(), "Bitwuzla") != 0)
+    return 1;
+  ++backends_exercised;
+#endif
+
+#if CAMADA_HAVE_CVC5
+  if (run(camada::createCVC5Solver(), "CVC5") != 0)
     return 1;
   ++backends_exercised;
 #endif
