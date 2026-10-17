@@ -179,19 +179,9 @@ if(CAMADA_ENABLE_REGRESSION)
   set(CAMADA_CATCH2_MIN_VERSION 3.7.1)
   find_package(Catch2 ${CAMADA_CATCH2_MIN_VERSION} QUIET)
   if(NOT Catch2_FOUND AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF")
-    message(STATUS "Catch2 not found locally. Downloading it for regression.")
-    camada_include_cpm()
-    cpmaddpackage(
-      NAME
-      Catch2
-      GITHUB_REPOSITORY
-      catchorg/Catch2
-      VERSION
-      3.16.1
-      OPTIONS
-      "CATCH_INSTALL_DOCS OFF"
-      "CATCH_INSTALL_EXTRAS ON")
-    list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
+    camada_setup_catch2()
+    find_package(Catch2 ${CAMADA_CATCH2_MIN_VERSION} REQUIRED PATHS
+                 "${CAMADA_DEPS_INSTALL_DIR}" NO_DEFAULT_PATH)
   endif()
   if(NOT TARGET Catch2::Catch2)
     find_package(Catch2 ${CAMADA_CATCH2_MIN_VERSION} REQUIRED)

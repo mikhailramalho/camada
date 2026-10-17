@@ -25,6 +25,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -192,12 +193,11 @@ protected:
   SMTSortRef CachedIntSort;
   SMTSortRef CachedRealSort;
   std::array<SMTSortRef, 2> CachedRMSorts;
-  std::unordered_map<SymbolExprCacheKey, SMTExprRef, SymbolExprCacheKeyHash>
+  // Every symbol by name, one entry per sort it was made with. One map, so a
+  // lookup and the "first sort owns the name" check (see mkSymbol) share a
+  // single hash of the name.
+  std::unordered_map<std::string, std::vector<SymbolCacheEntry>>
       SymbolExprCache;
-  // The first sort each user symbol name was made with. A later sort under the
-  // same name gets an alias (see mkSymbol), since backends keep one sort per
-  // name.
-  std::unordered_map<std::string, const SMTSort *> SymbolNameSort;
   unsigned SymbolAliasCounter = 0;
   std::unordered_map<FPSpecialExprCacheKey, SMTExprRef,
                      FPSpecialExprCacheKeyHash>
@@ -281,6 +281,15 @@ protected:
   /// True when the backend can express `((as const ...) v)` natively.
   /// Backends without it get constant arrays through mkLazyConstArray().
   virtual bool nativeConstArraySupport() const { return true; }
+
+  /// True when the backend's native constant array can be built over this
+  /// initializer. Most take any term; CVC5's takes only a value, so a symbol
+  /// or a computed initializer needs the lazy lowering there. Consulted only
+  /// when nativeConstArraySupport() is true.
+  virtual bool nativeConstArrayAccepts(const SMTExprRef &InitValue) const {
+    (void)InitValue;
+    return true;
+  }
 
   /// True when the backend decides array equality natively (extensional
   /// array theory). STP cannot: its only array predicate is select, so
@@ -458,7 +467,13 @@ protected:
 
   /// Set by the backend's checkImpl when it answers UNKNOWN; cleared by
   /// any check that decides, so a stale reason cannot be read back.
-  UnknownReason LastUnknownReason = UnknownReason::NotApplicable;
+  /// Why the last check answered UNKNOWN, and what the backend said about it.
+  /// One value, so nothing that saves or clears it can leave the two apart.
+  struct UnknownInfo {
+    UnknownReason Reason = UnknownReason::NotApplicable;
+    std::string Detail;
+  };
+  UnknownInfo LastUnknown;
 
   // --- Assumption-based solving ---
   // The assumptions of the most recent checkSatAssuming() call, kept so
@@ -493,13 +508,13 @@ protected:
   struct PreserveModelState {
     SMTSolverImpl &S;
     const bool Saved;
-    const UnknownReason SavedReason;
+    const UnknownInfo SavedUnknown;
     explicit PreserveModelState(SMTSolverImpl &Solver)
         : S(Solver), Saved(Solver.ModelAvailable),
-          SavedReason(Solver.LastUnknownReason) {}
+          SavedUnknown(Solver.LastUnknown) {}
     ~PreserveModelState() {
       S.ModelAvailable = Saved;
-      S.LastUnknownReason = SavedReason;
+      S.LastUnknown = SavedUnknown;
     }
   };
   /// The SMTError every model getter returns when no model is available.
@@ -544,12 +559,10 @@ protected:
   }
 
 public:
+  /// The cached bit-vector literal for Value (-1, 0 or 1) at Width, or a null
+  /// ref when there is none: Width not built yet, or Value not one of the
+  /// three cached values.
   SMTExprRef cachedSmallBVExpr(int64_t Value, unsigned Width) const;
-  SMTExprRef getBVZero1Expr() const;
-  SMTExprRef getBVOne1Expr() const;
-  SMTExprRef getBVZero2Expr() const;
-  SMTExprRef getBVZero3Expr() const;
-  SMTExprRef getBVZero4Expr() const;
   SMTExprRef getRMExpr(RM R) const;
   SMTExprRef getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
                               FPSpecialValueKind Kind, bool Sign);
@@ -842,8 +855,6 @@ public:
                            const SMTExprRef &Value) override final;
   SMTExprRef mkApply(const SMTExprRef &Function,
                      const std::vector<SMTExprRef> &Args) override final;
-  void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
-                                 const SMTExprRef &Body);
   SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
                       const SMTExprRef &Body) override final;
   SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
@@ -906,18 +917,32 @@ public:
   CheckResult check() override final;
 
   UnknownReason reasonUnknown() const override final {
-    return LastUnknownReason;
+    return LastUnknown.Reason;
+  }
+  std::string reasonUnknownDetail() const override final {
+    return LastUnknown.Detail;
   }
 
 protected:
   /// Called by a backend's checkImpl when it can tell why the search did
   /// not decide. Leaving it unset means Camada attributes the UNKNOWN to
   /// its own timeout, if one was configured, and to Incomplete otherwise.
-  void noteUnknownReason(UnknownReason Reason) { LastUnknownReason = Reason; }
+  void noteUnknownReason(UnknownReason Reason, std::string Detail = {}) {
+    LastUnknown = {Reason, std::move(Detail)};
+  }
 
 private:
-  /// Settles LastUnknownReason once the backend has answered.
+  /// The precondition mkForall and mkExists share.
+  void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
+                                 const SMTExprRef &Body);
+
+  /// Settles LastUnknown once the backend has answered.
   CheckResult finishCheck(CheckResult Result);
+  /// Runs a backend check. An exception out of it is the backend failing to
+  /// run the query (an internal error on valid input), so it answers UNKNOWN
+  /// with reason BackendError and the exception's text as the detail, rather
+  /// than ending the host.
+  CheckResult runBackendCheck(const std::function<CheckResult()> &Check);
 
 public:
   bool setTimeout(uint64_t Milliseconds) override final;
@@ -1022,6 +1047,12 @@ protected:
 
   /// Int and Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
   virtual bool intRealArithmeticSupport() const { return true; }
+  /// What mkIntSort/mkRealSort abort with when the hook above says no. A
+  /// backend whose arithmetic exists but is switched off says how to switch
+  /// it on.
+  virtual std::string noIntRealArithmeticMessage(const char *Feature) const {
+    return std::string(Feature) + " is not supported by this backend";
+  }
 
   /// Quantified formulas (mkForall, mkExists).
   virtual bool quantifierSupport() const { return true; }

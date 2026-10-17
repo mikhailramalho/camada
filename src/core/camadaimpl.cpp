@@ -200,10 +200,13 @@ namespace camada {
   }
 // Cached nullary sort: build once, keep it on the solver. The cache field and
 // the sort predicate are all that differ between them.
-#define CAMADA_DEFINE_CACHED_SORT(Name, CacheField, SortPredicate)             \
+#define CAMADA_DEFINE_CACHED_SORT(Name, CacheField, SortPredicate, Supported,  \
+                                  Feature)                                     \
   SMTSortRef SMTSolverImpl::Name() {                                           \
     if (CacheField)                                                            \
       return CacheField;                                                       \
+    if (!(Supported))                                                          \
+      fatalError(noIntRealArithmeticMessage(Feature).c_str());                 \
                                                                                \
     SMTSortRef theSort = Name##Impl();                                         \
     assert(theSort->SortPredicate());                                          \
@@ -440,33 +443,13 @@ static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
 
 } // namespace
 
-// The caches are empty until initializeCommonSingletons runs, which a
-// half-built SMTLIBSolver never does. Answer a null handle then, which aborts
-// with a diagnostic on use, rather than indexing past the end.
 SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
                                             unsigned Width) const {
+  // Only -1, 0 and 1 are cached; any other value is simply not in the cache.
+  if (Value < -1 || Value > 1)
+    return SMTExprRef{};
   const auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Value)];
   return Width < Cache.size() ? Cache[Width] : SMTExprRef{};
-}
-
-SMTExprRef SMTSolverImpl::getBVZero1Expr() const {
-  return cachedSmallBVExpr(0, 1);
-}
-
-SMTExprRef SMTSolverImpl::getBVOne1Expr() const {
-  return cachedSmallBVExpr(1, 1);
-}
-
-SMTExprRef SMTSolverImpl::getBVZero2Expr() const {
-  return cachedSmallBVExpr(0, 2);
-}
-
-SMTExprRef SMTSolverImpl::getBVZero3Expr() const {
-  return cachedSmallBVExpr(0, 3);
-}
-
-SMTExprRef SMTSolverImpl::getBVZero4Expr() const {
-  return cachedSmallBVExpr(0, 4);
 }
 
 SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
@@ -524,7 +507,7 @@ void SMTSolverImpl::invalidateUnsatAssumptions() {
   // reasonUnknown() is documented to report NotApplicable at any time other
   // than right after an UNKNOWN check, so the reason dies with the model
   // rather than outliving the query it belonged to.
-  LastUnknownReason = UnknownReason::NotApplicable;
+  LastUnknown = {};
   // Fires on everything that invalidates the current model (constraint,
   // check, push, pop, reset), which is exactly the lifetime of the index
   // bits and of the default values handed out for unconstrained
@@ -538,7 +521,10 @@ void SMTSolverImpl::clearExprCaches() {
   for (auto &Cache : CachedSmallBVExprs)
     Cache.clear();
   SymbolExprCache.clear();
-  SymbolNameSort.clear();
+  // Every alias just forgotten is gone from the backend too (this runs on
+  // reset and destruction), so the numbering starts over: a solver that has
+  // been reset names its symbols the way a fresh one does.
+  SymbolAliasCounter = 0;
   FPSpecialExprCache.clear();
   FPConstExprCache.clear();
   LazyConstArrayRoots.clear();
@@ -593,11 +579,15 @@ void SMTSolverImpl::initializeCommonSingletons() {
       SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
 }
 
-CAMADA_DEFINE_CACHED_SORT(mkBoolSort, CachedBoolSort, isBoolSort)
+CAMADA_DEFINE_CACHED_SORT(mkBoolSort, CachedBoolSort, isBoolSort, true, "")
 
-CAMADA_DEFINE_CACHED_SORT(mkIntSort, CachedIntSort, isIntSort)
+// supports(IntRealArithmetic) and these sorts answer from the same hook, so
+// they cannot disagree.
+CAMADA_DEFINE_CACHED_SORT(mkIntSort, CachedIntSort, isIntSort,
+                          intRealArithmeticSupport(), "Integer arithmetic")
 
-CAMADA_DEFINE_CACHED_SORT(mkRealSort, CachedRealSort, isRealSort)
+CAMADA_DEFINE_CACHED_SORT(mkRealSort, CachedRealSort, isRealSort,
+                          intRealArithmeticSupport(), "Real arithmetic")
 
 SMTSortRef SMTSolverImpl::mkBVSort(const unsigned BitWidth) {
   fatalErrorIf(BitWidth == 0, "Bit-vector sort width must be non-zero");
@@ -2204,29 +2194,34 @@ SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
   fatalErrorIf(Name.compare(0, 9, "__CAMADA_") == 0,
                "Symbol names with the reserved __CAMADA_ prefix are not "
                "permitted; rename the symbol");
-  SymbolExprCacheKey Key{Sort.get(), Name};
-  if (auto Cached = SymbolExprCache.find(Key); Cached != SymbolExprCache.end())
-    return Cached->second;
+  auto Named = SymbolExprCache.find(Name);
+  // Empty when a backend threw while the name's first symbol was being made.
+  if (Named == SymbolExprCache.end() || Named->second.empty())
+    return mkSymbolUnchecked(Name, Sort);
+  // Element references survive the rehash the alias's own insert may cause.
+  std::vector<SymbolCacheEntry> &Entries = Named->second;
+  for (const SymbolCacheEntry &Entry : Entries)
+    if (Entry.Sort == Sort.get())
+      return Entry.Exp;
   // Backends keep one sort per name: STP merges same-named symbols, MathSAT
   // and SMT-LIB abort on a redeclaration. A name already made with another
   // sort therefore gets a backend name of its own, in the reserved space so it
   // cannot meet a user symbol. The first sort keeps the plain name.
-  auto [Owner, First] = SymbolNameSort.try_emplace(Name, Sort.get());
-  if (First || Owner->second == Sort.get())
-    return mkSymbolUnchecked(Name, Sort);
   SMTExprRef theExp = mkSymbolUnchecked(
       "__CAMADA_alias" + std::to_string(SymbolAliasCounter++) + "_" + Name,
       Sort);
-  SymbolExprCache.emplace(std::move(Key), theExp);
+  Entries.push_back({Sort.get(), theExp});
   return theExp;
 }
 
 SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
                                             const SMTSortRef &Sort) {
-  SymbolExprCacheKey Key{Sort.get(), Name};
-  auto Cached = SymbolExprCache.find(Key);
-  if (Cached != SymbolExprCache.end())
-    return Cached->second;
+  // Element references survive the rehash a nested symbol (a lowered tuple's
+  // fields) may cause.
+  std::vector<SymbolCacheEntry> &Entries = SymbolExprCache[Name];
+  for (const SymbolCacheEntry &Entry : Entries)
+    if (Entry.Sort == Sort.get())
+      return Entry.Exp;
 
   SMTExprRef theExp;
   // Route tuple-typed symbols to the Camada-managed lowering on backends
@@ -2244,7 +2239,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
     theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
   }
-  SymbolExprCache.emplace(std::move(Key), theExp);
+  Entries.push_back({Sort.get(), theExp});
   return theExp;
 }
 
@@ -2329,16 +2324,20 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
+  const bool NativeOk =
+      nativeConstArraySupport() && nativeConstArrayAccepts(InitValue);
   if (Lowering == ConstArrayLowering::Auto)
-    Lowering = nativeConstArraySupport() ? ConstArrayLowering::Native
-                                         : ConstArrayLowering::Lazy;
-  // In Ackermann mode the lowering choice is moot (see below), so an
-  // explicit Native request is not an error on backends without native
-  // constant arrays.
-  fatalErrorIf(Lowering == ConstArrayLowering::Native &&
-                   !nativeConstArraySupport() &&
+    Lowering = NativeOk ? ConstArrayLowering::Native : ConstArrayLowering::Lazy;
+  // An explicit Native is not quietly downgraded: the caller asked for the
+  // backend operator, and the lazy lowering is a different term. In Ackermann
+  // mode the lowering choice is moot (see below), so it is not an error there.
+  fatalErrorIf(Lowering == ConstArrayLowering::Native && !NativeOk &&
                    arrayMode() != ArrayEncoding::Ackermann,
-               "Native constant arrays are not supported by this backend");
+               nativeConstArraySupport()
+                   ? "This backend's native constant arrays take only a "
+                     "literal initializer; use ConstArrayLowering::Auto or Lazy"
+                   : "Native constant arrays are not supported by this "
+                     "backend");
   // Tuple-involving initializers decompose into one constant array per
   // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
   // lowering (and its lazy machinery) applies per leaf.
@@ -2445,11 +2444,21 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
 }
 
 CheckResult SMTSolverImpl::check() {
-  // invalidateUnsatAssumptions() clears LastUnknownReason too. The sibling
+  // invalidateUnsatAssumptions() clears LastUnknown too. The sibling
   // in checkSatAssuming() does not have that luxury: it never calls this
   // hook, so it clears the reason itself.
   invalidateUnsatAssumptions();
-  return finishCheck(checkImpl());
+  return finishCheck(runBackendCheck([this] { return checkImpl(); }));
+}
+
+CheckResult
+SMTSolverImpl::runBackendCheck(const std::function<CheckResult()> &Check) {
+  try {
+    return Check();
+  } catch (const std::exception &E) {
+    noteUnknownReason(UnknownReason::BackendError, E.what());
+    return CheckResult::UNKNOWN;
+  }
 }
 
 CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
@@ -2468,14 +2477,14 @@ CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
   // assumption-based check would resolve this model's indexes with the
   // previous model's values and silently merge or drop array entries.
   if (Result != CheckResult::UNKNOWN) {
-    LastUnknownReason = UnknownReason::NotApplicable;
+    LastUnknown = {};
     return Result;
   }
   // A backend that recognised the cause already recorded it. Otherwise
   // attribute the UNKNOWN to the limit Camada set, if there was one:
   // several backends report a deadline stop as a bare "unknown".
-  if (LastUnknownReason == UnknownReason::NotApplicable)
-    LastUnknownReason =
+  if (LastUnknown.Reason == UnknownReason::NotApplicable)
+    LastUnknown.Reason =
         TimeoutMs ? UnknownReason::Timeout : UnknownReason::Incomplete;
   return Result;
 }
@@ -2490,9 +2499,11 @@ SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
   // addConstraint/push/pop (the default fallback and the activation-literal
   // lowerings do), all of which invalidate the unsat-assumption state, so
   // record it only after the check completes.
-  LastUnknownReason = UnknownReason::NotApplicable;
-  const CheckResult Result = finishCheck(
-      Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions));
+  LastUnknown = {};
+  const CheckResult Result = finishCheck(runBackendCheck([&] {
+    return Assumptions.empty() ? checkImpl()
+                               : checkSatAssumingImpl(Assumptions);
+  }));
   UnsatAssumptionsValid = Result == CheckResult::UNSAT;
   LastAssumptions =
       UnsatAssumptionsValid ? Assumptions : std::vector<SMTExprRef>{};
@@ -2511,7 +2522,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
     SMTSolverImpl &S;
     // Set once checkImpl() has answered; NotApplicable until then, so an
     // exception before that point restores nothing.
-    UnknownReason ReasonToRestore = UnknownReason::NotApplicable;
+    UnknownInfo UnknownToRestore;
     // A destructor is implicitly noexcept, and pop() can throw: it calls
     // popImpl() and then re-asserts the journaled lazy constraints, exactly
     // when the backend context may already be in an error state. Swallow
@@ -2530,9 +2541,9 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
       } else {
         S.pop();
       }
-      S.LastUnknownReason = ReasonToRestore;
+      S.LastUnknown = UnknownToRestore;
     }
-  } Guard{*this};
+  } Guard{*this, {}};
   for (const SMTExprRef &Assumption : Assumptions)
     addConstraint(Assumption);
   const CheckResult Result = checkImpl();
@@ -2541,7 +2552,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
   // before finishCheck() can read it. Have the guard carry it across the
   // teardown, or a precise BackendError is downgraded to the coarse
   // Timeout/Incomplete that finishCheck re-derives.
-  Guard.ReasonToRestore = LastUnknownReason;
+  Guard.UnknownToRestore = LastUnknown;
   return Result;
 }
 
@@ -2620,7 +2631,7 @@ void SMTSolverImpl::reset() {
   // reasonUnknown() is documented to report NotApplicable at any time
   // other than right after an UNKNOWN check; a reset discards the query
   // the reason belonged to.
-  LastUnknownReason = UnknownReason::NotApplicable;
+  LastUnknown = {};
   resetImpl();
   initializeCommonSingletons();
   // resetImpl() may recreate the backend context, dropping any limit
@@ -2742,7 +2753,7 @@ SMTExprRef SMTSolverImpl::mkBVAddOverflowImpl(const SMTExprRef &LHS,
   } else {
     // Unsigned addition overflows iff the (Width+1)-bit sum carries out.
     SMTExprRef Sum = mkBVAdd(mkBVZeroExt(LHS, 1), mkBVZeroExt(RHS, 1));
-    theExp = mkEqual(mkBVExtract(Width, Width, Sum), getBVOne1Expr());
+    theExp = mkEqual(mkBVExtract(Width, Width, Sum), cachedSmallBVExpr(1, 1));
   }
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVAddOverflow);
 }
@@ -2905,15 +2916,16 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
 SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
   // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(0, Exp->getWidth()));
-  SMTExprRef theExp =
-      mkIteImpl(mkNotImpl(comp), getBVOne1Expr(), getBVZero1Expr());
+  SMTExprRef theExp = mkIteImpl(mkNotImpl(comp), cachedSmallBVExpr(1, 1),
+                                cachedSmallBVExpr(0, 1));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
   // bvredand = bvcomp(x,-1) ? bv1 : bv0;
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(-1, Exp->getWidth()));
-  SMTExprRef theExp = mkIteImpl(comp, getBVOne1Expr(), getBVZero1Expr());
+  SMTExprRef theExp =
+      mkIteImpl(comp, cachedSmallBVExpr(1, 1), cachedSmallBVExpr(0, 1));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
 }
 

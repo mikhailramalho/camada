@@ -9,8 +9,8 @@
 // the table carries the whole capability story. Never by omission: a hole
 // in the matrix is always explained in the output.
 //
-// The test names and tags keep the historical spelling
-// ("SMTLIB pipeline: <fixture> [<child>]", "[<Backend>][SMTLIB][pipeline]").
+// Test names are "SMTLIB pipeline: <fixture> [<child>]", tagged
+// "[<Backend>][SMTLIB][pipeline]".
 
 #include "matrix.test.h" // camada_matrix::Exclusion
 #include "smtlib_pipeline.test.h"
@@ -26,20 +26,12 @@ using camada_matrix::Exclusion;
 // name as printed. These are facts about the child BINARIES, not about
 // camada's backends.
 constexpr Exclusion SMTLIBExclusions[] = {
+    // A row names a group (a set of fixtures sharing the same cause) or one
+    // fixture; the matrix rows say which group each fixture belongs to.
+
     // --- no Int/Real theory in the child ---
-    {"bitwuzla", "int_arithmetic_semantics", "the bitwuzla child is BV-only"},
-    {"bitwuzla", "real_arithmetic_semantics", "the bitwuzla child is BV-only"},
-    {"bitwuzla", "arith_division_semantics", "the bitwuzla child is BV-only"},
-    {"bitwuzla", "arith_model_queries", "the bitwuzla child is BV-only"},
-    {"bitwuzla", "arith_conversion_semantics", "the bitwuzla child is BV-only"},
-    {"bitwuzla", "int_bv_conversion_semantics",
-     "the bitwuzla child is BV-only"},
-    {"stp", "int_arithmetic_semantics", "the stp child is QF_AUFBV-only"},
-    {"stp", "real_arithmetic_semantics", "the stp child is QF_AUFBV-only"},
-    {"stp", "arith_division_semantics", "the stp child is QF_AUFBV-only"},
-    {"stp", "arith_model_queries", "the stp child is QF_AUFBV-only"},
-    {"stp", "arith_conversion_semantics", "the stp child is QF_AUFBV-only"},
-    {"stp", "int_bv_conversion_semantics", "the stp child is QF_AUFBV-only"},
+    {"bitwuzla", "arith", "the bitwuzla child is BV-only"},
+    {"stp", "arith", "the stp child is QF_AUFBV-only"},
 
     // --- no quantifiers in the child ---
     {"mathsat", "quantifier_semantics",
@@ -51,30 +43,12 @@ constexpr Exclusion SMTLIBExclusions[] = {
 
     // --- no (declare-datatypes ...) in the child; the [Camada] rows cover
     //     tuples there ---
-    {"bitwuzla", "tuple_semantics [native]",
+    {"bitwuzla", "native-tuples",
      "the bitwuzla child rejects declare-datatypes"},
-    {"bitwuzla", "tuple_with_array_field [native]",
-     "the bitwuzla child rejects declare-datatypes"},
-    {"bitwuzla", "empty_tuple_semantics [native]",
-     "the bitwuzla child rejects declare-datatypes"},
-    {"mathsat", "tuple_semantics [native]",
-     "the mathsat child rejects declare-datatypes"},
-    {"mathsat", "tuple_with_array_field [native]",
-     "the mathsat child rejects declare-datatypes"},
-    {"mathsat", "empty_tuple_semantics [native]",
-     "the mathsat child rejects declare-datatypes"},
-    {"yices-smt2", "tuple_semantics [native]",
+    {"mathsat", "native-tuples", "the mathsat child rejects declare-datatypes"},
+    {"yices-smt2", "native-tuples",
      "the yices-smt2 child rejects declare-datatypes"},
-    {"yices-smt2", "tuple_with_array_field [native]",
-     "the yices-smt2 child rejects declare-datatypes"},
-    {"yices-smt2", "empty_tuple_semantics [native]",
-     "the yices-smt2 child rejects declare-datatypes"},
-    {"stp", "tuple_semantics [native]",
-     "the stp child rejects declare-datatypes"},
-    {"stp", "tuple_with_array_field [native]",
-     "the stp child rejects declare-datatypes"},
-    {"stp", "empty_tuple_semantics [native]",
-     "the stp child rejects declare-datatypes"},
+    {"stp", "native-tuples", "the stp child rejects declare-datatypes"},
 
     // --- no FP theory in the child (the BVFP row still runs: the BV
     //     encoding puts only bit-vectors on the wire) ---
@@ -84,17 +58,9 @@ constexpr Exclusion SMTLIBExclusions[] = {
     // --- no ((as const ...)) array literals in the child; measured:
     //     yices-smt2 answers `undefined term: const`, stp a syntax error
     //     on `as`. array_model_values stays on: it builds no const array. ---
-    {"yices-smt2", "array",
+    {"yices-smt2", "const-arrays",
      "yices-smt2 does not implement ((as const ...)) array literals"},
-    {"yices-smt2", "array_const_store_semantics",
-     "yices-smt2 does not implement ((as const ...)) array literals"},
-    {"yices-smt2", "bool_array_const_store_semantics",
-     "yices-smt2 does not implement ((as const ...)) array literals"},
-    {"stp", "array",
-     "the stp child's parser has no ((as const ...)) array literals"},
-    {"stp", "array_const_store_semantics",
-     "the stp child's parser has no ((as const ...)) array literals"},
-    {"stp", "bool_array_const_store_semantics",
+    {"stp", "const-arrays",
      "the stp child's parser has no ((as const ...)) array literals"},
 
     // --- other measured child limits ---
@@ -113,35 +79,45 @@ constexpr Exclusion SMTLIBExclusions[] = {
      "declarations made inside a (push) scope die with the pop"},
 };
 
-inline const char *excluded(const char *Child, const char *Fixture) {
-  for (const auto &E : SMTLIBExclusions)
-    if (std::strcmp(E.Backend, Child) == 0 &&
-        std::strcmp(E.Group, Fixture) == 0)
-      return E.Reason;
-  return nullptr;
+// The reason a fixture is excluded for a child: through its group ("" for a
+// fixture in none) or by its own name.
+inline const char *excludedReason(const char *Child, const char *Group,
+                                  const char *Fixture) {
+  if (const char *Why = camada_matrix::excluded(SMTLIBExclusions, Child, Group))
+    return Why;
+  return camada_matrix::excluded(SMTLIBExclusions, Child, Fixture);
 }
 
 } // namespace camada_smtlib_matrix
 
-// A fixture driven through the pipe on a fresh SMTLIBSolver. ChildName is
-// the lowercase spelling in the test name; Tags the Catch2 tag string.
-#define CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, NameStr, MakeFn, ...)        \
+// One pipeline test case. SKIPs for an excluded (child, name) pair and when the
+// child's binary is not on disk; otherwise runs Body with `Cmd` in scope.
+#define CAMADA_SMTLIB_CASE(ChildName, Tags, CmdFn, Group, NameStr, ...)        \
   TEST_CASE("SMTLIB pipeline: " NameStr " [" ChildName "]", Tags) {            \
-    if (const char *Why = camada_smtlib_matrix::excluded(ChildName, NameStr))  \
+    if (const char *Why =                                                      \
+            camada_smtlib_matrix::excludedReason(ChildName, Group, NameStr))   \
       SKIP(Why);                                                               \
     CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::CmdFn(), ChildName);  \
-    camada::SMTSolverRef solver = camada_smtlib_pipeline::MakeFn(Cmd);         \
-    __VA_ARGS__;                                                               \
+    __VA_ARGS__                                                                \
   }
 
-// A pipeline-runner scenario (takes the argv, builds its own solver).
+// A pipeline scenario that takes the child's argv and builds its own solver.
 #define CAMADA_SMTLIB_RUNNER_ROW(ChildName, Tags, CmdFn, NameStr, RunFn)       \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [" ChildName "]", Tags) {            \
-    if (const char *Why = camada_smtlib_matrix::excluded(ChildName, NameStr))  \
-      SKIP(Why);                                                               \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::CmdFn(), ChildName);  \
-    camada_smtlib_pipeline::RunFn(Cmd);                                        \
-  }
+  CAMADA_SMTLIB_CASE(ChildName, Tags, CmdFn, "", NameStr,                      \
+                     camada_smtlib_pipeline::RunFn(Cmd);)
+
+// A shared fixture on a fresh SMTLIBSolver made by MakeFn, under NameStr, in
+// exclusion group Group ("" for none).
+#define CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, Group, NameStr, MakeFn, ...) \
+  CAMADA_SMTLIB_CASE(ChildName, Tags, CmdFn, Group, NameStr,                   \
+                     camada::SMTSolverRef solver =                             \
+                         camada_smtlib_pipeline::MakeFn(Cmd);                  \
+                     __VA_ARGS__;)
+
+// The common case: named after the fixture, on the default solver.
+#define CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, Group, Fixture)          \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, Group, #Fixture, makeSMTLIBSolver, \
+                    Fixture(solver))
 
 // clang-format off
 #define CAMADA_SMTLIB_MATRIX(ChildName, Tags, CmdFn)                           \
@@ -150,68 +126,57 @@ inline const char *excluded(const char *Child, const char *Fixture) {
   CAMADA_SMTLIB_RUNNER_ROW(ChildName, Tags, CmdFn,                             \
                            "dual emitter logs to file too",                    \
                            runSMTLIBDualEmitter)                               \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "equal_ten",                       \
-                    makeSMTLIBSolver, equal_ten(solver))                       \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "implies_semantics",               \
-                    makeSMTLIBSolver, implies_semantics(solver))               \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "implies_true_implies_false",      \
-                    makeSMTLIBSolver, implies_true_implies_false(solver))      \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "check_sat_assuming_semantics",    \
-                    makeSMTLIBSolver, check_sat_assuming_semantics(solver))    \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "bv_lshr_semantics",               \
-                    makeSMTLIBSolver, bv_lshr_semantics(solver))               \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "incremental_push_pop",            \
-                    makeSMTLIBSolver, incremental_push_pop(solver))            \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn,                                    \
-                    "symbol_cache_survives_push_pop", makeSMTLIBSolver,        \
-                    symbol_cache_survives_push_pop(solver))                    \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "array",                           \
-                    makeSMTLIBSolver, array(solver))                           \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "array_model_values",              \
-                    makeSMTLIBSolver, array_model_values(solver))              \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "array_const_store_semantics",     \
-                    makeSMTLIBSolver, array_const_store_semantics(solver))     \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn,                                    \
-                    "bool_array_const_store_semantics", makeSMTLIBSolver,      \
-                    bool_array_const_store_semantics(solver))                  \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "uf_semantics",                    \
-                    makeSMTLIBSolver, uf_semantics(solver))                    \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "quantifier_semantics",            \
-                    makeSMTLIBSolver, quantifier_semantics(solver))            \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "int_arithmetic_semantics",        \
-                    makeSMTLIBSolver, int_arithmetic_semantics(solver))        \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "real_arithmetic_semantics",       \
-                    makeSMTLIBSolver, real_arithmetic_semantics(solver))       \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "arith_division_semantics",        \
-                    makeSMTLIBSolver, arith_division_semantics(solver))        \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "arith_model_queries",             \
-                    makeSMTLIBSolver, arith_model_queries(solver))             \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "arith_conversion_semantics",      \
-                    makeSMTLIBSolver, arith_conversion_semantics(solver))      \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "int_bv_conversion_semantics",     \
-                    makeSMTLIBSolver, int_bv_conversion_semantics(solver))     \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "tuple_semantics [native]",        \
-                    makeSMTLIBSolver, tuple_semantics(solver))                 \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn,                                    \
-                    "tuple_with_array_field [native]", makeSMTLIBSolver,       \
-                    tuple_with_array_field(solver))                            \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "empty_tuple_semantics [native]",  \
-                    makeSMTLIBSolver, empty_tuple_semantics(solver))           \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "tuple_semantics [Camada]",        \
-                    makeSMTLIBSolverCamadaTuples, tuple_semantics(solver))     \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn,                                    \
-                    "tuple_with_array_field [Camada]",                         \
-                    makeSMTLIBSolverCamadaTuples,                              \
-                    tuple_with_array_field(solver))                            \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "empty_tuple_semantics [Camada]",  \
-                    makeSMTLIBSolverCamadaTuples, empty_tuple_semantics(solver)) \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "fp_equal NativeFP",               \
-                    makeSMTLIBSolver,                                          \
-                    fp_equal(solver, camada::FPEncoding::Native))              \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "fp_equal BVFP",                   \
-                    makeSMTLIBSolver, fp_equal(solver, camada::FPEncoding::BV)) \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "fxp_rounding_semantics",          \
-                    makeSMTLIBSolver, fxp_rounding_semantics(solver))          \
-  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "fxp_model_and_constructs",        \
-                    makeSMTLIBSolver, fxp_model_and_constructs(solver))
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", equal_ten)                 \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", implies_semantics)         \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "",                            \
+      implies_true_implies_false)                                              \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "",                            \
+      check_sat_assuming_semantics)                                            \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", bv_lshr_semantics)         \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", incremental_push_pop)      \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "",                            \
+      symbol_cache_survives_push_pop)                                          \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "const-arrays", array)         \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", array_model_values)        \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "const-arrays",                \
+      array_const_store_semantics)                                             \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "const-arrays",                \
+      bool_array_const_store_semantics)                                        \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "const-arrays",                \
+      const_array_nonliteral_initializer)                                      \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", uf_semantics)              \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", quantifier_semantics)      \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "arith",                       \
+      int_arithmetic_semantics)                                                \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "arith",                       \
+      real_arithmetic_semantics)                                               \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "arith",                       \
+      arith_division_semantics)                                                \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "arith", arith_model_queries)  \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "arith",                       \
+      arith_conversion_semantics)                                              \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "arith",                       \
+      int_bv_conversion_semantics)                                             \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "native-tuples",                   \
+      "tuple_semantics [native]", makeSMTLIBSolver, tuple_semantics(solver))   \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "native-tuples",                   \
+      "tuple_with_array_field [native]", makeSMTLIBSolver,                     \
+      tuple_with_array_field(solver))                                          \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "native-tuples",                   \
+      "empty_tuple_semantics [native]", makeSMTLIBSolver,                      \
+      empty_tuple_semantics(solver))                                           \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "", "tuple_semantics [Camada]",    \
+      makeSMTLIBSolverCamadaTuples, tuple_semantics(solver))                   \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "",                                \
+      "tuple_with_array_field [Camada]", makeSMTLIBSolverCamadaTuples,         \
+      tuple_with_array_field(solver))                                          \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "",                                \
+      "empty_tuple_semantics [Camada]", makeSMTLIBSolverCamadaTuples,          \
+      empty_tuple_semantics(solver))                                           \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "", "fp_equal NativeFP",           \
+      makeSMTLIBSolver, fp_equal(solver, camada::FPEncoding::Native))          \
+  CAMADA_SMTLIB_ROW(ChildName, Tags, CmdFn, "", "fp_equal BVFP",               \
+      makeSMTLIBSolver, fp_equal(solver, camada::FPEncoding::BV))              \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", fxp_rounding_semantics)    \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", fxp_model_and_constructs)
 // clang-format on

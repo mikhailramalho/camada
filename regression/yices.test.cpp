@@ -1,5 +1,5 @@
-#include "tests.h"
 #include "matrix.test.h"
+#include "tests.h"
 
 // One test case per shared fixture group; capability gates and
 // exclusions live in matrix.test.h.
@@ -55,6 +55,7 @@ TEST_CASE("Arith Yices test", "[YICES]") {
   {
     camada::SMTSolverRef yices =
         std::make_unique<myYicesArithSolver>("QF_UFLIA");
+    REQUIRE(yices->supports(camada::SolverFeature::IntRealArithmetic));
     auto int_sort = yices->mkIntSort();
     auto x = yices->mkSymbol("x", int_sort);
     auto one = yices->mkInt(1);
@@ -69,6 +70,7 @@ TEST_CASE("Arith Yices test", "[YICES]") {
   {
     camada::SMTSolverRef yices =
         std::make_unique<myYicesArithSolver>("QF_UFLRA");
+    REQUIRE(yices->supports(camada::SolverFeature::IntRealArithmetic));
     auto real_sort = yices->mkRealSort();
     auto r = yices->mkSymbol("r", real_sort);
     auto one = yices->mkReal(1);
@@ -83,6 +85,7 @@ TEST_CASE("Arith Yices test", "[YICES]") {
   {
     camada::SMTSolverRef yices =
         std::make_unique<myYicesArithSolver>("QF_UFLRA");
+    REQUIRE(yices->supports(camada::SolverFeature::IntRealArithmetic));
     arith_model_queries(yices);
   }
 
@@ -91,12 +94,14 @@ TEST_CASE("Arith Yices test", "[YICES]") {
     // through a context configured for a combined logic.
     camada::SMTSolverRef yices =
         std::make_unique<myYicesArithSolver>("QF_UFBVLIA");
+    REQUIRE(yices->supports(camada::SolverFeature::IntRealArithmetic));
     int_bv_conversion_semantics(yices);
   }
 
   {
     camada::SMTSolverRef yices =
         std::make_unique<myYicesArithSolver>("QF_UFLIRA");
+    REQUIRE(yices->supports(camada::SolverFeature::IntRealArithmetic));
     arith_conversion_semantics(yices);
   }
 }
@@ -152,7 +157,9 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   auto solver = camada::createYicesSolver();
   using camada::SolverFeature;
   REQUIRE(solver->getSolverKind() == camada::SolverKind::Yices);
-  REQUIRE(solver->supports(SolverFeature::IntRealArithmetic));
+  // The default QF_AUFBV context has no arithmetic; see the creation-logic
+  // test below.
+  REQUIRE_FALSE(solver->supports(SolverFeature::IntRealArithmetic));
   REQUIRE_FALSE(solver->supports(SolverFeature::Quantifiers));
   REQUIRE(solver->supports(SolverFeature::UninterpretedFunctions));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeFloatingPoint));
@@ -165,4 +172,64 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
 #endif
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
+}
+
+// A Yices context holds only the theories its logic names, so Int/Real support
+// is a property of the logic the solver was created with. Each logic below was
+// checked against Yices itself: a real inequality asserts under the arithmetic
+// ones and is rejected ("the context does not support arithmetic") under the
+// others.
+TEST_CASE("Yices Int/Real support follows the creation logic", "[YICES]") {
+  const auto supportsArith = [](const char *Logic) {
+    camada::SolverConfig Cfg;
+    Cfg.Logic = Logic;
+    return camada::createYicesSolver(Cfg)->supports(
+        camada::SolverFeature::IntRealArithmetic);
+  };
+
+  REQUIRE_FALSE(camada::createYicesSolver()->supports(
+      camada::SolverFeature::IntRealArithmetic));
+  for (const char *Logic :
+       {"QF_AUFBV", "QF_BV", "QF_UF", "QF_UFBV", "QF_ABV", "QF_AX"}) {
+    CAPTURE(Logic);
+    REQUIRE_FALSE(supportsArith(Logic));
+  }
+  for (const char *Logic :
+       {"QF_LIA", "QF_LRA", "QF_IDL", "QF_RDL", "QF_UFLIA", "QF_UFLRA",
+        "QF_UFLIRA", "QF_UFBVLIA", "QF_AUFLIA", "QF_AUFLIRA", "ALL"}) {
+    CAPTURE(Logic);
+    REQUIRE(supportsArith(Logic));
+  }
+
+  // The capability is the context's, so it survives a reset.
+  camada::SolverConfig Cfg;
+  Cfg.Logic = "QF_UFLIA";
+  auto arith = camada::createYicesSolver(Cfg);
+  arith->reset();
+  REQUIRE(arith->supports(camada::SolverFeature::IntRealArithmetic));
+  (void)arith->mkIntSort();
+}
+
+// Without arithmetic in the context, asking for an Int or Real sort is
+// rejected where it is made, not at the first arithmetic assertion.
+TEST_CASE("Yices rejects a logic it does not accept", "[YICES]") {
+  for (const char *Logic : {"QF_FOO", "AUFLIA"}) {
+    camada::SolverConfig Cfg;
+    Cfg.Logic = Logic;
+    require_abort([&]() { (void)camada::createYicesSolver(Cfg); });
+  }
+}
+
+TEST_CASE("Yices rejects Int/Real sorts without an arithmetic logic",
+          "[YICES]") {
+  auto yices = camada::createYicesSolver();
+  // Yices has the theory; the default QF_AUFBV context just leaves it off,
+  // so the message says how to turn it on rather than "not supported".
+  for (auto Make :
+       {&camada::SMTSolver::mkIntSort, &camada::SMTSolver::mkRealSort}) {
+    const std::string Message =
+        abort_message([&]() { (void)((*yices).*Make)(); });
+    REQUIRE(Message.find("disabled") != std::string::npos);
+    REQUIRE(Message.find("QF_AUFBV") != std::string::npos);
+  }
 }

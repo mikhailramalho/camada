@@ -1107,29 +1107,30 @@ void BitwuzlaSolver::dumpImpl(std::string &Out) {
 
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {
   Out.clear();
-  for (const auto &entry : SymbolExprCache) {
-    // The symbol cache also holds Camada-owned nodes (encoded tuples,
-    // tuple-array bundles, Ackermann arrays) that carry no bitwuzla term
-    // at all — casting one yields a garbage term and a SIGSEGV inside
-    // bitwuzla. Skip them: their backing per-field/per-read backend
-    // symbols are separate cache entries and print on their own.
-    const auto *BE = dynamic_cast<const BitwExpr *>(entry.second.get());
-    if (BE == nullptr)
-      continue;
-    const BitwuzlaTerm term = BE->Expr;
-    // A term without a symbol has nothing to name in a define-fun (and
-    // appending a null char* to std::string is undefined behavior).
-    const char *Symbol = bitwuzla_term_get_symbol(term);
-    if (Symbol == nullptr)
-      continue;
-    Out += "(define-fun ";
-    Out += Symbol;
-    Out += " () ";
-    Out += bitwuzla_sort_to_string(bitwuzla_term_get_sort(term));
-    Out += " ";
-    Out += bitwuzla_term_to_string(bitwuzla_get_value(Context, term));
-    Out += ")\n";
-  }
+  for (const auto &[Name, Entries] : SymbolExprCache)
+    for (const auto &Entry : Entries) {
+      // The symbol cache also holds Camada-owned nodes (encoded tuples,
+      // tuple-array bundles, Ackermann arrays) that carry no bitwuzla term
+      // at all — casting one yields a garbage term and a SIGSEGV inside
+      // bitwuzla. Skip them: their backing per-field/per-read backend
+      // symbols are separate cache entries and print on their own.
+      const auto *BE = dynamic_cast<const BitwExpr *>(Entry.Exp.get());
+      if (BE == nullptr)
+        continue;
+      const BitwuzlaTerm term = BE->Expr;
+      // A term without a symbol has nothing to name in a define-fun (and
+      // appending a null char* to std::string is undefined behavior).
+      const char *Symbol = bitwuzla_term_get_symbol(term);
+      if (Symbol == nullptr)
+        continue;
+      Out += "(define-fun ";
+      Out += Symbol;
+      Out += " () ";
+      Out += bitwuzla_sort_to_string(bitwuzla_term_get_sort(term));
+      Out += " ";
+      Out += bitwuzla_term_to_string(bitwuzla_get_value(Context, term));
+      Out += ")\n";
+    }
 }
 
 } // namespace camada

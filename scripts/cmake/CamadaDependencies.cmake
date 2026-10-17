@@ -33,13 +33,29 @@ set(CAMADA_DEPS_INSTALL_DIR
 # and a release that bundles a shared libz3 is not what Camada's tarballs are
 # meant to be. 5.3.0 is also the first release with the fp.rem truncation and
 # fp.fma rounding fixes. Windows keeps the prebuilt: it has always shipped
-# libz3.lib + libz3.dll, and MSVC is not built from source here.
+# libz3.lib + libz3.dll, and MSVC is not built from source here. Catch2 for the
+# regression suite when no new-enough copy is installed. It is installed into
+# the deps prefix like a solver, so a cached deps tree (CI) skips the build, and
+# a bump here changes this file's hash, the CI cache key.
+set(CAMADA_CATCH2_GIT_TAG
+    "v3.16.1"
+    CACHE STRING "Catch2 tag built when no suitable Catch2 is installed")
+set(CAMADA_CATCH2_SHA256
+    "d16bd1b8b2364918bd472cb216394acb93bde6784890df0d91bccfb3f28d777d"
+    CACHE STRING "Expected SHA256 of the Catch2 source archive")
+
 set(CAMADA_Z3_GIT_TAG
     "z3-5.3.1"
     CACHE STRING "Z3 tag built from source (every platform but Windows)")
 set(CAMADA_Z3_SHA256
     "c007089dd8d92298d2a7d14105b14e8dddfbb540062ce471c3111e0741edd8da"
     CACHE STRING "Expected SHA256 of the Z3 source archive")
+# Z3's own build type, not Camada's: a Debug Z3 is dramatically slower, and a
+# Debug Camada is for debugging Camada. Z3's API is plain C (z3++.h is thin
+# inline wrappers), so the two need not match.
+set(CAMADA_Z3_BUILD_TYPE
+    "Release"
+    CACHE STRING "CMake build type used when building Z3 from source")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-win.zip"
     CACHE STRING
@@ -202,6 +218,19 @@ function(camada_run_checked)
         "Command failed with exit code ${command_result}\nWorking directory: ${CAMADA_RUN_WORKING_DIRECTORY}\nCommand: ${command_string}\nstdout:\n${command_stdout}\nstderr:\n${command_stderr}"
     )
   endif()
+endfunction()
+
+# The parallel job count for a from-source build: the logical core count, at
+# least 1. An unbounded parallel build starts every ready compile at once, and a
+# few hundred concurrent compiler processes exhaust a small CI runner.
+function(camada_job_count out_var)
+  cmake_host_system_information(RESULT jobs QUERY NUMBER_OF_LOGICAL_CORES)
+  if(NOT jobs OR jobs LESS 1)
+    set(jobs 1)
+  endif()
+  set(${out_var}
+      ${jobs}
+      PARENT_SCOPE)
 endfunction()
 
 function(camada_find_gmp_header out_var)
@@ -1121,6 +1150,10 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
   # A pkg-config file is looked up before any fallback and does not depend on
   # the compiler, so publish the shared CaDiCaL through one.
   set(cadical_pc_dir "${cadical_prefix}/lib/pkgconfig")
+  # The pc file's version is the pinned one ("rel-2.1.3-elevate" -> 2.1.3), so
+  # it cannot disagree with the CaDiCaL actually built.
+  string(REGEX MATCH "[0-9]+(\\.[0-9]+)+" cadical_version
+               "${_camada_cadical_tag}")
   file(
     WRITE "${cadical_pc_dir}/cadical.pc"
     "prefix=${cadical_prefix}
@@ -1129,7 +1162,7 @@ includedir=\${prefix}/include
 
 Name: cadical
 Description: CaDiCaL SAT solver, shared by Camada's backends
-Version: 2.1.3
+Version: ${cadical_version}
 Libs: -L\${libdir} -lcadical
 Cflags: -I\${includedir}
 ")
@@ -1153,6 +1186,11 @@ Cflags: -I\${includedir}
     set(ENV{CPATH} "${cadical_prefix}/include")
   endif()
 
+  # Bitwuzla looks CaDiCaL up with find_library (the LIBRARY_PATH/CPATH above
+  # put ours ahead of any system copy), then pkg-config (cadical.pc), then its
+  # wrap. Without the wrap there is no bundled fallback: a lookup that misses
+  # the shared CaDiCaL fails at setup instead of embedding a second copy.
+  file(REMOVE "${bitwuzla_source_dir}/subprojects/cadical.wrap")
   camada_run_checked(
     WORKING_DIRECTORY
     "${bitwuzla_source_dir}"
@@ -1170,18 +1208,6 @@ Cflags: -I\${includedir}
     -Dcryptominisat=false
     -Dgimsatul=false
     -Dtesting=disabled)
-
-  # Fail here, with the cause, rather than at a link step much later: a cadical
-  # subproject in the build tree means the lookup above did not find the shared
-  # one (is pkg-config installed?) and Bitwuzla embeds its own.
-  file(GLOB bitwuzla_bundled_cadical
-       "${bitwuzla_build_dir}/subprojects/cadical*")
-  if(bitwuzla_bundled_cadical)
-    message(
-      FATAL_ERROR
-        "Bitwuzla's build fell back to its bundled CaDiCaL instead of the shared one in ${cadical_prefix}. It looks CaDiCaL up through pkg-config; make sure pkg-config (or pkgconf) is installed."
-    )
-  endif()
 
   camada_run_checked(WORKING_DIRECTORY "${bitwuzla_build_dir}" MESSAGE
                      "Building Bitwuzla" COMMAND "${ninja_program}")
@@ -1337,10 +1363,7 @@ function(camada_build_cvc5_from_source)
   # unbounded: make starts every ready target at once, and a few hundred
   # concurrent cc1plus instances exhaust a 16 GB CI runner long before the build
   # finishes (SIGTERM, ~85s in). Bound it by processor count.
-  cmake_host_system_information(RESULT cvc5_jobs QUERY NUMBER_OF_LOGICAL_CORES)
-  if(NOT cvc5_jobs OR cvc5_jobs LESS 1)
-    set(cvc5_jobs 1)
-  endif()
+  camada_job_count(cvc5_jobs)
   camada_run_checked(
     WORKING_DIRECTORY
     "${cvc5_build_dir}"
@@ -1426,13 +1449,23 @@ function(camada_setup_stp)
     30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe)
 
   if(APPLE)
-    file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
+    # STATICCOMPILE implies BUILD_SHARED_LIBS=OFF, which makes STP link its
+    # executables with -static; macOS has no static libc. STP offers no switch
+    # for that flag alone, so remove its line -- and fail, rather than quietly
+    # do nothing, if a newer STP words it differently.
+    file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_original)
     string(
       REPLACE
         "        set(CMAKE_EXE_LINKER_FLAGS \"\${CMAKE_EXE_LINKER_FLAGS} -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -static \")"
         ""
         stp_cmake_contents
-        "${stp_cmake_contents}")
+        "${stp_cmake_original}")
+    if(stp_cmake_contents STREQUAL stp_cmake_original)
+      message(
+        FATAL_ERROR
+          "STP's CMakeLists.txt no longer contains the -static executable linker flag this recipe removes on macOS. Update the patch in camada_setup_stp for this STP version."
+      )
+    endif()
     file(WRITE "${stp_source_dir}/CMakeLists.txt" "${stp_cmake_contents}")
   endif()
 
@@ -1594,17 +1627,41 @@ endfunction()
 # position-independent so it can land in a shared library. Z3 vendors no SAT
 # engine of its own to clash with the shared CaDiCaL, and uses its internal
 # multiprecision rather than GMP, so it adds nothing to the single-GMP story.
-# The z3 executable is built too: the SMT-LIB pipeline tests drive it.
+# The z3 executable is built only with the regression suite, whose SMT-LIB
+# pipeline tests drive it.
+#
+# Each variant keeps its build tree, configured --fresh so the initial cache
+# below always applies: a rebuild (a variant switch, the regression suite turned
+# on, a retried install) recompiles only what changed. A CMake-built dependency
+# gets Camada's own toolchain and flags (so a release build's path remapping and
+# macOS deployment target reach it) through an initial-cache file: a ';' in -D
+# arguments splits them in camada_run_checked.
+function(camada_write_initial_cache path)
+  file(WRITE "${path}" "")
+  foreach(inherited IN ITEMS C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
+                             OSX_DEPLOYMENT_TARGET OSX_ARCHITECTURES)
+    if(CMAKE_${inherited})
+      file(APPEND "${path}"
+           "set(CMAKE_${inherited} [==[${CMAKE_${inherited}}]==] "
+           "CACHE STRING \"\" FORCE)\n")
+    endif()
+  endforeach()
+endfunction()
+
 function(camada_build_z3_from_source)
   camada_fetch_git_source(z3src Z3Prover/z3 "${CAMADA_Z3_GIT_TAG}"
                           z3_source_dir "${CAMADA_Z3_SHA256}")
-  set(z3_build_dir "${z3_source_dir}/camada-build")
-  file(REMOVE_RECURSE "${z3_build_dir}")
-
   if(BUILD_SHARED_LIBS)
     set(z3_shared ON)
+    set(z3_build_dir "${z3_source_dir}/camada-build-shared")
   else()
     set(z3_shared OFF)
+    set(z3_build_dir "${z3_source_dir}/camada-build-static")
+  endif()
+  if(CAMADA_ENABLE_REGRESSION)
+    set(z3_executable ON)
+  else()
+    set(z3_executable OFF)
   endif()
   if(APPLE)
     set(z3_rpath "@loader_path/../lib")
@@ -1613,7 +1670,7 @@ function(camada_build_z3_from_source)
   endif()
 
   set(z3_cmake_args
-      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_BUILD_TYPE=${CAMADA_Z3_BUILD_TYPE}
       -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
       # Z3's default libdir would otherwise follow the host's lib64 convention.
       -DCMAKE_INSTALL_LIBDIR=lib
@@ -1621,22 +1678,14 @@ function(camada_build_z3_from_source)
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
       # The z3 executable has to find a shared libz3 beside the install.
       "-DCMAKE_INSTALL_RPATH=${z3_rpath}"
-      -DZ3_BUILD_EXECUTABLE=ON
+      -DZ3_BUILD_EXECUTABLE=${z3_executable}
       -DZ3_BUILD_TEST_EXECUTABLES=OFF
       -DZ3_ENABLE_EXAMPLE_TARGETS=OFF
       # A tarball carries no git history to describe.
       -DZ3_INCLUDE_GIT_HASH=OFF
       -DZ3_INCLUDE_GIT_DESCRIBE=OFF)
-  # Build with the toolchain and flags Camada itself was configured with, so a
-  # release build's path-prefix remapping (and a macOS deployment target) reach
-  # Z3 as well.
-  foreach(z3_inherited IN ITEMS C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
-                                OSX_DEPLOYMENT_TARGET OSX_ARCHITECTURES)
-    if(CMAKE_${z3_inherited})
-      list(APPEND z3_cmake_args
-           -DCMAKE_${z3_inherited}=${CMAKE_${z3_inherited}})
-    endif()
-  endforeach()
+  camada_write_initial_cache("${z3_source_dir}/camada-initial-cache.cmake")
+  list(APPEND z3_cmake_args -C "${z3_source_dir}/camada-initial-cache.cmake")
 
   # Ninja when it is there (the Bitwuzla recipe needs it anyway): a Unix
   # Makefiles tree built with a wide -j once lost object directories under the
@@ -1656,6 +1705,7 @@ function(camada_build_z3_from_source)
     "Configuring Z3"
     COMMAND
     "${CMAKE_COMMAND}"
+    --fresh
     -S
     "${z3_source_dir}"
     -B
@@ -1664,12 +1714,7 @@ function(camada_build_z3_from_source)
     "${z3_generator}"
     ${z3_cmake_args})
 
-  # Bound the job count by processor count, as for CVC5: an unbounded parallel
-  # build starts every ready compile at once and exhausts a small CI runner.
-  cmake_host_system_information(RESULT z3_jobs QUERY NUMBER_OF_LOGICAL_CORES)
-  if(NOT z3_jobs OR z3_jobs LESS 1)
-    set(z3_jobs 1)
-  endif()
+  camada_job_count(z3_jobs)
   camada_run_checked(
     WORKING_DIRECTORY
     "${z3_source_dir}"
@@ -1709,7 +1754,10 @@ function(camada_setup_z3)
     else()
       set(z3_installed "lib/libz3.a")
     endif()
-    if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/${z3_installed}")
+    if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/${z3_installed}"
+       AND (NOT CAMADA_ENABLE_REGRESSION OR EXISTS
+                                            "${CAMADA_DEPS_INSTALL_DIR}/bin/z3"
+           ))
       return()
     endif()
     camada_ensure_deps_dirs()
@@ -1885,4 +1933,68 @@ function(camada_setup_mathsat)
     file(COPY "${mathsat_source_dir}/include/"
          DESTINATION "${CAMADA_DEPS_INSTALL_DIR}/include")
   endif()
+endfunction()
+
+function(camada_setup_catch2)
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/Catch2/Catch2Config.cmake")
+    return()
+  endif()
+  message(STATUS "Catch2 not found locally. Building it for regression.")
+  camada_ensure_deps_dirs()
+  camada_fetch_git_source(catch2src catchorg/Catch2 "${CAMADA_CATCH2_GIT_TAG}"
+                          catch2_source_dir "${CAMADA_CATCH2_SHA256}")
+  set(catch2_build_dir "${catch2_source_dir}/camada-build")
+  camada_write_initial_cache("${catch2_source_dir}/camada-initial-cache.cmake")
+  if(CMAKE_BUILD_TYPE)
+    set(catch2_build_type "${CMAKE_BUILD_TYPE}")
+  else()
+    set(catch2_build_type Release)
+  endif()
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${catch2_source_dir}"
+    MESSAGE
+    "Configuring Catch2"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --fresh
+    -S
+    "${catch2_source_dir}"
+    -B
+    "${catch2_build_dir}"
+    -G
+    "${CMAKE_GENERATOR}"
+    -C
+    "${catch2_source_dir}/camada-initial-cache.cmake"
+    -DCMAKE_BUILD_TYPE=${catch2_build_type}
+    -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
+    -DCMAKE_INSTALL_LIBDIR=lib
+    -DBUILD_TESTING=OFF
+    -DCATCH_INSTALL_DOCS=OFF
+    -DCATCH_INSTALL_EXTRAS=ON)
+  camada_job_count(catch2_jobs)
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${catch2_source_dir}"
+    MESSAGE
+    "Building Catch2 with ${catch2_jobs} job(s)"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --build
+    "${catch2_build_dir}"
+    --config
+    ${catch2_build_type}
+    --parallel
+    ${catch2_jobs})
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${catch2_source_dir}"
+    MESSAGE
+    "Installing Catch2"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --install
+    "${catch2_build_dir}"
+    --config
+    ${catch2_build_type})
 endfunction()

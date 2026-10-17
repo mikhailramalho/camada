@@ -283,6 +283,12 @@ protected:
 
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
+  /// A Yices context holds only the theories its logic names, so Int/Real
+  /// arithmetic is available exactly when the logic Context was created with
+  /// includes it (QF_UFLIA, QF_LRA, QF_UFBVLIA, ...), not for every Yices
+  /// solver. The default QF_AUFBV context has none.
+  bool intRealArithmeticSupport() const override;
+  std::string noIntRealArithmeticMessage(const char *Feature) const override;
   bool quantifierSupport() const override { return false; }
   bool nativeFloatingPointSupport() const override { return false; }
   // Tracked natively, no creation-time opt-in.

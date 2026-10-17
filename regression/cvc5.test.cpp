@@ -1,5 +1,5 @@
-#include "tests.h"
 #include "matrix.test.h"
+#include "tests.h"
 
 // One test case per shared fixture group; capability gates and
 // exclusions live in matrix.test.h.
@@ -59,4 +59,32 @@ TEST_CASE("Unsat-assumption opt-in CVC5 test", "[CVC5]") {
   auto core = solver->getUnsatAssumptions();
   REQUIRE(core);
   REQUIRE(!core.value().empty());
+}
+
+// CVC5's native constant array takes only a value. Auto routes a symbolic
+// initializer to the lazy lowering (const_array_nonliteral_initializer proves
+// that works); an explicit Native request is rejected rather than quietly
+// answered with a different term.
+TEST_CASE("CVC5 native constant arrays reject a non-literal initializer",
+          "[CVC5]") {
+  auto solver = camada::createCVC5Solver();
+  auto idx = solver->mkBVSort(3);
+  auto elem = solver->mkBVSort(8);
+  auto sym = solver->mkSymbol("init_sym", elem);
+
+  require_abort([&]() {
+    (void)solver->mkArrayConst(idx, sym, camada::ConstArrayLowering::Native);
+  });
+
+  // A literal is still native, and Auto still builds the symbolic one.
+  auto literal = solver->mkBVFromDec(5, elem);
+  REQUIRE(solver->mkArrayConst(idx, literal, camada::ConstArrayLowering::Native)
+              ->getKind() == camada::SMTExprKind::ArrayConst);
+  auto lazy = solver->mkArrayConst(idx, sym);
+  REQUIRE(lazy->isArraySort());
+
+  // A tuple literal is a value too.
+  auto tuple = solver->mkTuple({literal, solver->mkBool(true)});
+  REQUIRE(solver->mkArrayConst(idx, tuple, camada::ConstArrayLowering::Native)
+              ->getKind() == camada::SMTExprKind::ArrayConst);
 }

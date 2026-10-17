@@ -64,9 +64,12 @@ enum class FPEncoding : bool { Native, BV };
 /// ites may mix them); the choice only affects how the "every element
 /// equals InitValue" semantics are produced.
 ///
-/// - Auto: native `((as const ...) v)` when the backend supports it, the
-///   Camada lazy lowering otherwise. The right default for almost all uses.
-/// - Native: force the backend operator; fails on backends without one.
+/// - Auto: native `((as const ...) v)` when the backend supports it for this
+///   initializer, the Camada lazy lowering otherwise. The right default for
+///   almost all uses.
+/// - Native: force the backend operator; fails on backends without one, and
+///   on a backend whose operator takes only a literal (CVC5) when the
+///   initializer is a symbol or a computed term.
 /// - Lazy: force the Camada lowering — a fresh array symbol whose default
 ///   value is asserted on demand at each index the formula observes. Works
 ///   at any index width and is the entry point for initializers that have
@@ -223,7 +226,9 @@ enum class SolverKind : std::uint8_t {
 /// describe what Camada emits — a particular child solver may still
 /// reject a construct at runtime.
 enum class SolverFeature : std::uint8_t {
-  /// Int/Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
+  /// Int/Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*). On Yices
+  /// this follows the logic the solver was created with (SolverConfig::Logic):
+  /// its default QF_AUFBV context has no arithmetic.
   IntRealArithmetic,
   /// Quantified formulas (mkForall, mkExists).
   Quantifiers,

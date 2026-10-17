@@ -40,19 +40,19 @@ constexpr Exclusion MatrixExclusions[] = {
      "a native constant array used as an array element always reaches "
      "bitwuzla's array solver, which answers UNKNOWN for CONST_ARRAY "
      "terms; the lazy lowering in the nesting group covers these shapes"},
-    {"Yices", "tuple-with-int",
-     "the default Yices context enables no arithmetic; Int needs a context "
-     "configured for an arithmetic logic (see the Arith Yices test)"},
-    {"Yices", "arith",
-     "each arith fixture needs a context configured for its logic; the "
-     "Arith Yices test runs them on per-logic contexts"},
-    {"MathSAT", "arith/symbolic-shift",
+    {"Yices", "arith-symbolic-shift",
+     "the Yices backend has no symbolic-amount shift (mkArithShl with a "
+     "non-constant amount is unimplemented), whatever logic the context has"},
+    {"MathSAT", "arith-symbolic-shift",
      "pow with a symbolic exponent answers UNSAT on a SAT query, still "
      "broken in MathSAT 5.6.19 despite its LA(Z) fixes"},
 };
 
-inline const char *excluded(const char *Backend, const char *Group) {
-  for (const auto &E : MatrixExclusions)
+// The reason a (Backend, Group) cell is excluded from Table, or null.
+template <std::size_t N>
+const char *excluded(const Exclusion (&Table)[N], const char *Backend,
+                     const char *Group) {
+  for (const auto &E : Table)
     if (std::strcmp(E.Backend, Backend) == 0 &&
         std::strcmp(E.Group, Group) == 0)
       return E.Reason;
@@ -63,58 +63,60 @@ inline const char *excluded(const char *Backend, const char *Group) {
 
 #define CAMADA_MATRIX_CASE(Backend, Group, ...)                                \
   TEST_CASE(Group " group " #Backend " test", "[" #Backend "][matrix]") {      \
-    if (const char *Why = camada_matrix::excluded(#Backend, Group))            \
+    if (const char *Why = camada_matrix::excluded(                             \
+            camada_matrix::MatrixExclusions, #Backend, Group))                 \
       SKIP(Why);                                                               \
     __VA_ARGS__                                                                \
   }
 
+// A group that is just one function over a fresh solver.
+#define CAMADA_MATRIX_GROUP(Backend, Factory, Group, GroupFn)                  \
+  CAMADA_MATRIX_CASE(Backend, Group, {                                         \
+    auto solver = Factory({});                                                 \
+    GroupFn(solver);                                                           \
+  })
+
+// A group that needs a feature the backend may lack. Without it the cell
+// proves the rejection instead (Unsupported must reject, not be undefined
+// behavior) and reports Skipped: the semantics did not run.
+#define CAMADA_REJECTED_WITHOUT(Feature, ...)                                  \
+  if (!solver->supports(camada::SolverFeature::Feature)) {                     \
+    __VA_ARGS__                                                                \
+    SKIP("feature absent: rejection verified, semantics not run");             \
+  }
+
+// A group that only needs Int/Real arithmetic to exist.
+#define CAMADA_MATRIX_ARITH_GROUP(Backend, Factory, Group, Fn)                 \
+  CAMADA_MATRIX_CASE(Backend, Group, {                                         \
+    auto solver = Factory({});                                                 \
+    if (!solver->supports(camada::SolverFeature::IntRealArithmetic))           \
+      SKIP("no Int/Real arithmetic");                                          \
+    Fn(solver);                                                                \
+  })
+
 // clang-format off
 #define CAMADA_SHARED_MATRIX(Backend, Factory)                                 \
-  CAMADA_MATRIX_CASE(Backend, "core", {                                        \
-    auto solver = Factory({});                                                 \
-    tests_core(solver);                                                        \
-  })                                                                           \
-  CAMADA_MATRIX_CASE(Backend, "arrays", {                                      \
-    auto solver = Factory({});                                                 \
-    tests_arrays(solver);                                                      \
-  })                                                                           \
-  CAMADA_MATRIX_CASE(Backend, "tuples", {                                      \
-    auto solver = Factory({});                                                 \
-    tests_tuples(solver);                                                      \
-  })                                                                           \
-  CAMADA_MATRIX_CASE(Backend, "fp", {                                          \
-    auto solver = Factory({});                                                 \
-    tests_fp(solver);                                                          \
-  })                                                                           \
-  CAMADA_MATRIX_CASE(Backend, "fxp", {                                         \
-    auto solver = Factory({});                                                 \
-    tests_fxp(solver);                                                         \
-  })                                                                           \
-  CAMADA_MATRIX_CASE(Backend, "nesting", {                                     \
-    auto solver = Factory({});                                                 \
-    tests_nesting(solver);                                                     \
-  })                                                                           \
-  CAMADA_MATRIX_CASE(Backend, "nesting-native-const", {                        \
-    auto solver = Factory({});                                                 \
-    tests_nesting_native_const(solver);                                        \
-  })                                                                           \
+  CAMADA_MATRIX_GROUP(Backend, Factory, "core", tests_core)                    \
+  CAMADA_MATRIX_GROUP(Backend, Factory, "arrays", tests_arrays)                \
+  CAMADA_MATRIX_GROUP(Backend, Factory, "tuples", tests_tuples)                \
+  CAMADA_MATRIX_GROUP(Backend, Factory, "fp", tests_fp)                        \
+  CAMADA_MATRIX_GROUP(Backend, Factory, "fxp", tests_fxp)                      \
+  CAMADA_MATRIX_GROUP(Backend, Factory, "nesting", tests_nesting)              \
+  CAMADA_MATRIX_GROUP(Backend, Factory, "nesting-native-const",                \
+                      tests_nesting_native_const)                              \
   CAMADA_MATRIX_CASE(Backend, "uf", {                                          \
     auto solver = Factory({});                                                 \
-    if (!solver->supports(camada::SolverFeature::UninterpretedFunctions)) {    \
-      /* Unsupported must reject, not be undefined behavior. */                \
+    CAMADA_REJECTED_WITHOUT(UninterpretedFunctions,                            \
       require_abort([&]() {                                                    \
         auto bv4 = solver->mkBVSort(4);                                        \
         auto fn = solver->mkFunctionSort({bv4}, bv4);                          \
         (void)solver->mkSymbol("f", fn);                                       \
-      });                                                                      \
-      SKIP("feature absent: rejection verified, semantics not run");           \
-    }                                                                          \
+      });)                                                                     \
     uf_semantics(solver);                                                      \
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "quantifiers", {                                 \
     auto solver = Factory({});                                                 \
-    if (!solver->supports(camada::SolverFeature::Quantifiers)) {               \
-      /* Unsupported must reject, not be undefined behavior. */                \
+    CAMADA_REJECTED_WITHOUT(Quantifiers,                                       \
       require_abort([&]() {                                                    \
         auto x = solver->mkSymbol("x", solver->mkBVSort(4));                   \
         (void)solver->mkForall({x}, solver->mkEqual(x, x));                    \
@@ -122,28 +124,20 @@ inline const char *excluded(const char *Backend, const char *Group) {
       require_abort([&]() {                                                    \
         auto x = solver->mkSymbol("x", solver->mkBVSort(4));                   \
         (void)solver->mkExists({x}, solver->mkEqual(x, x));                    \
-      });                                                                      \
-      SKIP("feature absent: rejection verified, semantics not run");           \
-    }                                                                          \
+      });)                                                                     \
     quantifier_semantics(solver);                                              \
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "arith", {                                       \
     auto solver = Factory({});                                                 \
-    if (!solver->supports(camada::SolverFeature::IntRealArithmetic)) {         \
-      /* Unsupported must reject, not be undefined behavior. */                \
+    CAMADA_REJECTED_WITHOUT(IntRealArithmetic,                                 \
       require_abort([&]() { (void)solver->mkIntSort(); });                     \
-      require_abort([&]() { (void)solver->mkRealSort(); });                    \
-      SKIP("feature absent: rejection verified, semantics not run");           \
-    }                                                                          \
-    tests_arith(solver, camada_matrix::excluded(                               \
-                            #Backend, "arith/symbolic-shift") == nullptr);     \
+      require_abort([&]() { (void)solver->mkRealSort(); });)                   \
+    tests_arith(solver);                                                       \
   })                                                                           \
-  CAMADA_MATRIX_CASE(Backend, "tuple-with-int", {                              \
-    auto solver = Factory({});                                                 \
-    if (!solver->supports(camada::SolverFeature::IntRealArithmetic))           \
-      SKIP("no Int/Real arithmetic");                                          \
-    tuple_semantics_with_int(solver);                                          \
-  })                                                                           \
+  CAMADA_MATRIX_ARITH_GROUP(Backend, Factory, "arith-symbolic-shift",          \
+                            arith_symbolic_shift_semantics)                    \
+  CAMADA_MATRIX_ARITH_GROUP(Backend, Factory, "tuple-with-int",                \
+                            tuple_semantics_with_int)                          \
   CAMADA_MATRIX_CASE(Backend, "ackermann-arrays", {                            \
     camada::SolverConfig Cfg;                                                  \
     Cfg.Arrays = camada::ArrayEncoding::Ackermann;                             \
@@ -162,13 +156,7 @@ inline const char *excluded(const char *Backend, const char *Group) {
       SKIP("no native datatypes; the tuples group already runs the Camada "    \
            "lowering here");                                                   \
     REQUIRE(solver->tupleMode() == camada::TupleEncoding::Camada);             \
-    tuple_semantics(solver);                                                   \
-    solver->reset();                                                           \
-    tuple_with_array_field(solver);                                            \
-    solver->reset();                                                           \
-    tuple_array_semantics(solver);                                             \
-    solver->reset();                                                           \
-    tuple_update_semantics(solver);                                            \
+    tests_camada_tuples(solver);                                               \
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "foreign-handles", {                             \
     auto a = Factory({});                                                      \

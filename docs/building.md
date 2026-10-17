@@ -54,9 +54,14 @@ Downloaded sources and locally installed solver artifacts are stored under
 
 When CMake downloads dependencies itself:
 - `Bitwuzla` uses a source build from `0.9.1`.
-- `Z3` uses a static source build of `z3-5.3.1` on Linux and macOS. The 5.3
+- `Z3` is built from source on Linux and macOS, in the variant Camada itself
+  is built as: shared for a shared Camada, static for a static one. The 5.3
   prebuilts ship only a shared `libz3` there, and Camada's release tarballs
-  link Z3 statically. Windows uses the prebuilt `z3-5.3.1` archive.
+  link Z3 statically. A static Camada links `libz3.a` whole-archive, because
+  Z3 5.3 registers its tactics through static initializers that a normal
+  static link drops, and so does not use a shared `libz3` it happens to find.
+  `CAMADA_Z3_BUILD_TYPE` (default `Release`) sets the build type of that Z3,
+  independently of Camada's. Windows uses the prebuilt `z3-5.3.1` archive.
 - `CVC5` uses a source build from `cvc5-1.4.2`.
 - `CaDiCaL` uses a source build, shared by every backend that needs it:
   Bitwuzla, CVC5 and STP link one copy, because two copies built with

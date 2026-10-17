@@ -14,6 +14,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #if !defined(_WIN32)
 #include <sys/wait.h>
 #include <unistd.h>
@@ -44,30 +45,10 @@ inline void disable_core_dump() {
   solver->reset();                                                             \
   testname(solver, arg);
 
-template <typename Fn> inline void require_abort(Fn &&Body) {
-#if defined(_WIN32)
-  SKIP("Abort regression helper is not implemented on Windows");
-#else
-  const pid_t pid = fork();
-  REQUIRE(pid != -1);
-
-  if (pid == 0) {
-    disable_core_dump();
-    Body();
-    std::_Exit(0);
-  }
-
-  int status = 0;
-  REQUIRE(waitpid(pid, &status, 0) == pid);
-  REQUIRE(WIFSIGNALED(status));
-  REQUIRE(WTERMSIG(status) == SIGABRT);
-#endif
-}
-
-// Like require_abort, but returns what the aborting child wrote to stderr so
-// a test can assert on the diagnostic itself. A sort mismatch that aborts
-// with the right signal but an unhelpful message is still a bug for the
-// consumer trying to find which of its types mapped wrong.
+// Runs Body in a forked child and returns what the child wrote to stderr,
+// requiring that it die of SIGABRT. A sort mismatch that aborts with the right
+// signal but an unhelpful message is still a bug for the consumer trying to
+// find which of its types mapped wrong, so tests can assert on the diagnostic.
 //
 // The child writes to a temporary file rather than a pipe: other fixtures in
 // this suite fork too, and a pipe held open across those forks is inherited
@@ -110,6 +91,11 @@ template <typename Fn> inline std::string abort_message(Fn &&Body) {
   unlink(Path);
   return Out;
 #endif
+}
+
+// Requires that Body dies of SIGABRT.
+template <typename Fn> inline void require_abort(Fn &&Body) {
+  (void)abort_message(std::forward<Fn>(Body));
 }
 
 // Degenerate formats whose significand cannot be renormalized within the
@@ -403,6 +389,12 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
   }
 }
 
+// The encodings and lowerings the group functions below run their fixtures
+// under, declared once for all of them.
+inline constexpr auto NativeFP = camada::FPEncoding::Native;
+inline constexpr auto BVFP = camada::FPEncoding::BV;
+inline constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
+
 // The shared suite, split by theory. Each group is independently runnable:
 // every fixture resets the solver before it starts (the RESETAND* macros),
 // so a group makes no assumptions about what ran before it. tests() below
@@ -411,9 +403,6 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
 
 // Booleans, bit-vectors, push/pop, models, symbols, solver contracts.
 inline void tests_core(const camada::SMTSolverRef &solver) {
-  constexpr auto NativeFP = camada::FPEncoding::Native;
-  constexpr auto BVFP = camada::FPEncoding::BV;
-
   RESETANDTEST(equal_ten);
   RESETANDTEST(symbol_name_punctuation_distinct);
   RESETANDTEST(null_sort_handle_equality);
@@ -446,6 +435,8 @@ inline void tests_core(const camada::SMTSolverRef &solver) {
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(sort_mismatch_names_both_sorts);
   RESETANDTEST(arena_stress_test);
+  RESETANDTEST(small_bv_cache_bounds);
+  RESETANDTEST(symbol_alias_names_restart_after_reset);
 }
 
 // Arrays: native and Ackermann-compatible fixtures, eager and lazy const
@@ -461,7 +452,6 @@ inline void tests_arrays(const camada::SMTSolverRef &solver) {
   RESETANDTEST(const_array_select_survives_pop);
   RESETANDTEST(array_equality_semantics);
   RESETANDTEST(const_array_equality_semantics);
-  constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
   RESETANDARGTEST(array, LazyArrays);
   RESETANDARGTEST(array_const_store_semantics, LazyArrays);
   RESETANDARGTEST(bool_array_const_store_semantics, LazyArrays);
@@ -486,7 +476,6 @@ inline void tests_arrays(const camada::SMTSolverRef &solver) {
 // Tuples: native datatypes or the per-field Camada lowering, and their
 // compositions with arrays.
 inline void tests_tuples(const camada::SMTSolverRef &solver) {
-  constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_symbol_name_reuse_across_sorts);
   RESETANDTEST(tuple_with_array_field);
@@ -503,9 +492,6 @@ inline void tests_tuples(const camada::SMTSolverRef &solver) {
 
 // Floating-point, native and BV-encoded, including the host oracles.
 inline void tests_fp(const camada::SMTSolverRef &solver) {
-  constexpr auto NativeFP = camada::FPEncoding::Native;
-  constexpr auto BVFP = camada::FPEncoding::BV;
-
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(ieee_fp_to_bv_after_check_reports);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
@@ -529,6 +515,8 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_round_to_away, BVFP);
   RESETANDARGTEST(fp_bv_conversions, NativeFP);
   RESETANDARGTEST(fp_bv_conversions, BVFP);
+  RESETANDARGTEST(fp_to_bv_unspecified_is_internal, NativeFP);
+  RESETANDARGTEST(fp_to_bv_unspecified_is_internal, BVFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, NativeFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, BVFP);
   RESETANDARGTEST(fp_ieee_bv_bitexact_roundtrip, NativeFP);
@@ -568,9 +556,6 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
 
 // Fixed-point: pure common-layer BV encoding, no backend gating needed.
 inline void tests_fxp(const camada::SMTSolverRef &solver) {
-  constexpr auto NativeFP = camada::FPEncoding::Native;
-  constexpr auto BVFP = camada::FPEncoding::BV;
-
   RESETANDTEST(fxp_countls_narrow_target_rejected);
   RESETANDTEST(fxp_exhaustive_semantics);
   RESETANDTEST(fxp_boundary_overflow_semantics);
@@ -595,20 +580,23 @@ inline void tests_fxp(const camada::SMTSolverRef &solver) {
 }
 
 // Int/Real arithmetic, model queries and the Int<->BV bridge. Backends
-// whose contexts must be configured per logic (MathSAT, Yices) are matrix
-// exclusions and run the applicable fixtures from their own Arith cases.
-inline void tests_arith(const camada::SMTSolverRef &solver,
-                        bool include_symbolic_shift = true) {
+// without Int/Real skip the cell through supports(IntRealArithmetic).
+inline void tests_arith(const camada::SMTSolverRef &solver) {
   RESETANDTEST(int_arithmetic_semantics);
   RESETANDTEST(real_arithmetic_semantics);
   RESETANDTEST(arith_division_semantics);
   RESETANDTEST(arith_model_queries);
   RESETANDTEST(arith_conversion_semantics);
   RESETANDTEST(int_bv_conversion_semantics);
-  // RESETANDTEST is two statements, so it needs the braces.
-  if (include_symbolic_shift) {
-    RESETANDTEST(arith_symbolic_shift_semantics);
-  }
+}
+
+// The fixtures the "camada-tuples" matrix cell runs: a backend with native
+// datatypes forced onto Camada's per-field tuple lowering.
+inline void tests_camada_tuples(const camada::SMTSolverRef &solver) {
+  RESETANDTEST(tuple_semantics);
+  RESETANDTEST(tuple_with_array_field);
+  RESETANDTEST(tuple_array_semantics);
+  RESETANDTEST(tuple_update_semantics);
 }
 
 // Nested array shapes: the depth-5 tuple/array tower and nested constant
@@ -617,11 +605,9 @@ inline void tests_arith(const camada::SMTSolverRef &solver,
 // supports() gate); every other backend runs them.
 inline void tests_nesting(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_array_deep_nesting);
-  RESETANDARGTEST(tuple_array_const_nested, camada::ConstArrayLowering::Lazy);
-  RESETANDARGTEST(nested_const_array_semantics,
-                  camada::ConstArrayLowering::Lazy);
-  RESETANDARGTEST(nested_const_array_survives_pop,
-                  camada::ConstArrayLowering::Lazy);
+  RESETANDARGTEST(tuple_array_const_nested, LazyArrays);
+  RESETANDARGTEST(nested_const_array_semantics, LazyArrays);
+  RESETANDARGTEST(nested_const_array_survives_pop, LazyArrays);
 }
 
 // The same nested constant-array shapes under the eager (native) lowering.
@@ -634,8 +620,8 @@ inline void tests_nesting_native_const(const camada::SMTSolverRef &solver) {
   RESETANDTEST(nested_const_array_survives_pop);
 }
 
-// The whole shared suite, as the per-backend "Simple" and "Override" test
-// cases have always run it.
+// The whole shared suite, for the cases that run it under a custom backend
+// configuration.
 inline void tests(const camada::SMTSolverRef &solver) {
   tests_core(solver);
   tests_arrays(solver);

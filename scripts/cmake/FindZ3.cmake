@@ -49,10 +49,11 @@ camada_should_download_dependency(_camada_download_z3 TRUE)
 # camada_setup_z3), and a static request must not be satisfied by a shared libz3
 # co-installed in the same prefix. Windows links the import library by its plain
 # name.
+set(_camada_z3_want_static FALSE)
+set(_camada_z3_names z3)
 if(NOT BUILD_SHARED_LIBS AND NOT WIN32)
+  set(_camada_z3_want_static TRUE)
   set(_camada_z3_names libz3.a)
-else()
-  set(_camada_z3_names z3)
 endif()
 
 if(_camada_download_z3
@@ -67,10 +68,6 @@ if(CAMADA_Z3_LIB)
   set(_camada_z3_cached_static FALSE)
   if(CAMADA_Z3_LIB MATCHES "\\.a$")
     set(_camada_z3_cached_static TRUE)
-  endif()
-  set(_camada_z3_want_static FALSE)
-  if(NOT BUILD_SHARED_LIBS AND NOT WIN32)
-    set(_camada_z3_want_static TRUE)
   endif()
   if(NOT EXISTS "${CAMADA_Z3_LIB}" OR NOT _camada_z3_cached_static STREQUAL
                                       _camada_z3_want_static)
@@ -134,12 +131,20 @@ if(_camada_download_z3
   endif()
 endif()
 
+if(NOT CAMADA_Z3_LIB AND _camada_z3_want_static)
+  message(
+    STATUS
+      "Z3: a static Camada needs libz3.a (a shared libz3 is not used); enable CAMADA_DOWNLOAD_DEPENDENCIES or set CAMADA_SOLVER_Z3_DIR."
+  )
+endif()
+
 # Z3 5.3 registers its tactics through inline global variables, i.e. static
 # initializers in the translation units that define them. Linked from a static
 # archive the normal way, the linker drops every member nothing references, the
 # initializers never run, and z3::tactic(c, "smt") finds no tactic at all. Link
 # the archive whole so they are kept. CAMADA_Z3_LIB stays the plain path: its
-# directory feeds the rpath logic.
+# directory feeds the rpath logic, and appending the link dependencies to it
+# would make a missing library look found.
 set(CAMADA_Z3_LINK_LIBRARIES "${CAMADA_Z3_LIB}")
 if(CAMADA_Z3_LIB MATCHES "\\.a$")
   set(CAMADA_Z3_LINK_LIBRARIES "$<LINK_LIBRARY:WHOLE_ARCHIVE,${CAMADA_Z3_LIB}>")
@@ -151,10 +156,8 @@ endif()
 if(NOT BUILD_SHARED_LIBS OR CAMADA_Z3_LIB MATCHES "\\.a$")
   find_package(Threads REQUIRED)
   if(Threads_FOUND)
-    list(APPEND CAMADA_Z3_LIB "${CMAKE_THREAD_LIBS_INIT}")
     list(APPEND CAMADA_Z3_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
     if(NOT MSVC)
-      list(APPEND CAMADA_Z3_LIB "-ldl")
       list(APPEND CAMADA_Z3_LINK_LIBRARIES "-ldl")
     endif()
   endif()

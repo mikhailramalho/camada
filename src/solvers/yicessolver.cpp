@@ -210,7 +210,13 @@ void YicesSolver::recreateContextWithConfig(const char *Logic,
   yices_clear_error();
 
   ctx_config_t *config = yices_new_config();
-  yices_default_config_for_logic(config, Logic);
+  // Unchecked, an unknown name ("unknown logic") or a quantified one ("logic
+  // not supported") silently left Yices' all-theories default, which then
+  // disagreed with the arithmetic this solver reports from the logic's name.
+  yicesCheckError(
+      yices_default_config_for_logic(config, Logic),
+      ("Yices does not accept the logic \"" + std::string(Logic) + "\"")
+          .c_str());
   if (Configure)
     Configure(config);
   // The context mode is owned by Camada, deliberately after the Configure
@@ -248,6 +254,32 @@ SMTSortRef YicesSolver::mkBoolSortImpl() {
   return makeSortRef<YicesSort>(YicesSort(SMTSortKind::Bool, Context,
                                           yices_bool_type(),
                                           SMTSort::ScalarSortData{1}));
+}
+
+// Whether an SMT-LIB logic name includes integer or real arithmetic: the
+// linear fragments (...LIA, ...LRA, ...LIRA), difference logic (IDL, RDL), or
+// ALL. Measured against Yices: a real inequality asserts under exactly these
+// and fails ("the context does not support arithmetic") under QF_AUFBV, QF_BV,
+// QF_UF, QF_UFBV, QF_ABV and QF_AX.
+static bool logicHasArithmetic(const std::string &Logic) {
+  for (const char *Fragment : {"IA", "RA", "IDL", "RDL"})
+    if (Logic.find(Fragment) != std::string::npos)
+      return true;
+  return Logic == "ALL";
+}
+
+bool YicesSolver::intRealArithmeticSupport() const {
+  return logicHasArithmetic(ContextLogic);
+}
+
+std::string
+YicesSolver::noIntRealArithmeticMessage(const char * /*Feature*/) const {
+  return "Int/Real arithmetic is disabled: this Yices context was created "
+         "with logic \"" +
+         ContextLogic +
+         "\", which has none. Enable it by creating the solver with an "
+         "arithmetic logic in SolverConfig::Logic (QF_UFLIA, QF_UFLRA, "
+         "QF_UFLIRA, QF_UFBVLIA, ALL, ...)";
 }
 
 SMTSortRef YicesSolver::mkIntSortImpl() {

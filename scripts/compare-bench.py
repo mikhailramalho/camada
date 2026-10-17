@@ -49,22 +49,16 @@ def parse_file(path: Path) -> dict[str, dict[str, object]]:
     return parse_lines(path.read_text().splitlines(), str(path))
 
 
+def bench_cmd(binary: Path, iterations: int, cpu: int, case_filter: str) -> list[str]:
+    cmd = ["schedtool", "-a", str(cpu), "-n", "20", "-e", str(binary)]
+    cmd += ["bitwuzla", str(iterations)]
+    return cmd + [case_filter] if case_filter else cmd
+
+
 def run_benchmark(
     binary: Path, iterations: int, cpu: int, case_filter: str = ""
 ) -> dict[str, dict[str, object]]:
-    cmd = [
-        "schedtool",
-        "-a",
-        str(cpu),
-        "-n",
-        "20",
-        "-e",
-        str(binary),
-        "bitwuzla",
-        str(iterations),
-    ]
-    if case_filter:
-        cmd.append(case_filter)
+    cmd = bench_cmd(binary, iterations, cpu, case_filter)
     proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
     return parse_lines(proc.stdout.splitlines(), f"cpu{cpu}")
 
@@ -80,19 +74,7 @@ def run_benchmarks(
         batch_size = min(cpu_count, runs - launched)
         procs: list[tuple[int, subprocess.Popen[str]]] = []
         for cpu in range(batch_size):
-            cmd = [
-                "schedtool",
-                "-a",
-                str(cpu),
-                "-n",
-                "20",
-                "-e",
-                str(binary),
-                "bitwuzla",
-                str(iterations),
-            ]
-            if case_filter:
-                cmd.append(case_filter)
+            cmd = bench_cmd(binary, iterations, cpu, case_filter)
             procs.append(
                 (
                     cpu,
@@ -177,31 +159,17 @@ def sign_test_p_value(samples: list[float], baseline: float) -> float:
     return min(1.0, 2.0 * tail)
 
 
-def sign_test_zero(samples: list[float]) -> float:
-    gt = sum(1 for sample in samples if sample > 0.0)
-    lt = sum(1 for sample in samples if sample < 0.0)
-    n = gt + lt
-    if n == 0:
-        return 1.0
-
-    k = min(gt, lt)
-    tail = sum(math.comb(n, i) for i in range(0, k + 1)) / (2**n)
-    return min(1.0, 2.0 * tail)
-
-
 def pct_change(old: float, new: float) -> float:
-    return ((new - old) / old) * 100.0
+    return ((new - old) / old) * 100.0 if old != 0 else 0.0
+
+
+def verdict(old: float, new: float) -> str:
+    return "improved" if new < old else "regressed" if new > old else "unchanged"
 
 
 def format_change(name: str, baseline: float, new: float, p_value: float) -> str:
     delta = pct_change(baseline, new)
-    word = (
-        "improved"
-        if new < baseline
-        else "regressed"
-        if new > baseline
-        else "unchanged"
-    )
+    word = verdict(baseline, new)
     return (
         f"{name}: {word} "
         f"({baseline:.2f} -> {new:.2f} ns/iter, {delta:+.2f}%, p={p_value:.4f})"
@@ -212,13 +180,7 @@ def format_overall_change(
     baseline_total: float, current_total: float, p_value: float
 ) -> str:
     delta = pct_change(baseline_total, current_total)
-    word = (
-        "improved"
-        if current_total < baseline_total
-        else "regressed"
-        if current_total > baseline_total
-        else "unchanged"
-    )
+    word = verdict(baseline_total, current_total)
     return (
         f"Overall: {word} "
         f"({baseline_total:.2f} -> {current_total:.2f} total ns/iter, "
@@ -227,14 +189,8 @@ def format_overall_change(
 
 
 def format_memory_change(name: str, baseline: float, new: float) -> str:
-    delta = pct_change(baseline, new) if baseline != 0 else 0.0
-    word = (
-        "improved"
-        if new < baseline
-        else "regressed"
-        if new > baseline
-        else "unchanged"
-    )
+    delta = pct_change(baseline, new)
+    word = verdict(baseline, new)
     return (
         f"{name}: {word} "
         f"({baseline:.0f} -> {new:.0f} KiB retained RSS, {delta:+.2f}%)"
@@ -244,18 +200,8 @@ def format_memory_change(name: str, baseline: float, new: float) -> str:
 def format_overall_memory_change(
     baseline_total: float, current_total: float
 ) -> str:
-    delta = (
-        pct_change(baseline_total, current_total)
-        if baseline_total != 0
-        else 0.0
-    )
-    word = (
-        "improved"
-        if current_total < baseline_total
-        else "regressed"
-        if current_total > baseline_total
-        else "unchanged"
-    )
+    delta = pct_change(baseline_total, current_total)
+    word = verdict(baseline_total, current_total)
     return (
         f"Overall retained RSS: {word} "
         f"({baseline_total:.0f} -> {current_total:.0f} KiB, {delta:+.2f}%)"
@@ -282,27 +228,24 @@ def compare_and_print(
     current_total = 0.0
     baseline_rss_total = 0.0
     current_rss_total = 0.0
+    base_runs = (
+        baseline_runs if baseline_runs is not None else [None] * len(current_runs)
+    )
 
     for name in common_names:
         old = float(baseline[name]["ns_per_iter"])
         cur = float(current[name]["ns_per_iter"])
         baseline_total += old
         current_total += cur
-        if baseline_runs is None:
-            samples = [
-                float(run[name]["ns_per_iter"])
-                for run in current_runs
-                if name in run
-            ]
-            p_value = sign_test_p_value(samples, old)
-        else:
-            samples = [
-                float(cur_run[name]["ns_per_iter"])
-                - float(base_run[name]["ns_per_iter"])
-                for base_run, cur_run in zip(baseline_runs, current_runs)
-                if name in base_run and name in cur_run
-            ]
-            p_value = sign_test_zero(samples)
+        # Unpaired runs compare against the baseline's mean; paired runs
+        # against the baseline run made alongside each.
+        diffs = [
+            float(cur_run[name]["ns_per_iter"])
+            - (float(base_run[name]["ns_per_iter"]) if base_run is not None else old)
+            for base_run, cur_run in zip(base_runs, current_runs)
+            if name in cur_run and (base_run is None or name in base_run)
+        ]
+        p_value = sign_test_p_value(diffs, 0.0)
         if cur < old:
             improved.append(format_change(name, old, cur, p_value))
         elif cur > old:
@@ -321,31 +264,18 @@ def compare_and_print(
         else:
             memory_unchanged.append(format_memory_change(name, old_rss, cur_rss))
 
-    if baseline_runs is None:
-        total_samples = [
-            sum(
-                float(run[name]["ns_per_iter"])
-                for name in common_names
-                if name in run
-            )
-            for run in current_runs
-        ]
-        overall_p_value = sign_test_p_value(total_samples, baseline_total)
-    else:
-        total_samples = [
-            sum(
-                float(cur_run[name]["ns_per_iter"])
-                for name in common_names
-                if name in cur_run
-            )
-            - sum(
-                float(base_run[name]["ns_per_iter"])
-                for name in common_names
-                if name in base_run
-            )
-            for base_run, cur_run in zip(baseline_runs, current_runs)
-        ]
-        overall_p_value = sign_test_zero(total_samples)
+    def run_total(run: dict[str, dict[str, object]]) -> float:
+        return sum(
+            float(run[name]["ns_per_iter"]) for name in common_names if name in run
+        )
+
+    total_diffs = [
+        run_total(cur_run) - (
+            run_total(base_run) if base_run is not None else baseline_total
+        )
+        for base_run, cur_run in zip(base_runs, current_runs)
+    ]
+    overall_p_value = sign_test_p_value(total_diffs, 0.0)
 
     print(format_overall_change(baseline_total, current_total, overall_p_value))
 
@@ -461,11 +391,14 @@ def main() -> int:
     if args.baseline_binary:
         if args.runs is None:
             runs_to_execute = DEFAULT_MIN_RUNS
-        for _ in range(args.warmups):
-            run_benchmark(
-                args.baseline_binary, args.iterations, args.cpu, args.case_filter
+        def run(binary: Path) -> dict[str, dict[str, object]]:
+            return run_benchmark(
+                binary, args.iterations, args.cpu, args.case_filter
             )
-            run_benchmark(args.binary, args.iterations, args.cpu, args.case_filter)
+
+        for _ in range(args.warmups):
+            run(args.baseline_binary)
+            run(args.binary)
 
         print(
             f"Running {runs_to_execute} paired A/B benchmarks on CPU {args.cpu}...",
@@ -474,26 +407,14 @@ def main() -> int:
         baseline_runs: list[dict[str, dict[str, object]]] = []
         current_runs: list[dict[str, dict[str, object]]] = []
         for i in range(runs_to_execute):
+            # Alternate which binary runs first, so neither always gets the
+            # warmer cache.
             if i % 2 == 0:
-                baseline_runs.append(
-                    run_benchmark(
-                        args.baseline_binary, args.iterations, args.cpu, args.case_filter
-                    )
-                )
-                current_runs.append(
-                    run_benchmark(
-                        args.binary, args.iterations, args.cpu, args.case_filter
-                    )
-                )
+                baseline_runs.append(run(args.baseline_binary))
+                current_runs.append(run(args.binary))
             else:
-                current_run = run_benchmark(
-                    args.binary, args.iterations, args.cpu, args.case_filter
-                )
-                baseline_run = run_benchmark(
-                    args.baseline_binary, args.iterations, args.cpu, args.case_filter
-                )
-                baseline_runs.append(baseline_run)
-                current_runs.append(current_run)
+                current_runs.append(run(args.binary))
+                baseline_runs.append(run(args.baseline_binary))
 
         baseline_medians = compute_medians(baseline_runs)
         current_medians = compute_medians(current_runs)

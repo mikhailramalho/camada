@@ -35,14 +35,30 @@ def copy_release_dependency(pattern, deps_install_dir, release_lib_dir):
     return copied
 
 
+def whole_archive_names(targets_text):
+    """The archives CMake linked whole-archive in the exported targets.
+
+    Z3 5.3 registers its tactics through static initializers, which a normal
+    static link drops. FindZ3 therefore wraps libz3.a in
+    $<LINK_LIBRARY:WHOLE_ARCHIVE,...>, and the rewrite below replaces the link
+    interface wholesale, so it has to carry that wrapper over. Asking the
+    exported file keeps CMake the one place that decides which archives need it.
+    """
+    return {
+        os.path.basename(path)
+        for path in re.findall(r"WHOLE_ARCHIVE,([^>;]+)", targets_text)
+    }
+
+
 def rewrite_release_link_interface(targets_file, solver_archives):
+    with open(targets_file, 'rt') as fin:
+        data = fin.read()
+    whole = whole_archive_names(data)
+
     packaged_solver_libs = []
     for name in solver_archives:
         entry = f"${{_IMPORT_PREFIX}}/lib/{name}"
-        if name == "libz3.a":
-            # Z3 5.3 registers its tactics through static initializers, which
-            # a normal static link drops: z3::tactic(c, "smt") would find no
-            # tactic. Link the archive whole so downstream builds keep them.
+        if name in whole:
             entry = f"$<LINK_LIBRARY:WHOLE_ARCHIVE,{entry}>"
         packaged_solver_libs.append(entry)
 
@@ -60,9 +76,6 @@ def rewrite_release_link_interface(targets_file, solver_archives):
 
     replacement = 'INTERFACE_LINK_LIBRARIES "{}"'.format(
         ";".join(packaged_solver_libs + system_libs))
-
-    with open(targets_file, 'rt') as fin:
-        data = fin.read()
 
     data = re.sub(r'INTERFACE_LINK_LIBRARIES ".*"', replacement, data)
 

@@ -1193,16 +1193,22 @@ SMTExprRef CVC5Solver::mkIEEEFPToBVImpl(const SMTExprRef &Exp) {
   return mkIEEEFPToBVViaUF(Exp);
 }
 
+// CVC5's constant array takes only a value: a symbol or a computed initializer
+// is rejected by the term manager, so those go through the lazy lowering.
+bool CVC5Solver::nativeConstArrayAccepts(const SMTExprRef &InitValue) const {
+  const cvc5::Term &Init = toSolverExpr<CVC5Expr>(*InitValue).Expr;
+  return Init.isBooleanValue() || Init.isBitVectorValue() ||
+         Init.isIntegerValue() || Init.isRealValue() ||
+         Init.isFloatingPointValue() || Init.isRoundingModeValue() ||
+         Init.isTupleValue() || Init.isConstArray();
+}
+
 SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                         const SMTExprRef &InitValue) {
-  // CVC5's constant array takes only a value, so a symbol or a computed
-  // initializer is lowered the way a backend without native ones would.
+  // Reached only for an initializer nativeConstArrayAccepts() allows; the
+  // core routes everything else to the lazy lowering, or rejects an explicit
+  // Native request.
   const cvc5::Term &Init = toSolverExpr<CVC5Expr>(*InitValue).Expr;
-  if (!(Init.isBooleanValue() || Init.isBitVectorValue() ||
-        Init.isIntegerValue() || Init.isRealValue() ||
-        Init.isFloatingPointValue() || Init.isRoundingModeValue() ||
-        Init.isConstArray()))
-    return mkLazyConstArray(IndexSort, InitValue);
   const SMTSortRef &sort = mkArraySort(IndexSort, InitValue->Sort);
   return makeExprRef<CVC5Expr>(
       SMTExprKind::ArrayConst, &Context, sort,
@@ -1388,18 +1394,19 @@ void CVC5Solver::dumpModelImpl(std::string &Out) {
   // logs has to be reproducible.
   std::vector<std::pair<std::string, std::string>> Bindings;
   Bindings.reserve(SymbolExprCache.size());
-  for (const auto &[Key, Exp] : SymbolExprCache) {
-    // The cache also holds Camada-owned nodes (encoded tuples, tuple-array
-    // bundles, Ackermann arrays) that carry no cvc5 term at all; casting
-    // one yields a garbage Term and a SIGSEGV inside getValue. Skip them --
-    // the backend symbols backing their fields and reads are separate
-    // cache entries and print on their own. BitwuzlaSolver::dumpModelImpl
-    // guards the same hazard the same way.
-    const auto *CE = dynamic_cast<const CVC5Expr *>(Exp.get());
-    if (CE == nullptr)
-      continue;
-    Bindings.emplace_back(Key.Name, Context.getValue(CE->Expr).toString());
-  }
+  for (const auto &[Name, Entries] : SymbolExprCache)
+    for (const auto &[Sort, Exp] : Entries) {
+      // The cache also holds Camada-owned nodes (encoded tuples, tuple-array
+      // bundles, Ackermann arrays) that carry no cvc5 term at all; casting
+      // one yields a garbage Term and a SIGSEGV inside getValue. Skip them --
+      // the backend symbols backing their fields and reads are separate
+      // cache entries and print on their own. BitwuzlaSolver::dumpModelImpl
+      // guards the same hazard the same way.
+      const auto *CE = dynamic_cast<const CVC5Expr *>(Exp.get());
+      if (CE == nullptr)
+        continue;
+      Bindings.emplace_back(Name, Context.getValue(CE->Expr).toString());
+    }
   std::sort(Bindings.begin(), Bindings.end());
   for (const auto &[Name, Value] : Bindings) {
     Out += Name;

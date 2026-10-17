@@ -1037,7 +1037,13 @@ public:
   /// Convenience method to create a bitvector from an integer in base 2
   virtual SMTExprRef mkBVFromBin(const std::string &Int) = 0;
 
-  /// Creates a new symbol, given a name and a sort
+  /// Creates a new symbol, given a name and a sort.
+  ///
+  /// A name belongs to one sort in the backend. The first sort a name is used
+  /// with keeps it verbatim; using the same name with another sort creates a
+  /// distinct symbol, which the backend (and so a dump, an SMT-LIB script or a
+  /// solver-side model) sees as `__CAMADA_alias<N>_<name>`. Names starting
+  /// with `__CAMADA_` are reserved for Camada's own encodings and are rejected.
   virtual SMTExprRef mkSymbol(const std::string &Name,
                               const SMTSortRef &Sort) = 0;
 
@@ -1142,6 +1148,12 @@ public:
   /// "unknown" is reported as Incomplete.
   virtual UnknownReason reasonUnknown() const = 0;
 
+  /// What the backend said about the failure behind reasonUnknown(), when it
+  /// said anything (the text of a Z3 exception, for instance); empty
+  /// otherwise, and always when reasonUnknown() is NotApplicable. Diagnostic
+  /// only: the wording is the backend's own.
+  virtual std::string reasonUnknownDetail() const = 0;
+
   /// Set a wall-clock time limit, in milliseconds, applied to each
   /// subsequent check() or checkSatAssuming() individually; 0 removes the
   /// limit. A check that hits the limit returns CheckResult::UNKNOWN and
@@ -1183,7 +1195,10 @@ public:
   /// This reports what the backend is *capable* of, not how this instance
   /// was configured. A backend that makes unsat-assumption tracking opt-in
   /// still reports SolverFeature::UnsatAssumptions; ask
-  /// produceUnsatAssumptions() whether this solver has it enabled.
+  /// produceUnsatAssumptions() whether this solver has it enabled. The one
+  /// exception is a theory the backend's context is built without: Yices
+  /// reports SolverFeature::IntRealArithmetic only for a solver created with a
+  /// logic that includes arithmetic.
 
   virtual bool supports(SolverFeature Feature) const = 0;
 

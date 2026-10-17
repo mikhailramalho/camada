@@ -179,13 +179,11 @@ struct SmallFunctionSortCacheKeyHash {
   }
 };
 
-struct SymbolExprCacheKey {
+/// One symbol made under a name: the cache maps each name to these, the
+/// first one's sort being the sort that owns the plain name.
+struct SymbolCacheEntry {
   const SMTSort *Sort;
-  std::string Name;
-
-  bool operator==(const SymbolExprCacheKey &Other) const {
-    return Sort == Other.Sort && Name == Other.Name;
-  }
+  SMTExprRef Exp;
 };
 
 struct FPSpecialExprCacheKey {
@@ -224,14 +222,6 @@ struct FPConstExprCacheKeyHash {
     auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
     auto BitsHash = std::hash<std::string>{}(Key.Bits);
     return static_cast<std::size_t>(SortPtr ^ (BitsHash << 1));
-  }
-};
-
-struct SymbolExprCacheKeyHash {
-  std::size_t operator()(const SymbolExprCacheKey &Key) const {
-    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
-    auto NameHash = std::hash<std::string>{}(Key.Name);
-    return static_cast<std::size_t>(SortPtr ^ (NameHash << 1));
   }
 };
 

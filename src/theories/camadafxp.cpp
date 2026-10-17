@@ -829,11 +829,6 @@ SMTExprRef SMTSolverImpl::mkFXPShlOverflow(const SMTExprRef &Exp,
 
 namespace {
 
-// Shared by mkFXPToFXP and its overflow predicate: the source raw view in a
-// wide intermediate, extended (per source signedness) with enough headroom
-// that neither the value's fraction-alignment shift nor the bound scaling in
-// the overflow predicate can lose bits, plus a slack bit so signed
-// comparisons on the wide value are exact even for unsigned sources.
 // Moves a wide raw value from the source fraction width to the target's:
 // widening the fraction is exact, narrowing rounds under Mode.
 SMTExprRef rescaleFraction(SMTSolverImpl &S, SMTExprRef Raw, unsigned Wide,
@@ -861,6 +856,11 @@ std::pair<SMTExprRef, unsigned> wideForBV(SMTSolverImpl &S,
   return {shiftRounded(S, Raw, From.FracBits, Wide, From.IsSigned, Mode), Wide};
 }
 
+// Shared by mkFXPToFXP and its overflow predicate: the source raw view in a
+// wide intermediate, extended (per source signedness) with enough headroom
+// that neither the value's fraction-alignment shift nor the bound scaling in
+// the overflow predicate can lose bits, plus a slack bit so signed
+// comparisons on the wide value are exact even for unsigned sources.
 std::pair<SMTExprRef, unsigned> wideForConversion(SMTSolverImpl &S,
                                                   const SMTExprRef &Exp,
                                                   const FXPFormat &To) {

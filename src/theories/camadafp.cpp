@@ -68,19 +68,19 @@ template <typename FPType, typename IntType> IntType FPAsInt(const FPType FP) {
 } // namespace
 
 static inline SMTExprRef mkBVZero1(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero1Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 1);
 }
 static inline SMTExprRef mkBVOne1(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVOne1Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(1, 1);
 }
 static inline SMTExprRef mkBVZero2(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero2Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 2);
 }
 static inline SMTExprRef mkBVZero3(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero3Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 3);
 }
 static inline SMTExprRef mkBVZero4(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero4Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 4);
 }
 static inline SMTExprRef mkRMLit(SMTSolver &S, RM R) {
   return static_cast<SMTSolverImpl &>(S).getRMExpr(R);
@@ -209,15 +209,12 @@ static inline SMTExprRef mkIsNeg(SMTSolver &S, const SMTExprRef &Exp) {
   return S.mkEqual(sgn, one);
 }
 
-// Assembles sign | exponent | significand into a BV-encoded float. SWidth is
-// the significand width including the hidden bit, so the stored field is one
-// narrower.
+// Assembles sign | exponent | significand into a BV-encoded float.
 static inline SMTExprRef packFP(SMTSolver &S, const SMTExprRef &Sgn,
                                 const SMTExprRef &Exp, const SMTExprRef &Sig) {
-  const unsigned EWidth = Exp->getWidth();
-  const unsigned SWidth = Sig->getWidth() + 1;
-  return S.mkBVToIEEEFP(S.mkBVConcat(Sgn, S.mkBVConcat(Exp, Sig)),
-                        S.mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
+  return S.mkBVToIEEEFP(
+      S.mkBVConcat(Sgn, S.mkBVConcat(Exp, Sig)),
+      S.mkFPSort(Exp->getWidth(), Sig->getWidth(), FPEncoding::BV));
 }
 
 static inline SMTExprRef mkSgnBit(SMTSolver &S, bool Negative) {
@@ -1911,8 +1908,9 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
 
   // NaN, Inf, or negative (except -0) -> unspecified
   SMTExprRef c1 = mkOr(x_is_nan, x_is_inf);
-  SMTExprRef unspec_v =
-      mkSymbol("UNSPEC_FP" + std::to_string(ToWidth), mkBVSort(ToWidth));
+  // Reserved name, so no user symbol can be this variable.
+  SMTExprRef unspec_v = mkSymbolUnchecked(
+      "__CAMADA_unspec_fp" + std::to_string(ToWidth), mkBVSort(ToWidth));
   const SMTExprRef &v1 = unspec_v;
 
   // +-0 -> 0
@@ -2187,9 +2185,7 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
   res_exp = mkBVExtract(ebits - 1, 0, res_exp);
   res_exp = mkBias(*this, res_exp);
   res_sig = mkBVExtract(sbits - 2, 0, res_sig);
-  SMTExprRef v6 =
-      mkBVToIEEEFP(mkBVConcat(res_sgn, mkBVConcat(res_exp, res_sig)),
-                   mkFPSort(ebits, sbits - 1, FPEncoding::BV));
+  SMTExprRef v6 = packFP(*this, res_sgn, res_exp, res_sig);
 
   // And finally, we tie them together.
   SMTExprRef result = mkIte(c5, v5, v6);
@@ -2358,9 +2354,6 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
 
   Sig = mkBVExtract(SWidth + 1, 2, Sig);
 
-  SMTExprRef rm_neg = getRMExpr(RM::ROUND_TO_MINUS_INF);
-  SMTExprRef rm_pos = getRMExpr(RM::ROUND_TO_PLUS_INF);
-
   SMTExprRef inc = mkRoundingDecision(*this, R, Sgn, last, round, sticky);
   assert(inc->getWidth() == 1);
 
@@ -2408,8 +2401,8 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
   SMTExprRef nil_1 = mkBVZero1(*this);
   SMTExprRef rm_zero = getRMExpr(RM::ROUND_TO_ZERO);
   SMTExprRef rm_is_to_zero = mkEqual(R, rm_zero);
-  SMTExprRef rm_is_to_neg = mkEqual(R, rm_neg);
-  SMTExprRef rm_is_to_pos = mkEqual(R, rm_pos);
+  SMTExprRef rm_is_to_neg = mkIsRM(*this, R, RM::ROUND_TO_MINUS_INF);
+  SMTExprRef rm_is_to_pos = mkIsRM(*this, R, RM::ROUND_TO_PLUS_INF);
   SMTExprRef rm_zero_or_neg = mkOr(rm_is_to_zero, rm_is_to_neg);
   SMTExprRef rm_zero_or_pos = mkOr(rm_is_to_zero, rm_is_to_pos);
 
@@ -2438,8 +2431,7 @@ SMTExprRef SMTSolverImpl::round(const SMTExprRef &R, const SMTExprRef &Sgn,
   assert(Sig->getWidth() == SWidth - 1);
   assert(Exp->getWidth() == EWidth);
 
-  return mkBVToIEEEFP(mkBVConcat(Sgn, mkBVConcat(Exp, Sig)),
-                      mkFPSort(EWidth, SWidth - 1, FPEncoding::BV));
+  return packFP(*this, Sgn, Exp, Sig);
 }
 
 SMTResult<int64_t> SMTSolverImpl::getBVImpl(const SMTExprRef &Exp) {
