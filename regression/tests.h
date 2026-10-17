@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "ackarray.test.h"
 #include "array.test.h"
 #include "bvconformance.test.h"
@@ -407,7 +406,8 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
 // The shared suite, split by theory. Each group is independently runnable:
 // every fixture resets the solver before it starts (the RESETAND* macros),
 // so a group makes no assumptions about what ran before it. tests() below
-// runs them all; a future per-group instantiation can call them one by one.
+// runs them all (for the custom-configuration cases); matrix.test.h runs
+// each group as its own test case per backend.
 
 // Booleans, bit-vectors, push/pop, models, symbols, solver contracts.
 inline void tests_core(const camada::SMTSolverRef &solver) {

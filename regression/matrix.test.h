@@ -107,7 +107,7 @@ inline const char *excluded(const char *Backend, const char *Group) {
         auto fn = solver->mkFunctionSort({bv4}, bv4);                          \
         (void)solver->mkSymbol("f", fn);                                       \
       });                                                                      \
-      return;                                                                  \
+      SKIP("feature absent: rejection verified, semantics not run");           \
     }                                                                          \
     uf_semantics(solver);                                                      \
   })                                                                           \
@@ -123,7 +123,7 @@ inline const char *excluded(const char *Backend, const char *Group) {
         auto x = solver->mkSymbol("x", solver->mkBVSort(4));                   \
         (void)solver->mkExists({x}, solver->mkEqual(x, x));                    \
       });                                                                      \
-      return;                                                                  \
+      SKIP("feature absent: rejection verified, semantics not run");           \
     }                                                                          \
     quantifier_semantics(solver);                                              \
   })                                                                           \
@@ -133,7 +133,7 @@ inline const char *excluded(const char *Backend, const char *Group) {
       /* Unsupported must reject, not be undefined behavior. */                \
       require_abort([&]() { (void)solver->mkIntSort(); });                     \
       require_abort([&]() { (void)solver->mkRealSort(); });                    \
-      return;                                                                  \
+      SKIP("feature absent: rejection verified, semantics not run");           \
     }                                                                          \
     tests_arith(solver, camada_matrix::excluded(                               \
                             #Backend, "arith/symbolic-shift") == nullptr);     \

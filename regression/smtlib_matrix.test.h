@@ -32,7 +32,8 @@ constexpr Exclusion SMTLIBExclusions[] = {
     {"bitwuzla", "arith_division_semantics", "the bitwuzla child is BV-only"},
     {"bitwuzla", "arith_model_queries", "the bitwuzla child is BV-only"},
     {"bitwuzla", "arith_conversion_semantics", "the bitwuzla child is BV-only"},
-    {"bitwuzla", "int_bv_conversion_semantics", "the bitwuzla child is BV-only"},
+    {"bitwuzla", "int_bv_conversion_semantics",
+     "the bitwuzla child is BV-only"},
     {"stp", "int_arithmetic_semantics", "the stp child is QF_AUFBV-only"},
     {"stp", "real_arithmetic_semantics", "the stp child is QF_AUFBV-only"},
     {"stp", "arith_division_semantics", "the stp child is QF_AUFBV-only"},
@@ -136,6 +137,8 @@ inline const char *excluded(const char *Child, const char *Fixture) {
 // A pipeline-runner scenario (takes the argv, builds its own solver).
 #define CAMADA_SMTLIB_RUNNER_ROW(ChildName, Tags, CmdFn, NameStr, RunFn)       \
   TEST_CASE("SMTLIB pipeline: " NameStr " [" ChildName "]", Tags) {            \
+    if (const char *Why = camada_smtlib_matrix::excluded(ChildName, NameStr))  \
+      SKIP(Why);                                                               \
     CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::CmdFn(), ChildName);  \
     camada_smtlib_pipeline::RunFn(Cmd);                                        \
   }
