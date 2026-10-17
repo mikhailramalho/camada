@@ -68,19 +68,19 @@ template <typename FPType, typename IntType> IntType FPAsInt(const FPType FP) {
 } // namespace
 
 static inline SMTExprRef mkBVZero1(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero1Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 1);
 }
 static inline SMTExprRef mkBVOne1(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVOne1Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(1, 1);
 }
 static inline SMTExprRef mkBVZero2(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero2Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 2);
 }
 static inline SMTExprRef mkBVZero3(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero3Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 3);
 }
 static inline SMTExprRef mkBVZero4(SMTSolver &S) {
-  return static_cast<SMTSolverImpl &>(S).getBVZero4Expr();
+  return static_cast<SMTSolverImpl &>(S).cachedSmallBVExpr(0, 4);
 }
 static inline SMTExprRef mkRMLit(SMTSolver &S, RM R) {
   return static_cast<SMTSolverImpl &>(S).getRMExpr(R);

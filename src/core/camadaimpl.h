@@ -564,11 +564,6 @@ public:
   /// ref when there is none: Width not built yet, or Value not one of the
   /// three cached values.
   SMTExprRef cachedSmallBVExpr(int64_t Value, unsigned Width) const;
-  SMTExprRef getBVZero1Expr() const;
-  SMTExprRef getBVOne1Expr() const;
-  SMTExprRef getBVZero2Expr() const;
-  SMTExprRef getBVZero3Expr() const;
-  SMTExprRef getBVZero4Expr() const;
   SMTExprRef getRMExpr(RM R) const;
   SMTExprRef getFPSpecialExpr(unsigned ExpWidth, unsigned SigWidth,
                               FPSpecialValueKind Kind, bool Sign);

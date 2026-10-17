@@ -272,21 +272,12 @@ bool YicesSolver::intRealArithmeticSupport() const {
   return logicHasArithmetic(ContextLogic);
 }
 
-// A sort is where an unsupported context should say so: left alone, the first
-// arithmetic assertion fails much later with a message that does not name the
-// logic.
-static const char *const NoArithmeticMessage =
-    "Int and Real need a Yices context created with an arithmetic logic "
-    "(QF_UFLIA, QF_UFLRA, QF_UFLIRA, ...); this solver's logic has none";
-
 SMTSortRef YicesSolver::mkIntSortImpl() {
-  fatalErrorIf(!intRealArithmeticSupport(), NoArithmeticMessage);
   return makeSortRef<YicesSort>(
       YicesSort(SMTSortKind::Int, Context, yices_int_type()));
 }
 
 SMTSortRef YicesSolver::mkRealSortImpl() {
-  fatalErrorIf(!intRealArithmeticSupport(), NoArithmeticMessage);
   return makeSortRef<YicesSort>(
       YicesSort(SMTSortKind::Real, Context, yices_real_type()));
 }

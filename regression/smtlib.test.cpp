@@ -850,19 +850,14 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
     REQUIRE_FALSE(Error.empty());
     REQUIRE(Error.find("NOT_A_LOGIC") != std::string::npos);
   }
-  // A solver half-built on an unopenable output path never ran
-  // initializeCommonSingletons, so the small-literal caches are empty. A
-  // common-layer fallback that reads them (bvredor reads the 1-bit one and
-  // zero) must abort on the null handle, not index past the end of an empty
-  // cache.
+  // A solver half-built on an unopenable output path still has the common
+  // literals, so a common-layer fallback that reads them (bvredor reads the
+  // 1-bit one and zero) builds its term like on any other solver.
   {
     camada::SMTLIBSolver solver("/nonexistent-camada-dir/out.smt2");
     REQUIRE_FALSE(solver.setupError().empty());
     auto x = solver.mkSymbol("x", solver.mkBVSort(8));
-    REQUIRE(abort_message([&]() {
-              (void)solver.mkBVRedOr(x);
-            }).find("Dereferencing null expression handle") !=
-            std::string::npos);
+    REQUIRE(solver.mkBVRedOr(x)->getWidth() == 1);
   }
   // ... and through the factory it is an SMTError rather than an abort.
   {

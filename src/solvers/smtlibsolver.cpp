@@ -755,22 +755,24 @@ std::string SMTLIBSolver::setupError() const {
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
                            const SolverConfig &Config)
     : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)) {
+  // The base sets arrayMode() before the singletons are built: constant
+  // tracking (AckBVConstBits) must cover the cached small bit-vectors. They
+  // are pure terms, so a half-built solver gets them too and keeps the
+  // invariants every other solver has.
+  initializeCommonSingletons();
   if (!setupError().empty())
     return; // half-built; createSMTLIBSolver reports and discards it
-  // The base sets arrayMode() before the singletons are built: constant
-  // tracking (AckBVConstBits) must cover the cached small bit-vectors.
   emitPreamble();
-  initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const SolverConfig &Config)
     : SMTSolverImpl(Config), Proc(std::make_unique<ProcessEmitter>(Argv)) {
+  initializeCommonSingletons();
   if (!setupError().empty())
     return; // half-built; createSMTLIBSolver reports and discards it
   emitPreamble();
-  initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
@@ -779,10 +781,10 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const SolverConfig &Config)
     : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)),
       Proc(std::make_unique<ProcessEmitter>(Argv)) {
+  initializeCommonSingletons();
   if (!setupError().empty())
     return; // half-built; createSMTLIBSolver reports and discards it
   emitPreamble();
-  initializeCommonSingletons();
 }
 
 SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,

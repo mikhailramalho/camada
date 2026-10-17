@@ -200,10 +200,13 @@ namespace camada {
   }
 // Cached nullary sort: build once, keep it on the solver. The cache field and
 // the sort predicate are all that differ between them.
-#define CAMADA_DEFINE_CACHED_SORT(Name, CacheField, SortPredicate)             \
+#define CAMADA_DEFINE_CACHED_SORT(Name, CacheField, SortPredicate, Supported,  \
+                                  Feature)                                     \
   SMTSortRef SMTSolverImpl::Name() {                                           \
     if (CacheField)                                                            \
       return CacheField;                                                       \
+    if (!(Supported))                                                          \
+      unsupportedFeature(Feature);                                             \
                                                                                \
     SMTSortRef theSort = Name##Impl();                                         \
     assert(theSort->SortPredicate());                                          \
@@ -440,9 +443,6 @@ static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
 
 } // namespace
 
-// The caches are empty until initializeCommonSingletons runs, which a
-// half-built SMTLIBSolver never does. Answer a null handle then, which aborts
-// with a diagnostic on use, rather than indexing past the end.
 SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
                                             unsigned Width) const {
   // Only -1, 0 and 1 are cached; any other value is simply not in the cache.
@@ -450,26 +450,6 @@ SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
     return SMTExprRef{};
   const auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Value)];
   return Width < Cache.size() ? Cache[Width] : SMTExprRef{};
-}
-
-SMTExprRef SMTSolverImpl::getBVZero1Expr() const {
-  return cachedSmallBVExpr(0, 1);
-}
-
-SMTExprRef SMTSolverImpl::getBVOne1Expr() const {
-  return cachedSmallBVExpr(1, 1);
-}
-
-SMTExprRef SMTSolverImpl::getBVZero2Expr() const {
-  return cachedSmallBVExpr(0, 2);
-}
-
-SMTExprRef SMTSolverImpl::getBVZero3Expr() const {
-  return cachedSmallBVExpr(0, 3);
-}
-
-SMTExprRef SMTSolverImpl::getBVZero4Expr() const {
-  return cachedSmallBVExpr(0, 4);
 }
 
 SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
@@ -600,11 +580,15 @@ void SMTSolverImpl::initializeCommonSingletons() {
       SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
 }
 
-CAMADA_DEFINE_CACHED_SORT(mkBoolSort, CachedBoolSort, isBoolSort)
+CAMADA_DEFINE_CACHED_SORT(mkBoolSort, CachedBoolSort, isBoolSort, true, "")
 
-CAMADA_DEFINE_CACHED_SORT(mkIntSort, CachedIntSort, isIntSort)
+// supports(IntRealArithmetic) and these sorts answer from the same hook, so
+// they cannot disagree.
+CAMADA_DEFINE_CACHED_SORT(mkIntSort, CachedIntSort, isIntSort,
+                          intRealArithmeticSupport(), "Integer arithmetic")
 
-CAMADA_DEFINE_CACHED_SORT(mkRealSort, CachedRealSort, isRealSort)
+CAMADA_DEFINE_CACHED_SORT(mkRealSort, CachedRealSort, isRealSort,
+                          intRealArithmeticSupport(), "Real arithmetic")
 
 SMTSortRef SMTSolverImpl::mkBVSort(const unsigned BitWidth) {
   fatalErrorIf(BitWidth == 0, "Bit-vector sort width must be non-zero");
@@ -2765,7 +2749,7 @@ SMTExprRef SMTSolverImpl::mkBVAddOverflowImpl(const SMTExprRef &LHS,
   } else {
     // Unsigned addition overflows iff the (Width+1)-bit sum carries out.
     SMTExprRef Sum = mkBVAdd(mkBVZeroExt(LHS, 1), mkBVZeroExt(RHS, 1));
-    theExp = mkEqual(mkBVExtract(Width, Width, Sum), getBVOne1Expr());
+    theExp = mkEqual(mkBVExtract(Width, Width, Sum), cachedSmallBVExpr(1, 1));
   }
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVAddOverflow);
 }
@@ -2928,15 +2912,16 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
 SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
   // bvredor = bvnot(bvcomp(x,0)) ? bv1 : bv0;
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(0, Exp->getWidth()));
-  SMTExprRef theExp =
-      mkIteImpl(mkNotImpl(comp), getBVOne1Expr(), getBVZero1Expr());
+  SMTExprRef theExp = mkIteImpl(mkNotImpl(comp), cachedSmallBVExpr(1, 1),
+                                cachedSmallBVExpr(0, 1));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
   // bvredand = bvcomp(x,-1) ? bv1 : bv0;
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(-1, Exp->getWidth()));
-  SMTExprRef theExp = mkIteImpl(comp, getBVOne1Expr(), getBVZero1Expr());
+  SMTExprRef theExp =
+      mkIteImpl(comp, cachedSmallBVExpr(1, 1), cachedSmallBVExpr(0, 1));
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
 }
 
