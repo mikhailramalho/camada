@@ -908,3 +908,62 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
     REQUIRE(Created.error().Message.find("NOT_A_LOGIC") != std::string::npos);
   }
 }
+
+// ============================================================================
+// The (fixture x child) pipeline matrix. Lives here, not in the native
+// backend files: a pipe test needs only the child binary on disk, not the
+// native backend compiled in. Capability holes are exclusions with reasons
+// in smtlib_matrix.test.h, never omissions.
+// ============================================================================
+#include "smtlib_matrix.test.h"
+
+// clang-format off
+CAMADA_SMTLIB_MATRIX("z3", "[Z3][SMTLIB][pipeline]", z3Command)
+CAMADA_SMTLIB_MATRIX("cvc5", "[CVC5][SMTLIB][pipeline]", cvc5Command)
+CAMADA_SMTLIB_MATRIX("bitwuzla", "[Bitwuzla][SMTLIB][pipeline]", bitwuzlaCommand)
+CAMADA_SMTLIB_MATRIX("mathsat", "[MathSAT][SMTLIB][pipeline]", mathsatCommand)
+CAMADA_SMTLIB_MATRIX("yices-smt2", "[YICES][SMTLIB][pipeline]", yicesSmt2Command)
+CAMADA_SMTLIB_MATRIX("stp", "[STP][SMTLIB][pipeline]", stpCommand)
+// clang-format on
+
+// Needs no solver binary: the child is a shell script that rejects
+// (set-logic), so it runs unconditionally rather than through the matrix.
+TEST_CASE("SMTLIB pipeline: preamble rejection is reported [z3]",
+          "[Z3][SMTLIB][pipeline]") {
+  camada_smtlib_pipeline::runSMTLIBPreambleRejectionReported();
+}
+
+// An environment failure at construction is reported, not aborted; one child
+// is enough since the failure fires before the child matters.
+TEST_CASE("SMTLIB pipeline: factory reports setup failure [z3]",
+          "[Z3][SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::z3Command(), "z3");
+  camada_smtlib_pipeline::runSMTLIBFactoryReportsSetupFailure(Cmd);
+}
+
+// Ackermann array encoding over the pipe: the wire carries no array
+// theory at all — only the read variables and their congruence axioms.
+TEST_CASE("SMTLIB pipeline: ack_array_tests [Ackermann] [z3]",
+          "[Z3][SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::z3Command(), "z3");
+  camada::SMTSolverRef solver =
+      camada_smtlib_pipeline::makeSMTLIBSolverAckermannArrays(Cmd);
+  ack_array_tests(solver);
+}
+
+// The Ackermann array encoding is aimed exactly at solvers like STP,
+// whose array support is its weakest theory: with it, the wire carries
+// no array sorts or select/store terms at all. checkSatAssuming inside
+// the fixture exercises the push/assert/check/pop fallback (the STP
+// child has no unsat-assumptions support), which replays the journaled
+// congruence axioms. Only the flat driver runs here: stp answers
+// `unsupported` to `:global-declarations true`, so fixtures that mint
+// read variables inside a (push) scope hit the documented
+// scoped-declaration limitation of such children.
+TEST_CASE("SMTLIB pipeline: ack_array_tests_flat [Ackermann] [stp]",
+          "[STP][SMTLIB][pipeline]") {
+  CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::stpCommand(), "stp");
+  camada::SMTSolverRef solver =
+      camada_smtlib_pipeline::makeSMTLIBSolverAckermannArrays(Cmd);
+  ack_array_tests_flat(solver);
+}
