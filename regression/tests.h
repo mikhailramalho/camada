@@ -16,7 +16,24 @@
 #if !defined(_WIN32)
 #include <sys/wait.h>
 #include <unistd.h>
+#if defined(__linux__)
+#include <sys/prctl.h>
 #endif
+#endif
+
+// The abort helpers below fork a child whose SIGABRT is the pass condition.
+// On hosts that route crashes through a core_pattern pipe handler (Ubuntu's
+// apport, systemd-coredump), every such intentional abort invokes the
+// handler -- RLIMIT_CORE does not gate pipe handlers -- which inspects a
+// process with every solver library mapped, serialized behind the handler's
+// lock. Measured: ~1s per abort, turning these suites from milliseconds
+// into minutes. A non-dumpable child skips the core pipeline entirely while
+// the parent still sees the same SIGABRT.
+inline void disable_core_dump() {
+#if defined(__linux__)
+  prctl(PR_SET_DUMPABLE, 0);
+#endif
+}
 
 #define RESETANDTEST(testname)                                                 \
   solver->reset();                                                             \
@@ -34,6 +51,7 @@ template <typename Fn> inline void require_abort(Fn &&Body) {
   REQUIRE(pid != -1);
 
   if (pid == 0) {
+    disable_core_dump();
     Body();
     std::_Exit(0);
   }
@@ -66,6 +84,7 @@ template <typename Fn> inline std::string abort_message(Fn &&Body) {
   REQUIRE(pid != -1);
 
   if (pid == 0) {
+    disable_core_dump();
     dup2(fd, STDERR_FILENO);
     close(fd);
     // Catch2 installs a SIGABRT handler that reports the abort and resumes
