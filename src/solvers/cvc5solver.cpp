@@ -1200,7 +1200,7 @@ bool CVC5Solver::nativeConstArrayAccepts(const SMTExprRef &InitValue) const {
   return Init.isBooleanValue() || Init.isBitVectorValue() ||
          Init.isIntegerValue() || Init.isRealValue() ||
          Init.isFloatingPointValue() || Init.isRoundingModeValue() ||
-         Init.isConstArray();
+         Init.isTupleValue() || Init.isConstArray();
 }
 
 SMTExprRef CVC5Solver::mkArrayConstImpl(const SMTSortRef &IndexSort,

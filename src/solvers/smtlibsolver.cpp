@@ -1459,6 +1459,22 @@ SMTExprRef SMTLIBSolver::mkSymbolImpl(const std::string &Name,
   return makeSMTLIBExpr(SMTExprKind::Symbol, Sort, std::move(Quoted));
 }
 
+bool SMTLIBSolver::nativeConstArrayAccepts(const SMTExprRef &InitValue) const {
+  switch (InitValue->getKind()) {
+  case SMTExprKind::BoolConst:
+  case SMTExprKind::IntConst:
+  case SMTExprKind::RealConst:
+  case SMTExprKind::BVConst:
+  case SMTExprKind::FPConst:
+  case SMTExprKind::RMConst:
+  case SMTExprKind::FXPConst:
+  case SMTExprKind::ArrayConst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 SMTExprRef SMTLIBSolver::mkArrayConstImpl(const SMTSortRef &IndexSort,
                                           const SMTExprRef &InitValue) {
   SMTSortRef Arr = mkArraySort(IndexSort, InitValue->Sort);

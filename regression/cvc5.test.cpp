@@ -1,5 +1,5 @@
-#include "tests.h"
 #include "matrix.test.h"
+#include "tests.h"
 
 // One test case per shared fixture group; capability gates and
 // exclusions live in matrix.test.h.
@@ -82,4 +82,9 @@ TEST_CASE("CVC5 native constant arrays reject a non-literal initializer",
               ->getKind() == camada::SMTExprKind::ArrayConst);
   auto lazy = solver->mkArrayConst(idx, sym);
   REQUIRE(lazy->isArraySort());
+
+  // A tuple literal is a value too.
+  auto tuple = solver->mkTuple({literal, solver->mkBool(true)});
+  REQUIRE(solver->mkArrayConst(idx, tuple, camada::ConstArrayLowering::Native)
+              ->getKind() == camada::SMTExprKind::ArrayConst);
 }

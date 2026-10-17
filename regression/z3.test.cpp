@@ -1,5 +1,5 @@
-#include "tests.h"
 #include "matrix.test.h"
+#include "tests.h"
 
 // One test case per shared fixture group; capability gates and
 // exclusions live in matrix.test.h.
@@ -7,6 +7,7 @@ CAMADA_SHARED_MATRIX(Z3, camada::createZ3Solver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/z3solver.h>
+#include <stdexcept>
 
 // The fixed<->float oracle tables bit-blast thousands of FP circuits, so
 // unlike the other FXP fixtures they run on one backend instead of all
@@ -105,6 +106,48 @@ TEST_CASE("Z3 internal exceptions surface as UNKNOWN", "[Z3]") {
     // The exception's own text is kept, not swallowed.
     REQUIRE_FALSE(solver->reasonUnknownDetail().empty());
   }
+}
+
+// A backend exception out of a check is caught once, in the core, on every
+// check path: check(), checkSatAssuming() and its push/check/pop fallback.
+TEST_CASE("Backend exceptions from a check surface as UNKNOWN", "[Z3]") {
+  class ThrowingZ3 : public camada::Z3Solver {
+  public:
+    explicit ThrowingZ3(z3::config &Cfg) : camada::Z3Solver(Cfg) {}
+    bool Throw = true;
+
+  protected:
+    camada::CheckResult checkImpl() override {
+      if (Throw)
+        throw std::runtime_error("boom");
+      return camada::Z3Solver::checkImpl();
+    }
+    camada::CheckResult
+    checkSatAssumingImpl(const std::vector<camada::SMTExprRef> &A) override {
+      return camada::SMTSolverImpl::checkSatAssumingImpl(A);
+    }
+  };
+
+  z3::config Cfg;
+  auto Owned = std::make_unique<ThrowingZ3>(Cfg);
+  ThrowingZ3 &Throwing = *Owned;
+  camada::SMTSolverRef solver = std::move(Owned);
+  auto b = solver->mkSymbol("b", solver->mkBoolSort());
+
+  auto expectBoom = [&](camada::CheckResult R) {
+    REQUIRE(R == camada::CheckResult::UNKNOWN);
+    REQUIRE(solver->reasonUnknown() == camada::UnknownReason::BackendError);
+    REQUIRE(solver->reasonUnknownDetail() == "boom");
+  };
+  expectBoom(solver->check());
+  expectBoom(solver->checkSatAssuming({}));
+  expectBoom(solver->checkSatAssuming({b}));
+
+  // The fallback popped its scope on the way out; the solver still works.
+  Throwing.Throw = false;
+  solver->addConstraint(solver->mkNot(b));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->checkSatAssuming({b}) == camada::CheckResult::UNSAT);
 }
 
 // The detail travels with the reason and dies with it. Z3 5.3 no longer throws

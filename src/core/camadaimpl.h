@@ -25,6 +25,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -128,11 +129,6 @@ public:
   /// extensionality, FP-to-BV shadowing) that mint symbols with the
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
-
-  /// Builds the symbol Key names (the cache lookup has already missed) and
-  /// records it. Split from mkSymbolUnchecked so mkSymbol, which has just
-  /// looked the same key up, does not look it up again.
-  SMTExprRef createSymbol(SymbolExprCacheKey Key, const SMTSortRef &Sort);
 
   /// The sorts lazyIndexModelBits can canonicalize. The Ackermann model
   /// walks compare indexes by those bits, so an index outside this set is
@@ -865,8 +861,6 @@ public:
                            const SMTExprRef &Value) override final;
   SMTExprRef mkApply(const SMTExprRef &Function,
                      const std::vector<SMTExprRef> &Args) override final;
-  void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
-                                 const SMTExprRef &Body);
   SMTExprRef mkForall(const std::vector<SMTExprRef> &Vars,
                       const SMTExprRef &Body) override final;
   SMTExprRef mkExists(const std::vector<SMTExprRef> &Vars,
@@ -944,8 +938,17 @@ protected:
   }
 
 private:
+  /// The precondition mkForall and mkExists share.
+  void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
+                                 const SMTExprRef &Body);
+
   /// Settles LastUnknown once the backend has answered.
   CheckResult finishCheck(CheckResult Result);
+  /// Runs a backend check. An exception out of it is the backend failing to
+  /// run the query (an internal error on valid input), so it answers UNKNOWN
+  /// with reason BackendError and the exception's text as the detail, rather
+  /// than ending the host.
+  CheckResult runBackendCheck(const std::function<CheckResult()> &Check);
 
 public:
   bool setTimeout(uint64_t Milliseconds) override final;

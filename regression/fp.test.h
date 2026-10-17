@@ -367,6 +367,17 @@ inline void fp_bv_conversions(const camada::SMTSolverRef &solver,
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
+// The unspecified result of converting NaN is internal: a user symbol with the
+// name the BV encoding once used for it stays a separate variable.
+inline void fp_to_bv_unspecified_is_internal(const camada::SMTSolverRef &solver,
+                                             camada::FPEncoding Encoding) {
+  auto nan_bv = solver->mkFPToUBV(solver->mkNaN32(false, Encoding), 8);
+  auto user = solver->mkSymbol("UNSPEC_FP8", solver->mkBVSort(8));
+  solver->addConstraint(solver->mkEqual(nan_bv, solver->mkBVFromDec(0, 8)));
+  solver->addConstraint(solver->mkEqual(user, solver->mkBVFromDec(1, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
 // Regression for the ESBMC fp.to_ieee_bv round-trip report: bit-exact
 // fp<->bv correspondence wherever camada can prove the bits.
 inline void fp_ieee_bv_bitexact_roundtrip(const camada::SMTSolverRef &solver,

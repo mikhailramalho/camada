@@ -142,6 +142,8 @@ inline const char *excludedReason(const char *Child, const char *Group,
       array_const_store_semantics)                                             \
   CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "const-arrays",                \
       bool_array_const_store_semantics)                                        \
+  CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "const-arrays",                \
+      const_array_nonliteral_initializer)                                      \
   CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", uf_semantics)              \
   CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "", quantifier_semantics)      \
   CAMADA_SMTLIB_FIXTURE(ChildName, Tags, CmdFn, "arith",                       \

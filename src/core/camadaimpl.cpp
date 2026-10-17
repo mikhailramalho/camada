@@ -2220,7 +2220,7 @@ SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
   // cannot meet a user symbol. The first sort keeps the plain name.
   auto [Owner, First] = SymbolNameSort.try_emplace(Name, Sort.get());
   if (First || Owner->second == Sort.get())
-    return createSymbol(std::move(Key), Sort);
+    return mkSymbolUnchecked(Name, Sort);
   SMTExprRef theExp = mkSymbolUnchecked(
       "__CAMADA_alias" + std::to_string(SymbolAliasCounter++) + "_" + Name,
       Sort);
@@ -2234,12 +2234,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   auto Cached = SymbolExprCache.find(Key);
   if (Cached != SymbolExprCache.end())
     return Cached->second;
-  return createSymbol(std::move(Key), Sort);
-}
 
-SMTExprRef SMTSolverImpl::createSymbol(SymbolExprCacheKey Key,
-                                       const SMTSortRef &Sort) {
-  const std::string &Name = Key.Name;
   SMTExprRef theExp;
   // Route tuple-typed symbols to the Camada-managed lowering on backends
   // without native datatype support.
@@ -2469,7 +2464,17 @@ CheckResult SMTSolverImpl::check() {
   // in checkSatAssuming() does not have that luxury: it never calls this
   // hook, so it clears the reason itself.
   invalidateUnsatAssumptions();
-  return finishCheck(checkImpl());
+  return finishCheck(runBackendCheck([this] { return checkImpl(); }));
+}
+
+CheckResult
+SMTSolverImpl::runBackendCheck(const std::function<CheckResult()> &Check) {
+  try {
+    return Check();
+  } catch (const std::exception &E) {
+    noteUnknownReason(UnknownReason::BackendError, E.what());
+    return CheckResult::UNKNOWN;
+  }
 }
 
 CheckResult SMTSolverImpl::finishCheck(CheckResult Result) {
@@ -2511,8 +2516,10 @@ SMTSolverImpl::checkSatAssuming(const std::vector<SMTExprRef> &Assumptions) {
   // lowerings do), all of which invalidate the unsat-assumption state, so
   // record it only after the check completes.
   LastUnknown = {};
-  const CheckResult Result = finishCheck(
-      Assumptions.empty() ? checkImpl() : checkSatAssumingImpl(Assumptions));
+  const CheckResult Result = finishCheck(runBackendCheck([&] {
+    return Assumptions.empty() ? checkImpl()
+                               : checkSatAssumingImpl(Assumptions);
+  }));
   UnsatAssumptionsValid = Result == CheckResult::UNSAT;
   LastAssumptions =
       UnsatAssumptionsValid ? Assumptions : std::vector<SMTExprRef>{};

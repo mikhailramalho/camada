@@ -396,6 +396,11 @@ protected:
                           const SMTSortRef &Sort) override;
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
+  /// ((as const ...) v) with a non-literal v is not portable: z3 accepts it,
+  /// cvc5 rejects the script ("expected a value"), and the pipe cannot know
+  /// which child it drives. Only literal initializers go native; the rest take
+  /// the lazy lowering, which every child accepts.
+  bool nativeConstArrayAccepts(const SMTExprRef &InitValue) const override;
 
   // --- native FP literals + RM ---
   SMTExprRef mkFPFromBinImpl(const std::string &FP, unsigned EWidth) override;

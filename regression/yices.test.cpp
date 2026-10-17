@@ -212,6 +212,14 @@ TEST_CASE("Yices Int/Real support follows the creation logic", "[YICES]") {
 
 // Without arithmetic in the context, asking for an Int or Real sort is
 // rejected where it is made, not at the first arithmetic assertion.
+TEST_CASE("Yices rejects a logic it does not accept", "[YICES]") {
+  for (const char *Logic : {"QF_FOO", "AUFLIA"}) {
+    camada::SolverConfig Cfg;
+    Cfg.Logic = Logic;
+    require_abort([&]() { (void)camada::createYicesSolver(Cfg); });
+  }
+}
+
 TEST_CASE("Yices rejects Int/Real sorts without an arithmetic logic",
           "[YICES]") {
   auto yices = camada::createYicesSolver();

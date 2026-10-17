@@ -1911,8 +1911,9 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
 
   // NaN, Inf, or negative (except -0) -> unspecified
   SMTExprRef c1 = mkOr(x_is_nan, x_is_inf);
-  SMTExprRef unspec_v =
-      mkSymbol("UNSPEC_FP" + std::to_string(ToWidth), mkBVSort(ToWidth));
+  // Reserved name, so no user symbol can be this variable.
+  SMTExprRef unspec_v = mkSymbolUnchecked(
+      "__CAMADA_unspec_fp" + std::to_string(ToWidth), mkBVSort(ToWidth));
   const SMTExprRef &v1 = unspec_v;
 
   // +-0 -> 0

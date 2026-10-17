@@ -515,6 +515,8 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
   RESETANDARGTEST(fp_round_to_away, BVFP);
   RESETANDARGTEST(fp_bv_conversions, NativeFP);
   RESETANDARGTEST(fp_bv_conversions, BVFP);
+  RESETANDARGTEST(fp_to_bv_unspecified_is_internal, NativeFP);
+  RESETANDARGTEST(fp_to_bv_unspecified_is_internal, BVFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, NativeFP);
   RESETANDARGTEST(fp_ieee_bv_sort_identity, BVFP);
   RESETANDARGTEST(fp_ieee_bv_bitexact_roundtrip, NativeFP);
