@@ -2518,7 +2518,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
     SMTSolverImpl &S;
     // Set once checkImpl() has answered; NotApplicable until then, so an
     // exception before that point restores nothing.
-    UnknownInfo UnknownToRestore;
+    UnknownInfo UnknownToRestore{};
     // A destructor is implicitly noexcept, and pop() can throw: it calls
     // popImpl() and then re-asserts the journaled lazy constraints, exactly
     // when the backend context may already be in an error state. Swallow
