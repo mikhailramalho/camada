@@ -36,8 +36,15 @@ def copy_release_dependency(pattern, deps_install_dir, release_lib_dir):
 
 
 def rewrite_release_link_interface(targets_file, solver_archives):
-    packaged_solver_libs = [f"${{_IMPORT_PREFIX}}/lib/{name}"
-                            for name in solver_archives]
+    packaged_solver_libs = []
+    for name in solver_archives:
+        entry = f"${{_IMPORT_PREFIX}}/lib/{name}"
+        if name == "libz3.a":
+            # Z3 5.3 registers its tactics through static initializers, which
+            # a normal static link drops: z3::tactic(c, "smt") would find no
+            # tactic. Link the archive whole so downstream builds keep them.
+            entry = f"$<LINK_LIBRARY:WHOLE_ARCHIVE,{entry}>"
+        packaged_solver_libs.append(entry)
 
     if sys.platform == "win32":
         # MSVC auto-links the C runtime; the Z3 import lib is the only
@@ -81,15 +88,17 @@ if __name__ == '__main__':
 
     # Bitwuzla is unsupported on Windows: its upstream prebuilt is MinGW-built
     # and the static archive is not link-compatible with MSVC. ESBMC's Windows
-    # CI is Z3-only for the same reason.
+    # CI is Z3-only for the same reason. CVC5 is built from source through a
+    # POSIX shell configure script and refuses to configure on Windows.
     bitwuzla_flag = "OFF" if is_windows else "ON"
+    cvc5_flag = "OFF" if is_windows else "ON"
     cmake_args = [
         "cmake", "..",
         "-DBUILD_SHARED_LIBS=OFF",
         "-DCAMADA_ENABLE_REGRESSION=OFF",
         "-DCAMADA_DOWNLOAD_DEPENDENCIES=PERMISSIVE",
         f"-DCAMADA_SOLVER_BITWUZLA_ENABLE={bitwuzla_flag}",
-        "-DCAMADA_SOLVER_CVC5_ENABLE=OFF",
+        f"-DCAMADA_SOLVER_CVC5_ENABLE={cvc5_flag}",
         "-DCAMADA_SOLVER_MATHSAT_ENABLE=OFF",
         "-DCAMADA_SOLVER_STP_ENABLE=OFF",
         "-DCAMADA_SOLVER_YICES_ENABLE=OFF",
@@ -143,10 +152,17 @@ if __name__ == '__main__':
         solver_archives.extend(
             copy_release_dependency("**/libbitwuzla*.a", deps_install_dir,
                                     release_lib_dir))
-        # Bitwuzla is built against the shared CaDiCaL rather than bundling
-        # its own, so the package has to ship it. It lives outside
+        # CVC5 and its bundled polynomial libraries. Both CVC5 and Bitwuzla
+        # reference CaDiCaL, so it follows them below.
+        for archive in ("lib/libcvc5.a", "lib/libpicpoly.a",
+                        "lib/libpicpolyxx.a"):
+            solver_archives.extend(
+                copy_release_dependency(archive, deps_install_dir,
+                                        release_lib_dir))
+        # Bitwuzla and CVC5 are built against the shared CaDiCaL rather than
+        # bundling their own, so the package has to ship it. It lives outside
         # deps/install on purpose (see CAMADA_CADICAL_PREFIX), and comes
-        # after Bitwuzla on the link line because Bitwuzla references it.
+        # after both on the link line because both reference it.
         solver_archives.extend(
             copy_release_dependency(
                 "lib/libcadical.a",
@@ -165,21 +181,10 @@ if __name__ == '__main__':
         copy_release_dependency("**/libz3.dll", deps_install_dir,
                                 release_bin_dir)
     else:
-        # Z3 prebuilts through 5.1 ship a static libz3.a. From 5.3.0 they ship
-        # only the shared library on Linux and macOS, so fall back to bundling
-        # that, as Windows always has. It is linked by path from the exported
-        # target; CMake puts its directory on the consumer's rpath, so the
-        # staged tree stays relocatable.
-        try:
-            solver_archives.extend(
-                copy_release_dependency("**/libz3.a", deps_install_dir,
-                                        release_lib_dir))
-        except FileNotFoundError:
-            shared_z3 = ("bin/libz3.dylib" if sys.platform == "darwin"
-                         else "bin/libz3.so")
-            solver_archives.extend(
-                copy_release_dependency(shared_z3, deps_install_dir,
-                                        release_lib_dir))
+        # Built from source as a static archive (see camada_setup_z3).
+        solver_archives.extend(
+            copy_release_dependency("**/libz3.a", deps_install_dir,
+                                    release_lib_dir))
     rewrite_release_link_interface(
         "./release/lib/cmake/camada/camadaTargets.cmake", solver_archives)
 

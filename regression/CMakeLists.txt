@@ -190,7 +190,8 @@ if(CAMADA_SOLVER_SMTLIB_ENABLE)
 endif()
 
 if(${CAMADA_SOLVER_Z3_ENABLE})
-  target_link_libraries(${REGRESSION_TARGET_NAME} PUBLIC ${CAMADA_Z3_LIB})
+  target_link_libraries(${REGRESSION_TARGET_NAME}
+                        PUBLIC ${CAMADA_Z3_LINK_LIBRARIES})
   target_include_directories(${REGRESSION_TARGET_NAME}
                              PRIVATE ${CAMADA_Z3_INCLUDE_DIR})
   # Tell the regression sources whether Z3 was compiled in. Per-backend test

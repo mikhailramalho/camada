@@ -25,26 +25,21 @@ set(CAMADA_DEPS_INSTALL_DIR
     "${CAMADA_DEPS_DIR}/install"
     CACHE PATH "Directory used to install downloaded solver dependencies")
 
-# Z3 prebuilts through 5.1 ship a static libz3.a on Linux and macOS; from 5.3.0
-# (the release that moved the build to CMake only) they ship the shared library
-# alone, as Windows always has (libz3.lib + libz3.dll). scripts/release.py
-# bundles whichever the archive provides. 5.3.0 is also the first release with
-# the fp.rem truncation and fp.fma rounding fixes.
-set(CAMADA_Z3_LINUX_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-glibc-2.39.zip"
-    CACHE STRING
-          "URL used to download the prebuilt Z3 archive for Linux x86_64")
-set(CAMADA_Z3_LINUX_AARCH64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-arm64-glibc-2.38.zip"
-    CACHE STRING
-          "URL used to download the prebuilt Z3 archive for Linux aarch64")
-set(CAMADA_Z3_MACOS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-osx-13.3.zip"
-    CACHE STRING
-          "URL used to download the prebuilt Z3 archive for macOS x86_64")
-set(CAMADA_Z3_MACOS_ARM64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-arm64-osx-13.3.zip"
-    CACHE STRING "URL used to download the prebuilt Z3 archive for macOS arm64")
+# Z3 is built from source everywhere but Windows, in the variant Camada itself
+# is built as: shared for a shared Camada (one Z3 runtime for the library, the
+# tests and anyone mixing z3++ with Camada's Z3 backend), static for a static
+# one (what the release tarballs ship). The 5.3.0 prebuilts (the release that
+# moved Z3 to a CMake-only build) stopped shipping libz3.a on Linux and macOS,
+# and a release that bundles a shared libz3 is not what Camada's tarballs are
+# meant to be. 5.3.0 is also the first release with the fp.rem truncation and
+# fp.fma rounding fixes. Windows keeps the prebuilt: it has always shipped
+# libz3.lib + libz3.dll, and MSVC is not built from source here.
+set(CAMADA_Z3_GIT_TAG
+    "z3-5.3.1"
+    CACHE STRING "Z3 tag built from source (every platform but Windows)")
+set(CAMADA_Z3_SHA256
+    "c007089dd8d92298d2a7d14105b14e8dddfbb540062ce471c3111e0741edd8da"
+    CACHE STRING "Expected SHA256 of the Z3 source archive")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-win.zip"
     CACHE STRING
@@ -1553,7 +1548,133 @@ function(camada_setup_yices)
   file(MAKE_DIRECTORY "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/yices")
 endfunction()
 
+# Z3's own CMake build, in the variant Camada is built as. A static Z3 is
+# position-independent so it can land in a shared library. Z3 vendors no SAT
+# engine of its own to clash with the shared CaDiCaL, and uses its internal
+# multiprecision rather than GMP, so it adds nothing to the single-GMP story.
+# The z3 executable is built too: the SMT-LIB pipeline tests drive it.
+function(camada_build_z3_from_source)
+  camada_fetch_git_source(z3src Z3Prover/z3 "${CAMADA_Z3_GIT_TAG}"
+                          z3_source_dir "${CAMADA_Z3_SHA256}")
+  set(z3_build_dir "${z3_source_dir}/camada-build")
+  file(REMOVE_RECURSE "${z3_build_dir}")
+
+  if(BUILD_SHARED_LIBS)
+    set(z3_shared ON)
+  else()
+    set(z3_shared OFF)
+  endif()
+  if(APPLE)
+    set(z3_rpath "@loader_path/../lib")
+  else()
+    set(z3_rpath "\$ORIGIN/../lib")
+  endif()
+
+  set(z3_cmake_args
+      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
+      # Z3's default libdir would otherwise follow the host's lib64 convention.
+      -DCMAKE_INSTALL_LIBDIR=lib
+      -DBUILD_SHARED_LIBS=${z3_shared}
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+      # The z3 executable has to find a shared libz3 beside the install.
+      "-DCMAKE_INSTALL_RPATH=${z3_rpath}"
+      -DZ3_BUILD_EXECUTABLE=ON
+      -DZ3_BUILD_TEST_EXECUTABLES=OFF
+      -DZ3_ENABLE_EXAMPLE_TARGETS=OFF
+      # A tarball carries no git history to describe.
+      -DZ3_INCLUDE_GIT_HASH=OFF
+      -DZ3_INCLUDE_GIT_DESCRIBE=OFF)
+  # Build with the toolchain and flags Camada itself was configured with, so a
+  # release build's path-prefix remapping (and a macOS deployment target) reach
+  # Z3 as well.
+  foreach(z3_inherited IN ITEMS C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
+                                OSX_DEPLOYMENT_TARGET OSX_ARCHITECTURES)
+    if(CMAKE_${z3_inherited})
+      list(APPEND z3_cmake_args
+           -DCMAKE_${z3_inherited}=${CMAKE_${z3_inherited}})
+    endif()
+  endforeach()
+
+  # Ninja when it is there (the Bitwuzla recipe needs it anyway): a Unix
+  # Makefiles tree built with a wide -j once lost object directories under the
+  # build mid-way, the signature of a regeneration racing the compile jobs,
+  # while Ninja regenerates as a single prerequisite step.
+  camada_find_program_with_prefixes(z3_ninja_program ninja)
+  if(z3_ninja_program)
+    set(z3_generator Ninja)
+  else()
+    set(z3_generator "${CMAKE_GENERATOR}")
+  endif()
+
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${z3_source_dir}"
+    MESSAGE
+    "Configuring Z3"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    -S
+    "${z3_source_dir}"
+    -B
+    "${z3_build_dir}"
+    -G
+    "${z3_generator}"
+    ${z3_cmake_args})
+
+  # Bound the job count by processor count, as for CVC5: an unbounded parallel
+  # build starts every ready compile at once and exhausts a small CI runner.
+  cmake_host_system_information(RESULT z3_jobs QUERY NUMBER_OF_LOGICAL_CORES)
+  if(NOT z3_jobs OR z3_jobs LESS 1)
+    set(z3_jobs 1)
+  endif()
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${z3_source_dir}"
+    MESSAGE
+    "Building Z3 with ${z3_jobs} job(s)"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --build
+    "${z3_build_dir}"
+    --parallel
+    ${z3_jobs})
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${z3_source_dir}"
+    MESSAGE
+    "Installing Z3"
+    COMMAND
+    "${CMAKE_COMMAND}"
+    --install
+    "${z3_build_dir}")
+
+  # A tree migrating from the prebuilt recipe still holds its shared and static
+  # libraries under bin/, its Python copy, and its shared-package CMake
+  # metadata; none of it matches the static install above.
+  file(GLOB z3_prebuilt_leftovers "${CAMADA_DEPS_INSTALL_DIR}/bin/libz3*")
+  file(REMOVE ${z3_prebuilt_leftovers})
+  file(REMOVE_RECURSE "${CAMADA_DEPS_INSTALL_DIR}/bin/python")
+endfunction()
+
 function(camada_setup_z3)
+  if(NOT WIN32)
+    # The source build installs under lib/; the prebuilt recipe staged both
+    # variants under bin/, so a tree migrating from it has z3.h but nothing here
+    # and rebuilds. Both variants can sit side by side in one prefix.
+    if(BUILD_SHARED_LIBS)
+      set(z3_installed "lib/libz3${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    else()
+      set(z3_installed "lib/libz3.a")
+    endif()
+    if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/${z3_installed}")
+      return()
+    endif()
+    camada_ensure_deps_dirs()
+    camada_build_z3_from_source()
+    return()
+  endif()
+
   set(z3_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libz3.a")
   if(BUILD_SHARED_LIBS)
     set(z3_lib
@@ -1584,25 +1705,6 @@ function(camada_setup_z3)
     SOURCE_DIR
     "${z3_root_dir}")
   camada_stage_prebuilt_tree("${z3_root_dir}")
-
-  if(APPLE)
-    set(z3_shared_lib
-        "${CAMADA_DEPS_INSTALL_DIR}/bin/libz3${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    if(EXISTS "${z3_shared_lib}")
-      execute_process(
-        COMMAND install_name_tool -id
-                "@rpath/libz3${CMAKE_SHARED_LIBRARY_SUFFIX}" "${z3_shared_lib}"
-        RESULT_VARIABLE z3_install_name_result
-        OUTPUT_VARIABLE z3_install_name_stdout
-        ERROR_VARIABLE z3_install_name_stderr)
-      if(NOT z3_install_name_result EQUAL 0)
-        message(
-          FATAL_ERROR
-            "Failed to normalize the Z3 install name for ${z3_shared_lib}\nstdout:\n${z3_install_name_stdout}\nstderr:\n${z3_install_name_stderr}"
-        )
-      endif()
-    endif()
-  endif()
 endfunction()
 
 # Stage the macOS MathSAT binary into ${CAMADA_DEPS_INSTALL_DIR}/bin and rewrite
