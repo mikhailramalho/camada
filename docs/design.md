@@ -112,6 +112,11 @@ that introduced them — but it diverges from strict SMT-LIB semantics where a
 `(declare-const)` inside a pushed scope is removed on pop. Code that relies on
 fresh-symbol-per-scope should call `solver->reset()` between scopes instead.
 
+A name can be reused with a different sort: `mkSymbol("x", bv8)` and
+`mkSymbol("x", bv16)` are two symbols. Backends keep one sort per name, so the
+first sort keeps the plain name and each later sort is declared under a
+reserved `__CAMADA_alias<n>_x` name, which shows up in dumps.
+
 ## Floating-point NaN handling
 
 Camada is based on the backend written for [ESBMC](https://github.com/esbmc/esbmc) so some of the implementation decisions were geared towards the verification of C programs. In particular:

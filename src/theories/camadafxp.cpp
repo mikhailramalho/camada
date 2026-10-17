@@ -1176,17 +1176,21 @@ const ExpFormatBound *findExpBound(const FXPFormat &F) {
 // width is cheap here.
 constexpr unsigned ExpGuardBits = 32;
 
-// floor(ln2 * 2^Prec) as a Width-bit binary string, computed exactly from
-// ln2 = sum_{k>=1} 1/(k*2^k). The series is truncated where its terms fall
-// below the last bit kept, so the result is exact for any Prec; deriving
-// it here rather than hard-coding digits keeps the constant tied to the
-// intermediate width the caller actually uses.
+// floor(ln2 * 2^Prec) as a Width-bit binary string, from
+// ln2 = sum_{k>=1} 1/(k*2^k). Every term is floored by its long division, so
+// summing at Prec bits would leave the constant up to Prec units short, which
+// is enough to misround the last bit of exp() near the end of a wide format.
+// The series is summed with ln2ExtraBits more bits instead, so those losses
+// land below the last bit kept.
+constexpr unsigned ln2ExtraBits = 32;
+
 std::string ln2Bits(unsigned Width, unsigned Prec) {
-  std::vector<uint32_t> Acc(Width / 32 + 2, 0);
-  for (unsigned K = 1; K <= Prec; ++K) {
-    // Term = 2^(Prec-K) / K, by long division over the limbs.
+  const unsigned Total = Prec + ln2ExtraBits;
+  std::vector<uint32_t> Acc(std::max(Width, Total) / 32 + 2, 0);
+  for (unsigned K = 1; K <= Total; ++K) {
+    // Term = 2^(Total-K) / K, by long division over the limbs.
     std::vector<uint32_t> T(Acc.size(), 0);
-    unsigned Bit = Prec - K;
+    unsigned Bit = Total - K;
     T[Bit / 32] = 1u << (Bit % 32);
     uint64_t Rem = 0;
     for (size_t I = T.size(); I-- > 0;) {
@@ -1202,9 +1206,11 @@ std::string ln2Bits(unsigned Width, unsigned Prec) {
     }
   }
   std::string Bits(Width, '0');
-  for (unsigned I = 0; I < Width; ++I)
-    if ((Acc[I / 32] >> (I % 32)) & 1)
+  for (unsigned I = 0; I < Width; ++I) {
+    const unsigned J = I + ln2ExtraBits;
+    if ((Acc[J / 32] >> (J % 32)) & 1)
       Bits[Width - 1 - I] = '1';
+  }
   return Bits;
 }
 
@@ -1354,7 +1360,9 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
   // exactly, so every mode is an adjustment from the floor. The true root
   // lies above the midpoint between Root and Root+1 exactly when
   // Rem > Root, since (Root + 1/2)^2 = Root^2 + Root + 1/4 and Rem is an
-  // integer; it is an exact tie when Rem == Root.
+  // integer. Rem == Root is below the midpoint, not on it: the midpoint
+  // squared is never an integer, so a square root has no ties and every
+  // nearest mode rounds up on the same condition.
   //
   // A square root is never exactly representable unless Rem == 0, so the
   // directed modes only need to know whether the result is inexact.
@@ -1374,16 +1382,10 @@ SMTExprRef SMTSolverImpl::mkFXPSqrt(const SMTExprRef &Exp, FXPRM Mode) {
     break;
   case FXPRM::NearestTiesTowardPositive:
   case FXPRM::NearestTiesAwayFromZero:
-    // The root is non-negative, so both tie directions round up. The
-    // Rem != 0 guard matters at Root == 0: an exact zero would otherwise
-    // satisfy Rem >= Root and round up to one.
-    RoundUp = mkAnd(mkNot(RemZero), mkBVUge(Rem, Root));
+  case FXPRM::NearestTiesToEven:
+    // Rem > Root implies Rem != 0, so an exact root never rounds up.
+    RoundUp = mkBVUgt(Rem, Root);
     break;
-  case FXPRM::NearestTiesToEven: {
-    SMTExprRef RootOdd = mkEqual(mkBVExtract(0, 0, Root), mkBVFromDec(1, 1));
-    RoundUp = mkOr(mkBVUgt(Rem, Root), mkAnd(mkEqual(Rem, Root), RootOdd));
-    break;
-  }
   }
   Root = mkIte(RoundUp, mkBVAdd(Root, One), Root);
 
