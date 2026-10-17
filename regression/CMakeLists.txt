@@ -29,7 +29,7 @@ function(compile_test)
 endfunction()
 
 if(NOT TARGET Catch2::Catch2)
-  find_package(Catch2 3 REQUIRED)
+  find_package(Catch2 ${CAMADA_CATCH2_MIN_VERSION} REQUIRED)
 endif()
 if(DEFINED Catch2_SOURCE_DIR)
   list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
