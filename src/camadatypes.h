@@ -226,7 +226,9 @@ enum class SolverKind : std::uint8_t {
 /// describe what Camada emits — a particular child solver may still
 /// reject a construct at runtime.
 enum class SolverFeature : std::uint8_t {
-  /// Int/Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
+  /// Int/Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*). On Yices
+  /// this follows the logic the solver was created with (SolverConfig::Logic):
+  /// its default QF_AUFBV context has no arithmetic.
   IntRealArithmetic,
   /// Quantified formulas (mkForall, mkExists).
   Quantifiers,

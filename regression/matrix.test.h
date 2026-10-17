@@ -40,14 +40,9 @@ constexpr Exclusion MatrixExclusions[] = {
      "a native constant array used as an array element always reaches "
      "bitwuzla's array solver, which answers UNKNOWN for CONST_ARRAY "
      "terms; the lazy lowering in the nesting group covers these shapes"},
-    {"Yices", "tuple-with-int",
-     "the default Yices context enables no arithmetic; Int needs a context "
-     "configured for an arithmetic logic (see the Arith Yices test)"},
-    {"Yices", "arith",
-     "each arith fixture needs a context configured for its logic; the "
-     "Arith Yices test runs them on per-logic contexts"},
     {"Yices", "arith-symbolic-shift",
-     "needs an arithmetic context, which the default Yices one is not"},
+     "the Yices backend has no symbolic-amount shift (mkArithShl with a "
+     "non-constant amount is unimplemented), whatever logic the context has"},
     {"MathSAT", "arith-symbolic-shift",
      "pow with a symbolic exponent answers UNSAT on a SAT query, still "
      "broken in MathSAT 5.6.19 despite its LA(Z) fixes"},

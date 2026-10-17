@@ -1195,7 +1195,10 @@ public:
   /// This reports what the backend is *capable* of, not how this instance
   /// was configured. A backend that makes unsat-assumption tracking opt-in
   /// still reports SolverFeature::UnsatAssumptions; ask
-  /// produceUnsatAssumptions() whether this solver has it enabled.
+  /// produceUnsatAssumptions() whether this solver has it enabled. The one
+  /// exception is a theory the backend's context is built without: Yices
+  /// reports SolverFeature::IntRealArithmetic only for a solver created with a
+  /// logic that includes arithmetic.
 
   virtual bool supports(SolverFeature Feature) const = 0;
 

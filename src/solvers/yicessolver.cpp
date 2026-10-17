@@ -250,12 +250,37 @@ SMTSortRef YicesSolver::mkBoolSortImpl() {
                                           SMTSort::ScalarSortData{1}));
 }
 
+// Whether an SMT-LIB logic name includes integer or real arithmetic: the
+// linear fragments (...LIA, ...LRA, ...LIRA), difference logic (IDL, RDL), or
+// ALL. Measured against Yices: a real inequality asserts under exactly these
+// and fails ("the context does not support arithmetic") under QF_AUFBV, QF_BV,
+// QF_UF, QF_UFBV, QF_ABV and QF_AX.
+static bool logicHasArithmetic(const std::string &Logic) {
+  for (const char *Fragment : {"IA", "RA", "IDL", "RDL"})
+    if (Logic.find(Fragment) != std::string::npos)
+      return true;
+  return Logic == "ALL";
+}
+
+bool YicesSolver::intRealArithmeticSupport() const {
+  return logicHasArithmetic(ContextLogic);
+}
+
+// A sort is where an unsupported context should say so: left alone, the first
+// arithmetic assertion fails much later with a message that does not name the
+// logic.
+static const char *const NoArithmeticMessage =
+    "Int and Real need a Yices context created with an arithmetic logic "
+    "(QF_UFLIA, QF_UFLRA, QF_UFLIRA, ...); this solver's logic has none";
+
 SMTSortRef YicesSolver::mkIntSortImpl() {
+  fatalErrorIf(!intRealArithmeticSupport(), NoArithmeticMessage);
   return makeSortRef<YicesSort>(
       YicesSort(SMTSortKind::Int, Context, yices_int_type()));
 }
 
 SMTSortRef YicesSolver::mkRealSortImpl() {
+  fatalErrorIf(!intRealArithmeticSupport(), NoArithmeticMessage);
   return makeSortRef<YicesSort>(
       YicesSort(SMTSortKind::Real, Context, yices_real_type()));
 }
