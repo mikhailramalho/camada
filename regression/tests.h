@@ -580,8 +580,7 @@ inline void tests_fxp(const camada::SMTSolverRef &solver) {
 }
 
 // Int/Real arithmetic, model queries and the Int<->BV bridge. Backends
-// whose contexts must be configured per logic (MathSAT, Yices) are matrix
-// exclusions and run the applicable fixtures from their own Arith cases.
+// without Int/Real skip the cell through supports(IntRealArithmetic).
 inline void tests_arith(const camada::SMTSolverRef &solver) {
   RESETANDTEST(int_arithmetic_semantics);
   RESETANDTEST(real_arithmetic_semantics);

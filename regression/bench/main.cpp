@@ -139,16 +139,12 @@ void runCase(const std::string &backend, const std::string &name,
     return;
   const std::size_t rss_before_kb = readCurrentRSSKiB();
   auto start = Clock::now();
-  bool Skipped = false;
   {
     auto solver = createSolver(backend);
     if (Requires && !solver->supports(*Requires))
-      Skipped = true;
-    else
-      fn(*solver, iterations);
+      return;
+    fn(*solver, iterations);
   }
-  if (Skipped)
-    return;
   ++casesRun;
   auto end = Clock::now();
   const std::size_t rss_after_kb = readCurrentRSSKiB();

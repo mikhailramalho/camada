@@ -2340,20 +2340,16 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
       nativeConstArraySupport() && nativeConstArrayAccepts(InitValue);
   if (Lowering == ConstArrayLowering::Auto)
     Lowering = NativeOk ? ConstArrayLowering::Native : ConstArrayLowering::Lazy;
-  // In Ackermann mode the lowering choice is moot (see below), so an
-  // explicit Native request is not an error on backends without native
-  // constant arrays.
-  fatalErrorIf(Lowering == ConstArrayLowering::Native &&
-                   !nativeConstArraySupport() &&
-                   arrayMode() != ArrayEncoding::Ackermann,
-               "Native constant arrays are not supported by this backend");
   // An explicit Native is not quietly downgraded: the caller asked for the
-  // backend operator, and the lazy lowering is a different term.
-  fatalErrorIf(Lowering == ConstArrayLowering::Native &&
-                   nativeConstArraySupport() && !NativeOk &&
+  // backend operator, and the lazy lowering is a different term. In Ackermann
+  // mode the lowering choice is moot (see below), so it is not an error there.
+  fatalErrorIf(Lowering == ConstArrayLowering::Native && !NativeOk &&
                    arrayMode() != ArrayEncoding::Ackermann,
-               "This backend's native constant arrays take only a literal "
-               "initializer; use ConstArrayLowering::Auto or Lazy");
+               nativeConstArraySupport()
+                   ? "This backend's native constant arrays take only a "
+                     "literal initializer; use ConstArrayLowering::Auto or Lazy"
+                   : "Native constant arrays are not supported by this "
+                     "backend");
   // Tuple-involving initializers decompose into one constant array per
   // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
   // lowering (and its lazy machinery) applies per leaf.

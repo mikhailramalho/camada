@@ -24,25 +24,22 @@
 // Build a tiny formula, emit the SMT-LIB script to a temp file, and assert
 // the file content matches a string literal. No external solver required.
 //
-// The interactive child-process pipeline tests live alongside each native
-// backend's regression file (z3.test.cpp etc.). They share the scenario
-// helpers in smtlib_pipeline.test.h, which lets one CTest entry per
-// (test × solver) report pass/fail without per-test SKIP noise.
+// The interactive child-process pipeline matrix is at the bottom of this file
+// (see smtlib_matrix.test.h).
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include "camada.h"
 #include "solvers/smtlibsolver.h"
+#include "tests.h"
 
 namespace {
 
@@ -433,40 +430,6 @@ std::vector<std::string> z3ModelArgv() {
   return {};
 }
 
-// Fork-and-expect-abort, local copy of the tests.h helpers (this file does
-// not include the shared fixture headers). With Expected, the child's stderr
-// must name it: a checked-STL assertion also aborts, so the signal alone
-// cannot tell camada's diagnostic from undefined behaviour.
-template <typename Fn>
-void requireAborts(Fn &&Body, const char *Expected = nullptr) {
-  std::string Path;
-  if (Expected)
-    Path = makeTempPath();
-  ::pid_t Pid = ::fork();
-  REQUIRE(Pid >= 0);
-  if (Pid == 0) {
-    if (Expected) {
-      std::freopen(Path.c_str(), "w", stderr);
-      std::setvbuf(stderr, nullptr, _IONBF, 0); // abort() does not flush
-      // Catch2's SIGABRT handler would resume the runner in the child.
-      std::signal(SIGABRT, SIG_DFL);
-    }
-    Body();
-    std::_Exit(0);
-  }
-  int Status = 0;
-  REQUIRE(::waitpid(Pid, &Status, 0) == Pid);
-  REQUIRE(WIFSIGNALED(Status));
-  REQUIRE(WTERMSIG(Status) == SIGABRT);
-  if (Expected) {
-    std::ifstream In(Path);
-    std::stringstream Out;
-    Out << In.rdbuf();
-    std::remove(Path.c_str());
-    REQUIRE(Out.str().find(Expected) != std::string::npos);
-  }
-}
-
 } // namespace
 
 TEST_CASE("SMTLIB one-shot verdict scanner contract", "[SMTLIB][oneshot]") {
@@ -534,7 +497,7 @@ TEST_CASE("SMTLIB one-shot sat with model solver", "[SMTLIB][oneshot]") {
   REQUIRE(Val.value() == 5);
 
   // Single-query restriction: a second check aborts.
-  requireAborts([&]() { (void)solver->check(); });
+  require_abort([&]() { (void)solver->check(); });
 
   solver.reset();
   std::remove(Formula.c_str());
@@ -747,7 +710,7 @@ TEST_CASE("SMTLIB one-shot assumption checks and mid-negotiation death",
     REQUIRE(Written.find("(check-sat)") != std::string::npos);
     REQUIRE(Written.find("(push 1)") != std::string::npos);
     // The single-query restriction holds through this entry point too.
-    requireAborts([&]() { (void)solver->check(); });
+    require_abort([&]() { (void)solver->check(); });
     solver.reset();
     std::remove(Formula.c_str());
     std::remove(Script.c_str());
@@ -896,8 +859,10 @@ TEST_CASE("SMTLIB caller-chosen logic against a child", "[SMTLIB][logic]") {
     camada::SMTLIBSolver solver("/nonexistent-camada-dir/out.smt2");
     REQUIRE_FALSE(solver.setupError().empty());
     auto x = solver.mkSymbol("x", solver.mkBVSort(8));
-    requireAborts([&]() { (void)solver.mkBVRedOr(x); },
-                  "Dereferencing null expression handle");
+    REQUIRE(abort_message([&]() {
+              (void)solver.mkBVRedOr(x);
+            }).find("Dereferencing null expression handle") !=
+            std::string::npos);
   }
   // ... and through the factory it is an SMTError rather than an abort.
   {

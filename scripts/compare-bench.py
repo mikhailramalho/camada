@@ -49,22 +49,16 @@ def parse_file(path: Path) -> dict[str, dict[str, object]]:
     return parse_lines(path.read_text().splitlines(), str(path))
 
 
+def bench_cmd(binary: Path, iterations: int, cpu: int, case_filter: str) -> list[str]:
+    cmd = ["schedtool", "-a", str(cpu), "-n", "20", "-e", str(binary)]
+    cmd += ["bitwuzla", str(iterations)]
+    return cmd + [case_filter] if case_filter else cmd
+
+
 def run_benchmark(
     binary: Path, iterations: int, cpu: int, case_filter: str = ""
 ) -> dict[str, dict[str, object]]:
-    cmd = [
-        "schedtool",
-        "-a",
-        str(cpu),
-        "-n",
-        "20",
-        "-e",
-        str(binary),
-        "bitwuzla",
-        str(iterations),
-    ]
-    if case_filter:
-        cmd.append(case_filter)
+    cmd = bench_cmd(binary, iterations, cpu, case_filter)
     proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
     return parse_lines(proc.stdout.splitlines(), f"cpu{cpu}")
 
@@ -80,19 +74,7 @@ def run_benchmarks(
         batch_size = min(cpu_count, runs - launched)
         procs: list[tuple[int, subprocess.Popen[str]]] = []
         for cpu in range(batch_size):
-            cmd = [
-                "schedtool",
-                "-a",
-                str(cpu),
-                "-n",
-                "20",
-                "-e",
-                str(binary),
-                "bitwuzla",
-                str(iterations),
-            ]
-            if case_filter:
-                cmd.append(case_filter)
+            cmd = bench_cmd(binary, iterations, cpu, case_filter)
             procs.append(
                 (
                     cpu,
@@ -246,27 +228,24 @@ def compare_and_print(
     current_total = 0.0
     baseline_rss_total = 0.0
     current_rss_total = 0.0
+    base_runs = (
+        baseline_runs if baseline_runs is not None else [None] * len(current_runs)
+    )
 
     for name in common_names:
         old = float(baseline[name]["ns_per_iter"])
         cur = float(current[name]["ns_per_iter"])
         baseline_total += old
         current_total += cur
-        if baseline_runs is None:
-            samples = [
-                float(run[name]["ns_per_iter"])
-                for run in current_runs
-                if name in run
-            ]
-            p_value = sign_test_p_value(samples, old)
-        else:
-            samples = [
-                float(cur_run[name]["ns_per_iter"])
-                - float(base_run[name]["ns_per_iter"])
-                for base_run, cur_run in zip(baseline_runs, current_runs)
-                if name in base_run and name in cur_run
-            ]
-            p_value = sign_test_p_value(samples, 0.0)
+        # Unpaired runs compare against the baseline's mean; paired runs
+        # against the baseline run made alongside each.
+        diffs = [
+            float(cur_run[name]["ns_per_iter"])
+            - (float(base_run[name]["ns_per_iter"]) if base_run is not None else old)
+            for base_run, cur_run in zip(base_runs, current_runs)
+            if name in cur_run and (base_run is None or name in base_run)
+        ]
+        p_value = sign_test_p_value(diffs, 0.0)
         if cur < old:
             improved.append(format_change(name, old, cur, p_value))
         elif cur > old:
@@ -285,31 +264,18 @@ def compare_and_print(
         else:
             memory_unchanged.append(format_memory_change(name, old_rss, cur_rss))
 
-    if baseline_runs is None:
-        total_samples = [
-            sum(
-                float(run[name]["ns_per_iter"])
-                for name in common_names
-                if name in run
-            )
-            for run in current_runs
-        ]
-        overall_p_value = sign_test_p_value(total_samples, baseline_total)
-    else:
-        total_samples = [
-            sum(
-                float(cur_run[name]["ns_per_iter"])
-                for name in common_names
-                if name in cur_run
-            )
-            - sum(
-                float(base_run[name]["ns_per_iter"])
-                for name in common_names
-                if name in base_run
-            )
-            for base_run, cur_run in zip(baseline_runs, current_runs)
-        ]
-        overall_p_value = sign_test_p_value(total_samples, 0.0)
+    def run_total(run: dict[str, dict[str, object]]) -> float:
+        return sum(
+            float(run[name]["ns_per_iter"]) for name in common_names if name in run
+        )
+
+    total_diffs = [
+        run_total(cur_run) - (
+            run_total(base_run) if base_run is not None else baseline_total
+        )
+        for base_run, cur_run in zip(base_runs, current_runs)
+    ]
+    overall_p_value = sign_test_p_value(total_diffs, 0.0)
 
     print(format_overall_change(baseline_total, current_total, overall_p_value))
 

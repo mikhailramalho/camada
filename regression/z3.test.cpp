@@ -89,44 +89,30 @@ TEST_CASE("Z3 feature capabilities", "[Z3]") {
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 }
 
-// Z3 4.13 throws from check() on this query once a scope is open; camada
-// reports that as UNKNOWN. A fixed Z3 may decide it, so only an UNKNOWN is
-// checked.
-TEST_CASE("Z3 internal exceptions surface as UNKNOWN", "[Z3]") {
-  auto solver = camada::createZ3Solver();
-  solver->push();
-  auto b = solver->mkSymbol("b", solver->mkBVSort(1));
-  auto f = solver->mkSBVToFP(
-      b, solver->mkFP32Sort(camada::FPEncoding::Native),
-      solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::Native));
-  solver->addConstraint(
-      solver->mkFPLt(f, solver->mkFP32(0.0f, camada::FPEncoding::Native)));
-  if (solver->check() == camada::CheckResult::UNKNOWN) {
-    REQUIRE(solver->reasonUnknown() == camada::UnknownReason::BackendError);
-    // The exception's own text is kept, not swallowed.
-    REQUIRE_FALSE(solver->reasonUnknownDetail().empty());
+namespace {
+// Throws from every check while Throw is set; the assumption path takes the
+// core's push/check/pop fallback.
+class ThrowingZ3 : public camada::Z3Solver {
+public:
+  explicit ThrowingZ3(z3::config &Cfg) : camada::Z3Solver(Cfg) {}
+  bool Throw = true;
+
+protected:
+  camada::CheckResult checkImpl() override {
+    if (Throw)
+      throw std::runtime_error("boom");
+    return camada::Z3Solver::checkImpl();
   }
-}
+  camada::CheckResult
+  checkSatAssumingImpl(const std::vector<camada::SMTExprRef> &A) override {
+    return camada::SMTSolverImpl::checkSatAssumingImpl(A);
+  }
+};
+} // namespace
 
 // A backend exception out of a check is caught once, in the core, on every
 // check path: check(), checkSatAssuming() and its push/check/pop fallback.
 TEST_CASE("Backend exceptions from a check surface as UNKNOWN", "[Z3]") {
-  class ThrowingZ3 : public camada::Z3Solver {
-  public:
-    explicit ThrowingZ3(z3::config &Cfg) : camada::Z3Solver(Cfg) {}
-    bool Throw = true;
-
-  protected:
-    camada::CheckResult checkImpl() override {
-      if (Throw)
-        throw std::runtime_error("boom");
-      return camada::Z3Solver::checkImpl();
-    }
-    camada::CheckResult
-    checkSatAssumingImpl(const std::vector<camada::SMTExprRef> &A) override {
-      return camada::SMTSolverImpl::checkSatAssumingImpl(A);
-    }
-  };
 
   z3::config Cfg;
   auto Owned = std::make_unique<ThrowingZ3>(Cfg);
@@ -150,26 +136,11 @@ TEST_CASE("Backend exceptions from a check surface as UNKNOWN", "[Z3]") {
   REQUIRE(solver->checkSatAssuming({b}) == camada::CheckResult::UNSAT);
 }
 
-// The detail travels with the reason and dies with it. Z3 5.3 no longer throws
-// on the query above, so a backend that fails on demand pins the plumbing.
+// The detail travels with the reason and dies with it.
 TEST_CASE("Unknown-reason detail follows the reason", "[Z3]") {
-  class FailingZ3 : public camada::Z3Solver {
-  public:
-    explicit FailingZ3(z3::config &Cfg) : camada::Z3Solver(Cfg) {}
-    bool Fail = true;
-
-  protected:
-    camada::CheckResult checkImpl() override {
-      if (!Fail)
-        return camada::Z3Solver::checkImpl();
-      noteUnknownReason(camada::UnknownReason::BackendError, "boom");
-      return camada::CheckResult::UNKNOWN;
-    }
-  };
-
   z3::config Cfg;
-  auto Owned = std::make_unique<FailingZ3>(Cfg);
-  FailingZ3 &Failing = *Owned;
+  auto Owned = std::make_unique<ThrowingZ3>(Cfg);
+  ThrowingZ3 &Throwing = *Owned;
   camada::SMTSolverRef solver = std::move(Owned);
 
   // Nothing has failed yet.
@@ -181,13 +152,13 @@ TEST_CASE("Unknown-reason detail follows the reason", "[Z3]") {
   REQUIRE(solver->reasonUnknownDetail() == "boom");
 
   // A later check that answers clears both.
-  Failing.Fail = false;
+  Throwing.Throw = false;
   REQUIRE(solver->check() == camada::CheckResult::SAT);
   REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
   REQUIRE(solver->reasonUnknownDetail().empty());
 
   // So does a reset, which discards the query the reason belonged to.
-  Failing.Fail = true;
+  Throwing.Throw = true;
   REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
   REQUIRE(solver->reasonUnknownDetail() == "boom");
   solver->reset();

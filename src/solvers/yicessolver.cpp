@@ -213,13 +213,10 @@ void YicesSolver::recreateContextWithConfig(const char *Logic,
   // Unchecked, an unknown name ("unknown logic") or a quantified one ("logic
   // not supported") silently left Yices' all-theories default, which then
   // disagreed with the arithmetic this solver reports from the logic's name.
-  if (yices_default_config_for_logic(config, Logic) != 0) {
-    const std::string Message =
-        std::string("Yices does not accept the logic \"") + Logic +
-        "\": " + yices_error_string();
-    yices_free_config(config);
-    fatalError(Message.c_str());
-  }
+  yicesCheckError(
+      yices_default_config_for_logic(config, Logic),
+      ("Yices does not accept the logic \"" + std::string(Logic) + "\"")
+          .c_str());
   if (Configure)
     Configure(config);
   // The context mode is owned by Camada, deliberately after the Configure
