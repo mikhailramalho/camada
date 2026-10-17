@@ -1047,6 +1047,12 @@ protected:
 
   /// Int and Real sorts and arithmetic (mkIntSort, mkRealSort, mkArith*).
   virtual bool intRealArithmeticSupport() const { return true; }
+  /// What mkIntSort/mkRealSort abort with when the hook above says no. A
+  /// backend whose arithmetic exists but is switched off says how to switch
+  /// it on.
+  virtual std::string noIntRealArithmeticMessage(const char *Feature) const {
+    return std::string(Feature) + " is not supported by this backend";
+  }
 
   /// Quantified formulas (mkForall, mkExists).
   virtual bool quantifierSupport() const { return true; }

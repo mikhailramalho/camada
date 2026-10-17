@@ -223,6 +223,13 @@ TEST_CASE("Yices rejects a logic it does not accept", "[YICES]") {
 TEST_CASE("Yices rejects Int/Real sorts without an arithmetic logic",
           "[YICES]") {
   auto yices = camada::createYicesSolver();
-  require_abort([&]() { (void)yices->mkIntSort(); });
-  require_abort([&]() { (void)yices->mkRealSort(); });
+  // Yices has the theory; the default QF_AUFBV context just leaves it off,
+  // so the message says how to turn it on rather than "not supported".
+  for (auto Make :
+       {&camada::SMTSolver::mkIntSort, &camada::SMTSolver::mkRealSort}) {
+    const std::string Message =
+        abort_message([&]() { (void)((*yices).*Make)(); });
+    REQUIRE(Message.find("disabled") != std::string::npos);
+    REQUIRE(Message.find("QF_AUFBV") != std::string::npos);
+  }
 }

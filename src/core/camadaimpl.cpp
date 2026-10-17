@@ -206,7 +206,7 @@ namespace camada {
     if (CacheField)                                                            \
       return CacheField;                                                       \
     if (!(Supported))                                                          \
-      unsupportedFeature(Feature);                                             \
+      fatalError(noIntRealArithmeticMessage(Feature).c_str());                 \
                                                                                \
     SMTSortRef theSort = Name##Impl();                                         \
     assert(theSort->SortPredicate());                                          \

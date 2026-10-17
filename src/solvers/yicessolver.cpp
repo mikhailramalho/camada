@@ -272,6 +272,16 @@ bool YicesSolver::intRealArithmeticSupport() const {
   return logicHasArithmetic(ContextLogic);
 }
 
+std::string
+YicesSolver::noIntRealArithmeticMessage(const char * /*Feature*/) const {
+  return "Int/Real arithmetic is disabled: this Yices context was created "
+         "with logic \"" +
+         ContextLogic +
+         "\", which has none. Enable it by creating the solver with an "
+         "arithmetic logic in SolverConfig::Logic (QF_UFLIA, QF_UFLRA, "
+         "QF_UFLIRA, QF_UFBVLIA, ALL, ...)";
+}
+
 SMTSortRef YicesSolver::mkIntSortImpl() {
   return makeSortRef<YicesSort>(
       YicesSort(SMTSortKind::Int, Context, yices_int_type()));
