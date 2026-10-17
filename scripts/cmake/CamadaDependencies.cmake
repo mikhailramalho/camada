@@ -1446,13 +1446,23 @@ function(camada_setup_stp)
     30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe)
 
   if(APPLE)
-    file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_contents)
+    # STATICCOMPILE implies BUILD_SHARED_LIBS=OFF, which makes STP link its
+    # executables with -static; macOS has no static libc. STP offers no switch
+    # for that flag alone, so remove its line -- and fail, rather than quietly
+    # do nothing, if a newer STP words it differently.
+    file(READ "${stp_source_dir}/CMakeLists.txt" stp_cmake_original)
     string(
       REPLACE
         "        set(CMAKE_EXE_LINKER_FLAGS \"\${CMAKE_EXE_LINKER_FLAGS} -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -static \")"
         ""
         stp_cmake_contents
-        "${stp_cmake_contents}")
+        "${stp_cmake_original}")
+    if(stp_cmake_contents STREQUAL stp_cmake_original)
+      message(
+        FATAL_ERROR
+          "STP's CMakeLists.txt no longer contains the -static executable linker flag this recipe removes on macOS. Update the patch in camada_setup_stp for this STP version."
+      )
+    endif()
     file(WRITE "${stp_source_dir}/CMakeLists.txt" "${stp_cmake_contents}")
   endif()
 

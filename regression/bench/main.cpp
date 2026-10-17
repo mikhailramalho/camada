@@ -13,6 +13,7 @@
 #include <fstream>
 #include <functional>
 #include <iomanip>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unistd.h>
@@ -121,34 +122,34 @@ std::string defaultBackend() {
 #endif
 }
 
-bool backendSupportsTuples(const std::string &backend) {
-  return backend == "cvc5" || backend == "z3" || backend == "smtlib";
-}
-
-// STP has no uninterpreted functions; mkFunctionSort aborts there.
-bool backendSupportsUF(const std::string &backend) { return backend != "stp"; }
-
-bool backendSupportsUnsatAssumptions(const std::string &backend) {
-  return backend != "stp" && backend != "smtlib";
-}
-
 // Optional substring filter on benchmark case names (third CLI argument).
 // Empty means "run everything".
 std::string caseFilter;
 std::size_t casesRun = 0;
 
+// Runs one case on a fresh solver. A case that Requires a feature the backend
+// lacks is dropped (not counted, not printed): the check is made on the solver
+// the case would run on, inside the measured region, so a probe cannot
+// disturb the retained-memory figures the baseline comparison reads.
 void runCase(const std::string &backend, const std::string &name,
              std::size_t iterations,
-             const std::function<void(camada::SMTSolver &, std::size_t)> &fn) {
+             const std::function<void(camada::SMTSolver &, std::size_t)> &fn,
+             std::optional<camada::SolverFeature> Requires = std::nullopt) {
   if (!caseFilter.empty() && name.find(caseFilter) == std::string::npos)
     return;
-  ++casesRun;
   const std::size_t rss_before_kb = readCurrentRSSKiB();
   auto start = Clock::now();
+  bool Skipped = false;
   {
     auto solver = createSolver(backend);
-    fn(*solver, iterations);
+    if (Requires && !solver->supports(*Requires))
+      Skipped = true;
+    else
+      fn(*solver, iterations);
   }
+  if (Skipped)
+    return;
+  ++casesRun;
   auto end = Clock::now();
   const std::size_t rss_after_kb = readCurrentRSSKiB();
 
@@ -375,9 +376,8 @@ void benchmarkUnsatAssumptionCore(camada::SMTSolver &solver,
 
   auto all_assumptions = solver.mkBool(true);
   for (std::size_t i = 0; i < CoreSize; ++i) {
-    auto assumption =
-        solver.mkSymbol("core_assumption_" + std::to_string(i),
-                        solver.mkBoolSort());
+    auto assumption = solver.mkSymbol("core_assumption_" + std::to_string(i),
+                                      solver.mkBoolSort());
     assumptions.push_back(assumption);
     all_assumptions = solver.mkAnd(all_assumptions, assumption);
   }
@@ -731,20 +731,18 @@ int main(int argc, char **argv) {
     // emission there.
     if (backend != "smtlib")
       runCase(backend, "array_solve", iterations, benchmarkArraySolve);
-    if (backendSupportsUF(backend))
-      runCase(backend, "function_sort_cache_hit", iterations,
-              benchmarkFunctionSortCacheHit);
-    if (backendSupportsTuples(backend))
-      runCase(backend, "tuple_sort_cache_hit", iterations,
-              benchmarkTupleSortCacheHit);
-    if (backendSupportsUnsatAssumptions(backend)) {
-      // Core production is opt-in at construction and may slow the engine,
-      // so enable it only for this case.
-      solverConfig.UseUnsatAssumptions = true;
-      runCase(backend, "unsat_assumption_core", iterations,
-              benchmarkUnsatAssumptionCore);
-      solverConfig.UseUnsatAssumptions = false;
-    }
+    runCase(backend, "function_sort_cache_hit", iterations,
+            benchmarkFunctionSortCacheHit,
+            camada::SolverFeature::UninterpretedFunctions);
+    runCase(backend, "tuple_sort_cache_hit", iterations,
+            benchmarkTupleSortCacheHit, camada::SolverFeature::NativeTuples);
+    // Core production is opt-in at construction and may slow the engine, so
+    // enable it only for this case.
+    solverConfig.UseUnsatAssumptions = true;
+    runCase(backend, "unsat_assumption_core", iterations,
+            benchmarkUnsatAssumptionCore,
+            camada::SolverFeature::UnsatAssumptions);
+    solverConfig.UseUnsatAssumptions = false;
     runCase(backend, "fp_from_bv", iterations, benchmarkFPFromBV);
     runCase(backend, "fp_add_only", iterations, benchmarkFPAddOnly);
     runCase(backend, "fp_div_only", iterations, benchmarkFPDivOnly);
