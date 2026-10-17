@@ -12,15 +12,6 @@ CAMADA_SHARED_MATRIX(STP, camada::createSTPSolver)
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/stpsolver.h>
 
-TEST_CASE("Unsupported UF STP test", "[STP]") {
-  auto stp = camada::createSTPSolver();
-  require_abort([&]() {
-    auto bv4 = stp->mkBVSort(4);
-    auto fn = stp->mkFunctionSort({bv4}, bv4);
-    (void)stp->mkSymbol("f", fn);
-  });
-}
-
 TEST_CASE("STP feature capabilities", "[STP]") {
   auto solver = camada::createSTPSolver();
   using camada::SolverFeature;

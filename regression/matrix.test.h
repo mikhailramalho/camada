@@ -103,23 +103,41 @@ inline const char *excluded(const char *Backend, const char *Group) {
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "uf", {                                          \
     auto solver = Factory({});                                                 \
-    if (!solver->supports(camada::SolverFeature::UninterpretedFunctions))      \
-      SKIP("no UF support; the backend's Unsupported UF case pins the "        \
-           "rejection");                                                       \
+    if (!solver->supports(camada::SolverFeature::UninterpretedFunctions)) {    \
+      /* Unsupported must reject, not be undefined behavior. */                \
+      require_abort([&]() {                                                    \
+        auto bv4 = solver->mkBVSort(4);                                        \
+        auto fn = solver->mkFunctionSort({bv4}, bv4);                          \
+        (void)solver->mkSymbol("f", fn);                                       \
+      });                                                                      \
+      return;                                                                  \
+    }                                                                          \
     uf_semantics(solver);                                                      \
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "quantifiers", {                                 \
     auto solver = Factory({});                                                 \
-    if (!solver->supports(camada::SolverFeature::Quantifiers))                 \
-      SKIP("no quantifier support; the backend's Unsupported quantifiers "     \
-           "case pins the rejection");                                         \
+    if (!solver->supports(camada::SolverFeature::Quantifiers)) {               \
+      /* Unsupported must reject, not be undefined behavior. */                \
+      require_abort([&]() {                                                    \
+        auto x = solver->mkSymbol("x", solver->mkBVSort(4));                   \
+        (void)solver->mkForall({x}, solver->mkEqual(x, x));                    \
+      });                                                                      \
+      require_abort([&]() {                                                    \
+        auto x = solver->mkSymbol("x", solver->mkBVSort(4));                   \
+        (void)solver->mkExists({x}, solver->mkEqual(x, x));                    \
+      });                                                                      \
+      return;                                                                  \
+    }                                                                          \
     quantifier_semantics(solver);                                              \
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "arith", {                                       \
     auto solver = Factory({});                                                 \
-    if (!solver->supports(camada::SolverFeature::IntRealArithmetic))           \
-      SKIP("no Int/Real arithmetic; the backend's Unsupported arithmetic "     \
-           "case pins the rejection");                                         \
+    if (!solver->supports(camada::SolverFeature::IntRealArithmetic)) {         \
+      /* Unsupported must reject, not be undefined behavior. */                \
+      require_abort([&]() { (void)solver->mkIntSort(); });                     \
+      require_abort([&]() { (void)solver->mkRealSort(); });                    \
+      return;                                                                  \
+    }                                                                          \
     tests_arith(solver);                                                       \
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "tuple-with-int", {                              \

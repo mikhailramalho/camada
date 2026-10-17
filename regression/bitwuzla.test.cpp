@@ -52,11 +52,6 @@ TEST_CASE("FP remainder randomized host oracle Bitwuzla", "[Bitwuzla]") {
   }
 }
 
-TEST_CASE("Unsupported arithmetic Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  require_abort([&]() { (void)bitwuzla->mkIntSort(); });
-}
-
 TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 
   class myBitwuzlaSolver : public camada::BitwuzlaSolver {

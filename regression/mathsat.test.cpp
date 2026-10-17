@@ -28,14 +28,6 @@ TEST_CASE("Config logic MathSAT test", "[MathSAT]") {
   REQUIRE(mathsat->check() == camada::CheckResult::SAT);
 }
 
-TEST_CASE("Unsupported quantifiers MathSAT test", "[MathSAT]") {
-  auto mathsat = camada::createMathSATSolver();
-  require_abort([&]() {
-    auto x = mathsat->mkSymbol("x", mathsat->mkBVSort(4));
-    (void)mathsat->mkForall({x}, mathsat->mkEqual(x, x));
-  });
-}
-
 TEST_CASE("Int-BV conversion MathSAT test", "[MathSAT]") {
   // The arith test's QF_UFLIRA config has no BV theory; the conversions
   // mix Int and BV, so they run on the default environment.
