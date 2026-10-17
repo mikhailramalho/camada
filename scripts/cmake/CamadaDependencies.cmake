@@ -1112,8 +1112,36 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
   set(bitwuzla_build_dir "${bitwuzla_source_dir}/build-camada")
   file(REMOVE_RECURSE "${bitwuzla_build_dir}")
 
+  # Bitwuzla finds CaDiCaL with find_library(), through the compiler's library
+  # search path, and LIBRARY_PATH extends that for GCC but not for Apple's
+  # clang. When the lookup fails meson does not stop: it falls back to a wrap
+  # that compiles a second, stock CaDiCaL into libbitwuzla.a, which then
+  # collides with the shared one as soon as another backend (CVC5) needs symbols
+  # only that one defines -- the layout mismatch this recipe exists to prevent.
+  # A pkg-config file is looked up before any fallback and does not depend on
+  # the compiler, so publish the shared CaDiCaL through one.
+  set(cadical_pc_dir "${cadical_prefix}/lib/pkgconfig")
+  file(
+    WRITE "${cadical_pc_dir}/cadical.pc"
+    "prefix=${cadical_prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: cadical
+Description: CaDiCaL SAT solver, shared by Camada's backends
+Version: 2.1.3
+Libs: -L\${libdir} -lcadical
+Cflags: -I\${includedir}
+")
+
+  set(saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
   set(saved_library_path "$ENV{LIBRARY_PATH}")
   set(saved_cpath "$ENV{CPATH}")
+  if(saved_pkg_config_path)
+    set(ENV{PKG_CONFIG_PATH} "${cadical_pc_dir}:${saved_pkg_config_path}")
+  else()
+    set(ENV{PKG_CONFIG_PATH} "${cadical_pc_dir}")
+  endif()
   if(saved_library_path)
     set(ENV{LIBRARY_PATH} "${cadical_prefix}/lib:${saved_library_path}")
   else()
@@ -1142,6 +1170,19 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
     -Dcryptominisat=false
     -Dgimsatul=false
     -Dtesting=disabled)
+
+  # Fail here, with the cause, rather than at a link step much later: a cadical
+  # subproject in the build tree means the lookup above did not find the shared
+  # one (is pkg-config installed?) and Bitwuzla embeds its own.
+  file(GLOB bitwuzla_bundled_cadical
+       "${bitwuzla_build_dir}/subprojects/cadical*")
+  if(bitwuzla_bundled_cadical)
+    message(
+      FATAL_ERROR
+        "Bitwuzla's build fell back to its bundled CaDiCaL instead of the shared one in ${cadical_prefix}. It looks CaDiCaL up through pkg-config; make sure pkg-config (or pkgconf) is installed."
+    )
+  endif()
+
   camada_run_checked(WORKING_DIRECTORY "${bitwuzla_build_dir}" MESSAGE
                      "Building Bitwuzla" COMMAND "${ninja_program}")
   # Meson may install into a different libdir than the old prebuilt. Remove its
@@ -1169,6 +1210,7 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
     "${ninja_program}"
     install)
 
+  set(ENV{PKG_CONFIG_PATH} "${saved_pkg_config_path}")
   set(ENV{LIBRARY_PATH} "${saved_library_path}")
   set(ENV{CPATH} "${saved_cpath}")
 endfunction()
