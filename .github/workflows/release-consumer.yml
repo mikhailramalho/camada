@@ -16,8 +16,12 @@ on:
 
 jobs:
   linux:
-    name: Linux release consumer
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    name: Linux release consumer (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
     steps:
     - uses: actions/checkout@v4
     - name: Install Dependencies
