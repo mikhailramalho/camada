@@ -100,6 +100,54 @@ TEST_CASE("Z3 internal exceptions surface as UNKNOWN", "[Z3]") {
       solver->mkRM(camada::RM::ROUND_TO_EVEN, camada::FPEncoding::Native));
   solver->addConstraint(
       solver->mkFPLt(f, solver->mkFP32(0.0f, camada::FPEncoding::Native)));
-  if (solver->check() == camada::CheckResult::UNKNOWN)
+  if (solver->check() == camada::CheckResult::UNKNOWN) {
     REQUIRE(solver->reasonUnknown() == camada::UnknownReason::BackendError);
+    // The exception's own text is kept, not swallowed.
+    REQUIRE_FALSE(solver->reasonUnknownDetail().empty());
+  }
+}
+
+// The detail travels with the reason and dies with it. Z3 5.3 no longer throws
+// on the query above, so a backend that fails on demand pins the plumbing.
+TEST_CASE("Unknown-reason detail follows the reason", "[Z3]") {
+  class FailingZ3 : public camada::Z3Solver {
+  public:
+    explicit FailingZ3(z3::config &Cfg) : camada::Z3Solver(Cfg) {}
+    bool Fail = true;
+
+  protected:
+    camada::CheckResult checkImpl() override {
+      if (!Fail)
+        return camada::Z3Solver::checkImpl();
+      noteUnknownReason(camada::UnknownReason::BackendError, "boom");
+      return camada::CheckResult::UNKNOWN;
+    }
+  };
+
+  z3::config Cfg;
+  auto Owned = std::make_unique<FailingZ3>(Cfg);
+  FailingZ3 &Failing = *Owned;
+  camada::SMTSolverRef solver = std::move(Owned);
+
+  // Nothing has failed yet.
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+  REQUIRE(solver->reasonUnknownDetail().empty());
+
+  REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::BackendError);
+  REQUIRE(solver->reasonUnknownDetail() == "boom");
+
+  // A later check that answers clears both.
+  Failing.Fail = false;
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+  REQUIRE(solver->reasonUnknownDetail().empty());
+
+  // So does a reset, which discards the query the reason belonged to.
+  Failing.Fail = true;
+  REQUIRE(solver->check() == camada::CheckResult::UNKNOWN);
+  REQUIRE(solver->reasonUnknownDetail() == "boom");
+  solver->reset();
+  REQUIRE(solver->reasonUnknown() == camada::UnknownReason::NotApplicable);
+  REQUIRE(solver->reasonUnknownDetail().empty());
 }

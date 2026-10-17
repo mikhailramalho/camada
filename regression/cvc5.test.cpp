@@ -60,3 +60,26 @@ TEST_CASE("Unsat-assumption opt-in CVC5 test", "[CVC5]") {
   REQUIRE(core);
   REQUIRE(!core.value().empty());
 }
+
+// CVC5's native constant array takes only a value. Auto routes a symbolic
+// initializer to the lazy lowering (const_array_nonliteral_initializer proves
+// that works); an explicit Native request is rejected rather than quietly
+// answered with a different term.
+TEST_CASE("CVC5 native constant arrays reject a non-literal initializer",
+          "[CVC5]") {
+  auto solver = camada::createCVC5Solver();
+  auto idx = solver->mkBVSort(3);
+  auto elem = solver->mkBVSort(8);
+  auto sym = solver->mkSymbol("init_sym", elem);
+
+  require_abort([&]() {
+    (void)solver->mkArrayConst(idx, sym, camada::ConstArrayLowering::Native);
+  });
+
+  // A literal is still native, and Auto still builds the symbolic one.
+  auto literal = solver->mkBVFromDec(5, elem);
+  REQUIRE(solver->mkArrayConst(idx, literal, camada::ConstArrayLowering::Native)
+              ->getKind() == camada::SMTExprKind::ArrayConst);
+  auto lazy = solver->mkArrayConst(idx, sym);
+  REQUIRE(lazy->isArraySort());
+}

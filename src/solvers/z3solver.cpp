@@ -1099,12 +1099,14 @@ SMTExprRef Z3Solver::mkExistsImpl(const std::vector<SMTExprRef> &Vars,
 CheckResult Z3Solver::checkImpl() {
   // An exception out of check is the backend failing to run the query (an
   // internal "invalid extract application" on valid input, for one), so it
-  // answers UNKNOWN with its reason rather than ending the host.
+  // answers UNKNOWN with its reason rather than ending the host. The message
+  // is kept as the reason's detail: without it a real internal error is
+  // indistinguishable from the query merely not deciding.
   z3::check_result res;
   try {
     res = Solver.check();
-  } catch (const z3::exception &) {
-    noteUnknownReason(UnknownReason::BackendError);
+  } catch (const z3::exception &E) {
+    noteUnknownReason(UnknownReason::BackendError, E.msg());
     return CheckResult::UNKNOWN;
   }
   if (res == z3::check_result::sat)
@@ -1156,8 +1158,8 @@ Z3Solver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   z3::check_result res;
   try {
     res = Solver.check(assumptions);
-  } catch (const z3::exception &) {
-    noteUnknownReason(UnknownReason::BackendError);
+  } catch (const z3::exception &E) {
+    noteUnknownReason(UnknownReason::BackendError, E.msg());
     return CheckResult::UNKNOWN;
   }
   if (res == z3::check_result::sat)

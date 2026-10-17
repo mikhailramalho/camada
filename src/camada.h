@@ -1037,7 +1037,13 @@ public:
   /// Convenience method to create a bitvector from an integer in base 2
   virtual SMTExprRef mkBVFromBin(const std::string &Int) = 0;
 
-  /// Creates a new symbol, given a name and a sort
+  /// Creates a new symbol, given a name and a sort.
+  ///
+  /// A name belongs to one sort in the backend. The first sort a name is used
+  /// with keeps it verbatim; using the same name with another sort creates a
+  /// distinct symbol, which the backend (and so a dump, an SMT-LIB script or a
+  /// solver-side model) sees as `__CAMADA_alias<N>_<name>`. Names starting
+  /// with `__CAMADA_` are reserved for Camada's own encodings and are rejected.
   virtual SMTExprRef mkSymbol(const std::string &Name,
                               const SMTSortRef &Sort) = 0;
 
@@ -1141,6 +1147,13 @@ public:
   /// imposed itself is always known, while a solver that reports only
   /// "unknown" is reported as Incomplete.
   virtual UnknownReason reasonUnknown() const = 0;
+
+  /// What the backend said about the failure behind reasonUnknown(), when it
+  /// said anything: the text of a Z3 exception, for instance. Empty whenever
+  /// reasonUnknown() is NotApplicable, and for a Timeout or Incomplete that
+  /// came with no message. Diagnostic only; the wording is the backend's own
+  /// and is not stable across versions.
+  virtual std::string reasonUnknownDetail() const = 0;
 
   /// Set a wall-clock time limit, in milliseconds, applied to each
   /// subsequent check() or checkSatAssuming() individually; 0 removes the

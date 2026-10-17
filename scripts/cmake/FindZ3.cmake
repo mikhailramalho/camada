@@ -134,6 +134,16 @@ if(_camada_download_z3
   endif()
 endif()
 
+# A static Camada links libz3.a whole-archive, so a shared libz3 sitting in a
+# hint directory is not a substitute. Say so, rather than leaving "Z3 not found"
+# (or an unexplained source build, when downloads are on) to be puzzled over.
+if(NOT CAMADA_Z3_LIB AND _camada_z3_names STREQUAL "libz3.a")
+  message(
+    STATUS
+      "Z3: a static Camada needs libz3.a (linked whole-archive; a shared libz3 is not used) and none was found. Enable CAMADA_DOWNLOAD_DEPENDENCIES to build one from source, or point CAMADA_SOLVER_Z3_DIR at a prefix that has libz3.a."
+  )
+endif()
+
 # Z3 5.3 registers its tactics through inline global variables, i.e. static
 # initializers in the translation units that define them. Linked from a static
 # archive the normal way, the linker drops every member nothing references, the

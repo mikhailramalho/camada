@@ -282,6 +282,15 @@ protected:
   /// Backends without it get constant arrays through mkLazyConstArray().
   virtual bool nativeConstArraySupport() const { return true; }
 
+  /// True when the backend's native constant array can be built over this
+  /// initializer. Most take any term; CVC5's takes only a value, so a symbol
+  /// or a computed initializer needs the lazy lowering there. Consulted only
+  /// when nativeConstArraySupport() is true.
+  virtual bool nativeConstArrayAccepts(const SMTExprRef &InitValue) const {
+    (void)InitValue;
+    return true;
+  }
+
   /// True when the backend decides array equality natively (extensional
   /// array theory). STP cannot: its only array predicate is select, so
   /// the common layer lowers array equality through mkEncodedArrayEqual()
@@ -459,6 +468,7 @@ protected:
   /// Set by the backend's checkImpl when it answers UNKNOWN; cleared by
   /// any check that decides, so a stale reason cannot be read back.
   UnknownReason LastUnknownReason = UnknownReason::NotApplicable;
+  std::string LastUnknownDetail;
 
   // --- Assumption-based solving ---
   // The assumptions of the most recent checkSatAssuming() call, kept so
@@ -494,12 +504,15 @@ protected:
     SMTSolverImpl &S;
     const bool Saved;
     const UnknownReason SavedReason;
+    const std::string SavedDetail;
     explicit PreserveModelState(SMTSolverImpl &Solver)
         : S(Solver), Saved(Solver.ModelAvailable),
-          SavedReason(Solver.LastUnknownReason) {}
+          SavedReason(Solver.LastUnknownReason),
+          SavedDetail(Solver.LastUnknownDetail) {}
     ~PreserveModelState() {
       S.ModelAvailable = Saved;
       S.LastUnknownReason = SavedReason;
+      S.LastUnknownDetail = SavedDetail;
     }
   };
   /// The SMTError every model getter returns when no model is available.
@@ -544,6 +557,9 @@ protected:
   }
 
 public:
+  /// The cached bit-vector literal for Value (-1, 0 or 1) at Width, or a null
+  /// ref when there is none: Width not built yet, or Value not one of the
+  /// three cached values.
   SMTExprRef cachedSmallBVExpr(int64_t Value, unsigned Width) const;
   SMTExprRef getBVZero1Expr() const;
   SMTExprRef getBVOne1Expr() const;
@@ -908,12 +924,25 @@ public:
   UnknownReason reasonUnknown() const override final {
     return LastUnknownReason;
   }
+  std::string reasonUnknownDetail() const override final {
+    return LastUnknownDetail;
+  }
 
 protected:
   /// Called by a backend's checkImpl when it can tell why the search did
   /// not decide. Leaving it unset means Camada attributes the UNKNOWN to
   /// its own timeout, if one was configured, and to Incomplete otherwise.
-  void noteUnknownReason(UnknownReason Reason) { LastUnknownReason = Reason; }
+  void noteUnknownReason(UnknownReason Reason, std::string Detail = {}) {
+    LastUnknownReason = Reason;
+    LastUnknownDetail = std::move(Detail);
+  }
+
+  /// Back to NotApplicable with no detail. Every place that ends the query
+  /// an unknown reason belonged to goes through here, so the two cannot drift.
+  void clearUnknownReason() {
+    LastUnknownReason = UnknownReason::NotApplicable;
+    LastUnknownDetail.clear();
+  }
 
 private:
   /// Settles LastUnknownReason once the backend has answered.

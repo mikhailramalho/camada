@@ -403,6 +403,12 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
   }
 }
 
+// The encodings and lowerings the group functions below run their fixtures
+// under, declared once for all of them.
+inline constexpr auto NativeFP = camada::FPEncoding::Native;
+inline constexpr auto BVFP = camada::FPEncoding::BV;
+inline constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
+
 // The shared suite, split by theory. Each group is independently runnable:
 // every fixture resets the solver before it starts (the RESETAND* macros),
 // so a group makes no assumptions about what ran before it. tests() below
@@ -411,8 +417,6 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
 
 // Booleans, bit-vectors, push/pop, models, symbols, solver contracts.
 inline void tests_core(const camada::SMTSolverRef &solver) {
-  constexpr auto NativeFP = camada::FPEncoding::Native;
-  constexpr auto BVFP = camada::FPEncoding::BV;
 
   RESETANDTEST(equal_ten);
   RESETANDTEST(symbol_name_punctuation_distinct);
@@ -446,6 +450,8 @@ inline void tests_core(const camada::SMTSolverRef &solver) {
   RESETANDTEST(dump_string_semantics);
   RESETANDTEST(sort_mismatch_names_both_sorts);
   RESETANDTEST(arena_stress_test);
+  RESETANDTEST(small_bv_cache_bounds);
+  RESETANDTEST(symbol_alias_names_restart_after_reset);
 }
 
 // Arrays: native and Ackermann-compatible fixtures, eager and lazy const
@@ -461,7 +467,6 @@ inline void tests_arrays(const camada::SMTSolverRef &solver) {
   RESETANDTEST(const_array_select_survives_pop);
   RESETANDTEST(array_equality_semantics);
   RESETANDTEST(const_array_equality_semantics);
-  constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
   RESETANDARGTEST(array, LazyArrays);
   RESETANDARGTEST(array_const_store_semantics, LazyArrays);
   RESETANDARGTEST(bool_array_const_store_semantics, LazyArrays);
@@ -486,7 +491,6 @@ inline void tests_arrays(const camada::SMTSolverRef &solver) {
 // Tuples: native datatypes or the per-field Camada lowering, and their
 // compositions with arrays.
 inline void tests_tuples(const camada::SMTSolverRef &solver) {
-  constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_symbol_name_reuse_across_sorts);
   RESETANDTEST(tuple_with_array_field);
@@ -503,8 +507,6 @@ inline void tests_tuples(const camada::SMTSolverRef &solver) {
 
 // Floating-point, native and BV-encoded, including the host oracles.
 inline void tests_fp(const camada::SMTSolverRef &solver) {
-  constexpr auto NativeFP = camada::FPEncoding::Native;
-  constexpr auto BVFP = camada::FPEncoding::BV;
 
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(ieee_fp_to_bv_after_check_reports);
@@ -568,8 +570,6 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
 
 // Fixed-point: pure common-layer BV encoding, no backend gating needed.
 inline void tests_fxp(const camada::SMTSolverRef &solver) {
-  constexpr auto NativeFP = camada::FPEncoding::Native;
-  constexpr auto BVFP = camada::FPEncoding::BV;
 
   RESETANDTEST(fxp_countls_narrow_target_rejected);
   RESETANDTEST(fxp_exhaustive_semantics);

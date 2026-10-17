@@ -1,7 +1,7 @@
 #pragma once
 
-
 #include "camada.h"
+#include "core/camadaimpl.h"
 
 #include <bitset>
 #include <catch2/catch_test_macros.hpp>
@@ -1205,6 +1205,38 @@ inline void arith_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(k, solver->mkInt("3")));
   solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
+// A name reused with another sort gets a backend name of its own, numbered
+// from a counter. The counter belongs to the symbols that exist, so a reset
+// solver names them as a fresh one does, not from where the last run stopped.
+inline void
+symbol_alias_names_restart_after_reset(const camada::SMTSolverRef &solver) {
+  auto aliasDump = [&]() {
+    (void)solver->mkSymbol("x", solver->mkBVSort(8));
+    auto Aliased = solver->mkSymbol("x", solver->mkBoolSort());
+    std::string Out = "seed";
+    Aliased->dump(Out);
+    return Out;
+  };
+  const std::string First = aliasDump();
+  REQUIRE(First != "seed");
+  solver->reset();
+  REQUIRE(aliasDump() == First);
+}
+
+// The small-literal cache holds only -1, 0 and 1. Asking it for anything else
+// has to answer "not cached" rather than index past its three slots.
+inline void small_bv_cache_bounds(const camada::SMTSolverRef &solver) {
+  auto *Impl = dynamic_cast<camada::SMTSolverImpl *>(solver.get());
+  REQUIRE(Impl != nullptr);
+
+  auto bv8 = solver->mkBVSort(8);
+  (void)solver->mkBVFromDec(1, bv8);
+  REQUIRE(static_cast<bool>(Impl->cachedSmallBVExpr(1, 8)));
+
+  for (int64_t Value : {int64_t{2}, int64_t{-2}, int64_t{-5}, int64_t{1} << 40})
+    REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(Value, 8)));
 }
 
 inline void arena_stress_test(const camada::SMTSolverRef &solver) {

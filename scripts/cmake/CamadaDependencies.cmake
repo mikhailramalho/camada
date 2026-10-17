@@ -40,6 +40,12 @@ set(CAMADA_Z3_GIT_TAG
 set(CAMADA_Z3_SHA256
     "c007089dd8d92298d2a7d14105b14e8dddfbb540062ce471c3111e0741edd8da"
     CACHE STRING "Expected SHA256 of the Z3 source archive")
+# Z3's own build type, not Camada's: a Debug Z3 is dramatically slower, and a
+# Debug Camada is for debugging Camada. Z3's API is plain C (z3++.h is thin
+# inline wrappers), so the two need not match.
+set(CAMADA_Z3_BUILD_TYPE
+    "Release"
+    CACHE STRING "CMake build type used when building Z3 from source")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
     "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-win.zip"
     CACHE STRING
@@ -1121,6 +1127,10 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
   # A pkg-config file is looked up before any fallback and does not depend on
   # the compiler, so publish the shared CaDiCaL through one.
   set(cadical_pc_dir "${cadical_prefix}/lib/pkgconfig")
+  # The pc file's version is the pinned one ("rel-2.1.3-elevate" -> 2.1.3), so
+  # it cannot disagree with the CaDiCaL actually built.
+  string(REGEX MATCH "[0-9]+(\\.[0-9]+)+" cadical_version
+               "${_camada_cadical_tag}")
   file(
     WRITE "${cadical_pc_dir}/cadical.pc"
     "prefix=${cadical_prefix}
@@ -1129,7 +1139,7 @@ includedir=\${prefix}/include
 
 Name: cadical
 Description: CaDiCaL SAT solver, shared by Camada's backends
-Version: 2.1.3
+Version: ${cadical_version}
 Libs: -L\${libdir} -lcadical
 Cflags: -I\${includedir}
 ")
@@ -1613,7 +1623,7 @@ function(camada_build_z3_from_source)
   endif()
 
   set(z3_cmake_args
-      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_BUILD_TYPE=${CAMADA_Z3_BUILD_TYPE}
       -DCMAKE_INSTALL_PREFIX=${CAMADA_DEPS_INSTALL_DIR}
       # Z3's default libdir would otherwise follow the host's lib64 convention.
       -DCMAKE_INSTALL_LIBDIR=lib
@@ -1629,14 +1639,20 @@ function(camada_build_z3_from_source)
       -DZ3_INCLUDE_GIT_DESCRIBE=OFF)
   # Build with the toolchain and flags Camada itself was configured with, so a
   # release build's path-prefix remapping (and a macOS deployment target) reach
-  # Z3 as well.
+  # Z3 as well. They go in through an initial-cache file with bracket-quoted
+  # values: as -D arguments a ';' in the flags splits the argument in two on its
+  # way through camada_run_checked, whether or not it is escaped.
+  set(z3_initial_cache "${z3_source_dir}/camada-initial-cache.cmake")
+  file(WRITE "${z3_initial_cache}" "")
   foreach(z3_inherited IN ITEMS C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
                                 OSX_DEPLOYMENT_TARGET OSX_ARCHITECTURES)
     if(CMAKE_${z3_inherited})
-      list(APPEND z3_cmake_args
-           -DCMAKE_${z3_inherited}=${CMAKE_${z3_inherited}})
+      file(APPEND "${z3_initial_cache}"
+           "set(CMAKE_${z3_inherited} [==[${CMAKE_${z3_inherited}}]==] "
+           "CACHE STRING \"\" FORCE)\n")
     endif()
   endforeach()
+  list(APPEND z3_cmake_args -C "${z3_initial_cache}")
 
   # Ninja when it is there (the Bitwuzla recipe needs it anyway): a Unix
   # Makefiles tree built with a wide -j once lost object directories under the

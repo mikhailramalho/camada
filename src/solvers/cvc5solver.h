@@ -366,6 +366,8 @@ protected:
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 
+  bool nativeConstArrayAccepts(const SMTExprRef &InitValue) const override;
+
   CheckResult checkImpl() override;
 
   bool setTimeoutImpl(uint64_t Milliseconds) override;
