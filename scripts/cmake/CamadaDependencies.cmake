@@ -1186,6 +1186,11 @@ Cflags: -I\${includedir}
     set(ENV{CPATH} "${cadical_prefix}/include")
   endif()
 
+  # Bitwuzla looks CaDiCaL up with find_library (the LIBRARY_PATH/CPATH above
+  # put ours ahead of any system copy), then pkg-config (cadical.pc), then its
+  # wrap. Without the wrap there is no bundled fallback: a lookup that misses
+  # the shared CaDiCaL fails at setup instead of embedding a second copy.
+  file(REMOVE "${bitwuzla_source_dir}/subprojects/cadical.wrap")
   camada_run_checked(
     WORKING_DIRECTORY
     "${bitwuzla_source_dir}"
@@ -1203,18 +1208,6 @@ Cflags: -I\${includedir}
     -Dcryptominisat=false
     -Dgimsatul=false
     -Dtesting=disabled)
-
-  # Fail here, with the cause, rather than at a link step much later: a cadical
-  # subproject in the build tree means the lookup above did not find the shared
-  # one (is pkg-config installed?) and Bitwuzla embeds its own.
-  file(GLOB bitwuzla_bundled_cadical
-       "${bitwuzla_build_dir}/subprojects/cadical*")
-  if(bitwuzla_bundled_cadical)
-    message(
-      FATAL_ERROR
-        "Bitwuzla's build fell back to its bundled CaDiCaL instead of the shared one in ${cadical_prefix}. It looks CaDiCaL up through pkg-config; make sure pkg-config (or pkgconf) is installed."
-    )
-  endif()
 
   camada_run_checked(WORKING_DIRECTORY "${bitwuzla_build_dir}" MESSAGE
                      "Building Bitwuzla" COMMAND "${ninja_program}")
