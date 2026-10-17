@@ -1,8 +1,9 @@
-
-#if SOLVER_SMTLIB_ENABLED
-#include "smtlib_pipeline.test.h"
-#endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(Bitwuzla, camada::createBitwuzlaSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
@@ -18,18 +19,6 @@ inline camada::SolverConfig withUnsatAssumptions() {
   return Cfg;
 }
 } // namespace
-
-TEST_CASE("Ackermann arrays Bitwuzla test", "[Bitwuzla]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto bzla = camada::createBitwuzlaSolver(Cfg);
-  ack_array_tests(bzla);
-}
-
-TEST_CASE("Simple Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  tests(bitwuzla);
-}
 
 // Randomized cross-check of the BV-encoded fp.rem against the host CPU,
 // which computes IEEE-754 remainder exactly. Full-bit-pattern inputs cover
@@ -59,21 +48,6 @@ TEST_CASE("FP remainder randomized host oracle Bitwuzla", "[Bitwuzla]") {
   }
 }
 
-TEST_CASE("Quantifiers Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  quantifier_semantics(bitwuzla);
-}
-
-TEST_CASE("UF Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  uf_semantics(bitwuzla);
-}
-
-TEST_CASE("Unsupported arithmetic Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  require_abort([&]() { (void)bitwuzla->mkIntSort(); });
-}
-
 TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 
   class myBitwuzlaSolver : public camada::BitwuzlaSolver {
@@ -89,103 +63,6 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
   camada::SMTSolverRef bitwuzla = std::make_unique<myBitwuzlaSolver>();
   tests(bitwuzla);
 }
-
-#if SOLVER_SMTLIB_ENABLED
-// ---------------------------------------------------------------------------
-// SMT-LIB pipeline tests against the bitwuzla binary. bitwuzla supports BV,
-// Bool, arrays, FP-native, FP-BV, UF, and BV-quantifiers. It does NOT
-// support Int/Real arithmetic or `declare-datatypes` (tuples), so those
-// fixtures are intentionally absent.
-// ---------------------------------------------------------------------------
-
-#define CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST(NameStr, RunFn)                   \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [bitwuzla]",                         \
-            "[Bitwuzla][SMTLIB][pipeline]") {                                  \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::bitwuzlaCommand(),    \
-                                 "bitwuzla");                                  \
-    camada_smtlib_pipeline::RunFn(Cmd);                                        \
-  }
-
-CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST("public factory works",
-                                     runSMTLIBPublicFactory)
-CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
-                                     runSMTLIBDualEmitter)
-
-#undef CAMADA_BITWUZLA_SMTLIB_PIPELINE_TEST
-
-// `MakeFn` is the camada_smtlib_pipeline factory used to construct the
-// SMTLIBSolver — pass `makeSMTLIBSolver` for the default native-tuple
-// configuration, or `makeSMTLIBSolverCamadaTuples` to lower tuples into
-// per-field BV/Bool symbols on the wire (required against children that
-// reject `(declare-datatypes ...)`).
-#define CAMADA_BITWUZLA_SMTLIB_SHARED_TEST(NameStr, FixtureCall, MakeFn)       \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [bitwuzla]",                         \
-            "[Bitwuzla][SMTLIB][pipeline]") {                                  \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::bitwuzlaCommand(),    \
-                                 "bitwuzla");                                  \
-    camada::SMTSolverRef solver = camada_smtlib_pipeline::MakeFn(Cmd);         \
-    FixtureCall;                                                               \
-  }
-
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_semantics",
-                                   implies_semantics(solver), makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("implies_true_implies_false",
-                                   implies_true_implies_false(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("check_sat_assuming_semantics",
-                                   check_sat_assuming_semantics(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("bv_lshr_semantics",
-                                   bv_lshr_semantics(solver), makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("incremental_push_pop",
-                                   incremental_push_pop(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
-                                   symbol_cache_survives_push_pop(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array", array(solver), makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array_model_values",
-                                   array_model_values(solver), makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("array_const_store_semantics",
-                                   array_const_store_semantics(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("bool_array_const_store_semantics",
-                                   bool_array_const_store_semantics(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("quantifier_semantics",
-                                   quantifier_semantics(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fp_equal NativeFP",
-                                   fp_equal(solver, camada::FPEncoding::Native),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fp_equal BVFP",
-                                   fp_equal(solver, camada::FPEncoding::BV),
-                                   makeSMTLIBSolver)
-// bitwuzla rejects (declare-datatypes ...), so tuples here must use the
-// Camada lowering (per-field BV/Bool symbols).
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
-                                   tuple_semantics(solver),
-                                   makeSMTLIBSolverCamadaTuples)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("tuple_with_array_field [Camada]",
-                                   tuple_with_array_field(solver),
-                                   makeSMTLIBSolverCamadaTuples)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
-                                   empty_tuple_semantics(solver),
-                                   makeSMTLIBSolverCamadaTuples)
-
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
-                                   fxp_rounding_semantics(solver),
-                                   makeSMTLIBSolver)
-CAMADA_BITWUZLA_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
-                                   fxp_model_and_constructs(solver),
-                                   makeSMTLIBSolver)
-
-#undef CAMADA_BITWUZLA_SMTLIB_SHARED_TEST
-#endif // SOLVER_SMTLIB_ENABLED
 
 TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {
   auto solver = camada::createBitwuzlaSolver();
@@ -228,36 +105,4 @@ TEST_CASE("Unsat-assumption opt-in Bitwuzla test", "[Bitwuzla]") {
   auto core = solver->getUnsatAssumptions();
   REQUIRE(core);
   REQUIRE(!core.value().empty());
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting Bitwuzla test", "[Bitwuzla]") {
-  auto solver = camada::createBitwuzlaSolver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays now lower lazily too,
-// so the per-leaf constant arrays of a tuple-array initializer can nest.
-// Lazy on Bitwuzla: a native constant array used as an array element always
-// reaches its array solver, which answers UNKNOWN for CONST_ARRAY terms.
-TEST_CASE("Nested constant tuple arrays Bitwuzla test", "[Bitwuzla]") {
-  auto solver = camada::createBitwuzlaSolver();
-  tuple_array_const_nested(solver, camada::ConstArrayLowering::Lazy);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-// Lazy only: see the tuple variant above.
-TEST_CASE("Nested constant arrays Bitwuzla test", "[Bitwuzla]") {
-  auto solver = camada::createBitwuzlaSolver();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
-}
-
-TEST_CASE("Foreign handle rejection Bitwuzla test", "[Bitwuzla]") {
-  auto a = camada::createBitwuzlaSolver();
-  auto b = camada::createBitwuzlaSolver();
-  foreign_handle_rejected(a, b);
 }

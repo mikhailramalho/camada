@@ -1,9 +1,10 @@
 
-
-#if SOLVER_SMTLIB_ENABLED
-#include "smtlib_pipeline.test.h"
-#endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(MathSAT, camada::createMathSATSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/mathsatsolver.h>
@@ -21,56 +22,6 @@ TEST_CASE("Config logic MathSAT test", "[MathSAT]") {
   auto x = mathsat->mkSymbol("x", mathsat->mkBVSort(8));
   mathsat->addConstraint(mathsat->mkEqual(x, mathsat->mkBVFromDec(7, 8)));
   REQUIRE(mathsat->check() == camada::CheckResult::SAT);
-}
-
-TEST_CASE("Ackermann arrays MathSAT test", "[MathSAT]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto mathsat = camada::createMathSATSolver(Cfg);
-  ack_array_tests(mathsat);
-}
-
-TEST_CASE("Simple MathSAT test", "[MathSAT]") {
-  // Create Mathsat Solver
-  auto mathsat = camada::createMathSATSolver();
-  tests(mathsat);
-}
-
-TEST_CASE("UF MathSAT test", "[MathSAT]") {
-  auto mathsat = camada::createMathSATSolver();
-  uf_semantics(mathsat);
-}
-
-TEST_CASE("Unsupported quantifiers MathSAT test", "[MathSAT]") {
-  auto mathsat = camada::createMathSATSolver();
-  require_abort([&]() {
-    auto x = mathsat->mkSymbol("x", mathsat->mkBVSort(4));
-    (void)mathsat->mkForall({x}, mathsat->mkEqual(x, x));
-  });
-}
-
-TEST_CASE("Int-BV conversion MathSAT test", "[MathSAT]") {
-  // The arith test's QF_UFLIRA config has no BV theory; the conversions
-  // mix Int and BV, so they run on the default environment.
-  auto mathsat = camada::createMathSATSolver();
-  int_bv_conversion_semantics(mathsat);
-}
-
-TEST_CASE("Arith MathSAT test", "[MathSAT]") {
-  msat_config Config = msat_create_default_config("QF_UFLIRA");
-  msat_set_option(Config, "model_generation", "true");
-  camada::SMTSolverRef mathsat =
-      std::make_unique<camada::MathSATSolver>(Config);
-
-  int_arithmetic_semantics(mathsat);
-  mathsat->reset();
-  real_arithmetic_semantics(mathsat);
-  mathsat->reset();
-  arith_division_semantics(mathsat);
-  mathsat->reset();
-  arith_model_queries(mathsat);
-  mathsat->reset();
-  arith_conversion_semantics(mathsat);
 }
 
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
@@ -155,116 +106,6 @@ TEST_CASE("MathSAT solver recreation reuses symbol names", "[MathSAT]") {
   }
 }
 
-#if SOLVER_SMTLIB_ENABLED
-// ---------------------------------------------------------------------------
-// SMT-LIB pipeline tests against the mathsat binary. mathsat supports BV,
-// Bool, arrays, FP-native, FP-BV, Int, Real, and UF. It does NOT support
-// (forall ...)/(exists ...) under any logic, nor `declare-datatypes`.
-// ---------------------------------------------------------------------------
-
-#define CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST(NameStr, RunFn)                    \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [mathsat]",                          \
-            "[MathSAT][SMTLIB][pipeline]") {                                   \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::mathsatCommand(),     \
-                                 "mathsat");                                   \
-    camada_smtlib_pipeline::RunFn(Cmd);                                        \
-  }
-
-CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST("public factory works",
-                                    runSMTLIBPublicFactory)
-CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
-                                    runSMTLIBDualEmitter)
-
-#undef CAMADA_MATHSAT_SMTLIB_PIPELINE_TEST
-
-// `MakeFn` is the camada_smtlib_pipeline factory used to construct the
-// SMTLIBSolver — pass `makeSMTLIBSolver` for the default native-tuple
-// configuration, or `makeSMTLIBSolverCamadaTuples` to lower tuples into
-// per-field BV/Bool symbols on the wire (required against children that
-// reject `(declare-datatypes ...)`).
-#define CAMADA_MATHSAT_SMTLIB_SHARED_TEST(NameStr, FixtureCall, MakeFn)        \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [mathsat]",                          \
-            "[MathSAT][SMTLIB][pipeline]") {                                   \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::mathsatCommand(),     \
-                                 "mathsat");                                   \
-    camada::SMTSolverRef solver = camada_smtlib_pipeline::MakeFn(Cmd);         \
-    FixtureCall;                                                               \
-  }
-
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("implies_semantics",
-                                  implies_semantics(solver), makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("implies_true_implies_false",
-                                  implies_true_implies_false(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("check_sat_assuming_semantics",
-                                  check_sat_assuming_semantics(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("bv_lshr_semantics",
-                                  bv_lshr_semantics(solver), makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("incremental_push_pop",
-                                  incremental_push_pop(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
-                                  symbol_cache_survives_push_pop(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array", array(solver), makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array_model_values",
-                                  array_model_values(solver), makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("array_const_store_semantics",
-                                  array_const_store_semantics(solver),
-                                  makeSMTLIBSolver)
-// bool_array_const_store_semantics is absent: mathsat rejects arrays whose
-// element sort is Bool ("Arrays with Bool as argument are not supported").
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
-                                  int_arithmetic_semantics(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
-                                  real_arithmetic_semantics(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_division_semantics",
-                                  arith_division_semantics(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_model_queries",
-                                  arith_model_queries(solver), makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("arith_conversion_semantics",
-                                  arith_conversion_semantics(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fp_equal NativeFP",
-                                  fp_equal(solver, camada::FPEncoding::Native),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fp_equal BVFP",
-                                  fp_equal(solver, camada::FPEncoding::BV),
-                                  makeSMTLIBSolver)
-// mathsat's SMT-LIB parser rejects (declare-datatypes ...), so tuples here
-// must use the Camada lowering (per-field BV/Bool symbols).
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
-                                  tuple_semantics(solver),
-                                  makeSMTLIBSolverCamadaTuples)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("tuple_with_array_field [Camada]",
-                                  tuple_with_array_field(solver),
-                                  makeSMTLIBSolverCamadaTuples)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
-                                  empty_tuple_semantics(solver),
-                                  makeSMTLIBSolverCamadaTuples)
-
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("int_bv_conversion_semantics",
-                                  int_bv_conversion_semantics(solver),
-                                  makeSMTLIBSolver)
-
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
-                                  fxp_rounding_semantics(solver),
-                                  makeSMTLIBSolver)
-CAMADA_MATHSAT_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
-                                  fxp_model_and_constructs(solver),
-                                  makeSMTLIBSolver)
-
-#undef CAMADA_MATHSAT_SMTLIB_SHARED_TEST
-#endif // SOLVER_SMTLIB_ENABLED
-
 TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
   auto solver = camada::createMathSATSolver();
   using camada::SolverFeature;
@@ -281,33 +122,4 @@ TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting MathSAT test", "[MathSAT]") {
-  auto solver = camada::createMathSATSolver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays require native constant
-// arrays (lazily lowered constant arrays cannot nest). MathSAT is the
-// one decomposed-path backend where they do — the per-leaf constant
-// arrays lower natively, so nesting is just an array-sorted initializer.
-TEST_CASE("Nested constant tuple arrays MathSAT test", "[MathSAT]") {
-  auto solver = camada::createMathSATSolver();
-  tuple_array_const_nested(solver);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-TEST_CASE("Nested constant arrays MathSAT test", "[MathSAT]") {
-  auto solver = camada::createMathSATSolver();
-  nested_const_array_semantics(solver);
-  solver->reset();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }

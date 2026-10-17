@@ -1,3 +1,4 @@
+#pragma once
 
 #include "ackarray.test.h"
 #include "array.test.h"
@@ -402,7 +403,14 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
   }
 }
 
-inline void tests(const camada::SMTSolverRef &solver) {
+// The shared suite, split by theory. Each group is independently runnable:
+// every fixture resets the solver before it starts (the RESETAND* macros),
+// so a group makes no assumptions about what ran before it. tests() below
+// runs them all (for the custom-configuration cases); matrix.test.h runs
+// each group as its own test case per backend.
+
+// Booleans, bit-vectors, push/pop, models, symbols, solver contracts.
+inline void tests_core(const camada::SMTSolverRef &solver) {
   constexpr auto NativeFP = camada::FPEncoding::Native;
   constexpr auto BVFP = camada::FPEncoding::BV;
 
@@ -435,6 +443,14 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(incremental_push_pop);
   RESETANDTEST(symbol_cache_survives_push_pop);
   RESETANDTEST(handle_invalidation_after_reset);
+  RESETANDTEST(dump_string_semantics);
+  RESETANDTEST(sort_mismatch_names_both_sorts);
+  RESETANDTEST(arena_stress_test);
+}
+
+// Arrays: native and Ackermann-compatible fixtures, eager and lazy const
+// lowering, equality propagation, models.
+inline void tests_arrays(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array);
   RESETANDTEST(array_element_typed_sorts);
   RESETANDTEST(array_const_store_semantics);
@@ -465,6 +481,12 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(lazy_array_equality_reached_defaults);
   RESETANDARGTEST(lazy_array_equality_reached_defaults, LazyArrays);
   RESETANDTEST(const_array_lowering_interop);
+}
+
+// Tuples: native datatypes or the per-field Camada lowering, and their
+// compositions with arrays.
+inline void tests_tuples(const camada::SMTSolverRef &solver) {
+  constexpr auto LazyArrays = camada::ConstArrayLowering::Lazy;
   RESETANDTEST(tuple_semantics);
   RESETANDTEST(tuple_symbol_name_reuse_across_sorts);
   RESETANDTEST(tuple_with_array_field);
@@ -477,7 +499,13 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_array_model_values);
   RESETANDARGTEST(tuple_array_model_values, LazyArrays);
   RESETANDTEST(empty_tuple_semantics);
-  RESETANDTEST(dump_string_semantics);
+}
+
+// Floating-point, native and BV-encoded, including the host oracles.
+inline void tests_fp(const camada::SMTSolverRef &solver) {
+  constexpr auto NativeFP = camada::FPEncoding::Native;
+  constexpr auto BVFP = camada::FPEncoding::BV;
+
   RESETANDTEST(fp_native_bv_predicate_parity);
   RESETANDTEST(ieee_fp_to_bv_after_check_reports);
   RESETANDTEST(fp_neg_nan_native_bv_parity);
@@ -530,17 +558,20 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_tointegral_large_values_bv);
   RESETANDARGTEST(fp_remainder_host_oracle, NativeFP);
   RESETANDARGTEST(fp_remainder_host_oracle, BVFP);
-  RESETANDTEST(arena_stress_test);
   RESETANDARGTEST(fp_non_standard_widths, BVFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, NativeFP);
   RESETANDARGTEST(fp_cancellation_and_normalization, BVFP);
   RESETANDTEST(fp_wide_format_semantics);
-  RESETANDTEST(sort_mismatch_names_both_sorts);
   RESETANDTEST(fp_degenerate_format_rejected);
   RESETANDTEST(fp_narrow_significand_operations_encode);
-  RESETANDTEST(fxp_countls_narrow_target_rejected);
+}
 
-  // Fixed-point: pure common-layer BV encoding, no backend gating needed.
+// Fixed-point: pure common-layer BV encoding, no backend gating needed.
+inline void tests_fxp(const camada::SMTSolverRef &solver) {
+  constexpr auto NativeFP = camada::FPEncoding::Native;
+  constexpr auto BVFP = camada::FPEncoding::BV;
+
+  RESETANDTEST(fxp_countls_narrow_target_rejected);
   RESETANDTEST(fxp_exhaustive_semantics);
   RESETANDTEST(fxp_boundary_overflow_semantics);
   RESETANDTEST(fxp_rounding_semantics);
@@ -561,4 +592,54 @@ inline void tests(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_oracle_mixed_semantics);
   RESETANDARGTEST(fxp_fp_conversion_semantics, NativeFP);
   RESETANDARGTEST(fxp_fp_conversion_semantics, BVFP);
+}
+
+// Int/Real arithmetic, model queries and the Int<->BV bridge. Backends
+// whose contexts must be configured per logic (MathSAT, Yices) are matrix
+// exclusions and run the applicable fixtures from their own Arith cases.
+inline void tests_arith(const camada::SMTSolverRef &solver,
+                        bool include_symbolic_shift = true) {
+  RESETANDTEST(int_arithmetic_semantics);
+  RESETANDTEST(real_arithmetic_semantics);
+  RESETANDTEST(arith_division_semantics);
+  RESETANDTEST(arith_model_queries);
+  RESETANDTEST(arith_conversion_semantics);
+  RESETANDTEST(int_bv_conversion_semantics);
+  // RESETANDTEST is two statements, so it needs the braces.
+  if (include_symbolic_shift) {
+    RESETANDTEST(arith_symbolic_shift_semantics);
+  }
+}
+
+// Nested array shapes: the depth-5 tuple/array tower and nested constant
+// arrays. Not part of tests_arrays because the shapes need nested array
+// SORTS, which STP's BV-only array theory lacks (an exclusion, not a
+// supports() gate); every other backend runs them.
+inline void tests_nesting(const camada::SMTSolverRef &solver) {
+  RESETANDTEST(tuple_array_deep_nesting);
+  RESETANDARGTEST(tuple_array_const_nested, camada::ConstArrayLowering::Lazy);
+  RESETANDARGTEST(nested_const_array_semantics,
+                  camada::ConstArrayLowering::Lazy);
+  RESETANDARGTEST(nested_const_array_survives_pop,
+                  camada::ConstArrayLowering::Lazy);
+}
+
+// The same nested constant-array shapes under the eager (native) lowering.
+// Separate from tests_nesting because Bitwuzla cannot run these: a native
+// constant array used as an array element always reaches its array solver,
+// which answers UNKNOWN for CONST_ARRAY terms (a matrix exclusion).
+inline void tests_nesting_native_const(const camada::SMTSolverRef &solver) {
+  RESETANDTEST(tuple_array_const_nested);
+  RESETANDTEST(nested_const_array_semantics);
+  RESETANDTEST(nested_const_array_survives_pop);
+}
+
+// The whole shared suite, as the per-backend "Simple" and "Override" test
+// cases have always run it.
+inline void tests(const camada::SMTSolverRef &solver) {
+  tests_core(solver);
+  tests_arrays(solver);
+  tests_tuples(solver);
+  tests_fp(solver);
+  tests_fxp(solver);
 }

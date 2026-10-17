@@ -1,3 +1,5 @@
+#pragma once
+
 // Conformance of the floating-point operations against IEEE-754, on every
 // backend and under both encodings.
 //

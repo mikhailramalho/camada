@@ -170,7 +170,14 @@ consumers must be built with the same value."
   ON)
 if(CAMADA_ENABLE_REGRESSION)
   include(CTest)
-  find_package(Catch2 3 QUIET)
+  # Catch2 exits 4 when every test in a run was skipped, and every matrix cell
+  # is its own run, so a gated or excluded cell is exactly that. Only the
+  # discovery module from 3.7.1 on maps that to a ctest skip; an older copy
+  # (Ubuntu ships 3.4.0) would report every skipped cell as a failure. Asking
+  # for the floor here lets a too-old system copy be passed over for the
+  # download below.
+  set(CAMADA_CATCH2_MIN_VERSION 3.7.1)
+  find_package(Catch2 ${CAMADA_CATCH2_MIN_VERSION} QUIET)
   if(NOT Catch2_FOUND AND NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF")
     message(STATUS "Catch2 not found locally. Downloading it for regression.")
     camada_include_cpm()
@@ -187,7 +194,7 @@ if(CAMADA_ENABLE_REGRESSION)
     list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
   endif()
   if(NOT TARGET Catch2::Catch2)
-    find_package(Catch2 3 REQUIRED)
+    find_package(Catch2 ${CAMADA_CATCH2_MIN_VERSION} REQUIRED)
   endif()
   enable_testing()
 endif()

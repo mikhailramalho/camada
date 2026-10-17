@@ -1,8 +1,9 @@
-
-#if SOLVER_SMTLIB_ENABLED
-#include "smtlib_pipeline.test.h"
-#endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(Yices, camada::createYicesSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/yicessolver.h>
@@ -34,32 +35,6 @@ TEST_CASE("Config logic Yices test", "[YICES]") {
     s->addConstraint(s->mkEqual(s->mkArraySelect(a, s->mkBVFromDec(1, 8)),
                                 s->mkBVFromDec(2, 8)));
     (void)s->check();
-  });
-}
-
-TEST_CASE("Ackermann arrays Yices test", "[YICES]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto yices = camada::createYicesSolver(Cfg);
-  ack_array_tests(yices);
-}
-
-TEST_CASE("Simple Yices test", "[YICES]") {
-  // Create Yices Solver
-  auto yices = camada::createYicesSolver();
-  tests(yices);
-}
-
-TEST_CASE("UF Yices test", "[YICES]") {
-  auto yices = camada::createYicesSolver();
-  uf_semantics(yices);
-}
-
-TEST_CASE("Unsupported quantifiers Yices test", "[YICES]") {
-  auto yices = camada::createYicesSolver();
-  require_abort([&]() {
-    auto x = yices->mkSymbol("x", yices->mkBVSort(4));
-    (void)yices->mkExists({x}, yices->mkEqual(x, x));
   });
 }
 
@@ -173,106 +148,6 @@ TEST_CASE("Yices multi-instance lifecycle edge case", "[YICES]") {
   REQUIRE(yices2->check() == camada::CheckResult::SAT); // Still SAT
 }
 
-#if SOLVER_SMTLIB_ENABLED
-// ---------------------------------------------------------------------------
-// SMT-LIB pipeline tests against the yices-smt2 binary. yices-smt2 supports
-// BV, Bool, arrays, FP-BV (via bit-blast), Int, Real, and UF. It does NOT
-// support native FP, quantifiers under logic ALL, or `declare-datatypes`.
-// The fp_equal NativeFP fixture is therefore absent.
-// ---------------------------------------------------------------------------
-
-#define CAMADA_YICES_SMTLIB_PIPELINE_TEST(NameStr, RunFn)                      \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [yices-smt2]",                       \
-            "[YICES][SMTLIB][pipeline]") {                                     \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::yicesSmt2Command(),   \
-                                 "yices-smt2");                                \
-    camada_smtlib_pipeline::RunFn(Cmd);                                        \
-  }
-
-CAMADA_YICES_SMTLIB_PIPELINE_TEST("public factory works",
-                                  runSMTLIBPublicFactory)
-CAMADA_YICES_SMTLIB_PIPELINE_TEST("dual emitter logs to file too",
-                                  runSMTLIBDualEmitter)
-
-#undef CAMADA_YICES_SMTLIB_PIPELINE_TEST
-
-// `MakeFn` is the camada_smtlib_pipeline factory used to construct the
-// SMTLIBSolver — pass `makeSMTLIBSolver` for the default native-tuple
-// configuration, or `makeSMTLIBSolverCamadaTuples` to lower tuples into
-// per-field BV/Bool symbols on the wire (required against children that
-// reject `(declare-datatypes ...)`).
-#define CAMADA_YICES_SMTLIB_SHARED_TEST(NameStr, FixtureCall, MakeFn)          \
-  TEST_CASE("SMTLIB pipeline: " NameStr " [yices-smt2]",                       \
-            "[YICES][SMTLIB][pipeline]") {                                     \
-    CAMADA_SMTLIB_REQUIRE_BINARY(camada_smtlib_pipeline::yicesSmt2Command(),   \
-                                 "yices-smt2");                                \
-    camada::SMTSolverRef solver = camada_smtlib_pipeline::MakeFn(Cmd);         \
-    FixtureCall;                                                               \
-  }
-
-CAMADA_YICES_SMTLIB_SHARED_TEST("equal_ten", equal_ten(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("implies_semantics", implies_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("implies_true_implies_false",
-                                implies_true_implies_false(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("check_sat_assuming_semantics",
-                                check_sat_assuming_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("bv_lshr_semantics", bv_lshr_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("incremental_push_pop",
-                                incremental_push_pop(solver), makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("symbol_cache_survives_push_pop",
-                                symbol_cache_survives_push_pop(solver),
-                                makeSMTLIBSolver)
-// Array fixtures absent for yices: they all use `mkArrayConst`, which Camada
-// emits as `((as const ...) ...)`. yices-smt2 rejects this syntax outright
-// ("undefined term: const"); native yices supports const-arrays via a
-// different C-API path, but there's no SMT-LIB-wire equivalent.
-CAMADA_YICES_SMTLIB_SHARED_TEST("uf_semantics", uf_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("int_arithmetic_semantics",
-                                int_arithmetic_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("real_arithmetic_semantics",
-                                real_arithmetic_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("arith_division_semantics",
-                                arith_division_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("arith_model_queries",
-                                arith_model_queries(solver), makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("arith_conversion_semantics",
-                                arith_conversion_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("fp_equal BVFP",
-                                fp_equal(solver, camada::FPEncoding::BV),
-                                makeSMTLIBSolver)
-// yices rejects (declare-datatypes ...), so tuples here must use the
-// Camada lowering (per-field BV/Bool symbols).
-CAMADA_YICES_SMTLIB_SHARED_TEST("tuple_semantics [Camada]",
-                                tuple_semantics(solver),
-                                makeSMTLIBSolverCamadaTuples)
-CAMADA_YICES_SMTLIB_SHARED_TEST("empty_tuple_semantics [Camada]",
-                                empty_tuple_semantics(solver),
-                                makeSMTLIBSolverCamadaTuples)
-
-CAMADA_YICES_SMTLIB_SHARED_TEST("int_bv_conversion_semantics",
-                                int_bv_conversion_semantics(solver),
-                                makeSMTLIBSolver)
-
-CAMADA_YICES_SMTLIB_SHARED_TEST("fxp_rounding_semantics",
-                                fxp_rounding_semantics(solver),
-                                makeSMTLIBSolver)
-CAMADA_YICES_SMTLIB_SHARED_TEST("fxp_model_and_constructs",
-                                fxp_model_and_constructs(solver),
-                                makeSMTLIBSolver)
-
-#undef CAMADA_YICES_SMTLIB_SHARED_TEST
-#endif // SOLVER_SMTLIB_ENABLED
-
 TEST_CASE("Yices feature capabilities", "[Yices]") {
   auto solver = camada::createYicesSolver();
   using camada::SolverFeature;
@@ -290,37 +165,4 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
 #endif
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting Yices test", "[Yices]") {
-  auto solver = camada::createYicesSolver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays now lower lazily too,
-// so the per-leaf constant arrays of a tuple-array initializer can nest.
-TEST_CASE("Nested constant tuple arrays Yices test", "[Yices]") {
-  auto solver = camada::createYicesSolver();
-  tuple_array_const_nested(solver);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-TEST_CASE("Nested constant arrays Yices test", "[Yices]") {
-  auto solver = camada::createYicesSolver();
-  nested_const_array_semantics(solver);
-  solver->reset();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
-}
-
-TEST_CASE("Foreign handle rejection YICES test", "[YICES]") {
-  auto a = camada::createYicesSolver();
-  auto b = camada::createYicesSolver();
-  foreign_handle_rejected(a, b);
 }

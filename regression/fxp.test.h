@@ -1,3 +1,5 @@
+#pragma once
+
 // Fixed-point (FXP) fixtures, backend-agnostic. Everything here goes
 // through Camada's common-layer BV encoding, so the same fixtures run on
 // every native backend and on the SMT-LIB pipeline children.
