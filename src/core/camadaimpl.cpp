@@ -521,7 +521,6 @@ void SMTSolverImpl::clearExprCaches() {
   for (auto &Cache : CachedSmallBVExprs)
     Cache.clear();
   SymbolExprCache.clear();
-  SymbolNameSort.clear();
   // Every alias just forgotten is gone from the backend too (this runs on
   // reset and destruction), so the numbering starts over: a solver that has
   // been reset names its symbols the way a fresh one does.
@@ -2195,29 +2194,34 @@ SMTExprRef SMTSolverImpl::mkSymbol(const std::string &Name,
   fatalErrorIf(Name.compare(0, 9, "__CAMADA_") == 0,
                "Symbol names with the reserved __CAMADA_ prefix are not "
                "permitted; rename the symbol");
-  SymbolExprCacheKey Key{Sort.get(), Name};
-  if (auto Cached = SymbolExprCache.find(Key); Cached != SymbolExprCache.end())
-    return Cached->second;
+  auto Named = SymbolExprCache.find(Name);
+  // Empty when a backend threw while the name's first symbol was being made.
+  if (Named == SymbolExprCache.end() || Named->second.empty())
+    return mkSymbolUnchecked(Name, Sort);
+  // Element references survive the rehash the alias's own insert may cause.
+  std::vector<SymbolCacheEntry> &Entries = Named->second;
+  for (const SymbolCacheEntry &Entry : Entries)
+    if (Entry.Sort == Sort.get())
+      return Entry.Exp;
   // Backends keep one sort per name: STP merges same-named symbols, MathSAT
   // and SMT-LIB abort on a redeclaration. A name already made with another
   // sort therefore gets a backend name of its own, in the reserved space so it
   // cannot meet a user symbol. The first sort keeps the plain name.
-  auto [Owner, First] = SymbolNameSort.try_emplace(Name, Sort.get());
-  if (First || Owner->second == Sort.get())
-    return mkSymbolUnchecked(Name, Sort);
   SMTExprRef theExp = mkSymbolUnchecked(
       "__CAMADA_alias" + std::to_string(SymbolAliasCounter++) + "_" + Name,
       Sort);
-  SymbolExprCache.emplace(std::move(Key), theExp);
+  Entries.push_back({Sort.get(), theExp});
   return theExp;
 }
 
 SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
                                             const SMTSortRef &Sort) {
-  SymbolExprCacheKey Key{Sort.get(), Name};
-  auto Cached = SymbolExprCache.find(Key);
-  if (Cached != SymbolExprCache.end())
-    return Cached->second;
+  // Element references survive the rehash a nested symbol (a lowered tuple's
+  // fields) may cause.
+  std::vector<SymbolCacheEntry> &Entries = SymbolExprCache[Name];
+  for (const SymbolCacheEntry &Entry : Entries)
+    if (Entry.Sort == Sort.get())
+      return Entry.Exp;
 
   SMTExprRef theExp;
   // Route tuple-typed symbols to the Camada-managed lowering on backends
@@ -2235,7 +2239,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
     theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
   }
-  SymbolExprCache.emplace(std::move(Key), theExp);
+  Entries.push_back({Sort.get(), theExp});
   return theExp;
 }
 
