@@ -143,7 +143,8 @@ endif()
 # archive the normal way, the linker drops every member nothing references, the
 # initializers never run, and z3::tactic(c, "smt") finds no tactic at all. Link
 # the archive whole so they are kept. CAMADA_Z3_LIB stays the plain path: its
-# directory feeds the rpath logic.
+# directory feeds the rpath logic, and appending the link dependencies to it
+# would make a missing library look found.
 set(CAMADA_Z3_LINK_LIBRARIES "${CAMADA_Z3_LIB}")
 if(CAMADA_Z3_LIB MATCHES "\\.a$")
   set(CAMADA_Z3_LINK_LIBRARIES "$<LINK_LIBRARY:WHOLE_ARCHIVE,${CAMADA_Z3_LIB}>")
@@ -155,10 +156,8 @@ endif()
 if(NOT BUILD_SHARED_LIBS OR CAMADA_Z3_LIB MATCHES "\\.a$")
   find_package(Threads REQUIRED)
   if(Threads_FOUND)
-    list(APPEND CAMADA_Z3_LIB "${CMAKE_THREAD_LIBS_INIT}")
     list(APPEND CAMADA_Z3_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
     if(NOT MSVC)
-      list(APPEND CAMADA_Z3_LIB "-ldl")
       list(APPEND CAMADA_Z3_LINK_LIBRARIES "-ldl")
     endif()
   endif()
