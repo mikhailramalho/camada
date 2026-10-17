@@ -3,6 +3,11 @@
 #include "smtlib_pipeline.test.h"
 #endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(CVC5, camada::createCVC5Solver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/cvc5solver.h>
@@ -16,71 +21,6 @@ inline camada::SolverConfig withUnsatAssumptions() {
   return Cfg;
 }
 } // namespace
-
-// SolverConfig::Tuples = Camada forces the per-field lowering even though
-// cvc5 has native datatypes.
-TEST_CASE("Camada tuples via config CVC5 test", "[CVC5]") {
-  camada::SolverConfig Cfg;
-  Cfg.Tuples = camada::TupleEncoding::Camada;
-  auto cvc5 = camada::createCVC5Solver(Cfg);
-  // supports() reports the backend capability, so cvc5 still claims native
-  // datatypes here; tupleMode() is what says this instance will not use
-  // them.
-  REQUIRE(cvc5->supports(camada::SolverFeature::NativeTuples));
-  REQUIRE(cvc5->tupleMode() == camada::TupleEncoding::Camada);
-  tuple_semantics(cvc5);
-  cvc5->reset();
-  tuple_with_array_field(cvc5);
-  cvc5->reset();
-  tuple_array_semantics(cvc5);
-  cvc5->reset();
-  tuple_update_semantics(cvc5);
-}
-
-TEST_CASE("Ackermann arrays CVC5 test", "[CVC5]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto cvc5 = camada::createCVC5Solver(Cfg);
-  ack_array_tests(cvc5);
-}
-
-TEST_CASE("Simple CVC5 test", "[CVC5]") {
-  // Create CVC5 Solver
-  auto cvc5 = camada::createCVC5Solver();
-  tests(cvc5);
-}
-
-TEST_CASE("Quantifiers CVC5 test", "[CVC5]") {
-  auto cvc5 = camada::createCVC5Solver();
-  quantifier_semantics(cvc5);
-}
-
-TEST_CASE("UF CVC5 test", "[CVC5]") {
-  auto cvc5 = camada::createCVC5Solver();
-  uf_semantics(cvc5);
-}
-
-TEST_CASE("Arith CVC5 test", "[CVC5]") {
-  auto cvc5 = camada::createCVC5Solver();
-  int_arithmetic_semantics(cvc5);
-  cvc5->reset();
-  real_arithmetic_semantics(cvc5);
-  cvc5->reset();
-  arith_division_semantics(cvc5);
-  cvc5->reset();
-  arith_model_queries(cvc5);
-  cvc5->reset();
-  arith_conversion_semantics(cvc5);
-  cvc5->reset();
-  int_bv_conversion_semantics(cvc5);
-  cvc5->reset();
-  arith_symbolic_shift_semantics(cvc5);
-}
-
-TEST_CASE("Tuple-with-Int CVC5 test", "[CVC5]") {
-  auto cvc5 = camada::createCVC5Solver();
-  tuple_semantics_with_int(cvc5);
-}
 
 #if SOLVER_SMTLIB_ENABLED
 // ---------------------------------------------------------------------------
@@ -237,37 +177,4 @@ TEST_CASE("Unsat-assumption opt-in CVC5 test", "[CVC5]") {
   auto core = solver->getUnsatAssumptions();
   REQUIRE(core);
   REQUIRE(!core.value().empty());
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting CVC5 test", "[CVC5]") {
-  auto solver = camada::createCVC5Solver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays require native constant
-// arrays (lazily lowered constant arrays cannot nest).
-TEST_CASE("Nested constant tuple arrays CVC5 test", "[CVC5]") {
-  auto solver = camada::createCVC5Solver();
-  tuple_array_const_nested(solver);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-TEST_CASE("Nested constant arrays CVC5 test", "[CVC5]") {
-  auto solver = camada::createCVC5Solver();
-  nested_const_array_semantics(solver);
-  solver->reset();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
-}
-
-TEST_CASE("Foreign handle rejection CVC5 test", "[CVC5]") {
-  auto a = camada::createCVC5Solver();
-  auto b = camada::createCVC5Solver();
-  foreign_handle_rejected(a, b);
 }

@@ -3,6 +3,11 @@
 #include "smtlib_pipeline.test.h"
 #endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(Bitwuzla, camada::createBitwuzlaSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
@@ -18,18 +23,6 @@ inline camada::SolverConfig withUnsatAssumptions() {
   return Cfg;
 }
 } // namespace
-
-TEST_CASE("Ackermann arrays Bitwuzla test", "[Bitwuzla]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto bzla = camada::createBitwuzlaSolver(Cfg);
-  ack_array_tests(bzla);
-}
-
-TEST_CASE("Simple Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  tests(bitwuzla);
-}
 
 // Randomized cross-check of the BV-encoded fp.rem against the host CPU,
 // which computes IEEE-754 remainder exactly. Full-bit-pattern inputs cover
@@ -57,16 +50,6 @@ TEST_CASE("FP remainder randomized host oracle Bitwuzla", "[Bitwuzla]") {
     std::memcpy(&Y, &YB, sizeof(Y));
     check_rem_pair_f64(solver, camada::FPEncoding::BV, X, Y);
   }
-}
-
-TEST_CASE("Quantifiers Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  quantifier_semantics(bitwuzla);
-}
-
-TEST_CASE("UF Bitwuzla test", "[Bitwuzla]") {
-  auto bitwuzla = camada::createBitwuzlaSolver();
-  uf_semantics(bitwuzla);
 }
 
 TEST_CASE("Unsupported arithmetic Bitwuzla test", "[Bitwuzla]") {
@@ -228,36 +211,4 @@ TEST_CASE("Unsat-assumption opt-in Bitwuzla test", "[Bitwuzla]") {
   auto core = solver->getUnsatAssumptions();
   REQUIRE(core);
   REQUIRE(!core.value().empty());
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting Bitwuzla test", "[Bitwuzla]") {
-  auto solver = camada::createBitwuzlaSolver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays now lower lazily too,
-// so the per-leaf constant arrays of a tuple-array initializer can nest.
-// Lazy on Bitwuzla: a native constant array used as an array element always
-// reaches its array solver, which answers UNKNOWN for CONST_ARRAY terms.
-TEST_CASE("Nested constant tuple arrays Bitwuzla test", "[Bitwuzla]") {
-  auto solver = camada::createBitwuzlaSolver();
-  tuple_array_const_nested(solver, camada::ConstArrayLowering::Lazy);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-// Lazy only: see the tuple variant above.
-TEST_CASE("Nested constant arrays Bitwuzla test", "[Bitwuzla]") {
-  auto solver = camada::createBitwuzlaSolver();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
-}
-
-TEST_CASE("Foreign handle rejection Bitwuzla test", "[Bitwuzla]") {
-  auto a = camada::createBitwuzlaSolver();
-  auto b = camada::createBitwuzlaSolver();
-  foreign_handle_rejected(a, b);
 }

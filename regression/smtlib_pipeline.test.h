@@ -1,3 +1,5 @@
+#pragma once
+
 // Helpers for the SMT-LIB pipeline tests, parameterized by the child-solver
 // command. Each <solver>.test.cpp uses these helpers to spin up an
 // SMTLIBSolver wired to that backend's child binary, then drives it through

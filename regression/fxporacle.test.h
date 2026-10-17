@@ -1,3 +1,5 @@
+#pragma once
+
 // Execution-oracle cross-check for the fixed-point encoding: every
 // vector in fxp_oracle_tables.h was computed by running Clang-compiled
 // -ffixed-point arithmetic (see scripts/fxp_oracle_gen.py for the

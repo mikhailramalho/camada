@@ -3,22 +3,14 @@
 #include "smtlib_pipeline.test.h"
 #endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(STP, camada::createSTPSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/stpsolver.h>
-
-TEST_CASE("Ackermann arrays STP test", "[STP]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto stp = camada::createSTPSolver(Cfg);
-  ack_array_tests(stp);
-}
-
-TEST_CASE("Simple STP test", "[STP]") {
-  // Create STP Solver
-  auto stp = camada::createSTPSolver();
-  tests(stp);
-}
 
 TEST_CASE("Unsupported UF STP test", "[STP]") {
   auto stp = camada::createSTPSolver();
@@ -146,10 +138,4 @@ TEST_CASE("SMTLIB pipeline: ack_array_tests_flat [Ackermann] [stp]",
 TEST_CASE("Unsupported nested constant arrays STP test", "[STP]") {
   auto stp = camada::createSTPSolver();
   require_abort([&]() { nested_const_array_semantics(stp); });
-}
-
-TEST_CASE("Foreign handle rejection STP test", "[STP]") {
-  auto a = camada::createSTPSolver();
-  auto b = camada::createSTPSolver();
-  foreign_handle_rejected(a, b);
 }

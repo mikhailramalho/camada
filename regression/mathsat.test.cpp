@@ -4,6 +4,11 @@
 #include "smtlib_pipeline.test.h"
 #endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(MathSAT, camada::createMathSATSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/mathsatsolver.h>
@@ -21,24 +26,6 @@ TEST_CASE("Config logic MathSAT test", "[MathSAT]") {
   auto x = mathsat->mkSymbol("x", mathsat->mkBVSort(8));
   mathsat->addConstraint(mathsat->mkEqual(x, mathsat->mkBVFromDec(7, 8)));
   REQUIRE(mathsat->check() == camada::CheckResult::SAT);
-}
-
-TEST_CASE("Ackermann arrays MathSAT test", "[MathSAT]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto mathsat = camada::createMathSATSolver(Cfg);
-  ack_array_tests(mathsat);
-}
-
-TEST_CASE("Simple MathSAT test", "[MathSAT]") {
-  // Create Mathsat Solver
-  auto mathsat = camada::createMathSATSolver();
-  tests(mathsat);
-}
-
-TEST_CASE("UF MathSAT test", "[MathSAT]") {
-  auto mathsat = camada::createMathSATSolver();
-  uf_semantics(mathsat);
 }
 
 TEST_CASE("Unsupported quantifiers MathSAT test", "[MathSAT]") {
@@ -281,33 +268,4 @@ TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting MathSAT test", "[MathSAT]") {
-  auto solver = camada::createMathSATSolver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays require native constant
-// arrays (lazily lowered constant arrays cannot nest). MathSAT is the
-// one decomposed-path backend where they do — the per-leaf constant
-// arrays lower natively, so nesting is just an array-sorted initializer.
-TEST_CASE("Nested constant tuple arrays MathSAT test", "[MathSAT]") {
-  auto solver = camada::createMathSATSolver();
-  tuple_array_const_nested(solver);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-TEST_CASE("Nested constant arrays MathSAT test", "[MathSAT]") {
-  auto solver = camada::createMathSATSolver();
-  nested_const_array_semantics(solver);
-  solver->reset();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
 }

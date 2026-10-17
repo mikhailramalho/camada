@@ -1,3 +1,5 @@
+#pragma once
+
 // Conformance of every bit-vector operation against SMT-LIB semantics, on
 // every backend.
 //

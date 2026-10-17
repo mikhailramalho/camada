@@ -1,3 +1,5 @@
+#pragma once
+
 
 #include "ackarray.test.h"
 #include "array.test.h"
@@ -590,6 +592,42 @@ inline void tests_fxp(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_oracle_mixed_semantics);
   RESETANDARGTEST(fxp_fp_conversion_semantics, NativeFP);
   RESETANDARGTEST(fxp_fp_conversion_semantics, BVFP);
+}
+
+// Int/Real arithmetic, model queries and the Int<->BV bridge. Backends
+// whose contexts must be configured per logic (MathSAT, Yices) are matrix
+// exclusions and run the applicable fixtures from their own Arith cases.
+inline void tests_arith(const camada::SMTSolverRef &solver) {
+  RESETANDTEST(int_arithmetic_semantics);
+  RESETANDTEST(real_arithmetic_semantics);
+  RESETANDTEST(arith_division_semantics);
+  RESETANDTEST(arith_model_queries);
+  RESETANDTEST(arith_conversion_semantics);
+  RESETANDTEST(int_bv_conversion_semantics);
+  RESETANDTEST(arith_symbolic_shift_semantics);
+}
+
+// Nested array shapes: the depth-5 tuple/array tower and nested constant
+// arrays. Not part of tests_arrays because the shapes need nested array
+// SORTS, which STP's BV-only array theory lacks (an exclusion, not a
+// supports() gate); every other backend runs them.
+inline void tests_nesting(const camada::SMTSolverRef &solver) {
+  RESETANDTEST(tuple_array_deep_nesting);
+  RESETANDARGTEST(tuple_array_const_nested, camada::ConstArrayLowering::Lazy);
+  RESETANDARGTEST(nested_const_array_semantics,
+                  camada::ConstArrayLowering::Lazy);
+  RESETANDARGTEST(nested_const_array_survives_pop,
+                  camada::ConstArrayLowering::Lazy);
+}
+
+// The same nested constant-array shapes under the eager (native) lowering.
+// Separate from tests_nesting because Bitwuzla cannot run these: a native
+// constant array used as an array element always reaches its array solver,
+// which answers UNKNOWN for CONST_ARRAY terms (a matrix exclusion).
+inline void tests_nesting_native_const(const camada::SMTSolverRef &solver) {
+  RESETANDTEST(tuple_array_const_nested);
+  RESETANDTEST(nested_const_array_semantics);
+  RESETANDTEST(nested_const_array_survives_pop);
 }
 
 // The whole shared suite, as the per-backend "Simple" and "Override" test

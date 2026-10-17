@@ -3,15 +3,14 @@
 #include "smtlib_pipeline.test.h"
 #endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(Z3, camada::createZ3Solver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/z3solver.h>
-
-TEST_CASE("Simple Z3 test", "[Z3]") {
-  // Create Z3 Solver
-  auto z3 = camada::createZ3Solver();
-  tests(z3);
-}
 
 // The fixed<->float oracle tables bit-blast thousands of FP circuits, so
 // unlike the other FXP fixtures they run on one backend instead of all
@@ -30,65 +29,6 @@ TEST_CASE("Fixed-point exp exhaustive Z3 test", "[Z3]") {
 TEST_CASE("Fixed-point/floating-point oracle Z3 test", "[Z3]") {
   auto z3 = camada::createZ3Solver();
   fxp_oracle_fp_semantics(z3, camada::FPEncoding::BV);
-}
-
-TEST_CASE("Quantifiers Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver();
-  quantifier_semantics(z3);
-}
-
-TEST_CASE("UF Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver();
-  uf_semantics(z3);
-}
-
-TEST_CASE("Arith Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver();
-  int_arithmetic_semantics(z3);
-  z3->reset();
-  real_arithmetic_semantics(z3);
-  z3->reset();
-  arith_division_semantics(z3);
-  z3->reset();
-  arith_model_queries(z3);
-  z3->reset();
-  arith_conversion_semantics(z3);
-  z3->reset();
-  int_bv_conversion_semantics(z3);
-  z3->reset();
-  arith_symbolic_shift_semantics(z3);
-}
-
-TEST_CASE("Tuple-with-Int Z3 test", "[Z3]") {
-  auto z3 = camada::createZ3Solver();
-  tuple_semantics_with_int(z3);
-}
-
-// SolverConfig::Tuples = Camada forces the per-field lowering even though
-// Z3 has native datatypes — the datatype engine stays out of the picture.
-TEST_CASE("Camada tuples via config Z3 test", "[Z3]") {
-  camada::SolverConfig Cfg;
-  Cfg.Tuples = camada::TupleEncoding::Camada;
-  auto z3 = camada::createZ3Solver(Cfg);
-  // supports() reports the backend capability, so Z3 still claims native
-  // datatypes here; tupleMode() is what says this instance will not use
-  // them.
-  REQUIRE(z3->supports(camada::SolverFeature::NativeTuples));
-  REQUIRE(z3->tupleMode() == camada::TupleEncoding::Camada);
-  tuple_semantics(z3);
-  z3->reset();
-  tuple_with_array_field(z3);
-  z3->reset();
-  tuple_array_semantics(z3);
-  z3->reset();
-  tuple_update_semantics(z3);
-}
-
-TEST_CASE("Ackermann arrays Z3 test", "[Z3]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto z3 = camada::createZ3Solver(Cfg);
-  ack_array_tests(z3);
 }
 
 // The full shared fixture suite under the Ackermann encoding — the same
@@ -285,39 +225,6 @@ TEST_CASE("Z3 feature capabilities", "[Z3]") {
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting Z3 test", "[Z3]") {
-  auto solver = camada::createZ3Solver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays require native constant
-// arrays (lazily lowered constant arrays cannot nest).
-TEST_CASE("Nested constant tuple arrays Z3 test", "[Z3]") {
-  auto solver = camada::createZ3Solver();
-  tuple_array_const_nested(solver);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-TEST_CASE("Nested constant arrays Z3 test", "[Z3]") {
-  auto solver = camada::createZ3Solver();
-  nested_const_array_semantics(solver);
-  solver->reset();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
-}
-
-TEST_CASE("Foreign handle rejection Z3 test", "[Z3]") {
-  auto a = camada::createZ3Solver();
-  auto b = camada::createZ3Solver();
-  foreign_handle_rejected(a, b);
 }
 
 // Z3 4.13 throws from check() on this query once a scope is open; camada

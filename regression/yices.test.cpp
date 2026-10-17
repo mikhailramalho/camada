@@ -3,6 +3,11 @@
 #include "smtlib_pipeline.test.h"
 #endif
 #include "tests.h"
+#include "matrix.test.h"
+
+// One test case per shared fixture group; capability gates and
+// exclusions live in matrix.test.h.
+CAMADA_SHARED_MATRIX(Yices, camada::createYicesSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/yicessolver.h>
@@ -35,24 +40,6 @@ TEST_CASE("Config logic Yices test", "[YICES]") {
                                 s->mkBVFromDec(2, 8)));
     (void)s->check();
   });
-}
-
-TEST_CASE("Ackermann arrays Yices test", "[YICES]") {
-  camada::SolverConfig Cfg;
-  Cfg.Arrays = camada::ArrayEncoding::Ackermann;
-  auto yices = camada::createYicesSolver(Cfg);
-  ack_array_tests(yices);
-}
-
-TEST_CASE("Simple Yices test", "[YICES]") {
-  // Create Yices Solver
-  auto yices = camada::createYicesSolver();
-  tests(yices);
-}
-
-TEST_CASE("UF Yices test", "[YICES]") {
-  auto yices = camada::createYicesSolver();
-  uf_semantics(yices);
 }
 
 TEST_CASE("Unsupported quantifiers Yices test", "[YICES]") {
@@ -290,37 +277,4 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   REQUIRE(solver->supports(SolverFeature::Timeouts));
 #endif
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
-}
-
-// Registered per backend rather than in tests(): the depth-5 shape
-// flattens to nested-array leaves, which STP's array theory lacks.
-TEST_CASE("Deep tuple/array nesting Yices test", "[Yices]") {
-  auto solver = camada::createYicesSolver();
-  tuple_array_deep_nesting(solver);
-}
-
-// Registered per backend: nested constant arrays now lower lazily too,
-// so the per-leaf constant arrays of a tuple-array initializer can nest.
-TEST_CASE("Nested constant tuple arrays Yices test", "[Yices]") {
-  auto solver = camada::createYicesSolver();
-  tuple_array_const_nested(solver);
-}
-
-// Registered per backend, not in tests(): array_of(array_of(v)) needs a
-// nested array sort, which STP's BV-only array theory lacks.
-TEST_CASE("Nested constant arrays Yices test", "[Yices]") {
-  auto solver = camada::createYicesSolver();
-  nested_const_array_semantics(solver);
-  solver->reset();
-  nested_const_array_semantics(solver, camada::ConstArrayLowering::Lazy);
-  solver->reset();
-  nested_const_array_survives_pop(solver);
-  solver->reset();
-  nested_const_array_survives_pop(solver, camada::ConstArrayLowering::Lazy);
-}
-
-TEST_CASE("Foreign handle rejection YICES test", "[YICES]") {
-  auto a = camada::createYicesSolver();
-  auto b = camada::createYicesSolver();
-  foreign_handle_rejected(a, b);
 }
