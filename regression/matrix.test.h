@@ -46,12 +46,9 @@ constexpr Exclusion MatrixExclusions[] = {
     {"Yices", "arith",
      "each arith fixture needs a context configured for its logic; the "
      "Arith Yices test runs them on per-logic contexts"},
-    {"MathSAT", "arith",
-     "the arith fixtures run on a QF_UFLIRA environment in the Arith "
-     "MathSAT test (int_bv_conversion on the default one), and "
-     "arith_symbolic_shift is wrong there anyway: pow with a symbolic "
-     "exponent answers UNSAT on a SAT query, still broken in MathSAT "
-     "5.6.19 despite its LA(Z) fixes"},
+    {"MathSAT", "arith/symbolic-shift",
+     "pow with a symbolic exponent answers UNSAT on a SAT query, still "
+     "broken in MathSAT 5.6.19 despite its LA(Z) fixes"},
 };
 
 inline const char *excluded(const char *Backend, const char *Group) {
@@ -138,7 +135,8 @@ inline const char *excluded(const char *Backend, const char *Group) {
       require_abort([&]() { (void)solver->mkRealSort(); });                    \
       return;                                                                  \
     }                                                                          \
-    tests_arith(solver);                                                       \
+    tests_arith(solver, camada_matrix::excluded(                               \
+                            #Backend, "arith/symbolic-shift") == nullptr);     \
   })                                                                           \
   CAMADA_MATRIX_CASE(Backend, "tuple-with-int", {                              \
     auto solver = Factory({});                                                 \

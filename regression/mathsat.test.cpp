@@ -28,30 +28,6 @@ TEST_CASE("Config logic MathSAT test", "[MathSAT]") {
   REQUIRE(mathsat->check() == camada::CheckResult::SAT);
 }
 
-TEST_CASE("Int-BV conversion MathSAT test", "[MathSAT]") {
-  // The arith test's QF_UFLIRA config has no BV theory; the conversions
-  // mix Int and BV, so they run on the default environment.
-  auto mathsat = camada::createMathSATSolver();
-  int_bv_conversion_semantics(mathsat);
-}
-
-TEST_CASE("Arith MathSAT test", "[MathSAT]") {
-  msat_config Config = msat_create_default_config("QF_UFLIRA");
-  msat_set_option(Config, "model_generation", "true");
-  camada::SMTSolverRef mathsat =
-      std::make_unique<camada::MathSATSolver>(Config);
-
-  int_arithmetic_semantics(mathsat);
-  mathsat->reset();
-  real_arithmetic_semantics(mathsat);
-  mathsat->reset();
-  arith_division_semantics(mathsat);
-  mathsat->reset();
-  arith_model_queries(mathsat);
-  mathsat->reset();
-  arith_conversion_semantics(mathsat);
-}
-
 TEST_CASE("Override MathSAT Solver", "[MathSAT]") {
 
   class mySolver : public camada::MathSATSolver {

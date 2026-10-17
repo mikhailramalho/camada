@@ -597,14 +597,18 @@ inline void tests_fxp(const camada::SMTSolverRef &solver) {
 // Int/Real arithmetic, model queries and the Int<->BV bridge. Backends
 // whose contexts must be configured per logic (MathSAT, Yices) are matrix
 // exclusions and run the applicable fixtures from their own Arith cases.
-inline void tests_arith(const camada::SMTSolverRef &solver) {
+inline void tests_arith(const camada::SMTSolverRef &solver,
+                        bool include_symbolic_shift = true) {
   RESETANDTEST(int_arithmetic_semantics);
   RESETANDTEST(real_arithmetic_semantics);
   RESETANDTEST(arith_division_semantics);
   RESETANDTEST(arith_model_queries);
   RESETANDTEST(arith_conversion_semantics);
   RESETANDTEST(int_bv_conversion_semantics);
-  RESETANDTEST(arith_symbolic_shift_semantics);
+  // RESETANDTEST is two statements, so it needs the braces.
+  if (include_symbolic_shift) {
+    RESETANDTEST(arith_symbolic_shift_semantics);
+  }
 }
 
 // Nested array shapes: the depth-5 tuple/array tower and nested constant
