@@ -129,8 +129,10 @@ if __name__ == '__main__':
 
     if is_windows:
         # Use the Visual Studio multi-config generator (default on Windows
-        # runners) and skip the GCC-only file-prefix-map flags.
-        pass
+        # runners) and skip the GCC-only file-prefix-map flags. Link the static
+        # CRT: ESBMC builds with /MT, and MSVC refuses to link a /MD camada.lib
+        # into it (LNK2038).
+        cmake_args.append("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
     else:
         cmake_args.insert(2, "-GNinja")
         # CMAKE_<LANG>_FLAGS, not CMAKE_<LANG>_FLAGS_RELEASE: setting the
