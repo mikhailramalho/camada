@@ -284,6 +284,18 @@ public:
   /// SMT-LIB's bvnego.
   virtual SMTExprRef mkBVNegOverflow(const SMTExprRef &Exp) = 0;
 
+  /// Creates a boolean predicate that is true iff the infinitely-precise
+  /// value LHS * 2^RHS is not representable at the operands' bit-width, with
+  /// LHS read as signed (mkBVSShlOverflow) or unsigned (mkBVUShlOverflow) and
+  /// RHS as an unsigned amount. An amount of at least the width overflows
+  /// unless LHS is zero. This is the mathematical rule: it does not reject a
+  /// negative LHS, which a C front end that treats that as undefined has to
+  /// test itself. SMT-LIB has no such operator, so it is built from bvshl.
+  virtual SMTExprRef mkBVSShlOverflow(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) = 0;
+  virtual SMTExprRef mkBVUShlOverflow(const SMTExprRef &LHS,
+                                      const SMTExprRef &RHS) = 0;
+
   /// Creates a boolean not operation
   virtual SMTExprRef mkNot(const SMTExprRef &Exp) = 0;
 
