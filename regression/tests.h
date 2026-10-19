@@ -426,6 +426,7 @@ inline void tests_core(const camada::SMTSolverRef &solver) {
   RESETANDTEST(check_sat_assuming_semantics);
   RESETANDTEST(narrow_bv_decimal_model_value);
   RESETANDTEST(wide_negative_bv_decimal);
+  RESETANDTEST(bv_shl_overflow_semantics);
   RESETANDTEST(symbol_name_reuse_across_sorts);
   RESETANDTEST(shared_subterm_model_value);
   RESETANDTEST(wide_bv_decimal_model_value);

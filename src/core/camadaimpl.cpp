@@ -1018,6 +1018,16 @@ CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSDivOverflow,
 CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVNegOverflow,
                                    requireBVSort(Exp), mkBVNegOverflowImpl(Exp),
                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSShlOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVShlOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/true),
+                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUShlOverflow,
+                                    requireBVSameSort(LHS, RHS),
+                                    mkBVShlOverflowImpl(LHS, RHS,
+                                                        /*IsSigned=*/false),
+                                    assert(theExp->Sort->isBoolSort()))
 
 SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
@@ -2817,6 +2827,19 @@ SMTExprRef SMTSolverImpl::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
   SMTExprRef Min = mkBVFromBin("1" + std::string(Width - 1, '0'), Width);
   SMTExprRef theExp = mkEqual(Exp, Min);
   return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNegOverflow);
+}
+
+SMTExprRef SMTSolverImpl::mkBVShlOverflowImpl(const SMTExprRef &LHS,
+                                              const SMTExprRef &RHS,
+                                              bool IsSigned) {
+  // LHS * 2^RHS is representable iff shifting the wrapped result back down
+  // recovers LHS (arithmetically for signed, logically for unsigned). An
+  // amount of at least the width makes bvshl give zero, which only matches
+  // LHS == 0, so that case needs no special arm.
+  SMTExprRef Shifted = mkBVShl(LHS, RHS);
+  SMTExprRef Back = IsSigned ? mkBVAshr(Shifted, RHS) : mkBVLshr(Shifted, RHS);
+  SMTExprRef theExp = mkNot(mkEqual(Back, LHS));
+  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVShlOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,

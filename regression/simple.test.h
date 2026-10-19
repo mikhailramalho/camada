@@ -426,6 +426,47 @@ inline void narrow_bv_decimal_model_value(const camada::SMTSolverRef &solver) {
   REQUIRE(bin3.value() == "111");
 }
 
+// Left-shift overflow against the mathematical rule, over every pair at width
+// 4: LHS * 2^RHS must fit the signed or unsigned range, and an amount of at
+// least the width overflows for any non-zero LHS.
+inline void bv_shl_overflow_semantics(const camada::SMTSolverRef &solver) {
+  constexpr unsigned W = 4;
+  auto bv = solver->mkBVSort(W);
+  camada::SMTExprRef All;
+  for (int64_t A = 0; A < (1 << W); ++A) {
+    for (int64_t B = 0; B < (1 << W); ++B) {
+      const int64_t Signed = A >= (1 << (W - 1)) ? A - (1 << W) : A;
+      bool SExpect, UExpect;
+      if (B >= int64_t(W)) {
+        SExpect = UExpect = A != 0;
+      } else {
+        const int64_t S = Signed * (int64_t(1) << B);
+        SExpect = S < -(1 << (W - 1)) || S > (1 << (W - 1)) - 1;
+        UExpect = A * (int64_t(1) << B) > (1 << W) - 1;
+      }
+      auto a = solver->mkBVFromDec(A, bv);
+      auto b = solver->mkBVFromDec(B, bv);
+      auto Both = solver->mkAnd(solver->mkEqual(solver->mkBVSShlOverflow(a, b),
+                                                solver->mkBool(SExpect)),
+                                solver->mkEqual(solver->mkBVUShlOverflow(a, b),
+                                                solver->mkBool(UExpect)));
+      All = All ? solver->mkAnd(All, Both) : Both;
+    }
+  }
+  solver->addConstraint(All);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  // The symbolic form agrees with the definition for every input.
+  solver->reset();
+  auto x = solver->mkSymbol("x", solver->mkBVSort(8));
+  auto n = solver->mkSymbol("n", solver->mkBVSort(8));
+  auto Lhs = solver->mkBVSShlOverflow(x, n);
+  auto Rhs = solver->mkNot(
+      solver->mkEqual(solver->mkBVAshr(solver->mkBVShl(x, n), n), x));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(Lhs, Rhs)));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+}
+
 // One name used with two sorts is two symbols. Backends keep a single sort
 // per name: STP merges same-named symbols, MathSAT and SMT-LIB redeclare and
 // abort, so the common layer has to keep the two apart.

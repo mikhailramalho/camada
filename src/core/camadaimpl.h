@@ -667,6 +667,10 @@ public:
   SMTExprRef mkBVSDivOverflow(const SMTExprRef &LHS,
                               const SMTExprRef &RHS) override final;
   SMTExprRef mkBVNegOverflow(const SMTExprRef &Exp) override final;
+  SMTExprRef mkBVSShlOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
+  SMTExprRef mkBVUShlOverflow(const SMTExprRef &LHS,
+                              const SMTExprRef &RHS) override final;
   SMTExprRef mkNot(const SMTExprRef &Exp) override final;
   SMTExprRef mkEqual(const SMTExprRef &LHS,
                      const SMTExprRef &RHS) override final;
@@ -1170,6 +1174,9 @@ protected:
                                           const SMTExprRef &RHS);
 
   virtual SMTExprRef mkBVNegOverflowImpl(const SMTExprRef &Exp);
+
+  virtual SMTExprRef mkBVShlOverflowImpl(const SMTExprRef &LHS,
+                                         const SMTExprRef &RHS, bool IsSigned);
 
   virtual SMTExprRef mkNotImpl(const SMTExprRef &Exp) = 0;
 
