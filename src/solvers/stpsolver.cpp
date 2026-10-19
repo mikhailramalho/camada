@@ -622,6 +622,7 @@ void STPSolver::resetImpl() {
     STP::vc_Destroy(Context);
   Context = STP::vc_createValidityChecker();
   STP::vc_registerErrorHandler(STPErrorHandler);
+  configureValidityChecker(Context);
 }
 
 void STPSolver::pushImpl(unsigned nscopes) {

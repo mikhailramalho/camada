@@ -77,6 +77,14 @@ protected:
   void initializeContext();
   void destroyContext();
 
+  /// Called by initializeContext() on every new context, after the options
+  /// Camada needs are set and before the Bitwuzla instance exists, which is
+  /// the only point it accepts options. Override it to set more through
+  /// bitwuzla_set_option. A subclass is not constructed yet while the base
+  /// constructor builds the first context, so it has to call reset() from its
+  /// own constructor to have the override applied.
+  virtual void configureOptions(BitwuzlaOptions *) {}
+
   // Arm CheckDeadline from TimeoutMs; both check paths call it before
   // querying the solver.
   void armCheckDeadline();

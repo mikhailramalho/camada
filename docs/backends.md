@@ -69,6 +69,26 @@ outside binary32/binary64.
   any backend: a fresh array symbol whose default-value axiom is instantiated
   at each index the formula observes.
 
+## Backend options
+
+Camada has no option passthrough: options differ per solver, so a consumer that
+needs one subclasses the backend class (`solvers/<name>solver.h`) or hands it a
+native configuration object. Options that must exist before the first
+assertion are applied again whenever `reset()` builds a new context.
+
+| Backend | How to set an option |
+| ------- | -------------------- |
+| Bitwuzla | Override `configureOptions(BitwuzlaOptions *)`; it runs before every context is created. |
+| STP | Override `configureValidityChecker(STP::VC)`; it runs on every checker `reset()` creates. |
+| MathSAT | Construct with a `msat_config`, which is reused across resets. |
+| Z3 | Construct with a `z3::config`, or `setSolver()` from a subclass. |
+| CVC5 | Call `context().setOption(...)` from a subclass constructor. |
+| Yices | `recreateContextWithConfig(logic, fn)`, remembered across resets. |
+
+A subclass is not constructed while its base builds the first context, so the
+Bitwuzla and STP overrides are not called for that one. Call `reset()` from the
+subclass constructor, as `regression/bitwuzla.test.cpp` does.
+
 ## Caveats
 
 Camada tries to hide backend differences where practical, but a few solver

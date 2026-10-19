@@ -75,11 +75,21 @@ public:
 class STPSolver : public SMTSolverImpl {
 public:
   explicit STPSolver(const SolverConfig &Config = {});
+  /// Takes ownership of a caller-built checker. It lasts until the first
+  /// reset(), which replaces it with a fresh one; configure every checker
+  /// through configureValidityChecker() to keep the settings across resets.
   explicit STPSolver(STP::VC C, const SolverConfig &Config = {});
   ~STPSolver() override;
 
 protected:
   STP::VC context() const { return Context; }
+
+  /// Called on every checker reset() creates, so settings made here (for
+  /// example through STP::vc_setFlags) survive a reset. A subclass is not
+  /// constructed yet while the base constructor makes the first checker, so
+  /// it has to call reset() from its own constructor to have the override
+  /// applied.
+  virtual void configureValidityChecker(STP::VC) {}
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 

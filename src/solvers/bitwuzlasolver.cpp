@@ -134,6 +134,7 @@ void BitwuzlaSolver::initializeContext() {
   // construction) and the default context stays fast.
   if (produceUnsatAssumptions())
     bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
+  configureOptions(Options);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
   Context = bitwuzla_new(TermManager, Options);
   bitwuzla_set_termination_callback(Context, bitwuzlaTerminationCallback,
