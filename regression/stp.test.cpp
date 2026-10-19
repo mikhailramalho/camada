@@ -1,5 +1,5 @@
-#include "tests.h"
 #include "matrix.test.h"
+#include "tests.h"
 
 // One test case per shared fixture group; capability gates and
 // exclusions live in matrix.test.h.
@@ -7,6 +7,31 @@ CAMADA_SHARED_MATRIX(STP, camada::createSTPSolver)
 
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/stpsolver.h>
+
+// The hook runs for every checker a reset() creates, so a subclass's settings
+// are not lost on the first reset.
+TEST_CASE("STP checker hook survives reset", "[STP]") {
+  class hookSolver : public camada::STPSolver {
+  public:
+    hookSolver() { reset(); } // the base constructor cannot reach the hook
+
+    unsigned Calls = 0;
+
+  protected:
+    void configureValidityChecker(STP::VC) override { ++Calls; }
+  };
+
+  hookSolver solver;
+  REQUIRE(solver.Calls == 1);
+  solver.reset();
+  solver.reset();
+  REQUIRE(solver.Calls == 3);
+
+  // A checker made through the hook still solves.
+  auto x = solver.mkSymbol("x", solver.mkBVSort(8));
+  solver.addConstraint(solver.mkEqual(x, solver.mkBVFromDec(5, 8)));
+  REQUIRE(solver.check() == camada::CheckResult::SAT);
+}
 
 TEST_CASE("STP feature capabilities", "[STP]") {
   auto solver = camada::createSTPSolver();

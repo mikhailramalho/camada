@@ -1,5 +1,5 @@
-#include "tests.h"
 #include "matrix.test.h"
+#include "tests.h"
 
 // One test case per shared fixture group; capability gates and
 // exclusions live in matrix.test.h.
@@ -62,6 +62,44 @@ TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 
   camada::SMTSolverRef bitwuzla = std::make_unique<myBitwuzlaSolver>();
   tests(bitwuzla);
+}
+
+// A subclass reaches the options before the instance exists, and again for
+// every context a reset() builds.
+TEST_CASE("Bitwuzla options hook survives reset", "[Bitwuzla]") {
+  class optionsSolver : public camada::BitwuzlaSolver {
+  public:
+    explicit optionsSolver(bool Set) : Set(Set) {
+      reset(); // the base constructor cannot reach the hook
+    }
+
+    unsigned Calls = 0;
+    uint64_t preprocess() const {
+      return bitwuzla_get_option(options(), BITWUZLA_OPT_PREPROCESS);
+    }
+
+  protected:
+    void configureOptions(BitwuzlaOptions *Opts) override {
+      ++Calls;
+      if (Set)
+        bitwuzla_set_option(Opts, BITWUZLA_OPT_PREPROCESS, 0);
+    }
+
+  private:
+    bool Set;
+  };
+
+  optionsSolver solver(true);
+  REQUIRE(solver.Calls == 1);
+  REQUIRE(solver.preprocess() == 0);
+
+  solver.reset();
+  REQUIRE(solver.Calls == 2);
+  REQUIRE(solver.preprocess() == 0);
+
+  // Without the override the context keeps Bitwuzla's own setting.
+  optionsSolver untouched(false);
+  REQUIRE(untouched.preprocess() == 1);
 }
 
 TEST_CASE("Bitwuzla feature capabilities", "[Bitwuzla]") {

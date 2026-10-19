@@ -88,3 +88,21 @@ TEST_CASE("CVC5 native constant arrays reject a non-literal initializer",
   REQUIRE(solver->mkArrayConst(idx, tuple, camada::ConstArrayLowering::Native)
               ->getKind() == camada::SMTExprKind::ArrayConst);
 }
+
+// CVC5 takes options through context() after construction, before the first
+// assertion, and reset() only clears assertions, so they persist.
+TEST_CASE("CVC5 options set by a subclass survive reset", "[CVC5]") {
+  class optionSolver : public camada::CVC5Solver {
+  public:
+    optionSolver() { context().setOption("random-seed", "7"); }
+    std::string seed() { return context().getOption("random-seed"); }
+  };
+
+  optionSolver solver;
+  REQUIRE(solver.seed() == "7");
+  solver.reset();
+  REQUIRE(solver.seed() == "7");
+  auto x = solver.mkSymbol("x", solver.mkBVSort(8));
+  solver.addConstraint(solver.mkEqual(x, solver.mkBVFromDec(5, 8)));
+  REQUIRE(solver.check() == camada::CheckResult::SAT);
+}
