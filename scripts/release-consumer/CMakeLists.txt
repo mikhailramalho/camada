@@ -12,6 +12,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# scripts/release.py builds the Windows release against the static MSVC runtime
+# (/MT), the one ESBMC links. A consumer on the default /MD runtime then fails
+# to link with LNK2038, so match it here. Ignored by other generators.
+if(WIN32)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+endif()
+
 find_package(camada CONFIG REQUIRED)
 
 add_executable(release_consumer main.cpp)
