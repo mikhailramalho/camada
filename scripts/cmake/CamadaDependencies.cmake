@@ -45,10 +45,10 @@ set(CAMADA_CATCH2_SHA256
     CACHE STRING "Expected SHA256 of the Catch2 source archive")
 
 set(CAMADA_Z3_GIT_TAG
-    "z3-5.3.1"
+    "z3-5.3.2"
     CACHE STRING "Z3 tag built from source (every platform but Windows)")
 set(CAMADA_Z3_SHA256
-    "c007089dd8d92298d2a7d14105b14e8dddfbb540062ce471c3111e0741edd8da"
+    "df91b87822f5f8b6710af1f2419ba98758cd647dee3a8f0d070f128b47024dbe"
     CACHE STRING "Expected SHA256 of the Z3 source archive")
 # Z3's own build type, not Camada's: a Debug Z3 is dramatically slower, and a
 # Debug Camada is for debugging Camada. Z3's API is plain C (z3++.h is thin
@@ -57,7 +57,7 @@ set(CAMADA_Z3_BUILD_TYPE
     "Release"
     CACHE STRING "CMake build type used when building Z3 from source")
 set(CAMADA_Z3_WINDOWS_X86_64_URL
-    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.1/z3-5.3.1-x64-win.zip"
+    "https://github.com/Z3Prover/z3/releases/download/z3-5.3.2/z3-5.3.2-x64-win.zip"
     CACHE STRING
           "URL used to download the prebuilt Z3 archive for Windows x86_64")
 set(CAMADA_CVC5_GIT_TAG

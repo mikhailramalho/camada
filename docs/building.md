@@ -61,7 +61,7 @@ When CMake downloads dependencies itself:
   Z3 5.3 registers its tactics through static initializers that a normal
   static link drops, and so does not use a shared `libz3` it happens to find.
   `CAMADA_Z3_BUILD_TYPE` (default `Release`) sets the build type of that Z3,
-  independently of Camada's. Windows uses the prebuilt `z3-5.3.1` archive.
+  independently of Camada's. Windows uses the prebuilt `z3-5.3.2` archive.
 - `CVC5` uses a source build from `cvc5-1.4.2`.
 - `CaDiCaL` uses a source build, shared by every backend that needs it:
   Bitwuzla, CVC5 and STP link one copy, because two copies built with
