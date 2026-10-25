@@ -72,6 +72,7 @@ enum class SMTExprKind : std::uint8_t {
   BVMulOverflow,
   BVSDivOverflow,
   BVNegOverflow,
+  BVShlOverflow,
   Not,
   Equal,
   Implies,
