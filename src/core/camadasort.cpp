@@ -38,9 +38,7 @@ void SMTSort::dump(std::string &Out) const {
   switch (Kind) {
   case SMTSortKind::Bool:
     Out = "kind: Bool\n";
-    Out += "width: " + std::to_string(getWidth()) +
-           ", solver: " + std::to_string(getWidthFromSolver()) + "\n";
-    return;
+    break;
   case SMTSortKind::Int:
     Out = "kind: Int\n\n";
     return;
@@ -49,15 +47,11 @@ void SMTSort::dump(std::string &Out) const {
     return;
   case SMTSortKind::BV:
     Out = "kind: Bitvector\n";
-    Out += "width: " + std::to_string(getWidth()) +
-           ", solver: " + std::to_string(getWidthFromSolver()) + "\n";
-    return;
+    break;
   case SMTSortKind::RM:
   case SMTSortKind::BVRM:
     Out = "kind: RoundingMode\n";
-    Out += "width: " + std::to_string(getWidth()) +
-           ", solver: " + std::to_string(getWidthFromSolver()) + "\n";
-    return;
+    break;
   case SMTSortKind::FP:
     Out = "kind: Floating-point\n";
     break;
