@@ -150,6 +150,17 @@ public:
   /// Public because the Camada tuple lowering is a free function.
   std::string lazyIndexModelBits(const SMTExprRef &Exp);
 
+  /// The backend this solver drives, read off a cached expression.
+  /// Public, like unsupportedError, for the Camada tuple lowering.
+  SMTBackendKind backendKind() const {
+    return CachedBoolExprs[0]->getBackendKind();
+  }
+
+  /// An UnsupportedOperation error from \p Backend saying \p Msg.
+  static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
+    return SMTError{SMTErrorCode::UnsupportedOperation, Backend, Msg};
+  }
+
 private:
   /// Memo for lazyIndexModelBits, valid for the lifetime of one model and
   /// cleared with it. Every caller resolves the same index terms repeatedly
@@ -525,16 +536,6 @@ protected:
       S.LastUnknown = SavedUnknown;
     }
   };
-  /// The backend this solver drives, read off a cached expression.
-  SMTBackendKind backendKind() const {
-    return CachedBoolExprs[0]->getBackendKind();
-  }
-
-  /// An UnsupportedOperation error from \p Backend saying \p Msg.
-  static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
-    return SMTError{SMTErrorCode::UnsupportedOperation, Backend, Msg};
-  }
-
   /// The SMTError every model getter returns when no model is available.
   /// Takes the queried expression only to name the backend in the error.
   static SMTError noModelError(const SMTExprRef &Exp) {
