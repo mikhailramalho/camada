@@ -120,7 +120,8 @@ struct SmallTupleSortCacheKey {
 
 // Boost-style hash combine.
 inline void hashCombine(std::size_t &Hash, std::size_t Value) noexcept {
-  Hash ^= Value + 0x9e3779b97f4a7c15ULL + (Hash << 6) + (Hash >> 2);
+  Hash ^= static_cast<std::size_t>(Value + 0x9e3779b97f4a7c15ULL + (Hash << 6) +
+                                   (Hash >> 2));
 }
 
 inline void combineSortHash(std::size_t &Hash, const SMTSort *Sort) {
