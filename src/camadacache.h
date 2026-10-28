@@ -118,23 +118,24 @@ struct SmallTupleSortCacheKey {
   }
 };
 
+// Boost-style hash combine.
+inline void hashCombine(std::size_t &Hash, std::size_t Value) noexcept {
+  Hash ^= Value + 0x9e3779b97f4a7c15ULL + (Hash << 6) + (Hash >> 2);
+}
+
+inline void combineSortHash(std::size_t &Hash, const SMTSort *Sort) {
+  hashCombine(Hash, reinterpret_cast<std::uintptr_t>(Sort));
+}
+
 // Hash for a pair of hashable keys, such as two expression pointers.
 struct PairKeyHash {
   template <class A, class B>
-  std::size_t operator()(const std::pair<A, B> &Key) const {
+  std::size_t operator()(const std::pair<A, B> &Key) const noexcept {
     std::size_t Hash = std::hash<A>{}(Key.first);
-    Hash ^= std::hash<B>{}(Key.second) + 0x9e3779b97f4a7c15ULL + (Hash << 6) +
-            (Hash >> 2);
+    hashCombine(Hash, std::hash<B>{}(Key.second));
     return Hash;
   }
 };
-
-// Boost-style hash combine over a sort pointer.
-inline void combineSortHash(std::size_t &Hash, const SMTSort *Sort) {
-  auto Ptr = reinterpret_cast<std::uintptr_t>(Sort);
-  Hash ^= static_cast<std::size_t>(Ptr + 0x9e3779b97f4a7c15ULL + (Hash << 6) +
-                                   (Hash >> 2));
-}
 
 struct TupleSortCacheKeyHash {
   std::size_t operator()(const TupleSortCacheKey &Key) const {
