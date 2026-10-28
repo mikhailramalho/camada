@@ -22,6 +22,7 @@
 #include "camadaimpl.h"
 #include "../camadaerrors.h"
 #include "../theories/camadatuple.h"
+#include "camadadecimal.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -53,6 +54,34 @@ namespace camada {
     ResultAssert;                                                              \
     return theExp;                                                             \
   }
+// Shapes of the simple binary wrappers that recur across the bit-vector,
+// Boolean and arithmetic operators: the same operand check and the same
+// postcondition, differing only in the operation.
+#define CAMADA_BV_BINARY(Name)                                                 \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBVSameSort(LHS, RHS), Name##Impl(LHS, RHS),     \
+      assert(theExp->Sort == LHS->Sort))
+#define CAMADA_BV_PREDICATE(Name)                                              \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBVSameSort(LHS, RHS), Name##Impl(LHS, RHS),     \
+      assert(theExp->Sort->isBoolSort()))
+#define CAMADA_BV_OVERFLOW(Name, ImplName, IsSigned)                           \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBVSameSort(LHS, RHS),                           \
+      ImplName(LHS, RHS, /*IsSigned=*/IsSigned),                               \
+      assert(theExp->Sort->isBoolSort()))
+#define CAMADA_BOOL_BINARY(Name)                                               \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBoolSameSort(LHS, RHS), Name##Impl(LHS, RHS),   \
+      assert(theExp->isBoolSort()))
+#define CAMADA_ARITH_BINARY(Name)                                              \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireArithSameSort(LHS, RHS), Name##Impl(LHS, RHS),  \
+      assert(theExp->Sort == LHS->Sort))
+#define CAMADA_ARITH_PREDICATE(Name)                                           \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireArithSameSort(LHS, RHS), Name##Impl(LHS, RHS),  \
+      assert(theExp->isBoolSort()))
 #define CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(ReturnType, Name, SortAssert,       \
                                            ImplCall, ResultAssert)             \
   ReturnType SMTSolverImpl::Name(const SMTExprRef &Exp) {                      \
@@ -62,6 +91,11 @@ namespace camada {
     ResultAssert;                                                              \
     return theExp;                                                             \
   }
+// Calls the common layer's own *Impl when UseBV holds, the virtual one
+// otherwise. A macro, not a template: naming the member through a pointer
+// would dispatch virtually and defeat the point.
+#define CAMADA_FP_DISPATCH(UseBV, Impl, ...)                                   \
+  ((UseBV) ? SMTSolverImpl::Impl(__VA_ARGS__) : Impl(__VA_ARGS__))
 // Floating-point operations dispatch on the operand's encoding: a BV-encoded
 // sort must go to the common layer's bit-blast, because the backend override
 // only understands its own native FP sort. Writing that ternary by hand at
@@ -73,7 +107,7 @@ namespace camada {
     requireOwned(Exp);                                                         \
     SortAssert;                                                                \
     SMTExprRef theExp =                                                        \
-        usesBVFPEncoding(Exp) ? SMTSolverImpl::ImplName(Exp) : ImplName(Exp);  \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), ImplName, Exp);              \
     ResultAssert;                                                              \
     return theExp;                                                             \
   }
@@ -85,9 +119,8 @@ namespace camada {
     requireOwned(LHS);                                                         \
     requireOwned(RHS);                                                         \
     requireFPSameSort(LHS, RHS);                                               \
-    SMTExprRef theExp = usesBVFPEncoding(LHS)                                  \
-                            ? SMTSolverImpl::ImplName(LHS, RHS)                \
-                            : ImplName(LHS, RHS);                              \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(LHS), ImplName, LHS, RHS);         \
     assert(theExp->isBoolSort());                                              \
     return theExp;                                                             \
   }
@@ -106,9 +139,8 @@ namespace camada {
     fatalErrorIf(                                                              \
         usesBVFPEncoding(To) != usesBVRMEncoding(R),                           \
         "Floating-point target and rounding mode use different encodings");    \
-    SMTExprRef theExp = usesBVFPEncoding(To)                                   \
-                            ? SMTSolverImpl::ImplName(From, To, R)             \
-                            : ImplName(From, To, R);                           \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(To), ImplName, From, To, R);       \
     assert(theExp->Sort == To);                                                \
     return theExp;                                                             \
   }
@@ -120,7 +152,7 @@ namespace camada {
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &LHS,                        \
                                  const SMTExprRef &RHS) {                      \
     SMTExprRef theExp = Composition;                                           \
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Kind);           \
+    return rewrapAs(theExp, SMTExprKind::Kind);                                \
   }
 // Default *Impl for a feature a backend does not implement: abort with the
 // theory's name. Variadic so one macro covers every parameter shape, and the
@@ -150,9 +182,8 @@ namespace camada {
     requireOwned(RHS);                                                         \
     requireOwned(R);                                                           \
     requireFPSameSortAndRM(LHS, RHS, R);                                       \
-    SMTExprRef theExp = usesBVFPEncoding(LHS)                                  \
-                            ? SMTSolverImpl::ImplName(LHS, RHS, R)             \
-                            : ImplName(LHS, RHS, R);                           \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(LHS), ImplName, LHS, RHS, R);      \
     assert(theExp->Sort == LHS->Sort);                                         \
     return theExp;                                                             \
   }
@@ -163,9 +194,8 @@ namespace camada {
     requireOwned(From);                                                        \
     requireFPSort(From);                                                       \
     fatalErrorIf(ToWidth == 0, "Bit-vector target width must be non-zero");    \
-    SMTExprRef theExp = usesBVFPEncoding(From)                                 \
-                            ? SMTSolverImpl::ImplName(From, ToWidth)           \
-                            : ImplName(From, ToWidth);                         \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(From), ImplName, From, ToWidth);   \
     assert(theExp->getWidth() == ToWidth);                                     \
     return theExp;                                                             \
   }
@@ -223,9 +253,8 @@ namespace camada {
     fatalErrorIf(SigWidth == 0,                                                \
                  "Floating-point significand width must be non-zero");         \
     SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);              \
-    SMTExprRef theExp = usesBVFPEncoding(Sort)                                 \
-                            ? SMTSolverImpl::ImplName(Sgn, ExpWidth, SigWidth) \
-                            : ImplName(Sgn, ExpWidth, SigWidth);               \
+    SMTExprRef theExp = CAMADA_FP_DISPATCH(usesBVFPEncoding(Sort), ImplName,   \
+                                           Sgn, ExpWidth, SigWidth);           \
     assert(theExp->isFPSort());                                                \
     assert(theExp->getWidth() == (ExpWidth + SigWidth));                       \
     assert(theExp->getWidth() == theExp->Sort->getWidthFromSolver());          \
@@ -249,23 +278,9 @@ SMTHandleState *makeProcessLifetimeHandleState() {
 namespace {
 
 std::string power2Dec(unsigned int N) {
-  std::vector<unsigned char> Digits{1};
-  for (unsigned int I = 0; I < N; ++I) {
-    int Carry = 0;
-    for (auto &Digit : Digits) {
-      int Value = Digit * 2 + Carry;
-      Digit = static_cast<unsigned char>(Value % 10);
-      Carry = Value / 10;
-    }
-    while (Carry != 0) {
-      Digits.push_back(static_cast<unsigned char>(Carry % 10));
-      Carry /= 10;
-    }
-  }
-  std::string Result;
-  Result.reserve(Digits.size());
-  for (auto It = Digits.rbegin(); It != Digits.rend(); ++It)
-    Result.push_back(static_cast<char>('0' + *It));
+  std::string Result = "1";
+  for (unsigned int I = 0; I < N; ++I)
+    mulDecimal(Result, 2);
   return Result;
 }
 
@@ -304,12 +319,8 @@ static bool usesBVFPEncoding(const SMTExprRef &Exp) {
   return usesBVFPEncoding(Exp->Sort);
 }
 
-static bool usesBVRMEncoding(const SMTSortRef &Sort) {
-  return Sort->isBVRMSort();
-}
-
 static bool usesBVRMEncoding(const SMTExprRef &Exp) {
-  return usesBVRMEncoding(Exp->Sort);
+  return Exp->Sort->isBVRMSort();
 }
 
 // The operation name comes from the caller via __builtin_FUNCTION(), so a
@@ -441,6 +452,27 @@ static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
   requireMatchingFPAndRMEncoding(LHS, RM, Op);
 }
 
+static void requireArraySort(const SMTExprRef &Exp,
+                             const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isArraySort())
+    reportWrongSort(Exp->Sort, "an array", Op);
+}
+
+static void requireSortOf(const SMTSortRef &Expected, const SMTExprRef &Exp,
+                          const char *What,
+                          const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (Exp->Sort != Expected)
+    fatalError((std::string(Op) + ": " + What + " has sort " +
+                Exp->Sort->describe() + ", expected " + Expected->describe())
+                   .c_str());
+}
+
+static void requireArrayIndex(const SMTExprRef &Array, const SMTExprRef &Index,
+                              const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireArraySort(Array, Op);
+  requireSortOf(Array->Sort->getIndexSort(), Index, "array index", Op);
+}
+
 } // namespace
 
 SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
@@ -544,7 +576,6 @@ void SMTSolverImpl::clearExprCaches() {
   AckBVConstBits.clear();
   IEEEBVShadow.clear();
   PendingShadowLinks.clear();
-  ShadowScopeLevels.assign(1, {});
   IEEEBVFnCache.clear();
   IEEEBVAppCache.clear();
   invalidateUnsatAssumptions();
@@ -567,16 +598,9 @@ void SMTSolverImpl::initializeCommonSingletons() {
   CachedBVOneExprs[1] = One1;
   CachedBVNegOneExprs.resize(2);
   CachedBVNegOneExprs[1] = One1;
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_EVEN);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_AWAY);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_PLUS_INF);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_MINUS_INF);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
+  for (RM R : {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
+               RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
+    CachedRMBVExprs[static_cast<std::size_t>(R)] = SMTSolverImpl::mkRMImpl(R);
 }
 
 CAMADA_DEFINE_CACHED_SORT(mkBoolSort, CachedBoolSort, isBoolSort, true, "")
@@ -653,9 +677,8 @@ SMTSortRef SMTSolverImpl::mkFPSort(const unsigned ExpWidth,
   if (It != Cache.end())
     return It->second;
 
-  SMTSortRef theSort = Encoding == FPEncoding::BV
-                           ? SMTSolverImpl::mkFPSortImpl(ExpWidth, SigWidth)
-                           : mkFPSortImpl(ExpWidth, SigWidth);
+  SMTSortRef theSort = CAMADA_FP_DISPATCH(Encoding == FPEncoding::BV,
+                                          mkFPSortImpl, ExpWidth, SigWidth);
   assert(theSort->isFPSort());
   assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
   assert(theSort->getWidth() == theSort->getWidthFromSolver());
@@ -671,6 +694,10 @@ SMTSortRef SMTSolverImpl::mkFP64Sort(FPEncoding Encoding) {
   return mkFPSort(11, 52, Encoding);
 }
 
+bool SMTSolverImpl::lowersTuples(const SMTSortRef &Sort) const {
+  return !nativeTupleSupport() && sortContainsTuple(Sort);
+}
+
 SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
   requireOwned(IndexSort);
@@ -680,7 +707,7 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
   // no backend sort handle) through mkArraySortImpl, where the backend
   // would static_cast it as one of its own sorts. Reject up front. The
   // per-field array decomposition is tracked in issue #17.
-  fatalErrorIf(sortContainsTuple(IndexSort) && !nativeTupleSupport(),
+  fatalErrorIf(lowersTuples(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
   ArraySortCacheKey Key{IndexSort.get(), ElemSort.get()};
@@ -691,7 +718,7 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
   // Element sorts involving tuples have no backend representation on
   // backends without native datatype support: the array decomposes into
   // a bundle of per-leaf-field backend arrays (see camadatuple.cpp).
-  if (!nativeTupleSupport() && sortContainsTuple(ElemSort)) {
+  if (lowersTuples(ElemSort)) {
     SMTSortRef theSort = mkCamadaTupleArraySort(*this, IndexSort, ElemSort);
     assert(theSort->isArraySort());
     ArraySortCache.emplace(Key, theSort);
@@ -728,16 +755,14 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
   // Tuple-typed function components on backends without native datatype
   // support would static_cast a CamadaTupleSort as a backend sort.
   // Reject up front; structural lowering is part of the issue #17 work.
-  if (!nativeTupleSupport()) {
-    fatalErrorIf(sortContainsTuple(CodomainSort),
-                 "Functions returning tuples (or tuple-involving arrays) "
-                 "are not yet supported on this backend; see issue #17");
-    for (const auto &D : DomainSorts)
-      fatalErrorIf(sortContainsTuple(D),
-                   "Functions taking tuple (or tuple-involving array) "
-                   "arguments are not yet supported on this backend; see "
-                   "issue #17");
-  }
+  fatalErrorIf(lowersTuples(CodomainSort),
+               "Functions returning tuples (or tuple-involving arrays) "
+               "are not yet supported on this backend; see issue #17");
+  for (const auto &D : DomainSorts)
+    fatalErrorIf(lowersTuples(D),
+                 "Functions taking tuple (or tuple-involving array) "
+                 "arguments are not yet supported on this backend; see "
+                 "issue #17");
   // Ackermann-mode arrays have no backend term to pass to or return from
   // an uninterpreted function.
   if (arrayMode() == ArrayEncoding::Ackermann) {
@@ -749,6 +774,14 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
                    "Functions taking array arguments are not supported "
                    "with the Ackermann array encoding");
   }
+  auto Construct = [&]() {
+    SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
+    assert(theSort->isFunctionSort());
+    assert(theSort->getDomainSorts() == DomainSorts);
+    assert(theSort->getCodomainSort() == CodomainSort);
+    return theSort;
+  };
+
   if (DomainSorts.size() <= 4) {
     SmallFunctionSortCacheKey SmallKey{};
     SmallKey.CodomainSort = CodomainSort.get();
@@ -760,10 +793,7 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
     if (It != SmallFunctionSortCache.end())
       return It->second;
 
-    SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
-    assert(theSort->isFunctionSort());
-    assert(theSort->getDomainSorts() == DomainSorts);
-    assert(theSort->getCodomainSort() == CodomainSort);
+    SMTSortRef theSort = Construct();
     SmallFunctionSortCache.emplace(SmallKey, theSort);
     return theSort;
   }
@@ -777,10 +807,7 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
   if (It != FunctionSortCache.end())
     return It->second;
 
-  SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
-  assert(theSort->isFunctionSort());
-  assert(theSort->getDomainSorts() == DomainSorts);
-  assert(theSort->getCodomainSort() == CodomainSort);
+  SMTSortRef theSort = Construct();
   FunctionSortCache.emplace(std::move(Key), theSort);
   return theSort;
 }
@@ -793,8 +820,12 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
   // datatype support; the caches still serve identity for these (the
   // CamadaTupleSort sits in the same SortArena as backend sorts).
   auto Construct = [this, &ElementSorts]() {
-    return nativeTupleSupport() ? mkTupleSortImpl(ElementSorts)
-                                : mkCamadaTupleSort(*this, ElementSorts);
+    SMTSortRef theSort = nativeTupleSupport()
+                             ? mkTupleSortImpl(ElementSorts)
+                             : mkCamadaTupleSort(*this, ElementSorts);
+    assert(theSort->isTupleSort());
+    assert(theSort->getTupleElementSorts() == ElementSorts);
+    return theSort;
   };
 
   if (ElementSorts.size() <= 4) {
@@ -808,8 +839,6 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
       return It->second;
 
     SMTSortRef theSort = Construct();
-    assert(theSort->isTupleSort());
-    assert(theSort->getTupleElementSorts() == ElementSorts);
     SmallTupleSortCache.emplace(SmallKey, theSort);
     return theSort;
   }
@@ -823,8 +852,6 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
     return It->second;
 
   SMTSortRef theSort = Construct();
-  assert(theSort->isTupleSort());
-  assert(theSort->getTupleElementSorts() == ElementSorts);
   TupleSortCache.emplace(std::move(Key), theSort);
   return theSort;
 }
@@ -860,12 +887,7 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // reports UNSAT on satisfiable formulas. At scope 0 no pop can retract
   // the tie, so the rewrite stays sound; deeper scopes fall back to the
   // underspecified backend operation, which is always correct.
-  //
-  // Because only scope 0 commits, ShadowScopeLevels never holds more than
-  // the root entry and pop()'s retraction loop is unreachable today. Both
-  // are kept deliberately: they are what makes relaxing this gate safe, and
-  // the journal is the only record of which shadows a scope established.
-  if (ShadowScopeLevels.size() != 1)
+  if (LazyConstraintLevels.size() != 1)
     return;
   // Consume the entry only now that it commits. Erasing before this gate
   // would drop a link asserted inside a scope, so a later assert of the
@@ -874,160 +896,52 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // backend operation. The entry cannot outlive its key: the map is
   // cleared in clearExprCaches(), which runs before ExprArena.clear().
   PendingShadowLinks.erase(It);
-  // Keep the first entry on collision; only journal what was inserted.
-  if (IEEEBVShadow.emplace(Link.Target, Link.Bits).second)
-    ShadowScopeLevels.back().push_back(Link.Target);
+  // Keep the first entry on collision.
+  IEEEBVShadow.emplace(Link.Target, Link.Bits);
 }
 
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAddImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSub,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSubImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVMul,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVMulImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSRem,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSRemImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVURem,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVURemImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSDiv,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSDivImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUDiv,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUDivImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVShl,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVShlImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAshr,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAshrImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVLshr,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVLshrImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVXor,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVXorImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVOr,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVOrImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAnd,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAndImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVXnor,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVXnorImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVNor,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVNorImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVNand,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVNandImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUlt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUltImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSlt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSltImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUgt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUgtImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSgt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSgtImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUle,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUleImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSle,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSleImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUge,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUgeImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSge,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSgeImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_BV_BINARY(mkBVAdd)
+CAMADA_BV_BINARY(mkBVSub)
+CAMADA_BV_BINARY(mkBVMul)
+CAMADA_BV_BINARY(mkBVSRem)
+CAMADA_BV_BINARY(mkBVURem)
+CAMADA_BV_BINARY(mkBVSDiv)
+CAMADA_BV_BINARY(mkBVUDiv)
+CAMADA_BV_BINARY(mkBVShl)
+CAMADA_BV_BINARY(mkBVAshr)
+CAMADA_BV_BINARY(mkBVLshr)
+CAMADA_BV_BINARY(mkBVXor)
+CAMADA_BV_BINARY(mkBVOr)
+CAMADA_BV_BINARY(mkBVAnd)
+CAMADA_BV_BINARY(mkBVXnor)
+CAMADA_BV_BINARY(mkBVNor)
+CAMADA_BV_BINARY(mkBVNand)
+CAMADA_BV_PREDICATE(mkBVUlt)
+CAMADA_BV_PREDICATE(mkBVSlt)
+CAMADA_BV_PREDICATE(mkBVUgt)
+CAMADA_BV_PREDICATE(mkBVSgt)
+CAMADA_BV_PREDICATE(mkBVUle)
+CAMADA_BV_PREDICATE(mkBVSle)
+CAMADA_BV_PREDICATE(mkBVUge)
+CAMADA_BV_PREDICATE(mkBVSge)
 
 // The public surface follows the mkBVS*/mkBVU* naming convention of the
 // other signed/unsigned BV pairs; the protected *Impl hooks keep a single
 // IsSigned-parameterized entry point per operation, since every backend
 // implements both signednesses in one place.
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSAddOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAddOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUAddOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAddOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSSubOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSubOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUSubOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSubOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSMulOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVMulOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUMulOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVMulOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSDivOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSDivOverflowImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_BV_OVERFLOW(mkBVSAddOverflow, mkBVAddOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUAddOverflow, mkBVAddOverflowImpl, false)
+CAMADA_BV_OVERFLOW(mkBVSSubOverflow, mkBVSubOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUSubOverflow, mkBVSubOverflowImpl, false)
+CAMADA_BV_OVERFLOW(mkBVSMulOverflow, mkBVMulOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUMulOverflow, mkBVMulOverflowImpl, false)
+CAMADA_BV_PREDICATE(mkBVSDivOverflow)
 
 CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVNegOverflow,
                                    requireBVSort(Exp), mkBVNegOverflowImpl(Exp),
                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSShlOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVShlOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUShlOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVShlOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_BV_OVERFLOW(mkBVSShlOverflow, mkBVShlOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUShlOverflow, mkBVShlOverflowImpl, false)
 
 SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
@@ -1043,7 +957,7 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // Decomposed tuple arrays compare as the conjunction of their leaf
     // equalities; each leaf re-enters this wrapper and engages the
     // normal array-equality machinery (lazy witness, STP encoding).
-    if (!nativeTupleSupport() && sortContainsTuple(LHS->Sort->getElementSort()))
+    if (lowersTuples(LHS->Sort))
       return mkCamadaTupleArrayEqual(*this, LHS, RHS);
     // Ackermann-mode arrays have no backend term to hand to mkEqualImpl;
     // equality is always the witness + observed-index congruence
@@ -1100,58 +1014,22 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   }
   return theExp;
 }
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkImplies,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkImpliesImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkAnd,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkAndImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkOr,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkOrImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkXor,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkXorImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithAdd,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithAddImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithSub,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithSubImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithMul,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithMulImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithDiv,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithDivImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
+CAMADA_BOOL_BINARY(mkImplies)
+CAMADA_BOOL_BINARY(mkAnd)
+CAMADA_BOOL_BINARY(mkOr)
+CAMADA_BOOL_BINARY(mkXor)
+CAMADA_ARITH_BINARY(mkArithAdd)
+CAMADA_ARITH_BINARY(mkArithSub)
+CAMADA_ARITH_BINARY(mkArithMul)
+CAMADA_ARITH_BINARY(mkArithDiv)
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithMod,
                                     requireIntSameSort(LHS, RHS),
                                     mkArithModImpl(LHS, RHS),
                                     assert(theExp->isIntSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithLt,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithLtImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithGt,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithGtImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithLe,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithLeImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithGe,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithGeImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
+CAMADA_ARITH_PREDICATE(mkArithLt)
+CAMADA_ARITH_PREDICATE(mkArithGt)
+CAMADA_ARITH_PREDICATE(mkArithLe)
+CAMADA_ARITH_PREDICATE(mkArithGe)
 
 CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVXnorImpl,
                                   mkBVNotImpl(mkBVXorImpl(LHS, RHS)), BVXnor)
@@ -1248,8 +1126,7 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
     return mkCamadaTupleIte(*this, Cond, T, F);
   // Decomposed tuple arrays ite leaf-wise; the per-leaf ites re-enter
   // this wrapper, so the lazy-root union tracking below applies per leaf.
-  if (!nativeTupleSupport() && T->Sort->isArraySort() &&
-      sortContainsTuple(T->Sort->getElementSort()))
+  if (lowersTuples(T->Sort))
     return mkCamadaTupleArrayIte(*this, Cond, T, F);
   if (arrayMode() == ArrayEncoding::Ackermann && T->Sort->isArraySort())
     return mkAckArrayIte(Cond, T, F);
@@ -1316,9 +1193,8 @@ SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
                                   FPNegBehavior Behavior) {
   requireOwned(Exp);
   requireFPSort(Exp);
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkFPNegImpl(Exp, Behavior)
-                          : mkFPNegImpl(Exp, Behavior);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), mkFPNegImpl, Exp, Behavior);
   assert(theExp->Sort == Exp->Sort);
   return theExp;
 }
@@ -1347,9 +1223,8 @@ SMTExprRef SMTSolverImpl::mkFPRem(const SMTExprRef &LHS,
   requireOwned(LHS);
   requireOwned(RHS);
   requireFPSameSort(LHS, RHS);
-  SMTExprRef theExp = usesBVFPEncoding(LHS)
-                          ? SMTSolverImpl::mkFPRemImpl(LHS, RHS)
-                          : mkFPRemImpl(LHS, RHS);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(LHS), mkFPRemImpl, LHS, RHS);
   assert(theExp->Sort == LHS->Sort);
   return theExp;
 }
@@ -1363,9 +1238,8 @@ SMTExprRef SMTSolverImpl::mkFPSqrt(const SMTExprRef &Exp, const SMTExprRef &R) {
   requireOwned(R);
   requireFPSort(Exp);
   requireMatchingFPAndRMEncoding(Exp, R);
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkFPSqrtImpl(Exp, R)
-                          : mkFPSqrtImpl(Exp, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), mkFPSqrtImpl, Exp, R);
   assert(theExp->Sort == Exp->Sort);
   return theExp;
 }
@@ -1378,9 +1252,8 @@ SMTExprRef SMTSolverImpl::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
   requireOwned(R);
   requireFPSameSortAndRM(X, Y, R);
   requireSameSort(Y, Z, "floating-point");
-  SMTExprRef theExp = usesBVFPEncoding(X)
-                          ? SMTSolverImpl::mkFPFMAImpl(X, Y, Z, R)
-                          : mkFPFMAImpl(X, Y, Z, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(X), mkFPFMAImpl, X, Y, Z, R);
   assert(theExp->Sort == Z->Sort);
   return theExp;
 }
@@ -1398,9 +1271,8 @@ SMTExprRef SMTSolverImpl::mkFPToFP(const SMTExprRef &From, const SMTSortRef &To,
   fatalErrorIf(
       usesBVFPEncoding(To) != usesBVRMEncoding(R),
       "Floating-point target and rounding mode use different encodings");
-  SMTExprRef theExp = usesBVFPEncoding(To)
-                          ? SMTSolverImpl::mkFPToFPImpl(From, To, R)
-                          : mkFPToFPImpl(From, To, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(To), mkFPToFPImpl, From, To, R);
   assert(theExp->Sort == To);
   return theExp;
 }
@@ -1419,9 +1291,8 @@ SMTExprRef SMTSolverImpl::mkFPToIntegral(const SMTExprRef &From,
   requireOwned(R);
   requireFPSort(From);
   requireMatchingFPAndRMEncoding(From, R);
-  SMTExprRef theExp = usesBVFPEncoding(From)
-                          ? SMTSolverImpl::mkFPToIntegralImpl(From, R)
-                          : mkFPToIntegralImpl(From, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(From), mkFPToIntegralImpl, From, R);
   assert(theExp->isFPSort());
   return theExp;
 }
@@ -1430,13 +1301,11 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
                                         const SMTExprRef &Index) {
   requireOwned(Array);
   requireOwned(Index);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
-               "Expected array index with matching sort");
+  requireArrayIndex(Array, Index);
   // Decomposed tuple arrays select leaf-wise; the per-leaf selects below
   // re-enter this wrapper, so observation/lazy instantiation happens per
   // leaf.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return mkCamadaTupleArraySelect(*this, Array, Index);
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
@@ -1459,14 +1328,11 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
   requireOwned(Array);
   requireOwned(Index);
   requireOwned(Element);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
-               "Expected array index with matching sort");
-  fatalErrorIf(Array->Sort->getElementSort() != Element->Sort,
-               "Expected array element with matching sort");
+  requireArrayIndex(Array, Index);
+  requireSortOf(Array->Sort->getElementSort(), Element, "array element");
   // Decomposed tuple arrays store leaf-wise; the per-leaf stores re-enter
   // this wrapper, so the lazy guards/tracking below apply per leaf.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return mkCamadaTupleArrayStore(*this, Array, Index, Element);
   // A store index is an index the formula constrains, exactly like a select
   // index: without observing it, encoded array equality never instantiates
@@ -1524,7 +1390,7 @@ SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
   SMTSortRef ArraySort = mkArraySort(IndexSort, InitValue->Sort);
   SMTExprRef Root = mkSymbolUnchecked(
       "__CAMADA_lazyarr" + std::to_string(LazyConstArrayCounter++), ArraySort);
-  Root = rewrapExprImpl(*Root, Root->Sort, SMTExprKind::ArrayConst);
+  Root = rewrapAs(Root, SMTExprKind::ArrayConst);
   LazyConstArrayRoots.emplace(&*Root, LazyConstArrayRoot{Root, InitValue});
   const SMTSort *IndexSortKey = &*IndexSort;
   LazyRootsByIndexSort[IndexSortKey].push_back(&*Root);
@@ -1601,7 +1467,7 @@ std::string SMTSolverImpl::lazyIndexModelBitsUncached(const SMTExprRef &Exp) {
 
 void SMTSolverImpl::observeArrayIndex(const SMTExprRef &Index) {
   const SMTSort *SortKey = &*Index->Sort;
-  if (!ObservedIndexSeen.insert({SortKey, &*Index}).second)
+  if (!ObservedIndexSeen.insert(&*Index).second)
     return;
   ObservedIndexesBySort[SortKey].push_back(Index);
   // Copies throughout: instantiation builds selects that re-enter this
@@ -1627,7 +1493,7 @@ SMTExprRef SMTSolverImpl::mkEncodedArrayEqual(const SMTExprRef &LHS,
       "__CAMADA_arreq" + std::to_string(ArrayEqualCounter++), mkBoolSort());
   // Present the lowering as an Equal node, like the other common-layer
   // lowerings do.
-  EqVar = rewrapExprImpl(*EqVar, EqVar->Sort, SMTExprKind::Equal);
+  EqVar = rewrapAs(EqVar, SMTExprKind::Equal);
   ArrayEqualLinks.push_back(ArrayEqualLink{EqVar, LHS, RHS});
   const SMTSort *IndexSortKey = &*LHS->Sort->getIndexSort();
   ArrayEqualLinksByIndexSort[IndexSortKey].push_back(LinkId);
@@ -1671,6 +1537,38 @@ void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 
+SMTResult<SMTExprRef> SMTSolverImpl::walkLazyChain(
+    const SMTExpr *Cur,
+    const std::function<SMTExprRef(const LazyArrayStoreStep &,
+                                   const std::string &)> &Visit) {
+  while (true) {
+    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
+      const std::string StepBits = lazyIndexModelBits(It->second.Index);
+      if (StepBits.empty())
+        return SMTError{SMTErrorCode::BackendError, backendKind(),
+                        "Could not evaluate a store index while walking a "
+                        "lazily lowered array model"};
+      if (SMTExprRef Found = Visit(It->second, StepBits))
+        return Found;
+      Cur = It->second.Parent;
+      continue;
+    }
+    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
+      SMTResult<bool> Cond = getBool(It->second.Cond);
+      if (!Cond)
+        return Cond.error();
+      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
+      continue;
+    }
+    if (auto It = LazyConstArrayRoots.find(Cur);
+        It != LazyConstArrayRoots.end())
+      return It->second.Init;
+    return SMTError{SMTErrorCode::BackendError, backendKind(),
+                    "Untracked derivation while walking a lazily lowered "
+                    "array model"};
+  }
+}
+
 SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
                                                   const SMTExprRef &Index) {
   // Post-check model query: the solver's model is unconstrained at indexes
@@ -1681,29 +1579,11 @@ SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
   if (QueryBits.empty())
     return {};
 
-  const SMTExpr *Cur = &*Array;
-  while (true) {
-    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
-      const std::string StepBits = lazyIndexModelBits(It->second.Index);
-      if (StepBits.empty())
-        return {};
-      if (StepBits == QueryBits)
-        return It->second.Value;
-      Cur = It->second.Parent;
-      continue;
-    }
-    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
-      SMTResult<bool> Cond = getBool(It->second.Cond);
-      if (!Cond)
-        return {};
-      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
-      continue;
-    }
-    if (auto It = LazyConstArrayRoots.find(Cur);
-        It != LazyConstArrayRoots.end())
-      return It->second.Init;
-    return {};
-  }
+  auto Value = walkLazyChain(
+      &*Array, [&](const LazyArrayStoreStep &Step, const std::string &Bits) {
+        return Bits == QueryBits ? Step.Value : SMTExprRef();
+      });
+  return Value ? Value.value() : SMTExprRef();
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
@@ -1813,12 +1693,11 @@ void SMTSolverImpl::requireQuantifierOperands(
   // Encoded tuple variables would reach the backend's mkForallImpl as a
   // CamadaTupleExpr without a backend term, which the backend would
   // then static_cast as one of its own expressions. Reject up front.
-  if (!nativeTupleSupport())
-    for (const auto &V : Vars)
-      fatalErrorIf(sortContainsTuple(V->Sort),
-                   "Quantifiers over tuple-typed (or tuple-involving-array) "
-                   "variables are not yet supported on this backend; see "
-                   "issue #17");
+  for (const auto &V : Vars)
+    fatalErrorIf(lowersTuples(V->Sort),
+                 "Quantifiers over tuple-typed (or tuple-involving-array) "
+                 "variables are not yet supported on this backend; see "
+                 "issue #17");
 }
 
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
@@ -1885,8 +1764,8 @@ SMTSolverImpl::getRational(const SMTExprRef &Exp) {
 
 SMTResult<std::pair<std::string, std::string>>
 SMTSolverImpl::getRationalImpl(const SMTExprRef &Exp) {
-  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
-                  "Real arithmetic is not supported by this backend"};
+  return unsupportedError(Exp->getBackendKind(),
+                          "Real arithmetic is not supported by this backend");
 }
 
 SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
@@ -1909,9 +1788,8 @@ SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   requireFPSort(Exp);
   if (!ModelAvailable)
     return noModelError(Exp);
-  SMTResult<std::string> result = usesBVFPEncoding(Exp)
-                                      ? SMTSolverImpl::getFPInBinImpl(Exp)
-                                      : getFPInBinImpl(Exp);
+  SMTResult<std::string> result =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), getFPInBinImpl, Exp);
   if (!result)
     return result.error();
   return addLeadingZeroes(result.value(), Exp->getWidth());
@@ -1925,14 +1803,12 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
                                                      const SMTExprRef &Index) {
   requireOwned(Array);
   requireOwned(Index);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
-               "Expected array index with matching sort");
+  requireArrayIndex(Array, Index);
   if (!ModelAvailable)
     return noModelError(Array);
   // Decomposed tuple arrays read each leaf at Index and reassemble the
   // per-leaf values into a tuple; the per-leaf reads re-enter this wrapper.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return getCamadaTupleArrayElement(*this, Array, Index);
   // Ackermann-mode arrays have no backend term to evaluate; resolve from
   // the tracked derivation chain and the reads of the equality class.
@@ -1963,12 +1839,12 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   requireOwned(Array);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  requireArraySort(Array);
   if (!ModelAvailable)
     return noModelError(Array);
   // Decomposed tuple arrays zip the per-leaf sparse models into one
   // tuple-valued model; the per-leaf queries re-enter this wrapper.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return getCamadaTupleArrayValues(*this, Array);
   if (arrayMode() == ArrayEncoding::Ackermann) {
     // Same limitation getArrayElement screens: the walk compares indexes by
@@ -1992,37 +1868,18 @@ SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
   // reached root's initializer becomes the default.
   ArrayModel Model;
   std::set<std::string> SeenIndexBits;
-  const SMTExpr *Cur = &*Array;
-  while (true) {
-    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
-      const std::string StepBits = lazyIndexModelBits(It->second.Index);
-      if (StepBits.empty())
-        return SMTError{SMTErrorCode::BackendError,
-                        CachedBoolExprs[0]->getBackendKind(),
-                        "Could not evaluate a store index while walking a "
-                        "lazily lowered array model"};
-      if (SeenIndexBits.insert(StepBits).second)
-        Model.Entries.emplace_back(It->second.Index, It->second.Value);
-      Cur = It->second.Parent;
-      continue;
-    }
-    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
-      SMTResult<bool> Cond = getBool(It->second.Cond);
-      if (!Cond)
-        return Cond.error();
-      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
-      continue;
-    }
-    if (auto It = LazyConstArrayRoots.find(Cur);
-        It != LazyConstArrayRoots.end()) {
-      Model.Base = It->second.Init;
-      return Model;
-    }
-    return SMTError{SMTErrorCode::BackendError,
-                    CachedBoolExprs[0]->getBackendKind(),
-                    "Untracked derivation while walking a lazily lowered "
-                    "array model"};
-  }
+  auto Init =
+      walkLazyChain(&*Array,
+                    [&](const LazyArrayStoreStep &Step,
+                        const std::string &Bits) -> SMTExprRef {
+                      if (SeenIndexBits.insert(Bits).second)
+                        Model.Entries.emplace_back(Step.Index, Step.Value);
+                      return {};
+                    });
+  if (!Init)
+    return Init.error();
+  Model.Base = Init.value();
+  return Model;
 }
 
 SMTResult<SMTExprRef>
@@ -2081,9 +1938,8 @@ SMTSolverImpl::getArrayElementByModelValue(const SMTExprRef &Array,
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValuesImpl(const SMTExprRef &) {
-  return SMTError{SMTErrorCode::UnsupportedOperation,
-                  CachedBoolExprs[0]->getBackendKind(),
-                  "Array model extraction is not supported by this backend"};
+  return unsupportedError(
+      backendKind(), "Array model extraction is not supported by this backend");
 }
 
 SMTExprKind SMTSolverImpl::valueKindForSort(const SMTSortRef &Sort) {
@@ -2132,31 +1988,24 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector decimal literal sort must be bit-vector");
-  const bool IsBV = Sort->getSortKind() == SMTSortKind::BV;
-  if (IsBV) {
-    const unsigned Width = Sort->getWidth();
-    if (Int >= -1 && Int <= 1) {
-      auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
-      if (Cache.size() <= Width)
-        Cache.resize(Width + 1);
-
-      SMTExprRef &CachedExpr = Cache[Width];
-      if (CachedExpr)
-        return CachedExpr;
-
-      SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
-      assert(theExp->isBVSort());
-      assert(theExp->getWidth() == Width);
-      noteAckBVConstBits(theExp, Int);
-      CachedExpr = theExp;
-      return CachedExpr;
-    }
+  const unsigned Width = Sort->getWidth();
+  // Only plain bit-vector -1, 0 and 1 are cached.
+  SMTExprRef *Slot = nullptr;
+  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
+    auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
+    if (Cache.size() <= Width)
+      Cache.resize(Width + 1);
+    Slot = &Cache[Width];
+    if (*Slot)
+      return *Slot;
   }
 
   SMTExprRef theExp = mkBVFromDecImpl(Int, Sort);
   assert(theExp->isBVSort());
-  assert(theExp->getWidth() == Sort->getWidth());
+  assert(theExp->getWidth() == Width);
   noteAckBVConstBits(theExp, Int);
+  if (Slot)
+    *Slot = theExp;
   return theExp;
 }
 
@@ -2238,8 +2087,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   // without native datatype support.
   if (Sort->isTupleSort() && !nativeTupleSupport())
     theExp = mkCamadaTupleSymbol(*this, Name, Sort);
-  else if (!nativeTupleSupport() && Sort->isArraySort() &&
-           sortContainsTuple(Sort->getElementSort()))
+  else if (lowersTuples(Sort))
     theExp = mkCamadaTupleArraySymbol(*this, Name, Sort);
   // Ackermann mode: array symbols are roots of the read/congruence
   // encoding, never backend terms.
@@ -2271,9 +2119,8 @@ SMTExprRef SMTSolverImpl::mkFPFromBin(const std::string &FP, unsigned EWidth,
   if (Cached != FPConstExprCache.end())
     return Cached->second;
 
-  SMTExprRef theExp = usesBVFPEncoding(Sort)
-                          ? SMTSolverImpl::mkFPFromBinImpl(FP, EWidth)
-                          : mkFPFromBinImpl(FP, EWidth);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Sort), mkFPFromBinImpl, FP, EWidth);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == FP.length());
   // The bits of a native-FP constant are known here and nowhere else;
@@ -2296,7 +2143,7 @@ CAMADA_DEFINE_CONST_CTOR(mkFP64, (const double Double, FPEncoding Encoding),
 
 SMTExprRef SMTSolverImpl::mkRM(const RM &R, FPEncoding Encoding) {
   SMTExprRef theExp =
-      Encoding == FPEncoding::BV ? SMTSolverImpl::mkRMImpl(R) : mkRMImpl(R);
+      CAMADA_FP_DISPATCH(Encoding == FPEncoding::BV, mkRMImpl, R);
   assert(theExp->isRMSort());
   return theExp;
 }
@@ -2331,7 +2178,7 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
                                        ConstArrayLowering Lowering) {
   requireOwned(IndexSort);
   requireOwned(InitValue);
-  fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(IndexSort),
+  fatalErrorIf(lowersTuples(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
   const bool NativeOk =
@@ -2351,7 +2198,7 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   // Tuple-involving initializers decompose into one constant array per
   // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
   // lowering (and its lazy machinery) applies per leaf.
-  if (!nativeTupleSupport() && sortContainsTuple(InitValue->Sort))
+  if (lowersTuples(InitValue->Sort))
     return mkCamadaTupleArrayConst(*this, IndexSort, InitValue, Lowering);
   // Ackermann mode: the lowering choice is moot — a Const node's selects
   // return the initializer directly, which is exactly what both Native
@@ -2380,9 +2227,8 @@ SMTExprRef SMTSolverImpl::mkBVToIEEEFP(const SMTExprRef &Exp,
   requireFPSort(To);
   fatalErrorIf(Exp->getWidth() != To->getWidth(),
                "Bit-vector and floating-point target widths must match");
-  SMTExprRef theExp = usesBVFPEncoding(To)
-                          ? SMTSolverImpl::mkBVToIEEEFPImpl(Exp, To)
-                          : mkBVToIEEEFPImpl(Exp, To);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(To), mkBVToIEEEFPImpl, Exp, To);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == Exp->getWidth());
   // Remember the bits this native-FP term was built from, so a later
@@ -2443,9 +2289,8 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   // unconditional bit-exactness must use FPEncoding::BV.
   if (auto It = IEEEBVShadow.find(&*Exp); It != IEEEBVShadow.end())
     return It->second;
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkIEEEFPToBVImpl(Exp)
-                          : mkIEEEFPToBVImpl(Exp);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), mkIEEEFPToBVImpl, Exp);
   // Exactly a plain BV sort: isBVSort() also answers true for BVFP, and a
   // BVFP-sorted result would leak into caller sort comparisons.
   assert(theExp->Sort->getSortKind() == SMTSortKind::BV);
@@ -2568,8 +2413,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
   if (!UnsatAssumptionsValid)
-    return SMTError{SMTErrorCode::InvalidUsage,
-                    CachedBoolExprs[0]->getBackendKind(),
+    return SMTError{SMTErrorCode::InvalidUsage, backendKind(),
                     "getUnsatAssumptions is only valid right after a "
                     "checkSatAssuming call that returned UNSAT, before the "
                     "solver state is mutated or checked again"};
@@ -2594,9 +2438,8 @@ SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
 }
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptionsImpl() {
-  return SMTError{SMTErrorCode::UnsupportedOperation,
-                  CachedBoolExprs[0]->getBackendKind(),
-                  "Unsat assumptions are not supported by this backend"};
+  return unsupportedError(
+      backendKind(), "Unsat assumptions are not supported by this backend");
 }
 
 // One hook per feature, so the enum and the hooks stay in step: a new
@@ -2654,14 +2497,13 @@ void SMTSolverImpl::reset() {
 void SMTSolverImpl::push(unsigned nscopes) {
   invalidateUnsatAssumptions();
   LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
-  ShadowScopeLevels.resize(ShadowScopeLevels.size() + nscopes);
   pushImpl(nscopes);
 }
 
 void SMTSolverImpl::pop(unsigned nscopes) {
   // LazyConstraintLevels always holds the root scope plus one entry per
   // push, so its size minus one is the number of scopes that can be
-  // popped. Reject an over-pop here: the journal loops below stop at the
+  // popped. Reject an over-pop here: the journal loop below stops at the
   // root either way, but popImpl() would still be handed the unclamped
   // count and take the backend below its own root -- Z3 throws
   // "index out of bounds" and the process dies -- leaving the common and
@@ -2673,9 +2515,9 @@ void SMTSolverImpl::pop(unsigned nscopes) {
   // into a model-less backend. This is cheap and cannot itself throw.
   invalidateUnsatAssumptions();
   // Then pop the backend, still ahead of the journal work below. That work
-  // moves the axioms out of LazyConstraintLevels and erases the shadow
-  // entries, so a throw after it would lose them for good while leaving
-  // the backend a scope deeper than the common layer believes.
+  // moves the axioms out of LazyConstraintLevels, so a throw after it
+  // would lose them for good while leaving the backend a scope deeper than
+  // the common layer believes.
   popImpl(nscopes);
   // Lazy default axioms and extensionality lemmas asserted inside the
   // popped scopes are scope-independent facts about expressions that
@@ -2687,14 +2529,6 @@ void SMTSolverImpl::pop(unsigned nscopes) {
     Reassert.insert(Reassert.end(), std::make_move_iterator(Level.begin()),
                     std::make_move_iterator(Level.end()));
     LazyConstraintLevels.pop_back();
-  }
-  // Assert-derived bit-pattern shadows die with their scope: the tying
-  // equality is retracted by the pop, and keeping the bits without it
-  // would let mkIEEEFPToBV claim facts no longer asserted.
-  for (unsigned I = 0; I < nscopes && ShadowScopeLevels.size() > 1; ++I) {
-    for (const SMTExpr *Key : ShadowScopeLevels.back())
-      IEEEBVShadow.erase(Key);
-    ShadowScopeLevels.pop_back();
   }
   // Not model-preserving, despite re-asserting axioms that were: popImpl
   // above already discarded the backend's model, so there is nothing left
@@ -2765,7 +2599,7 @@ SMTExprRef SMTSolverImpl::mkBVAddOverflowImpl(const SMTExprRef &LHS,
     SMTExprRef Sum = mkBVAdd(mkBVZeroExt(LHS, 1), mkBVZeroExt(RHS, 1));
     theExp = mkEqual(mkBVExtract(Width, Width, Sum), cachedSmallBVExpr(1, 1));
   }
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVAddOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVAddOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVSubOverflowImpl(const SMTExprRef &LHS,
@@ -2786,7 +2620,7 @@ SMTExprRef SMTSolverImpl::mkBVSubOverflowImpl(const SMTExprRef &LHS,
     // Unsigned subtraction overflows (borrows) iff LHS < RHS.
     theExp = mkBVUlt(LHS, RHS);
   }
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSubOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVSubOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVMulOverflowImpl(const SMTExprRef &LHS,
@@ -2808,7 +2642,7 @@ SMTExprRef SMTSolverImpl::mkBVMulOverflowImpl(const SMTExprRef &LHS,
     SMTExprRef Top = mkBVExtract(2 * Width - 1, Width, Prod);
     theExp = mkNot(mkEqual(Top, mkBVFromDec(0, Width)));
   }
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVMulOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVMulOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
@@ -2818,7 +2652,7 @@ SMTExprRef SMTSolverImpl::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
   SMTExprRef Min = mkBVFromBin("1" + std::string(Width - 1, '0'), Width);
   SMTExprRef NegOne = mkBVFromDec(-1, Width);
   SMTExprRef theExp = mkAnd(mkEqual(LHS, Min), mkEqual(RHS, NegOne));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSDivOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVSDivOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
@@ -2826,7 +2660,7 @@ SMTExprRef SMTSolverImpl::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
   const unsigned Width = Exp->getWidth();
   SMTExprRef Min = mkBVFromBin("1" + std::string(Width - 1, '0'), Width);
   SMTExprRef theExp = mkEqual(Exp, Min);
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNegOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVNegOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVShlOverflowImpl(const SMTExprRef &LHS,
@@ -2839,14 +2673,14 @@ SMTExprRef SMTSolverImpl::mkBVShlOverflowImpl(const SMTExprRef &LHS,
   SMTExprRef Shifted = mkBVShl(LHS, RHS);
   SMTExprRef Back = IsSigned ? mkBVAshr(Shifted, RHS) : mkBVLshr(Shifted, RHS);
   SMTExprRef theExp = mkNot(mkEqual(Back, LHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVShlOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVShlOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   SMTExprRef theExp =
       mkAndImpl(mkOrImpl(LHS, RHS), mkNotImpl(mkAndImpl(LHS, RHS)));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Xor);
+  return rewrapAs(theExp, SMTExprKind::Xor);
 }
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithNegImpl, "Arithmetic",
@@ -2870,7 +2704,7 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithModImpl, "Integer arithmetic",
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
                                          unsigned Amount) {
   SMTExprRef TheExp = mkArithMulImpl(Exp, mkInt(power2Dec(Amount)));
-  return rewrapExprImpl(*TheExp, TheExp->Sort, SMTExprKind::ArithShl);
+  return rewrapAs(TheExp, SMTExprKind::ArithShl);
 }
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithShlImpl, "Integer arithmetic",
@@ -2906,17 +2740,18 @@ SMTExprRef SMTSolverImpl::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
   SMTExprRef BitSet = mkBVFromDec(1, 1);
   SMTExprRef Zero = mkInt(0);
   SMTExprRef Sum = Zero;
+  std::string Power = "1";
   for (unsigned I = 0; I < Width; ++I) {
     SMTExprRef Bit = mkBVExtract(I, I, Exp);
-    Sum =
-        mkArithAdd(Sum, mkIte(mkEqual(Bit, BitSet), mkInt(power2Dec(I)), Zero));
+    Sum = mkArithAdd(Sum, mkIte(mkEqual(Bit, BitSet), mkInt(Power), Zero));
+    mulDecimal(Power, 2);
   }
   if (IsSigned) {
+    // Power is now 2^Width.
     SMTExprRef Sign = mkBVExtract(Width - 1, Width - 1, Exp);
-    Sum = mkArithSub(
-        Sum, mkIte(mkEqual(Sign, BitSet), mkInt(power2Dec(Width)), Zero));
+    Sum = mkArithSub(Sum, mkIte(mkEqual(Sign, BitSet), mkInt(Power), Zero));
   }
-  return rewrapExprImpl(*Sum, Sum->Sort, SMTExprKind::BV2Int);
+  return rewrapAs(Sum, SMTExprKind::BV2Int);
 }
 
 SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
@@ -2933,7 +2768,7 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   // Not model-preserving: Fresh is minted just above, so the current model
   // has no value for it and the backend discards the model here.
   addConstraint(mkEqual(mkBV2IntImpl(Fresh, /*IsSigned=*/false), Wrapped));
-  return rewrapExprImpl(*Fresh, Fresh->Sort, SMTExprKind::Int2BV);
+  return rewrapAs(Fresh, SMTExprKind::Int2BV);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
@@ -2941,7 +2776,7 @@ SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(0, Exp->getWidth()));
   SMTExprRef theExp = mkIteImpl(mkNotImpl(comp), cachedSmallBVExpr(1, 1),
                                 cachedSmallBVExpr(0, 1));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
+  return rewrapAs(theExp, SMTExprKind::BVRedOr);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
@@ -2949,7 +2784,7 @@ SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(-1, Exp->getWidth()));
   SMTExprRef theExp =
       mkIteImpl(comp, cachedSmallBVExpr(1, 1), cachedSmallBVExpr(0, 1));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
+  return rewrapAs(theExp, SMTExprKind::BVRedAnd);
 }
 
 // Reversed operands: (a > b) iff (b < a).
@@ -2967,8 +2802,9 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkTupleSelectImpl, "Tuples",
                                const SMTExprRef &, unsigned)
 
 SMTResult<std::string> SMTSolverImpl::getIntImpl(const SMTExprRef &Exp) {
-  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
-                  "Integer arithmetic is not supported by this backend"};
+  return unsupportedError(
+      Exp->getBackendKind(),
+      "Integer arithmetic is not supported by this backend");
 }
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkIntImpl, "Integer arithmetic",
@@ -2986,13 +2822,9 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkRealImpl, "Real arithmetic",
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkRealImpl, "Real arithmetic",
                                int64_t, int64_t)
 
-CAMADA_DEFINE_DUMP_TO_STDERR(dumpImpl)
-
 void SMTSolverImpl::dumpImpl(std::string &Out) {
   Out = "SMTSolver dump not implemented.\n";
 }
-
-CAMADA_DEFINE_DUMP_TO_STDERR(dumpModelImpl)
 
 void SMTSolverImpl::dumpModelImpl(std::string &Out) {
   // Every in-tree backend overrides this. An empty dump is the contract's

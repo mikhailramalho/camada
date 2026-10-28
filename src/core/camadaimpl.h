@@ -27,9 +27,9 @@
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -137,9 +137,9 @@ public:
     return Sort->isBoolSort() || Sort->isBVSort();
   }
   static SMTError ackUnsupportedIndexSort(SMTBackendKind Backend) {
-    return SMTError{SMTErrorCode::UnsupportedOperation, Backend,
-                    "The Ackermann array encoding can only evaluate bool- "
-                    "and bitvector-sorted indexes against a model"};
+    return unsupportedError(
+        Backend, "The Ackermann array encoding can only evaluate bool- "
+                 "and bitvector-sorted indexes against a model");
   }
 
   /// Model bits of a bool/BV-sorted expression after a SAT check, used to
@@ -149,6 +149,17 @@ public:
   /// the lifetime of the current model.
   /// Public because the Camada tuple lowering is a free function.
   std::string lazyIndexModelBits(const SMTExprRef &Exp);
+
+  /// The backend this solver drives, read off a cached expression.
+  /// Public, like unsupportedError, for the Camada tuple lowering.
+  SMTBackendKind backendKind() const {
+    return CachedBoolExprs[0]->getBackendKind();
+  }
+
+  /// An UnsupportedOperation error from \p Backend saying \p Msg.
+  static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
+    return SMTError{SMTErrorCode::UnsupportedOperation, Backend, Msg};
+  }
 
 private:
   /// Memo for lazyIndexModelBits, valid for the lifetime of one model and
@@ -252,11 +263,22 @@ protected:
       LazyConstArrayReach;
   std::unordered_map<const SMTExpr *, LazyArrayStoreStep> LazyArrayStores;
   std::unordered_map<const SMTExpr *, LazyArrayIteStep> LazyArrayItes;
+  /// Follows the store/ite derivation chain of a lazily lowered array under
+  /// the current model. \p Visit(Step, IndexBits) runs for each store; a
+  /// non-null result stops the walk and becomes the answer. Otherwise the
+  /// answer is the initializer of the const-array root reached. Errors when
+  /// an index or ite condition cannot be evaluated or the chain leaves the
+  /// tracked terms.
+  SMTResult<SMTExprRef>
+  walkLazyChain(const SMTExpr *Cur,
+                const std::function<SMTExprRef(const LazyArrayStoreStep &,
+                                               const std::string &)> &Visit);
   // Memo of instantiated (root, index term) pairs. Default axioms and
   // extensionality lemmas are scope-independent facts, so instead of
   // forgetting them when a push scope pops, pop() re-asserts the journaled
   // constraints at the outer level (see LazyConstraintLevels).
-  std::set<std::pair<const SMTExpr *, const SMTExpr *>> LazyTouched;
+  std::unordered_set<std::pair<const SMTExpr *, const SMTExpr *>, PairKeyHash>
+      LazyTouched;
   std::vector<std::vector<SMTExprRef>> LazyConstraintLevels{1};
   uint64_t LazyConstArrayCounter = 0;
   // Every distinct index term ever selected or stored at, grouped by index
@@ -270,7 +292,7 @@ protected:
   // for quantifier-free formulas (only finitely many index terms exist).
   std::unordered_map<const SMTSort *, std::vector<SMTExprRef>>
       ObservedIndexesBySort;
-  std::set<std::pair<const SMTSort *, const SMTExpr *>> ObservedIndexSeen;
+  std::unordered_set<const SMTExpr *> ObservedIndexSeen;
   void observeArrayIndex(const SMTExprRef &Index);
   // True while a model query (getArrayElement) is evaluating: selects
   // built for evaluation must not instantiate default axioms or count as
@@ -316,7 +338,8 @@ protected:
   std::vector<ArrayEqualLink> ArrayEqualLinks;
   std::unordered_map<const SMTSort *, std::vector<std::size_t>>
       ArrayEqualLinksByIndexSort;
-  std::set<std::pair<std::size_t, const SMTExpr *>> ArrayEqualCongruenceDone;
+  std::unordered_set<std::pair<std::size_t, const SMTExpr *>, PairKeyHash>
+      ArrayEqualCongruenceDone;
   uint64_t ArrayEqualCounter = 0;
 
   SMTExprRef mkEncodedArrayEqual(const SMTExprRef &LHS, const SMTExprRef &RHS);
@@ -407,9 +430,9 @@ protected:
   //
   // Provenance entries (terms camada itself built from bits) are
   // scope-independent identity facts. Entries derived from asserted
-  // equalities die with their push scope: the tying constraint is
-  // retracted by pop(), and keeping the bits without it could conjure
-  // contradictions out of thin air.
+  // equalities commit only at scope 0 (see commitShadowLink): inside a
+  // scope the tying constraint would be retracted by pop(), and keeping
+  // the bits without it could conjure contradictions out of thin air.
   std::unordered_map<const SMTExpr *, SMTExprRef> IEEEBVShadow;
   // mkEqual results pairing a native-FP term with a shadowed counterpart;
   // the shadow commits only if the equality is actually asserted
@@ -419,9 +442,6 @@ protected:
     SMTExprRef Bits;
   };
   std::unordered_map<const SMTExpr *, PendingShadowLink> PendingShadowLinks;
-  // Scope journal for assert-derived entries: pop() erases them — the
-  // opposite of LazyConstraintLevels' re-assert, deliberately.
-  std::vector<std::vector<const SMTExpr *>> ShadowScopeLevels{1};
   void commitShadowLink(const SMTExprRef &Constraint);
 
   // --- IEEE bits function for backends without a native fp->bv ---
@@ -998,6 +1018,11 @@ protected:
   virtual SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
                                     SMTExprKind Kind) = 0;
 
+  /// rewrapExprImpl keeping the expression's own sort.
+  SMTExprRef rewrapAs(const SMTExprRef &Exp, SMTExprKind Kind) {
+    return rewrapExprImpl(*Exp, Exp->Sort, Kind);
+  }
+
   virtual SMTSortRef mkBoolSortImpl() = 0;
 
   virtual SMTSortRef mkIntSortImpl();
@@ -1036,6 +1061,11 @@ protected:
     return tupleMode() == TupleEncoding::Native &&
            arrayMode() != ArrayEncoding::Ackermann && nativeDatatypeSupport();
   }
+
+  /// Whether values of \p Sort are lowered by the common layer instead of
+  /// reaching the backend: the sort involves a tuple and the backend has no
+  /// native tuples (arrays of tuples decompose into per-leaf arrays).
+  bool lowersTuples(const SMTSortRef &Sort) const;
 
   /// Whether the backend implements SMT-LIB datatypes at all. A fixed
   /// property of the backend, unlike nativeTupleSupport() which also
@@ -1471,10 +1501,8 @@ protected:
 
   virtual void popImpl(unsigned nscopes) = 0;
 
-  virtual void dumpImpl();
   virtual void dumpImpl(std::string &Out);
 
-  virtual void dumpModelImpl();
   virtual void dumpModelImpl(std::string &Out);
 
   virtual SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,

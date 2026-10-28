@@ -486,7 +486,7 @@ SMTExprRef MathSATSolver::mkArithModImpl(const SMTExprRef &LHS,
   const SMTExprRef &rhs_real = mkInt2Real(RHS);
   const SMTExprRef &q = mkReal2Int(mkArithDiv(lhs_real, rhs_real));
   SMTExprRef theExp = mkArithSub(LHS, mkArithMul(RHS, q));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::ArithMod);
+  return rewrapAs(theExp, SMTExprKind::ArithMod);
 }
 
 SMTExprRef MathSATSolver::mkArithShlImpl(const SMTExprRef &LHS,
@@ -538,7 +538,7 @@ SMTExprRef MathSATSolver::mkIsIntImpl(const SMTExprRef &Exp) {
     return mkBool(true);
 
   SMTExprRef theExp = mkEqual(mkInt2Real(mkReal2Int(Exp)), Exp);
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::IsInt);
+  return rewrapAs(theExp, SMTExprKind::IsInt);
 }
 
 SMTExprRef MathSATSolver::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
@@ -716,7 +716,7 @@ SMTExprRef MathSATSolver::mkFPRemImpl(const SMTExprRef &LHS,
 
   // And convert it back the right type
   SMTExprRef result = mkBVToIEEEFP(rem, LHS->Sort);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPRem);
+  return rewrapAs(result, SMTExprKind::FPRem);
 }
 
 SMTExprRef MathSATSolver::mkFPAddImpl(const SMTExprRef &LHS,
@@ -810,7 +810,7 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
 
   // And convert it back the right type
   SMTExprRef result = mkBVToIEEEFP(fma, X->Sort);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPFMA);
+  return rewrapAs(result, SMTExprKind::FPFMA);
 }
 
 SMTExprRef MathSATSolver::mkFPLtImpl(const SMTExprRef &LHS,

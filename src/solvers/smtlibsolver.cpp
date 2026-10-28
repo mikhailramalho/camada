@@ -21,6 +21,7 @@
 
 #include "smtlibsolver.h"
 #include "../camadaerrors.h"
+#include "../core/camadadecimal.h"
 
 #include <algorithm>
 #include <atomic>
@@ -2419,18 +2420,8 @@ bool decimalDivideExact(const std::string &Num, const std::string &Den,
     int D = 0;
     std::string Multiple = "0";
     for (int Try = 1; Try <= 9; ++Try) {
-      // Compute Try * Den incrementally.
-      std::string Next;
-      int Carry = 0;
-      for (std::size_t I = Den.size(); I-- > 0;) {
-        int Digit = (Den[I] - '0') * Try + Carry;
-        Next.insert(Next.begin(), static_cast<char>('0' + Digit % 10));
-        Carry = Digit / 10;
-      }
-      while (Carry > 0) {
-        Next.insert(Next.begin(), static_cast<char>('0' + Carry % 10));
-        Carry /= 10;
-      }
+      std::string Next = Den;
+      mulDecimal(Next, Try);
       if (cmpDecimal(Next, R) > 0)
         break;
       D = Try;
@@ -2587,8 +2578,9 @@ std::string SMTLIBSolver::parseIntModelValueForTest(const std::string &Value) {
 SMTResult<std::string> SMTLIBSolver::sendGetValue(const SMTExprRef &Exp,
                                                   std::string &Resp) {
   if (!Proc)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "SMTLIBSolver write-only mode does not support get*"};
+    return unsupportedError(
+        SMTBackendKind::SMTLIB,
+        "SMTLIBSolver write-only mode does not support get*");
 
   const std::string Cmd = "(get-value (" + renderSMTLIBExpr(Exp) + "))\n";
   if (File)
@@ -2761,9 +2753,9 @@ SMTResult<std::vector<SMTExprRef>> SMTLIBSolver::getUnsatAssumptionsImpl() {
                     "SMTLIBSolver: no child process to query for unsat "
                     "assumptions in write-only mode"};
   if (!UnsatAssumptionsSupported)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "The child solver does not support "
-                    ":produce-unsat-assumptions"};
+    return unsupportedError(SMTBackendKind::SMTLIB,
+                            "The child solver does not support "
+                            ":produce-unsat-assumptions");
 
   const std::string Cmd = "(get-unsat-assumptions)\n";
   if (File)

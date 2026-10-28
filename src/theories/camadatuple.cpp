@@ -319,13 +319,8 @@ SMTExprRef assembleFromLeaves(SMTSolverImpl &Solver, const SMTSortRef &Sort,
 
 SMTSortRef mkCamadaTupleSort(SMTSolverImpl &Solver,
                              const std::vector<SMTSortRef> &ElementSorts) {
-  // Pick the backend kind from the first element when available; for
-  // empty tuples, the bool sort gives us the same backend kind without
-  // needing a dedicated solver-level accessor.
-  SMTBackendKind BackendKind = ElementSorts.empty()
-                                   ? Solver.mkBoolSort()->getBackendKind()
-                                   : ElementSorts.front()->getBackendKind();
-  return Solver.makeSortRef(CamadaTupleSort(BackendKind, ElementSorts));
+  return Solver.makeSortRef(
+      CamadaTupleSort(Solver.backendKind(), ElementSorts));
 }
 
 SMTExprRef mkCamadaTupleSymbol(SMTSolverImpl &Solver, const std::string &Name,
@@ -626,10 +621,10 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
       bool Found = false;
       SMTExprRef V = leafValueAt(L, IndexBits[K], Found);
       if (!Found)
-        return SMTError{SMTErrorCode::UnsupportedOperation,
-                        Array->getBackendKind(),
-                        "A tuple-array leaf has no value at a defined index "
-                        "and no base default"};
+        return SMTSolverImpl::unsupportedError(
+            Array->getBackendKind(),
+            "A tuple-array leaf has no value at a defined index and no base "
+            "default");
       LeafValues.push_back(V);
     }
     std::size_t Pos = 0;
