@@ -751,16 +751,14 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
   // Tuple-typed function components on backends without native datatype
   // support would static_cast a CamadaTupleSort as a backend sort.
   // Reject up front; structural lowering is part of the issue #17 work.
-  if (!nativeTupleSupport()) {
-    fatalErrorIf(sortContainsTuple(CodomainSort),
-                 "Functions returning tuples (or tuple-involving arrays) "
-                 "are not yet supported on this backend; see issue #17");
-    for (const auto &D : DomainSorts)
-      fatalErrorIf(sortContainsTuple(D),
-                   "Functions taking tuple (or tuple-involving array) "
-                   "arguments are not yet supported on this backend; see "
-                   "issue #17");
-  }
+  fatalErrorIf(lowersTuples(CodomainSort),
+               "Functions returning tuples (or tuple-involving arrays) "
+               "are not yet supported on this backend; see issue #17");
+  for (const auto &D : DomainSorts)
+    fatalErrorIf(lowersTuples(D),
+                 "Functions taking tuple (or tuple-involving array) "
+                 "arguments are not yet supported on this backend; see "
+                 "issue #17");
   // Ackermann-mode arrays have no backend term to pass to or return from
   // an uninterpreted function.
   if (arrayMode() == ArrayEncoding::Ackermann) {
@@ -955,7 +953,7 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // Decomposed tuple arrays compare as the conjunction of their leaf
     // equalities; each leaf re-enters this wrapper and engages the
     // normal array-equality machinery (lazy witness, STP encoding).
-    if (lowersTuples(LHS->Sort->getElementSort()))
+    if (lowersTuples(LHS->Sort))
       return mkCamadaTupleArrayEqual(*this, LHS, RHS);
     // Ackermann-mode arrays have no backend term to hand to mkEqualImpl;
     // equality is always the witness + observed-index congruence
@@ -1124,7 +1122,7 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
     return mkCamadaTupleIte(*this, Cond, T, F);
   // Decomposed tuple arrays ite leaf-wise; the per-leaf ites re-enter
   // this wrapper, so the lazy-root union tracking below applies per leaf.
-  if (T->Sort->isArraySort() && lowersTuples(T->Sort->getElementSort()))
+  if (T->Sort->isArraySort() && lowersTuples(T->Sort))
     return mkCamadaTupleArrayIte(*this, Cond, T, F);
   if (arrayMode() == ArrayEncoding::Ackermann && T->Sort->isArraySort())
     return mkAckArrayIte(Cond, T, F);
@@ -1303,7 +1301,7 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   // Decomposed tuple arrays select leaf-wise; the per-leaf selects below
   // re-enter this wrapper, so observation/lazy instantiation happens per
   // leaf.
-  if (lowersTuples(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return mkCamadaTupleArraySelect(*this, Array, Index);
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
@@ -1331,7 +1329,7 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
                "Expected array element with matching sort");
   // Decomposed tuple arrays store leaf-wise; the per-leaf stores re-enter
   // this wrapper, so the lazy guards/tracking below apply per leaf.
-  if (lowersTuples(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return mkCamadaTupleArrayStore(*this, Array, Index, Element);
   // A store index is an index the formula constrains, exactly like a select
   // index: without observing it, encoded array equality never instantiates
@@ -1697,12 +1695,11 @@ void SMTSolverImpl::requireQuantifierOperands(
   // Encoded tuple variables would reach the backend's mkForallImpl as a
   // CamadaTupleExpr without a backend term, which the backend would
   // then static_cast as one of its own expressions. Reject up front.
-  if (!nativeTupleSupport())
-    for (const auto &V : Vars)
-      fatalErrorIf(sortContainsTuple(V->Sort),
-                   "Quantifiers over tuple-typed (or tuple-involving-array) "
-                   "variables are not yet supported on this backend; see "
-                   "issue #17");
+  for (const auto &V : Vars)
+    fatalErrorIf(lowersTuples(V->Sort),
+                 "Quantifiers over tuple-typed (or tuple-involving-array) "
+                 "variables are not yet supported on this backend; see "
+                 "issue #17");
 }
 
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
@@ -1813,7 +1810,7 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     return noModelError(Array);
   // Decomposed tuple arrays read each leaf at Index and reassemble the
   // per-leaf values into a tuple; the per-leaf reads re-enter this wrapper.
-  if (lowersTuples(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return getCamadaTupleArrayElement(*this, Array, Index);
   // Ackermann-mode arrays have no backend term to evaluate; resolve from
   // the tracked derivation chain and the reads of the equality class.
@@ -1849,7 +1846,7 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
     return noModelError(Array);
   // Decomposed tuple arrays zip the per-leaf sparse models into one
   // tuple-valued model; the per-leaf queries re-enter this wrapper.
-  if (lowersTuples(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort))
     return getCamadaTupleArrayValues(*this, Array);
   if (arrayMode() == ArrayEncoding::Ackermann) {
     // Same limitation getArrayElement screens: the walk compares indexes by
@@ -2090,7 +2087,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   // without native datatype support.
   if (Sort->isTupleSort() && !nativeTupleSupport())
     theExp = mkCamadaTupleSymbol(*this, Name, Sort);
-  else if (Sort->isArraySort() && lowersTuples(Sort->getElementSort()))
+  else if (Sort->isArraySort() && lowersTuples(Sort))
     theExp = mkCamadaTupleArraySymbol(*this, Name, Sort);
   // Ackermann mode: array symbols are roots of the read/congruence
   // encoding, never backend terms.
