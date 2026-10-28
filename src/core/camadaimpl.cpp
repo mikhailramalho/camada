@@ -22,6 +22,7 @@
 #include "camadaimpl.h"
 #include "../camadaerrors.h"
 #include "../theories/camadatuple.h"
+#include "camadadecimal.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -276,22 +277,10 @@ SMTHandleState *makeProcessLifetimeHandleState() {
 
 namespace {
 
-// Doubles a decimal string in place.
-void doubleDecimal(std::string &Dec) {
-  int Carry = 0;
-  for (auto It = Dec.rbegin(); It != Dec.rend(); ++It) {
-    int Value = (*It - '0') * 2 + Carry;
-    *It = static_cast<char>('0' + Value % 10);
-    Carry = Value / 10;
-  }
-  if (Carry != 0)
-    Dec.insert(Dec.begin(), static_cast<char>('0' + Carry));
-}
-
 std::string power2Dec(unsigned int N) {
   std::string Result = "1";
   for (unsigned int I = 0; I < N; ++I)
-    doubleDecimal(Result);
+    mulDecimal(Result, 2);
   return Result;
 }
 
@@ -2755,7 +2744,7 @@ SMTExprRef SMTSolverImpl::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
   for (unsigned I = 0; I < Width; ++I) {
     SMTExprRef Bit = mkBVExtract(I, I, Exp);
     Sum = mkArithAdd(Sum, mkIte(mkEqual(Bit, BitSet), mkInt(Power), Zero));
-    doubleDecimal(Power);
+    mulDecimal(Power, 2);
   }
   if (IsSigned) {
     // Power is now 2^Width.

@@ -21,6 +21,7 @@
 
 #include "smtlibsolver.h"
 #include "../camadaerrors.h"
+#include "../core/camadadecimal.h"
 
 #include <algorithm>
 #include <atomic>
@@ -2419,18 +2420,8 @@ bool decimalDivideExact(const std::string &Num, const std::string &Den,
     int D = 0;
     std::string Multiple = "0";
     for (int Try = 1; Try <= 9; ++Try) {
-      // Compute Try * Den incrementally.
-      std::string Next;
-      int Carry = 0;
-      for (std::size_t I = Den.size(); I-- > 0;) {
-        int Digit = (Den[I] - '0') * Try + Carry;
-        Next.insert(Next.begin(), static_cast<char>('0' + Digit % 10));
-        Carry = Digit / 10;
-      }
-      while (Carry > 0) {
-        Next.insert(Next.begin(), static_cast<char>('0' + Carry % 10));
-        Carry /= 10;
-      }
+      std::string Next = Den;
+      mulDecimal(Next, Try);
       if (cmpDecimal(Next, R) > 0)
         break;
       D = Try;
