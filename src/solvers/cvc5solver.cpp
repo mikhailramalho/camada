@@ -1294,9 +1294,10 @@ SMTResult<std::vector<SMTExprRef>> CVC5Solver::getUnsatAssumptionsImpl() {
   // Guard: cvc5 throws when queried for a core it was not configured to
   // produce.
   if (!produceUnsatAssumptions())
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::CVC5,
-                    "Unsat-assumption production is off; construct with "
-                    "SolverConfig::UseUnsatAssumptions to extract cores"};
+    return unsupportedError(
+        SMTBackendKind::CVC5,
+        "Unsat-assumption production is off; construct with "
+        "SolverConfig::UseUnsatAssumptions to extract cores");
   std::vector<cvc5::Term> core = Context.getUnsatAssumptions();
   std::vector<SMTExprRef> Result;
   for (const cvc5::Term &Term : core)

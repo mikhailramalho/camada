@@ -137,9 +137,9 @@ public:
     return Sort->isBoolSort() || Sort->isBVSort();
   }
   static SMTError ackUnsupportedIndexSort(SMTBackendKind Backend) {
-    return SMTError{SMTErrorCode::UnsupportedOperation, Backend,
-                    "The Ackermann array encoding can only evaluate bool- "
-                    "and bitvector-sorted indexes against a model"};
+    return unsupportedError(
+        Backend, "The Ackermann array encoding can only evaluate bool- "
+                 "and bitvector-sorted indexes against a model");
   }
 
   /// Model bits of a bool/BV-sorted expression after a SAT check, used to
@@ -529,6 +529,10 @@ protected:
   /// The backend this solver drives, read off a cached expression.
   SMTBackendKind backendKind() const {
     return CachedBoolExprs[0]->getBackendKind();
+  }
+
+  static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
+    return SMTError{SMTErrorCode::UnsupportedOperation, Backend, Msg};
   }
 
   static SMTError noModelError(const SMTExprRef &Exp) {

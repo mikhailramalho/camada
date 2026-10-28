@@ -1056,10 +1056,10 @@ SMTResult<std::vector<SMTExprRef>> BitwuzlaSolver::getUnsatAssumptionsImpl() {
   // Guard: querying bitwuzla for a core it was not configured to produce
   // trips its abort handler rather than returning an error.
   if (!produceUnsatAssumptions())
-    return SMTError{SMTErrorCode::UnsupportedOperation,
-                    SMTBackendKind::Bitwuzla,
-                    "Unsat-assumption production is off; construct with "
-                    "SolverConfig::UseUnsatAssumptions to extract cores"};
+    return unsupportedError(
+        SMTBackendKind::Bitwuzla,
+        "Unsat-assumption production is off; construct with "
+        "SolverConfig::UseUnsatAssumptions to extract cores");
   size_t size = 0;
   const BitwuzlaTerm *core = bitwuzla_get_unsat_assumptions(Context, &size);
   std::vector<SMTExprRef> Result;

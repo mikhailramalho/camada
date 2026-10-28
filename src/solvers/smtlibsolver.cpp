@@ -2587,8 +2587,9 @@ std::string SMTLIBSolver::parseIntModelValueForTest(const std::string &Value) {
 SMTResult<std::string> SMTLIBSolver::sendGetValue(const SMTExprRef &Exp,
                                                   std::string &Resp) {
   if (!Proc)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "SMTLIBSolver write-only mode does not support get*"};
+    return unsupportedError(
+        SMTBackendKind::SMTLIB,
+        "SMTLIBSolver write-only mode does not support get*");
 
   const std::string Cmd = "(get-value (" + renderSMTLIBExpr(Exp) + "))\n";
   if (File)
@@ -2761,9 +2762,9 @@ SMTResult<std::vector<SMTExprRef>> SMTLIBSolver::getUnsatAssumptionsImpl() {
                     "SMTLIBSolver: no child process to query for unsat "
                     "assumptions in write-only mode"};
   if (!UnsatAssumptionsSupported)
-    return SMTError{SMTErrorCode::UnsupportedOperation, SMTBackendKind::SMTLIB,
-                    "The child solver does not support "
-                    ":produce-unsat-assumptions"};
+    return unsupportedError(SMTBackendKind::SMTLIB,
+                            "The child solver does not support "
+                            ":produce-unsat-assumptions");
 
   const std::string Cmd = "(get-unsat-assumptions)\n";
   if (File)

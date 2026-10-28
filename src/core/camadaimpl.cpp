@@ -1769,8 +1769,8 @@ SMTSolverImpl::getRational(const SMTExprRef &Exp) {
 
 SMTResult<std::pair<std::string, std::string>>
 SMTSolverImpl::getRationalImpl(const SMTExprRef &Exp) {
-  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
-                  "Real arithmetic is not supported by this backend"};
+  return unsupportedError(Exp->getBackendKind(),
+                          "Real arithmetic is not supported by this backend");
 }
 
 SMTResult<std::string> SMTSolverImpl::getRealNumerator(const SMTExprRef &Exp) {
@@ -1941,8 +1941,8 @@ SMTSolverImpl::getArrayElementByModelValue(const SMTExprRef &Array,
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValuesImpl(const SMTExprRef &) {
-  return SMTError{SMTErrorCode::UnsupportedOperation, backendKind(),
-                  "Array model extraction is not supported by this backend"};
+  return unsupportedError(
+      backendKind(), "Array model extraction is not supported by this backend");
 }
 
 SMTExprKind SMTSolverImpl::valueKindForSort(const SMTSortRef &Sort) {
@@ -2441,8 +2441,8 @@ SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
 }
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptionsImpl() {
-  return SMTError{SMTErrorCode::UnsupportedOperation, backendKind(),
-                  "Unsat assumptions are not supported by this backend"};
+  return unsupportedError(
+      backendKind(), "Unsat assumptions are not supported by this backend");
 }
 
 // One hook per feature, so the enum and the hooks stay in step: a new
@@ -2805,8 +2805,9 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkTupleSelectImpl, "Tuples",
                                const SMTExprRef &, unsigned)
 
 SMTResult<std::string> SMTSolverImpl::getIntImpl(const SMTExprRef &Exp) {
-  return SMTError{SMTErrorCode::UnsupportedOperation, Exp->getBackendKind(),
-                  "Integer arithmetic is not supported by this backend"};
+  return unsupportedError(
+      Exp->getBackendKind(),
+      "Integer arithmetic is not supported by this backend");
 }
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkIntImpl, "Integer arithmetic",
