@@ -302,12 +302,8 @@ static bool usesBVFPEncoding(const SMTExprRef &Exp) {
   return usesBVFPEncoding(Exp->Sort);
 }
 
-static bool usesBVRMEncoding(const SMTSortRef &Sort) {
-  return Sort->isBVRMSort();
-}
-
 static bool usesBVRMEncoding(const SMTExprRef &Exp) {
-  return usesBVRMEncoding(Exp->Sort);
+  return Exp->Sort->isBVRMSort();
 }
 
 // The operation name comes from the caller via __builtin_FUNCTION(), so a
@@ -571,16 +567,9 @@ void SMTSolverImpl::initializeCommonSingletons() {
   CachedBVOneExprs[1] = One1;
   CachedBVNegOneExprs.resize(2);
   CachedBVNegOneExprs[1] = One1;
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_EVEN)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_EVEN);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_AWAY)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_AWAY);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_PLUS_INF)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_PLUS_INF);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_MINUS_INF)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_MINUS_INF);
-  CachedRMBVExprs[static_cast<std::size_t>(RM::ROUND_TO_ZERO)] =
-      SMTSolverImpl::mkRMImpl(RM::ROUND_TO_ZERO);
+  for (RM R : {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
+               RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
+    CachedRMBVExprs[static_cast<std::size_t>(R)] = SMTSolverImpl::mkRMImpl(R);
 }
 
 CAMADA_DEFINE_CACHED_SORT(mkBoolSort, CachedBoolSort, isBoolSort, true, "")
