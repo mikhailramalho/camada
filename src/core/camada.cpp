@@ -129,8 +129,8 @@ SMTResult<SMTSolverRef> createSMTLIBSolver(const std::vector<std::string> &Argv,
 #else
   (void)Argv;
   (void)Config;
-  fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
-             "(unsupported on this platform)");
+  fatalError("Camada was not compiled with the SMT-LIB pipeline backend, "
+             "rebuild with -DCAMADA_SOLVER_SMTLIB_ENABLE=ON (POSIX only)");
 #endif
 }
 
@@ -148,8 +148,8 @@ SMTResult<SMTSolverRef> createSMTLIBSolver(const std::vector<std::string> &Argv,
   (void)Argv;
   (void)OutputPath;
   (void)Config;
-  fatalError("Camada was not compiled with the SMT-LIB pipeline backend "
-             "(unsupported on this platform)");
+  fatalError("Camada was not compiled with the SMT-LIB pipeline backend, "
+             "rebuild with -DCAMADA_SOLVER_SMTLIB_ENABLE=ON (POSIX only)");
 #endif
 }
 
