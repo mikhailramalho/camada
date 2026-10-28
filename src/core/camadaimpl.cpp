@@ -1651,6 +1651,39 @@ void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 
+template <class OnStore>
+SMTResult<const SMTSolverImpl::LazyConstArrayRoot *>
+SMTSolverImpl::walkLazyChain(const SMTExpr *Cur, OnStore Visit) {
+  while (true) {
+    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
+      const std::string StepBits = lazyIndexModelBits(It->second.Index);
+      if (StepBits.empty())
+        return SMTError{SMTErrorCode::BackendError,
+                        CachedBoolExprs[0]->getBackendKind(),
+                        "Could not evaluate a store index while walking a "
+                        "lazily lowered array model"};
+      if (Visit(It->second, StepBits))
+        return static_cast<const LazyConstArrayRoot *>(nullptr);
+      Cur = It->second.Parent;
+      continue;
+    }
+    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
+      SMTResult<bool> Cond = getBool(It->second.Cond);
+      if (!Cond)
+        return Cond.error();
+      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
+      continue;
+    }
+    if (auto It = LazyConstArrayRoots.find(Cur);
+        It != LazyConstArrayRoots.end())
+      return &It->second;
+    return SMTError{SMTErrorCode::BackendError,
+                    CachedBoolExprs[0]->getBackendKind(),
+                    "Untracked derivation while walking a lazily lowered "
+                    "array model"};
+  }
+}
+
 SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
                                                   const SMTExprRef &Index) {
   // Post-check model query: the solver's model is unconstrained at indexes
@@ -1661,29 +1694,17 @@ SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
   if (QueryBits.empty())
     return {};
 
-  const SMTExpr *Cur = &*Array;
-  while (true) {
-    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
-      const std::string StepBits = lazyIndexModelBits(It->second.Index);
-      if (StepBits.empty())
-        return {};
-      if (StepBits == QueryBits)
-        return It->second.Value;
-      Cur = It->second.Parent;
-      continue;
-    }
-    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
-      SMTResult<bool> Cond = getBool(It->second.Cond);
-      if (!Cond)
-        return {};
-      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
-      continue;
-    }
-    if (auto It = LazyConstArrayRoots.find(Cur);
-        It != LazyConstArrayRoots.end())
-      return It->second.Init;
+  SMTExprRef Stored;
+  auto Root = walkLazyChain(
+      &*Array, [&](const LazyArrayStoreStep &Step, const std::string &Bits) {
+        if (Bits != QueryBits)
+          return false;
+        Stored = Step.Value;
+        return true;
+      });
+  if (!Root)
     return {};
-  }
+  return Root.value() ? Root.value()->Init : Stored;
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
@@ -1969,37 +1990,16 @@ SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
   // reached root's initializer becomes the default.
   ArrayModel Model;
   std::set<std::string> SeenIndexBits;
-  const SMTExpr *Cur = &*Array;
-  while (true) {
-    if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
-      const std::string StepBits = lazyIndexModelBits(It->second.Index);
-      if (StepBits.empty())
-        return SMTError{SMTErrorCode::BackendError,
-                        CachedBoolExprs[0]->getBackendKind(),
-                        "Could not evaluate a store index while walking a "
-                        "lazily lowered array model"};
-      if (SeenIndexBits.insert(StepBits).second)
-        Model.Entries.emplace_back(It->second.Index, It->second.Value);
-      Cur = It->second.Parent;
-      continue;
-    }
-    if (auto It = LazyArrayItes.find(Cur); It != LazyArrayItes.end()) {
-      SMTResult<bool> Cond = getBool(It->second.Cond);
-      if (!Cond)
-        return Cond.error();
-      Cur = Cond.value() ? It->second.TrueArr : It->second.FalseArr;
-      continue;
-    }
-    if (auto It = LazyConstArrayRoots.find(Cur);
-        It != LazyConstArrayRoots.end()) {
-      Model.Base = It->second.Init;
-      return Model;
-    }
-    return SMTError{SMTErrorCode::BackendError,
-                    CachedBoolExprs[0]->getBackendKind(),
-                    "Untracked derivation while walking a lazily lowered "
-                    "array model"};
-  }
+  auto Root = walkLazyChain(
+      &*Array, [&](const LazyArrayStoreStep &Step, const std::string &Bits) {
+        if (SeenIndexBits.insert(Bits).second)
+          Model.Entries.emplace_back(Step.Index, Step.Value);
+        return false;
+      });
+  if (!Root)
+    return Root.error();
+  Model.Base = Root.value()->Init;
+  return Model;
 }
 
 SMTResult<SMTExprRef>
