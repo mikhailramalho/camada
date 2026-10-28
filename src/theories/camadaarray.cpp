@@ -538,8 +538,7 @@ SMTResult<ArrayModel> SMTSolverImpl::ackArrayModel(const SMTExprRef &Array) {
   if (!Walk.Failed)
     ackExpandEqualityClass(Array->Sort, std::string(), Walk);
   if (Walk.Failed)
-    return SMTError{SMTErrorCode::BackendError,
-                    CachedBoolExprs[0]->getBackendKind(),
+    return SMTError{SMTErrorCode::BackendError, backendKind(),
                     "Could not walk the array derivation chain against the "
                     "model under the Ackermann array encoding"};
 
@@ -557,8 +556,7 @@ SMTResult<ArrayModel> SMTSolverImpl::ackArrayModel(const SMTExprRef &Array) {
       const std::string ReadBits =
           R.IndexIsConst ? R.ConstBits : lazyIndexModelBits(R.Index);
       if (ReadBits.empty())
-        return SMTError{SMTErrorCode::BackendError,
-                        CachedBoolExprs[0]->getBackendKind(),
+        return SMTError{SMTErrorCode::BackendError, backendKind(),
                         "Could not evaluate a read index while walking an "
                         "Ackermann array model"};
       if (Walk.SeenStoreBits.insert(ReadBits).second)
