@@ -63,7 +63,7 @@ SMTSolverRef createZ3Solver(const SolverConfig &Config) {
 #else
   (void)Config;
   fatalError("Camada was not compiled with Z3 support, rebuild with "
-             "-DCAMADA_ENABLE_SOLVER_Z3=ON");
+             "-DCAMADA_SOLVER_Z3_ENABLE=ON");
 #endif
 }
 
@@ -73,7 +73,7 @@ SMTSolverRef createMathSATSolver(const SolverConfig &Config) {
 #else
   (void)Config;
   fatalError("Camada was not compiled with MathSAT support, rebuild with "
-             "-DCAMADA_ENABLE_SOLVER_MATHSAT=ON");
+             "-DCAMADA_SOLVER_MATHSAT_ENABLE=ON");
 #endif
 }
 
@@ -83,7 +83,7 @@ SMTSolverRef createCVC5Solver(const SolverConfig &Config) {
 #else
   (void)Config;
   fatalError("Camada was not compiled with CVC5 support, rebuild with "
-             "-DCAMADA_ENABLE_SOLVER_CVC5=ON");
+             "-DCAMADA_SOLVER_CVC5_ENABLE=ON");
 #endif
 }
 
@@ -93,7 +93,7 @@ SMTSolverRef createBitwuzlaSolver(const SolverConfig &Config) {
 #else
   (void)Config;
   fatalError("Camada was not compiled with Bitwuzla support, rebuild with "
-             "-DCAMADA_ENABLE_SOLVER_BITWUZLA=ON");
+             "-DCAMADA_SOLVER_BITWUZLA_ENABLE=ON");
 #endif
 }
 
@@ -103,7 +103,7 @@ SMTSolverRef createYicesSolver(const SolverConfig &Config) {
 #else
   (void)Config;
   fatalError("Camada was not compiled with YICES support, rebuild with "
-             "-DCAMADA_ENABLE_SOLVER_YICES=ON");
+             "-DCAMADA_SOLVER_YICES_ENABLE=ON");
 #endif
 }
 
@@ -113,7 +113,7 @@ SMTSolverRef createSTPSolver(const SolverConfig &Config) {
 #else
   (void)Config;
   fatalError("Camada was not compiled with STP support, rebuild with "
-             "-DCAMADA_ENABLE_SOLVER_STP=ON");
+             "-DCAMADA_SOLVER_STP_ENABLE=ON");
 #endif
 }
 
