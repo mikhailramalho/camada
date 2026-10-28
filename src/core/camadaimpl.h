@@ -264,14 +264,15 @@ protected:
   std::unordered_map<const SMTExpr *, LazyArrayStoreStep> LazyArrayStores;
   std::unordered_map<const SMTExpr *, LazyArrayIteStep> LazyArrayItes;
   /// Follows the store/ite derivation chain of a lazily lowered array under
-  /// the current model. \p Visit(Step, IndexBits) runs for each store and
-  /// returns true to stop. Gives the initializer of the const-array root
-  /// reached, a null ref when stopped, or an error when an index or ite
-  /// condition cannot be evaluated or the chain leaves the tracked terms.
-  SMTResult<SMTExprRef> walkLazyChain(
-      const SMTExpr *Cur,
-      const std::function<bool(const LazyArrayStoreStep &, const std::string &)>
-          &Visit);
+  /// the current model. \p Visit(Step, IndexBits) runs for each store; a
+  /// non-null result stops the walk and becomes the answer. Otherwise the
+  /// answer is the initializer of the const-array root reached. Errors when
+  /// an index or ite condition cannot be evaluated or the chain leaves the
+  /// tracked terms.
+  SMTResult<SMTExprRef>
+  walkLazyChain(const SMTExpr *Cur,
+                const std::function<SMTExprRef(const LazyArrayStoreStep &,
+                                               const std::string &)> &Visit);
   // Memo of instantiated (root, index term) pairs. Default axioms and
   // extensionality lemmas are scope-independent facts, so instead of
   // forgetting them when a push scope pops, pop() re-asserts the journaled

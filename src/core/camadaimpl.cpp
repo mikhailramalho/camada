@@ -1550,8 +1550,8 @@ void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,
 
 SMTResult<SMTExprRef> SMTSolverImpl::walkLazyChain(
     const SMTExpr *Cur,
-    const std::function<bool(const LazyArrayStoreStep &, const std::string &)>
-        &Visit) {
+    const std::function<SMTExprRef(const LazyArrayStoreStep &,
+                                   const std::string &)> &Visit) {
   while (true) {
     if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
       const std::string StepBits = lazyIndexModelBits(It->second.Index);
@@ -1559,8 +1559,8 @@ SMTResult<SMTExprRef> SMTSolverImpl::walkLazyChain(
         return SMTError{SMTErrorCode::BackendError, backendKind(),
                         "Could not evaluate a store index while walking a "
                         "lazily lowered array model"};
-      if (Visit(It->second, StepBits))
-        return SMTExprRef();
+      if (SMTExprRef Found = Visit(It->second, StepBits))
+        return Found;
       Cur = It->second.Parent;
       continue;
     }
@@ -1590,17 +1590,11 @@ SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
   if (QueryBits.empty())
     return {};
 
-  SMTExprRef Stored;
-  auto Init = walkLazyChain(
+  auto Value = walkLazyChain(
       &*Array, [&](const LazyArrayStoreStep &Step, const std::string &Bits) {
-        if (Bits != QueryBits)
-          return false;
-        Stored = Step.Value;
-        return true;
+        return Bits == QueryBits ? Step.Value : SMTExprRef();
       });
-  if (!Init)
-    return {};
-  return Stored ? Stored : Init.value();
+  return Value ? Value.value() : SMTExprRef();
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
@@ -1885,12 +1879,14 @@ SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
   // reached root's initializer becomes the default.
   ArrayModel Model;
   std::set<std::string> SeenIndexBits;
-  auto Init = walkLazyChain(
-      &*Array, [&](const LazyArrayStoreStep &Step, const std::string &Bits) {
-        if (SeenIndexBits.insert(Bits).second)
-          Model.Entries.emplace_back(Step.Index, Step.Value);
-        return false;
-      });
+  auto Init =
+      walkLazyChain(&*Array,
+                    [&](const LazyArrayStoreStep &Step,
+                        const std::string &Bits) -> SMTExprRef {
+                      if (SeenIndexBits.insert(Bits).second)
+                        Model.Entries.emplace_back(Step.Index, Step.Value);
+                      return {};
+                    });
   if (!Init)
     return Init.error();
   Model.Base = Init.value();
