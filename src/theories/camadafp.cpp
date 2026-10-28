@@ -478,7 +478,7 @@ SMTExprRef SMTSolverImpl::mkFPAbsImpl(const SMTExprRef &Exp) {
   // Concat that with '0'
   SMTExprRef zero = mkBVZero1(*this);
   SMTExprRef result = mkBVToIEEEFP(mkBVConcat(zero, ew_sw), Exp->Sort);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPAbs);
+  return rewrapAs(result, SMTExprKind::FPAbs);
 }
 
 SMTExprRef SMTSolverImpl::mkFPNegImpl(const SMTExprRef &Exp,
@@ -500,7 +500,7 @@ SMTExprRef SMTSolverImpl::mkFPNegImpl(const SMTExprRef &Exp,
     result = mkIte(x_is_nan, Exp, nx);
   }
 
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPNeg);
+  return rewrapAs(result, SMTExprKind::FPNeg);
 }
 
 SMTExprRef SMTSolverImpl::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
@@ -509,7 +509,7 @@ SMTExprRef SMTSolverImpl::mkFPIsInfiniteImpl(const SMTExprRef &Exp) {
   SMTExprRef pInf = mkFPInf(*this, eWidth, sWidth, false);
   SMTExprRef nInf = mkFPInf(*this, eWidth, sWidth, true);
   SMTExprRef result = mkOr(mkEqual(Exp, pInf), mkEqual(Exp, nInf));
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPIsInfinite);
+  return rewrapAs(result, SMTExprKind::FPIsInfinite);
 }
 
 SMTExprRef SMTSolverImpl::mkFPIsNaNImpl(const SMTExprRef &Exp) {
@@ -524,7 +524,7 @@ SMTExprRef SMTSolverImpl::mkFPIsNaNImpl(const SMTExprRef &Exp) {
   SMTExprRef sigIsNotZero = mkNot(mkEqual(sig, zero));
   SMTExprRef expIsTop = mkEqual(exp, topExp);
   SMTExprRef result = mkAnd(expIsTop, sigIsNotZero);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPIsNaN);
+  return rewrapAs(result, SMTExprKind::FPIsNaN);
 }
 
 SMTExprRef SMTSolverImpl::mkFPIsSubnormalImpl(const SMTExprRef &Exp) {
@@ -536,7 +536,7 @@ SMTExprRef SMTSolverImpl::mkFPIsSubnormalImpl(const SMTExprRef &Exp) {
   SMTExprRef isZero = mkFPIsZero(Exp);
   SMTExprRef nIsZero = mkNot(isZero);
   SMTExprRef result = mkAnd(nIsZero, zExp);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPIsSubnormal);
+  return rewrapAs(result, SMTExprKind::FPIsSubnormal);
 }
 
 // Shifts a significand left so its leading one lands in the top position,
@@ -575,7 +575,7 @@ SMTExprRef SMTSolverImpl::mkFPIsNormalImpl(const SMTExprRef &Exp) {
   SMTExprRef orEx = mkOr(isSpecial, isSubnormal);
   orEx = mkOr(isZero, orEx);
   SMTExprRef result = mkNot(orEx);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPIsNormal);
+  return rewrapAs(result, SMTExprKind::FPIsNormal);
 }
 
 SMTExprRef SMTSolverImpl::mkFPIsZeroImpl(const SMTExprRef &Exp) {
@@ -586,7 +586,7 @@ SMTExprRef SMTSolverImpl::mkFPIsZeroImpl(const SMTExprRef &Exp) {
 
   // Then compare it with zero of the same size
   SMTExprRef result = mkEqual(ew_sw, mkBVFromDec(0, Exp->getWidth() - 1));
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPIsZero);
+  return rewrapAs(result, SMTExprKind::FPIsZero);
 }
 
 SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
@@ -698,7 +698,7 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
   result = mkIte(c1, v1, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPMul);
+  return rewrapAs(result, SMTExprKind::FPMul);
 }
 
 SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
@@ -834,7 +834,7 @@ SMTExprRef SMTSolverImpl::mkFPDivImpl(const SMTExprRef &LHS,
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
   result = mkIte(c1, v1, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPDiv);
+  return rewrapAs(result, SMTExprKind::FPDiv);
 }
 
 SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
@@ -1026,7 +1026,7 @@ SMTExprRef SMTSolverImpl::mkFPRemImpl(const SMTExprRef &LHS,
   SMTExprRef result_is_zero = mkFPIsZero(result);
   SMTExprRef zeros = mkIte(mkEqual(x_sgn, mkBVZero1(*this)), pzero, nzero);
   result = mkIte(result_is_zero, zeros, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPRem);
+  return rewrapAs(result, SMTExprKind::FPRem);
 }
 
 static inline void addCore(SMTSolver &S, unsigned int SWidth,
@@ -1196,14 +1196,14 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
   result = mkIte(c1, v1, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPAdd);
+  return rewrapAs(result, SMTExprKind::FPAdd);
 }
 
 SMTExprRef SMTSolverImpl::mkFPSubImpl(const SMTExprRef &LHS,
                                       const SMTExprRef &RHS,
                                       const SMTExprRef &R) {
   SMTExprRef result = mkFPAdd(LHS, mkFPNeg(RHS), R);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPSub);
+  return rewrapAs(result, SMTExprKind::FPSub);
 }
 
 SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp,
@@ -1304,7 +1304,7 @@ SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp,
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
   result = mkIte(c1, v1, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPSqrt);
+  return rewrapAs(result, SMTExprKind::FPSqrt);
 }
 
 SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
@@ -1574,7 +1574,7 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
   result = mkIte(c1, v1, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPFMA);
+  return rewrapAs(result, SMTExprKind::FPFMA);
 }
 
 SMTExprRef SMTSolverImpl::mkFPLtImpl(const SMTExprRef &LHS,
@@ -1617,7 +1617,7 @@ SMTExprRef SMTSolverImpl::mkFPLtImpl(const SMTExprRef &LHS,
   SMTExprRef c3t3t4 = mkIte(c3, t3, t4);
   SMTExprRef c2else = mkIte(c2, mkBool(false), c3t3t4);
   SMTExprRef result = mkIte(c1, mkBool(false), c2else);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPLt);
+  return rewrapAs(result, SMTExprKind::FPLt);
 }
 
 SMTExprRef SMTSolverImpl::mkFPLeImpl(const SMTExprRef &LHS,
@@ -1625,7 +1625,7 @@ SMTExprRef SMTSolverImpl::mkFPLeImpl(const SMTExprRef &LHS,
   SMTExprRef lt = mkFPLt(LHS, RHS);
   SMTExprRef eq = mkFPEqual(LHS, RHS);
   SMTExprRef result = mkOr(lt, eq);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPLe);
+  return rewrapAs(result, SMTExprKind::FPLe);
 }
 
 SMTExprRef SMTSolverImpl::mkFPEqualImpl(const SMTExprRef &LHS,
@@ -1646,7 +1646,7 @@ SMTExprRef SMTSolverImpl::mkFPEqualImpl(const SMTExprRef &LHS,
   // They are equal if they are either +0 and -0 (and vice-versa) or bitwise
   // equal and neither is NaN
   SMTExprRef result = mkAnd(mkOr(bothZero, are_equal), mkNot(nan));
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPEqual);
+  return rewrapAs(result, SMTExprKind::FPEqual);
 }
 
 SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
@@ -1779,7 +1779,7 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
   result = mkIte(c1, v1, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPtoFP);
+  return rewrapAs(result, SMTExprKind::FPtoFP);
 }
 
 // Shared body of the two bit-vector to float conversions. Magnitude is the
@@ -1871,7 +1871,7 @@ SMTExprRef SMTSolverImpl::bvToFPCore(const SMTExprRef &From,
 
   SMTExprRef v2 = round(R, SgnBit, sig_4, exp_2, ebits, sbits);
   SMTExprRef result = mkIte(is_zero, pzero, v2);
-  return rewrapExprImpl(*result, result->Sort, Kind);
+  return rewrapAs(result, Kind);
 }
 
 SMTExprRef SMTSolverImpl::mkSBVToFPImpl(const SMTExprRef &From,
@@ -2014,13 +2014,13 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
 SMTExprRef SMTSolverImpl::mkFPToSBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
   SMTExprRef result = mkToBV(From, true, ToWidth);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPtoSBV);
+  return rewrapAs(result, SMTExprKind::FPtoSBV);
 }
 
 SMTExprRef SMTSolverImpl::mkFPToUBVImpl(const SMTExprRef &From,
                                         unsigned ToWidth) {
   SMTExprRef result = mkToBV(From, false, ToWidth);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPtoUBV);
+  return rewrapAs(result, SMTExprKind::FPtoUBV);
 }
 
 SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
@@ -2193,7 +2193,7 @@ SMTExprRef SMTSolverImpl::mkFPToIntegralImpl(const SMTExprRef &From,
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
   result = mkIte(c1, v1, result);
-  return rewrapExprImpl(*result, result->Sort, SMTExprKind::FPtoIntegral);
+  return rewrapAs(result, SMTExprKind::FPtoIntegral);
 }
 
 SMTResult<std::string> SMTSolverImpl::getFPInBinImpl(const SMTExprRef &Exp) {
@@ -2220,13 +2220,13 @@ SMTExprRef SMTSolverImpl::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
   SMTExprRef theExp =
       packFP(*this, mkSgnBit(*this, Sgn), mkTopExp(*this, ExpWidth),
              mkBVFromDec(1, SigWidth - 1));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPConst);
+  return rewrapAs(theExp, SMTExprKind::FPConst);
 }
 
 SMTExprRef SMTSolverImpl::mkInfImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
   SMTExprRef theExp = mkFPInfBits(*this, Sgn, ExpWidth, SigWidth);
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::FPConst);
+  return rewrapAs(theExp, SMTExprKind::FPConst);
 }
 
 SMTExprRef SMTSolverImpl::mkBVToIEEEFPImpl(const SMTExprRef &Exp,

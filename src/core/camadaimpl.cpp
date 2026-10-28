@@ -123,7 +123,7 @@ namespace camada {
   SMTExprRef SMTSolverImpl::Name(const SMTExprRef &LHS,                        \
                                  const SMTExprRef &RHS) {                      \
     SMTExprRef theExp = Composition;                                           \
-    return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Kind);           \
+    return rewrapAs(theExp, SMTExprKind::Kind);                                \
   }
 // Default *Impl for a feature a backend does not implement: abort with the
 // theory's name. Variadic so one macro covers every parameter shape, and the
@@ -1513,7 +1513,7 @@ SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
   SMTSortRef ArraySort = mkArraySort(IndexSort, InitValue->Sort);
   SMTExprRef Root = mkSymbolUnchecked(
       "__CAMADA_lazyarr" + std::to_string(LazyConstArrayCounter++), ArraySort);
-  Root = rewrapExprImpl(*Root, Root->Sort, SMTExprKind::ArrayConst);
+  Root = rewrapAs(Root, SMTExprKind::ArrayConst);
   LazyConstArrayRoots.emplace(&*Root, LazyConstArrayRoot{Root, InitValue});
   const SMTSort *IndexSortKey = &*IndexSort;
   LazyRootsByIndexSort[IndexSortKey].push_back(&*Root);
@@ -1616,7 +1616,7 @@ SMTExprRef SMTSolverImpl::mkEncodedArrayEqual(const SMTExprRef &LHS,
       "__CAMADA_arreq" + std::to_string(ArrayEqualCounter++), mkBoolSort());
   // Present the lowering as an Equal node, like the other common-layer
   // lowerings do.
-  EqVar = rewrapExprImpl(*EqVar, EqVar->Sort, SMTExprKind::Equal);
+  EqVar = rewrapAs(EqVar, SMTExprKind::Equal);
   ArrayEqualLinks.push_back(ArrayEqualLink{EqVar, LHS, RHS});
   const SMTSort *IndexSortKey = &*LHS->Sort->getIndexSort();
   ArrayEqualLinksByIndexSort[IndexSortKey].push_back(LinkId);
@@ -2731,7 +2731,7 @@ SMTExprRef SMTSolverImpl::mkBVAddOverflowImpl(const SMTExprRef &LHS,
     SMTExprRef Sum = mkBVAdd(mkBVZeroExt(LHS, 1), mkBVZeroExt(RHS, 1));
     theExp = mkEqual(mkBVExtract(Width, Width, Sum), cachedSmallBVExpr(1, 1));
   }
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVAddOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVAddOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVSubOverflowImpl(const SMTExprRef &LHS,
@@ -2752,7 +2752,7 @@ SMTExprRef SMTSolverImpl::mkBVSubOverflowImpl(const SMTExprRef &LHS,
     // Unsigned subtraction overflows (borrows) iff LHS < RHS.
     theExp = mkBVUlt(LHS, RHS);
   }
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSubOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVSubOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVMulOverflowImpl(const SMTExprRef &LHS,
@@ -2774,7 +2774,7 @@ SMTExprRef SMTSolverImpl::mkBVMulOverflowImpl(const SMTExprRef &LHS,
     SMTExprRef Top = mkBVExtract(2 * Width - 1, Width, Prod);
     theExp = mkNot(mkEqual(Top, mkBVFromDec(0, Width)));
   }
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVMulOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVMulOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
@@ -2784,7 +2784,7 @@ SMTExprRef SMTSolverImpl::mkBVSDivOverflowImpl(const SMTExprRef &LHS,
   SMTExprRef Min = mkBVFromBin("1" + std::string(Width - 1, '0'), Width);
   SMTExprRef NegOne = mkBVFromDec(-1, Width);
   SMTExprRef theExp = mkAnd(mkEqual(LHS, Min), mkEqual(RHS, NegOne));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVSDivOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVSDivOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
@@ -2792,7 +2792,7 @@ SMTExprRef SMTSolverImpl::mkBVNegOverflowImpl(const SMTExprRef &Exp) {
   const unsigned Width = Exp->getWidth();
   SMTExprRef Min = mkBVFromBin("1" + std::string(Width - 1, '0'), Width);
   SMTExprRef theExp = mkEqual(Exp, Min);
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVNegOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVNegOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkBVShlOverflowImpl(const SMTExprRef &LHS,
@@ -2805,14 +2805,14 @@ SMTExprRef SMTSolverImpl::mkBVShlOverflowImpl(const SMTExprRef &LHS,
   SMTExprRef Shifted = mkBVShl(LHS, RHS);
   SMTExprRef Back = IsSigned ? mkBVAshr(Shifted, RHS) : mkBVLshr(Shifted, RHS);
   SMTExprRef theExp = mkNot(mkEqual(Back, LHS));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVShlOverflow);
+  return rewrapAs(theExp, SMTExprKind::BVShlOverflow);
 }
 
 SMTExprRef SMTSolverImpl::mkXorImpl(const SMTExprRef &LHS,
                                     const SMTExprRef &RHS) {
   SMTExprRef theExp =
       mkAndImpl(mkOrImpl(LHS, RHS), mkNotImpl(mkAndImpl(LHS, RHS)));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::Xor);
+  return rewrapAs(theExp, SMTExprKind::Xor);
 }
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithNegImpl, "Arithmetic",
@@ -2836,7 +2836,7 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithModImpl, "Integer arithmetic",
 SMTExprRef SMTSolverImpl::mkArithShlImpl(const SMTExprRef &Exp,
                                          unsigned Amount) {
   SMTExprRef TheExp = mkArithMulImpl(Exp, mkInt(power2Dec(Amount)));
-  return rewrapExprImpl(*TheExp, TheExp->Sort, SMTExprKind::ArithShl);
+  return rewrapAs(TheExp, SMTExprKind::ArithShl);
 }
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkArithShlImpl, "Integer arithmetic",
@@ -2883,7 +2883,7 @@ SMTExprRef SMTSolverImpl::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
     SMTExprRef Sign = mkBVExtract(Width - 1, Width - 1, Exp);
     Sum = mkArithSub(Sum, mkIte(mkEqual(Sign, BitSet), mkInt(Power), Zero));
   }
-  return rewrapExprImpl(*Sum, Sum->Sort, SMTExprKind::BV2Int);
+  return rewrapAs(Sum, SMTExprKind::BV2Int);
 }
 
 SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
@@ -2900,7 +2900,7 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   // Not model-preserving: Fresh is minted just above, so the current model
   // has no value for it and the backend discards the model here.
   addConstraint(mkEqual(mkBV2IntImpl(Fresh, /*IsSigned=*/false), Wrapped));
-  return rewrapExprImpl(*Fresh, Fresh->Sort, SMTExprKind::Int2BV);
+  return rewrapAs(Fresh, SMTExprKind::Int2BV);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
@@ -2908,7 +2908,7 @@ SMTExprRef SMTSolverImpl::mkBVRedOrImpl(const SMTExprRef &Exp) {
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(0, Exp->getWidth()));
   SMTExprRef theExp = mkIteImpl(mkNotImpl(comp), cachedSmallBVExpr(1, 1),
                                 cachedSmallBVExpr(0, 1));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedOr);
+  return rewrapAs(theExp, SMTExprKind::BVRedOr);
 }
 
 SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
@@ -2916,7 +2916,7 @@ SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
   SMTExprRef comp = mkEqualImpl(Exp, mkBVFromDec(-1, Exp->getWidth()));
   SMTExprRef theExp =
       mkIteImpl(comp, cachedSmallBVExpr(1, 1), cachedSmallBVExpr(0, 1));
-  return rewrapExprImpl(*theExp, theExp->Sort, SMTExprKind::BVRedAnd);
+  return rewrapAs(theExp, SMTExprKind::BVRedAnd);
 }
 
 // Reversed operands: (a > b) iff (b < a).

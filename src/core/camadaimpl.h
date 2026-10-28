@@ -996,6 +996,11 @@ protected:
   virtual SMTExprRef rewrapExprImpl(const SMTExpr &Exp, const SMTSortRef &Sort,
                                     SMTExprKind Kind) = 0;
 
+  /// rewrapExprImpl keeping the expression's own sort.
+  SMTExprRef rewrapAs(const SMTExprRef &Exp, SMTExprKind Kind) {
+    return rewrapExprImpl(*Exp, Exp->Sort, Kind);
+  }
+
   virtual SMTSortRef mkBoolSortImpl() = 0;
 
   virtual SMTSortRef mkIntSortImpl();
