@@ -744,6 +744,14 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
                    "Functions taking array arguments are not supported "
                    "with the Ackermann array encoding");
   }
+  auto Construct = [&]() {
+    SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
+    assert(theSort->isFunctionSort());
+    assert(theSort->getDomainSorts() == DomainSorts);
+    assert(theSort->getCodomainSort() == CodomainSort);
+    return theSort;
+  };
+
   if (DomainSorts.size() <= 4) {
     SmallFunctionSortCacheKey SmallKey{};
     SmallKey.CodomainSort = CodomainSort.get();
@@ -755,10 +763,7 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
     if (It != SmallFunctionSortCache.end())
       return It->second;
 
-    SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
-    assert(theSort->isFunctionSort());
-    assert(theSort->getDomainSorts() == DomainSorts);
-    assert(theSort->getCodomainSort() == CodomainSort);
+    SMTSortRef theSort = Construct();
     SmallFunctionSortCache.emplace(SmallKey, theSort);
     return theSort;
   }
@@ -772,10 +777,7 @@ SMTSolverImpl::mkFunctionSort(const std::vector<SMTSortRef> &DomainSorts,
   if (It != FunctionSortCache.end())
     return It->second;
 
-  SMTSortRef theSort = mkFunctionSortImpl(DomainSorts, CodomainSort);
-  assert(theSort->isFunctionSort());
-  assert(theSort->getDomainSorts() == DomainSorts);
-  assert(theSort->getCodomainSort() == CodomainSort);
+  SMTSortRef theSort = Construct();
   FunctionSortCache.emplace(std::move(Key), theSort);
   return theSort;
 }
@@ -788,8 +790,12 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
   // datatype support; the caches still serve identity for these (the
   // CamadaTupleSort sits in the same SortArena as backend sorts).
   auto Construct = [this, &ElementSorts]() {
-    return nativeTupleSupport() ? mkTupleSortImpl(ElementSorts)
-                                : mkCamadaTupleSort(*this, ElementSorts);
+    SMTSortRef theSort = nativeTupleSupport()
+                             ? mkTupleSortImpl(ElementSorts)
+                             : mkCamadaTupleSort(*this, ElementSorts);
+    assert(theSort->isTupleSort());
+    assert(theSort->getTupleElementSorts() == ElementSorts);
+    return theSort;
   };
 
   if (ElementSorts.size() <= 4) {
@@ -803,8 +809,6 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
       return It->second;
 
     SMTSortRef theSort = Construct();
-    assert(theSort->isTupleSort());
-    assert(theSort->getTupleElementSorts() == ElementSorts);
     SmallTupleSortCache.emplace(SmallKey, theSort);
     return theSort;
   }
@@ -818,8 +822,6 @@ SMTSolverImpl::mkTupleSort(const std::vector<SMTSortRef> &ElementSorts) {
     return It->second;
 
   SMTSortRef theSort = Construct();
-  assert(theSort->isTupleSort());
-  assert(theSort->getTupleElementSorts() == ElementSorts);
   TupleSortCache.emplace(std::move(Key), theSort);
   return theSort;
 }
