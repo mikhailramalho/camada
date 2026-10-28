@@ -53,6 +53,34 @@ namespace camada {
     ResultAssert;                                                              \
     return theExp;                                                             \
   }
+// Shapes of the simple binary wrappers that recur across the bit-vector,
+// Boolean and arithmetic operators: the same operand check and the same
+// postcondition, differing only in the operation.
+#define CAMADA_BV_BINARY(Name)                                                 \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBVSameSort(LHS, RHS), Name##Impl(LHS, RHS),     \
+      assert(theExp->Sort == LHS->Sort))
+#define CAMADA_BV_PREDICATE(Name)                                              \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBVSameSort(LHS, RHS), Name##Impl(LHS, RHS),     \
+      assert(theExp->Sort->isBoolSort()))
+#define CAMADA_BV_OVERFLOW(Name, ImplName, IsSigned)                           \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBVSameSort(LHS, RHS),                           \
+      ImplName(LHS, RHS, /*IsSigned=*/IsSigned),                               \
+      assert(theExp->Sort->isBoolSort()))
+#define CAMADA_BOOL_BINARY(Name)                                               \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireBoolSameSort(LHS, RHS), Name##Impl(LHS, RHS),   \
+      assert(theExp->isBoolSort()))
+#define CAMADA_ARITH_BINARY(Name)                                              \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireArithSameSort(LHS, RHS), Name##Impl(LHS, RHS),  \
+      assert(theExp->Sort == LHS->Sort))
+#define CAMADA_ARITH_PREDICATE(Name)                                           \
+  CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(                                         \
+      SMTExprRef, Name, requireArithSameSort(LHS, RHS), Name##Impl(LHS, RHS),  \
+      assert(theExp->isBoolSort()))
 #define CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(ReturnType, Name, SortAssert,       \
                                            ImplCall, ResultAssert)             \
   ReturnType SMTSolverImpl::Name(const SMTExprRef &Exp) {                      \
@@ -870,155 +898,48 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   IEEEBVShadow.emplace(Link.Target, Link.Bits);
 }
 
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAddImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSub,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSubImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVMul,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVMulImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSRem,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSRemImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVURem,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVURemImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSDiv,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSDivImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUDiv,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUDivImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVShl,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVShlImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAshr,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAshrImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVLshr,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVLshrImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVXor,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVXorImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVOr,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVOrImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAnd,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAndImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVXnor,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVXnorImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVNor,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVNorImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVNand,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVNandImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUlt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUltImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSlt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSltImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUgt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUgtImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSgt,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSgtImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUle,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUleImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSle,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSleImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUge,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVUgeImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSge,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSgeImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_BV_BINARY(mkBVAdd)
+CAMADA_BV_BINARY(mkBVSub)
+CAMADA_BV_BINARY(mkBVMul)
+CAMADA_BV_BINARY(mkBVSRem)
+CAMADA_BV_BINARY(mkBVURem)
+CAMADA_BV_BINARY(mkBVSDiv)
+CAMADA_BV_BINARY(mkBVUDiv)
+CAMADA_BV_BINARY(mkBVShl)
+CAMADA_BV_BINARY(mkBVAshr)
+CAMADA_BV_BINARY(mkBVLshr)
+CAMADA_BV_BINARY(mkBVXor)
+CAMADA_BV_BINARY(mkBVOr)
+CAMADA_BV_BINARY(mkBVAnd)
+CAMADA_BV_BINARY(mkBVXnor)
+CAMADA_BV_BINARY(mkBVNor)
+CAMADA_BV_BINARY(mkBVNand)
+CAMADA_BV_PREDICATE(mkBVUlt)
+CAMADA_BV_PREDICATE(mkBVSlt)
+CAMADA_BV_PREDICATE(mkBVUgt)
+CAMADA_BV_PREDICATE(mkBVSgt)
+CAMADA_BV_PREDICATE(mkBVUle)
+CAMADA_BV_PREDICATE(mkBVSle)
+CAMADA_BV_PREDICATE(mkBVUge)
+CAMADA_BV_PREDICATE(mkBVSge)
 
 // The public surface follows the mkBVS*/mkBVU* naming convention of the
 // other signed/unsigned BV pairs; the protected *Impl hooks keep a single
 // IsSigned-parameterized entry point per operation, since every backend
 // implements both signednesses in one place.
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSAddOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAddOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUAddOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVAddOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSSubOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSubOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUSubOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSubOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSMulOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVMulOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUMulOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVMulOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSDivOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVSDivOverflowImpl(LHS, RHS),
-                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_BV_OVERFLOW(mkBVSAddOverflow, mkBVAddOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUAddOverflow, mkBVAddOverflowImpl, false)
+CAMADA_BV_OVERFLOW(mkBVSSubOverflow, mkBVSubOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUSubOverflow, mkBVSubOverflowImpl, false)
+CAMADA_BV_OVERFLOW(mkBVSMulOverflow, mkBVMulOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUMulOverflow, mkBVMulOverflowImpl, false)
+CAMADA_BV_PREDICATE(mkBVSDivOverflow)
 
 CAMADA_DEFINE_SIMPLE_UNARY_WRAPPER(SMTExprRef, mkBVNegOverflow,
                                    requireBVSort(Exp), mkBVNegOverflowImpl(Exp),
                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVSShlOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVShlOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/true),
-                                    assert(theExp->Sort->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVUShlOverflow,
-                                    requireBVSameSort(LHS, RHS),
-                                    mkBVShlOverflowImpl(LHS, RHS,
-                                                        /*IsSigned=*/false),
-                                    assert(theExp->Sort->isBoolSort()))
+CAMADA_BV_OVERFLOW(mkBVSShlOverflow, mkBVShlOverflowImpl, true)
+CAMADA_BV_OVERFLOW(mkBVUShlOverflow, mkBVShlOverflowImpl, false)
 
 SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
                                   const SMTExprRef &RHS) {
@@ -1091,58 +1012,22 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
   }
   return theExp;
 }
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkImplies,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkImpliesImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkAnd,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkAndImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkOr,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkOrImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkXor,
-                                    requireBoolSameSort(LHS, RHS),
-                                    mkXorImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithAdd,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithAddImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithSub,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithSubImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithMul,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithMulImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithDiv,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithDivImpl(LHS, RHS),
-                                    assert(theExp->Sort == LHS->Sort))
+CAMADA_BOOL_BINARY(mkImplies)
+CAMADA_BOOL_BINARY(mkAnd)
+CAMADA_BOOL_BINARY(mkOr)
+CAMADA_BOOL_BINARY(mkXor)
+CAMADA_ARITH_BINARY(mkArithAdd)
+CAMADA_ARITH_BINARY(mkArithSub)
+CAMADA_ARITH_BINARY(mkArithMul)
+CAMADA_ARITH_BINARY(mkArithDiv)
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithMod,
                                     requireIntSameSort(LHS, RHS),
                                     mkArithModImpl(LHS, RHS),
                                     assert(theExp->isIntSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithLt,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithLtImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithGt,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithGtImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithLe,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithLeImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
-CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkArithGe,
-                                    requireArithSameSort(LHS, RHS),
-                                    mkArithGeImpl(LHS, RHS),
-                                    assert(theExp->isBoolSort()))
+CAMADA_ARITH_PREDICATE(mkArithLt)
+CAMADA_ARITH_PREDICATE(mkArithGt)
+CAMADA_ARITH_PREDICATE(mkArithLe)
+CAMADA_ARITH_PREDICATE(mkArithGe)
 
 CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkBVXnorImpl,
                                   mkBVNotImpl(mkBVXorImpl(LHS, RHS)), BVXnor)
