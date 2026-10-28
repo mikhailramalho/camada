@@ -248,24 +248,22 @@ SMTHandleState *makeProcessLifetimeHandleState() {
 
 namespace {
 
-std::string power2Dec(unsigned int N) {
-  std::vector<unsigned char> Digits{1};
-  for (unsigned int I = 0; I < N; ++I) {
-    int Carry = 0;
-    for (auto &Digit : Digits) {
-      int Value = Digit * 2 + Carry;
-      Digit = static_cast<unsigned char>(Value % 10);
-      Carry = Value / 10;
-    }
-    while (Carry != 0) {
-      Digits.push_back(static_cast<unsigned char>(Carry % 10));
-      Carry /= 10;
-    }
+// Doubles a decimal string in place.
+void doubleDecimal(std::string &Dec) {
+  int Carry = 0;
+  for (auto It = Dec.rbegin(); It != Dec.rend(); ++It) {
+    int Value = (*It - '0') * 2 + Carry;
+    *It = static_cast<char>('0' + Value % 10);
+    Carry = Value / 10;
   }
-  std::string Result;
-  Result.reserve(Digits.size());
-  for (auto It = Digits.rbegin(); It != Digits.rend(); ++It)
-    Result.push_back(static_cast<char>('0' + *It));
+  if (Carry != 0)
+    Dec.insert(Dec.begin(), static_cast<char>('0' + Carry));
+}
+
+std::string power2Dec(unsigned int N) {
+  std::string Result = "1";
+  for (unsigned int I = 0; I < N; ++I)
+    doubleDecimal(Result);
   return Result;
 }
 
@@ -2890,15 +2888,16 @@ SMTExprRef SMTSolverImpl::mkBV2IntImpl(const SMTExprRef &Exp, bool IsSigned) {
   SMTExprRef BitSet = mkBVFromDec(1, 1);
   SMTExprRef Zero = mkInt(0);
   SMTExprRef Sum = Zero;
+  std::string Power = "1";
   for (unsigned I = 0; I < Width; ++I) {
     SMTExprRef Bit = mkBVExtract(I, I, Exp);
-    Sum =
-        mkArithAdd(Sum, mkIte(mkEqual(Bit, BitSet), mkInt(power2Dec(I)), Zero));
+    Sum = mkArithAdd(Sum, mkIte(mkEqual(Bit, BitSet), mkInt(Power), Zero));
+    doubleDecimal(Power);
   }
   if (IsSigned) {
+    // Power is now 2^Width.
     SMTExprRef Sign = mkBVExtract(Width - 1, Width - 1, Exp);
-    Sum = mkArithSub(
-        Sum, mkIte(mkEqual(Sign, BitSet), mkInt(power2Dec(Width)), Zero));
+    Sum = mkArithSub(Sum, mkIte(mkEqual(Sign, BitSet), mkInt(Power), Zero));
   }
   return rewrapExprImpl(*Sum, Sum->Sort, SMTExprKind::BV2Int);
 }
