@@ -441,6 +441,13 @@ static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
   requireMatchingFPAndRMEncoding(LHS, RM, Op);
 }
 
+static void requireArrayIndex(const SMTExprRef &Array,
+                              const SMTExprRef &Index) {
+  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
+               "Expected array index with matching sort");
+}
+
 } // namespace
 
 SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
@@ -1433,9 +1440,7 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
                                         const SMTExprRef &Index) {
   requireOwned(Array);
   requireOwned(Index);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
-               "Expected array index with matching sort");
+  requireArrayIndex(Array, Index);
   // Decomposed tuple arrays select leaf-wise; the per-leaf selects below
   // re-enter this wrapper, so observation/lazy instantiation happens per
   // leaf.
@@ -1462,9 +1467,7 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
   requireOwned(Array);
   requireOwned(Index);
   requireOwned(Element);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
-               "Expected array index with matching sort");
+  requireArrayIndex(Array, Index);
   fatalErrorIf(Array->Sort->getElementSort() != Element->Sort,
                "Expected array element with matching sort");
   // Decomposed tuple arrays store leaf-wise; the per-leaf stores re-enter
@@ -1928,9 +1931,7 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
                                                      const SMTExprRef &Index) {
   requireOwned(Array);
   requireOwned(Index);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
-               "Expected array index with matching sort");
+  requireArrayIndex(Array, Index);
   if (!ModelAvailable)
     return noModelError(Array);
   // Decomposed tuple arrays read each leaf at Index and reassemble the
