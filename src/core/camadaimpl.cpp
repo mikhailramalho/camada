@@ -1597,7 +1597,7 @@ std::string SMTSolverImpl::lazyIndexModelBitsUncached(const SMTExprRef &Exp) {
 
 void SMTSolverImpl::observeArrayIndex(const SMTExprRef &Index) {
   const SMTSort *SortKey = &*Index->Sort;
-  if (!ObservedIndexSeen.insert({SortKey, &*Index}).second)
+  if (!ObservedIndexSeen.insert(&*Index).second)
     return;
   ObservedIndexesBySort[SortKey].push_back(Index);
   // Copies throughout: instantiation builds selects that re-enter this

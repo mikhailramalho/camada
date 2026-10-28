@@ -30,6 +30,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -270,7 +271,7 @@ protected:
   // for quantifier-free formulas (only finitely many index terms exist).
   std::unordered_map<const SMTSort *, std::vector<SMTExprRef>>
       ObservedIndexesBySort;
-  std::set<std::pair<const SMTSort *, const SMTExpr *>> ObservedIndexSeen;
+  std::unordered_set<const SMTExpr *> ObservedIndexSeen;
   void observeArrayIndex(const SMTExprRef &Index);
   // True while a model query (getArrayElement) is evaluating: selects
   // built for evaluation must not instantiate default axioms or count as
