@@ -2982,13 +2982,9 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkRealImpl, "Real arithmetic",
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkRealImpl, "Real arithmetic",
                                int64_t, int64_t)
 
-CAMADA_DEFINE_DUMP_TO_STDERR(dumpImpl)
-
 void SMTSolverImpl::dumpImpl(std::string &Out) {
   Out = "SMTSolver dump not implemented.\n";
 }
-
-CAMADA_DEFINE_DUMP_TO_STDERR(dumpModelImpl)
 
 void SMTSolverImpl::dumpModelImpl(std::string &Out) {
   // Every in-tree backend overrides this. An empty dump is the contract's

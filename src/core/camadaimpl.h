@@ -1476,10 +1476,8 @@ protected:
 
   virtual void popImpl(unsigned nscopes) = 0;
 
-  virtual void dumpImpl();
   virtual void dumpImpl(std::string &Out);
 
-  virtual void dumpModelImpl();
   virtual void dumpModelImpl(std::string &Out);
 
   virtual SMTSortRef mkBVFPSortImpl(const unsigned ExpWidth,
