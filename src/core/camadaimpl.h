@@ -525,17 +525,18 @@ protected:
       S.LastUnknown = SavedUnknown;
     }
   };
-  /// The SMTError every model getter returns when no model is available.
-  /// Takes the queried expression only to name the backend in the error.
   /// The backend this solver drives, read off a cached expression.
   SMTBackendKind backendKind() const {
     return CachedBoolExprs[0]->getBackendKind();
   }
 
+  /// An UnsupportedOperation error from \p Backend saying \p Msg.
   static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
     return SMTError{SMTErrorCode::UnsupportedOperation, Backend, Msg};
   }
 
+  /// The SMTError every model getter returns when no model is available.
+  /// Takes the queried expression only to name the backend in the error.
   static SMTError noModelError(const SMTExprRef &Exp) {
     return SMTError{SMTErrorCode::InvalidUsage, Exp->getBackendKind(),
                     "No model is available: the last check did not return "

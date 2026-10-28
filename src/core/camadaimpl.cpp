@@ -2504,7 +2504,7 @@ void SMTSolverImpl::push(unsigned nscopes) {
 void SMTSolverImpl::pop(unsigned nscopes) {
   // LazyConstraintLevels always holds the root scope plus one entry per
   // push, so its size minus one is the number of scopes that can be
-  // popped. Reject an over-pop here: the journal loops below stop at the
+  // popped. Reject an over-pop here: the journal loop below stops at the
   // root either way, but popImpl() would still be handed the unclamped
   // count and take the backend below its own root -- Z3 throws
   // "index out of bounds" and the process dies -- leaving the common and
