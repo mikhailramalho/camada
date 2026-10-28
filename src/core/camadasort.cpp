@@ -172,12 +172,12 @@ bool SMTSort::isFXPSignedSort() const {
   return std::get<FXPSortData>(Data).IsSigned;
 }
 
-const SMTSortRef &SMTSort::getIndexSort() const {
+SMTSortRef SMTSort::getIndexSort() const {
   fatalErrorIf(!isArraySort(), "Index sort is only defined for array sorts");
   return std::get<ArraySortData>(Data).IndexSort;
 }
 
-const SMTSortRef &SMTSort::getElementSort() const {
+SMTSortRef SMTSort::getElementSort() const {
   fatalErrorIf(!isArraySort(), "Element sort is only defined for array sorts");
   return std::get<ArraySortData>(Data).ElementSort;
 }
