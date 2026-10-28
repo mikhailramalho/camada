@@ -233,10 +233,10 @@ public:
   bool isFXPSignedSort() const;
 
   /// Returns the array's index sort, fails if the sort is not an array.
-  SMTSortRef getIndexSort() const;
+  const SMTSortRef &getIndexSort() const;
 
   /// Returns the array's element sort, fails if the sort is not an array.
-  SMTSortRef getElementSort() const;
+  const SMTSortRef &getElementSort() const;
 
   /// Returns the function's domain sorts, fails if the sort is not a function.
   const std::vector<SMTSortRef> &getDomainSorts() const;
