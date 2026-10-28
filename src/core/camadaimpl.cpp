@@ -1129,7 +1129,7 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
     return mkCamadaTupleIte(*this, Cond, T, F);
   // Decomposed tuple arrays ite leaf-wise; the per-leaf ites re-enter
   // this wrapper, so the lazy-root union tracking below applies per leaf.
-  if (T->Sort->isArraySort() && lowersTuples(T->Sort))
+  if (lowersTuples(T->Sort))
     return mkCamadaTupleArrayIte(*this, Cond, T, F);
   if (arrayMode() == ArrayEncoding::Ackermann && T->Sort->isArraySort())
     return mkAckArrayIte(Cond, T, F);
@@ -2096,7 +2096,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   // without native datatype support.
   if (Sort->isTupleSort() && !nativeTupleSupport())
     theExp = mkCamadaTupleSymbol(*this, Name, Sort);
-  else if (Sort->isArraySort() && lowersTuples(Sort))
+  else if (lowersTuples(Sort))
     theExp = mkCamadaTupleArraySymbol(*this, Name, Sort);
   // Ackermann mode: array symbols are roots of the read/congruence
   // encoding, never backend terms.
