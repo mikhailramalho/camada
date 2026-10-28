@@ -62,6 +62,11 @@ namespace camada {
     ResultAssert;                                                              \
     return theExp;                                                             \
   }
+// Calls the common layer's own *Impl when UseBV holds, the virtual one
+// otherwise. A macro, not a template: naming the member through a pointer
+// would dispatch virtually and defeat the point.
+#define CAMADA_FP_DISPATCH(UseBV, Impl, ...)                                   \
+  ((UseBV) ? SMTSolverImpl::Impl(__VA_ARGS__) : Impl(__VA_ARGS__))
 // Floating-point operations dispatch on the operand's encoding: a BV-encoded
 // sort must go to the common layer's bit-blast, because the backend override
 // only understands its own native FP sort. Writing that ternary by hand at
@@ -73,7 +78,7 @@ namespace camada {
     requireOwned(Exp);                                                         \
     SortAssert;                                                                \
     SMTExprRef theExp =                                                        \
-        usesBVFPEncoding(Exp) ? SMTSolverImpl::ImplName(Exp) : ImplName(Exp);  \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), ImplName, Exp);              \
     ResultAssert;                                                              \
     return theExp;                                                             \
   }
@@ -85,9 +90,8 @@ namespace camada {
     requireOwned(LHS);                                                         \
     requireOwned(RHS);                                                         \
     requireFPSameSort(LHS, RHS);                                               \
-    SMTExprRef theExp = usesBVFPEncoding(LHS)                                  \
-                            ? SMTSolverImpl::ImplName(LHS, RHS)                \
-                            : ImplName(LHS, RHS);                              \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(LHS), ImplName, LHS, RHS);         \
     assert(theExp->isBoolSort());                                              \
     return theExp;                                                             \
   }
@@ -106,9 +110,8 @@ namespace camada {
     fatalErrorIf(                                                              \
         usesBVFPEncoding(To) != usesBVRMEncoding(R),                           \
         "Floating-point target and rounding mode use different encodings");    \
-    SMTExprRef theExp = usesBVFPEncoding(To)                                   \
-                            ? SMTSolverImpl::ImplName(From, To, R)             \
-                            : ImplName(From, To, R);                           \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(To), ImplName, From, To, R);       \
     assert(theExp->Sort == To);                                                \
     return theExp;                                                             \
   }
@@ -150,9 +153,8 @@ namespace camada {
     requireOwned(RHS);                                                         \
     requireOwned(R);                                                           \
     requireFPSameSortAndRM(LHS, RHS, R);                                       \
-    SMTExprRef theExp = usesBVFPEncoding(LHS)                                  \
-                            ? SMTSolverImpl::ImplName(LHS, RHS, R)             \
-                            : ImplName(LHS, RHS, R);                           \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(LHS), ImplName, LHS, RHS, R);      \
     assert(theExp->Sort == LHS->Sort);                                         \
     return theExp;                                                             \
   }
@@ -163,9 +165,8 @@ namespace camada {
     requireOwned(From);                                                        \
     requireFPSort(From);                                                       \
     fatalErrorIf(ToWidth == 0, "Bit-vector target width must be non-zero");    \
-    SMTExprRef theExp = usesBVFPEncoding(From)                                 \
-                            ? SMTSolverImpl::ImplName(From, ToWidth)           \
-                            : ImplName(From, ToWidth);                         \
+    SMTExprRef theExp =                                                        \
+        CAMADA_FP_DISPATCH(usesBVFPEncoding(From), ImplName, From, ToWidth);   \
     assert(theExp->getWidth() == ToWidth);                                     \
     return theExp;                                                             \
   }
@@ -223,9 +224,8 @@ namespace camada {
     fatalErrorIf(SigWidth == 0,                                                \
                  "Floating-point significand width must be non-zero");         \
     SMTSortRef Sort = mkFPSort(ExpWidth, SigWidth - 1, Encoding);              \
-    SMTExprRef theExp = usesBVFPEncoding(Sort)                                 \
-                            ? SMTSolverImpl::ImplName(Sgn, ExpWidth, SigWidth) \
-                            : ImplName(Sgn, ExpWidth, SigWidth);               \
+    SMTExprRef theExp = CAMADA_FP_DISPATCH(usesBVFPEncoding(Sort), ImplName,   \
+                                           Sgn, ExpWidth, SigWidth);           \
     assert(theExp->isFPSort());                                                \
     assert(theExp->getWidth() == (ExpWidth + SigWidth));                       \
     assert(theExp->getWidth() == theExp->Sort->getWidthFromSolver());          \
@@ -624,9 +624,8 @@ SMTSortRef SMTSolverImpl::mkRMSort(FPEncoding Encoding) {
   if (CachedSort)
     return CachedSort;
 
-  SMTSortRef theSort = Encoding == FPEncoding::BV
-                           ? SMTSolverImpl::mkRMSortImpl()
-                           : mkRMSortImpl();
+  SMTSortRef theSort =
+      CAMADA_FP_DISPATCH(Encoding == FPEncoding::BV, mkRMSortImpl, );
   assert(theSort->isRMSort());
   CachedSort = theSort;
   return theSort;
@@ -660,9 +659,8 @@ SMTSortRef SMTSolverImpl::mkFPSort(const unsigned ExpWidth,
   if (It != Cache.end())
     return It->second;
 
-  SMTSortRef theSort = Encoding == FPEncoding::BV
-                           ? SMTSolverImpl::mkFPSortImpl(ExpWidth, SigWidth)
-                           : mkFPSortImpl(ExpWidth, SigWidth);
+  SMTSortRef theSort = CAMADA_FP_DISPATCH(Encoding == FPEncoding::BV,
+                                          mkFPSortImpl, ExpWidth, SigWidth);
   assert(theSort->isFPSort());
   assert(theSort->getWidth() == (1 + ExpWidth + SigWidth));
   assert(theSort->getWidth() == theSort->getWidthFromSolver());
@@ -1326,9 +1324,8 @@ SMTExprRef SMTSolverImpl::mkFPNeg(const SMTExprRef &Exp,
                                   FPNegBehavior Behavior) {
   requireOwned(Exp);
   requireFPSort(Exp);
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkFPNegImpl(Exp, Behavior)
-                          : mkFPNegImpl(Exp, Behavior);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), mkFPNegImpl, Exp, Behavior);
   assert(theExp->Sort == Exp->Sort);
   return theExp;
 }
@@ -1357,9 +1354,8 @@ SMTExprRef SMTSolverImpl::mkFPRem(const SMTExprRef &LHS,
   requireOwned(LHS);
   requireOwned(RHS);
   requireFPSameSort(LHS, RHS);
-  SMTExprRef theExp = usesBVFPEncoding(LHS)
-                          ? SMTSolverImpl::mkFPRemImpl(LHS, RHS)
-                          : mkFPRemImpl(LHS, RHS);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(LHS), mkFPRemImpl, LHS, RHS);
   assert(theExp->Sort == LHS->Sort);
   return theExp;
 }
@@ -1373,9 +1369,8 @@ SMTExprRef SMTSolverImpl::mkFPSqrt(const SMTExprRef &Exp, const SMTExprRef &R) {
   requireOwned(R);
   requireFPSort(Exp);
   requireMatchingFPAndRMEncoding(Exp, R);
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkFPSqrtImpl(Exp, R)
-                          : mkFPSqrtImpl(Exp, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), mkFPSqrtImpl, Exp, R);
   assert(theExp->Sort == Exp->Sort);
   return theExp;
 }
@@ -1388,9 +1383,8 @@ SMTExprRef SMTSolverImpl::mkFPFMA(const SMTExprRef &X, const SMTExprRef &Y,
   requireOwned(R);
   requireFPSameSortAndRM(X, Y, R);
   requireSameSort(Y, Z, "floating-point");
-  SMTExprRef theExp = usesBVFPEncoding(X)
-                          ? SMTSolverImpl::mkFPFMAImpl(X, Y, Z, R)
-                          : mkFPFMAImpl(X, Y, Z, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(X), mkFPFMAImpl, X, Y, Z, R);
   assert(theExp->Sort == Z->Sort);
   return theExp;
 }
@@ -1408,9 +1402,8 @@ SMTExprRef SMTSolverImpl::mkFPToFP(const SMTExprRef &From, const SMTSortRef &To,
   fatalErrorIf(
       usesBVFPEncoding(To) != usesBVRMEncoding(R),
       "Floating-point target and rounding mode use different encodings");
-  SMTExprRef theExp = usesBVFPEncoding(To)
-                          ? SMTSolverImpl::mkFPToFPImpl(From, To, R)
-                          : mkFPToFPImpl(From, To, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(To), mkFPToFPImpl, From, To, R);
   assert(theExp->Sort == To);
   return theExp;
 }
@@ -1429,9 +1422,8 @@ SMTExprRef SMTSolverImpl::mkFPToIntegral(const SMTExprRef &From,
   requireOwned(R);
   requireFPSort(From);
   requireMatchingFPAndRMEncoding(From, R);
-  SMTExprRef theExp = usesBVFPEncoding(From)
-                          ? SMTSolverImpl::mkFPToIntegralImpl(From, R)
-                          : mkFPToIntegralImpl(From, R);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(From), mkFPToIntegralImpl, From, R);
   assert(theExp->isFPSort());
   return theExp;
 }
@@ -1915,9 +1907,8 @@ SMTResult<std::string> SMTSolverImpl::getFPInBin(const SMTExprRef &Exp) {
   requireFPSort(Exp);
   if (!ModelAvailable)
     return noModelError(Exp);
-  SMTResult<std::string> result = usesBVFPEncoding(Exp)
-                                      ? SMTSolverImpl::getFPInBinImpl(Exp)
-                                      : getFPInBinImpl(Exp);
+  SMTResult<std::string> result =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), getFPInBinImpl, Exp);
   if (!result)
     return result.error();
   return addLeadingZeroes(result.value(), Exp->getWidth());
@@ -2267,9 +2258,8 @@ SMTExprRef SMTSolverImpl::mkFPFromBin(const std::string &FP, unsigned EWidth,
   if (Cached != FPConstExprCache.end())
     return Cached->second;
 
-  SMTExprRef theExp = usesBVFPEncoding(Sort)
-                          ? SMTSolverImpl::mkFPFromBinImpl(FP, EWidth)
-                          : mkFPFromBinImpl(FP, EWidth);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Sort), mkFPFromBinImpl, FP, EWidth);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == FP.length());
   // The bits of a native-FP constant are known here and nowhere else;
@@ -2292,7 +2282,7 @@ CAMADA_DEFINE_CONST_CTOR(mkFP64, (const double Double, FPEncoding Encoding),
 
 SMTExprRef SMTSolverImpl::mkRM(const RM &R, FPEncoding Encoding) {
   SMTExprRef theExp =
-      Encoding == FPEncoding::BV ? SMTSolverImpl::mkRMImpl(R) : mkRMImpl(R);
+      CAMADA_FP_DISPATCH(Encoding == FPEncoding::BV, mkRMImpl, R);
   assert(theExp->isRMSort());
   return theExp;
 }
@@ -2376,9 +2366,8 @@ SMTExprRef SMTSolverImpl::mkBVToIEEEFP(const SMTExprRef &Exp,
   requireFPSort(To);
   fatalErrorIf(Exp->getWidth() != To->getWidth(),
                "Bit-vector and floating-point target widths must match");
-  SMTExprRef theExp = usesBVFPEncoding(To)
-                          ? SMTSolverImpl::mkBVToIEEEFPImpl(Exp, To)
-                          : mkBVToIEEEFPImpl(Exp, To);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(To), mkBVToIEEEFPImpl, Exp, To);
   assert(theExp->isFPSort());
   assert(theExp->getWidth() == Exp->getWidth());
   // Remember the bits this native-FP term was built from, so a later
@@ -2439,9 +2428,8 @@ SMTExprRef SMTSolverImpl::mkIEEEFPToBV(const SMTExprRef &Exp) {
   // unconditional bit-exactness must use FPEncoding::BV.
   if (auto It = IEEEBVShadow.find(&*Exp); It != IEEEBVShadow.end())
     return It->second;
-  SMTExprRef theExp = usesBVFPEncoding(Exp)
-                          ? SMTSolverImpl::mkIEEEFPToBVImpl(Exp)
-                          : mkIEEEFPToBVImpl(Exp);
+  SMTExprRef theExp =
+      CAMADA_FP_DISPATCH(usesBVFPEncoding(Exp), mkIEEEFPToBVImpl, Exp);
   // Exactly a plain BV sort: isBVSort() also answers true for BVFP, and a
   // BVFP-sorted result would leak into caller sort comparisons.
   assert(theExp->Sort->getSortKind() == SMTSortKind::BV);
