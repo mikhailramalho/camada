@@ -1534,9 +1534,10 @@ void SMTSolverImpl::assertArrayEqualCongruence(std::size_t LinkId,
   LazyConstraintLevels.back().push_back(std::move(Constraint));
 }
 
-template <class OnStore>
-SMTResult<const SMTSolverImpl::LazyConstArrayRoot *>
-SMTSolverImpl::walkLazyChain(const SMTExpr *Cur, OnStore Visit) {
+SMTResult<SMTExprRef> SMTSolverImpl::walkLazyChain(
+    const SMTExpr *Cur,
+    const std::function<bool(const LazyArrayStoreStep &, const std::string &)>
+        &Visit) {
   while (true) {
     if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
       const std::string StepBits = lazyIndexModelBits(It->second.Index);
@@ -1545,7 +1546,7 @@ SMTSolverImpl::walkLazyChain(const SMTExpr *Cur, OnStore Visit) {
                         "Could not evaluate a store index while walking a "
                         "lazily lowered array model"};
       if (Visit(It->second, StepBits))
-        return static_cast<const LazyConstArrayRoot *>(nullptr);
+        return SMTExprRef();
       Cur = It->second.Parent;
       continue;
     }
@@ -1558,7 +1559,7 @@ SMTSolverImpl::walkLazyChain(const SMTExpr *Cur, OnStore Visit) {
     }
     if (auto It = LazyConstArrayRoots.find(Cur);
         It != LazyConstArrayRoots.end())
-      return &It->second;
+      return It->second.Init;
     return SMTError{SMTErrorCode::BackendError, backendKind(),
                     "Untracked derivation while walking a lazily lowered "
                     "array model"};
@@ -1576,16 +1577,16 @@ SMTExprRef SMTSolverImpl::resolveLazyArrayElement(const SMTExprRef &Array,
     return {};
 
   SMTExprRef Stored;
-  auto Root = walkLazyChain(
+  auto Init = walkLazyChain(
       &*Array, [&](const LazyArrayStoreStep &Step, const std::string &Bits) {
         if (Bits != QueryBits)
           return false;
         Stored = Step.Value;
         return true;
       });
-  if (!Root)
+  if (!Init)
     return {};
-  return Root.value() ? Root.value()->Init : Stored;
+  return Stored ? Stored : Init.value();
 }
 
 SMTExprRef SMTSolverImpl::mkTuple(const std::vector<SMTExprRef> &Elements) {
@@ -1870,15 +1871,15 @@ SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
   // reached root's initializer becomes the default.
   ArrayModel Model;
   std::set<std::string> SeenIndexBits;
-  auto Root = walkLazyChain(
+  auto Init = walkLazyChain(
       &*Array, [&](const LazyArrayStoreStep &Step, const std::string &Bits) {
         if (SeenIndexBits.insert(Bits).second)
           Model.Entries.emplace_back(Step.Index, Step.Value);
         return false;
       });
-  if (!Root)
-    return Root.error();
-  Model.Base = Root.value()->Init;
+  if (!Init)
+    return Init.error();
+  Model.Base = Init.value();
   return Model;
 }
 

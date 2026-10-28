@@ -253,13 +253,14 @@ protected:
   std::unordered_map<const SMTExpr *, LazyArrayStoreStep> LazyArrayStores;
   std::unordered_map<const SMTExpr *, LazyArrayIteStep> LazyArrayItes;
   /// Follows the store/ite derivation chain of a lazily lowered array under
-  /// the current model. \p OnStore(Step, IndexBits) runs for each store and
-  /// returns true to stop. Gives the const-array root reached, or null when
-  /// stopped, or an error when an index or ite condition cannot be evaluated
-  /// or the chain leaves the tracked terms.
-  template <class OnStore>
-  SMTResult<const LazyConstArrayRoot *> walkLazyChain(const SMTExpr *Cur,
-                                                      OnStore Visit);
+  /// the current model. \p Visit(Step, IndexBits) runs for each store and
+  /// returns true to stop. Gives the initializer of the const-array root
+  /// reached, a null ref when stopped, or an error when an index or ite
+  /// condition cannot be evaluated or the chain leaves the tracked terms.
+  SMTResult<SMTExprRef> walkLazyChain(
+      const SMTExpr *Cur,
+      const std::function<bool(const LazyArrayStoreStep &, const std::string &)>
+          &Visit);
   // Memo of instantiated (root, index term) pairs. Default axioms and
   // extensionality lemmas are scope-independent facts, so instead of
   // forgetting them when a push scope pops, pop() re-asserts the journaled
