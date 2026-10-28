@@ -34,6 +34,16 @@ namespace camada {
 class SMTSort;
 enum class FPSpecialValueKind : uint8_t { NaN, Zero, Inf, One };
 
+// Boost-style hash combine.
+inline void hashCombine(std::size_t &Hash, std::size_t Value) noexcept {
+  Hash ^= static_cast<std::size_t>(Value + 0x9e3779b97f4a7c15ULL + (Hash << 6) +
+                                   (Hash >> 2));
+}
+
+inline void combineSortHash(std::size_t &Hash, const SMTSort *Sort) {
+  hashCombine(Hash, reinterpret_cast<std::uintptr_t>(Sort));
+}
+
 struct FPSortCacheKey {
   unsigned ExpWidth;
   unsigned SigWidth;
@@ -79,9 +89,9 @@ struct ArraySortCacheKey {
 
 struct ArraySortCacheKeyHash {
   std::size_t operator()(const ArraySortCacheKey &Key) const {
-    auto Index = reinterpret_cast<std::uintptr_t>(Key.IndexSort);
-    auto Element = reinterpret_cast<std::uintptr_t>(Key.ElementSort);
-    return static_cast<std::size_t>(Index ^ (Element << 1));
+    std::size_t Hash = reinterpret_cast<std::uintptr_t>(Key.IndexSort);
+    combineSortHash(Hash, Key.ElementSort);
+    return Hash;
   }
 };
 
@@ -117,16 +127,6 @@ struct SmallTupleSortCacheKey {
     return true;
   }
 };
-
-// Boost-style hash combine.
-inline void hashCombine(std::size_t &Hash, std::size_t Value) noexcept {
-  Hash ^= static_cast<std::size_t>(Value + 0x9e3779b97f4a7c15ULL + (Hash << 6) +
-                                   (Hash >> 2));
-}
-
-inline void combineSortHash(std::size_t &Hash, const SMTSort *Sort) {
-  hashCombine(Hash, reinterpret_cast<std::uintptr_t>(Sort));
-}
 
 // Hash for a pair of hashable keys, such as two expression pointers.
 struct PairKeyHash {
@@ -233,9 +233,9 @@ struct FPSpecialExprCacheKeyHash {
 
 struct FPConstExprCacheKeyHash {
   std::size_t operator()(const FPConstExprCacheKey &Key) const {
-    auto SortPtr = reinterpret_cast<std::uintptr_t>(Key.Sort);
-    auto BitsHash = std::hash<std::string>{}(Key.Bits);
-    return static_cast<std::size_t>(SortPtr ^ (BitsHash << 1));
+    std::size_t Hash = std::hash<std::string>{}(Key.Bits);
+    combineSortHash(Hash, Key.Sort);
+    return Hash;
   }
 };
 
