@@ -469,12 +469,19 @@ static void requireArraySort(const SMTExprRef &Exp,
     reportWrongSort(Exp->Sort, "an array", Op);
 }
 
+static void requireSortOf(const SMTSortRef &Expected, const SMTExprRef &Exp,
+                          const char *What,
+                          const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (Exp->Sort != Expected)
+    fatalError((std::string(Op) + ": " + What + " has sort " +
+                Exp->Sort->describe() + ", expected " + Expected->describe())
+                   .c_str());
+}
+
 static void requireArrayIndex(const SMTExprRef &Array, const SMTExprRef &Index,
                               const char *Op = CAMADA_CALLER_FUNCTION) {
   requireArraySort(Array, Op);
-  if (Array->Sort->getIndexSort() != Index->Sort)
-    reportSortMismatch(Array->Sort->getIndexSort(), Index->Sort, "array index",
-                       Op);
+  requireSortOf(Array->Sort->getIndexSort(), Index, "array index", Op);
 }
 
 } // namespace
@@ -1333,9 +1340,7 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
   requireOwned(Index);
   requireOwned(Element);
   requireArrayIndex(Array, Index);
-  if (Array->Sort->getElementSort() != Element->Sort)
-    reportSortMismatch(Array->Sort->getElementSort(), Element->Sort,
-                       "array element", "mkArrayStore");
+  requireSortOf(Array->Sort->getElementSort(), Element, "array element");
   // Decomposed tuple arrays store leaf-wise; the per-leaf stores re-enter
   // this wrapper, so the lazy guards/tracking below apply per leaf.
   if (lowersTuples(Array->Sort))
