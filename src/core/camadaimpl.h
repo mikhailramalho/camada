@@ -27,7 +27,6 @@
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -265,7 +264,8 @@ protected:
   // extensionality lemmas are scope-independent facts, so instead of
   // forgetting them when a push scope pops, pop() re-asserts the journaled
   // constraints at the outer level (see LazyConstraintLevels).
-  std::set<std::pair<const SMTExpr *, const SMTExpr *>> LazyTouched;
+  std::unordered_set<std::pair<const SMTExpr *, const SMTExpr *>, PairKeyHash>
+      LazyTouched;
   std::vector<std::vector<SMTExprRef>> LazyConstraintLevels{1};
   uint64_t LazyConstArrayCounter = 0;
   // Every distinct index term ever selected or stored at, grouped by index
@@ -325,7 +325,8 @@ protected:
   std::vector<ArrayEqualLink> ArrayEqualLinks;
   std::unordered_map<const SMTSort *, std::vector<std::size_t>>
       ArrayEqualLinksByIndexSort;
-  std::set<std::pair<std::size_t, const SMTExpr *>> ArrayEqualCongruenceDone;
+  std::unordered_set<std::pair<std::size_t, const SMTExpr *>, PairKeyHash>
+      ArrayEqualCongruenceDone;
   uint64_t ArrayEqualCounter = 0;
 
   SMTExprRef mkEncodedArrayEqual(const SMTExprRef &LHS, const SMTExprRef &RHS);

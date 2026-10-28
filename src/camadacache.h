@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace camada {
@@ -114,6 +115,17 @@ struct SmallTupleSortCacheKey {
         return false;
     }
     return true;
+  }
+};
+
+// Hash for a pair of hashable keys, such as two expression pointers.
+struct PairKeyHash {
+  template <class A, class B>
+  std::size_t operator()(const std::pair<A, B> &Key) const {
+    std::size_t Hash = std::hash<A>{}(Key.first);
+    Hash ^= std::hash<B>{}(Key.second) + 0x9e3779b97f4a7c15ULL + (Hash << 6) +
+            (Hash >> 2);
+    return Hash;
   }
 };
 
