@@ -645,8 +645,9 @@ SMTSortRef SMTSolverImpl::mkRMSort(FPEncoding Encoding) {
   if (CachedSort)
     return CachedSort;
 
-  SMTSortRef theSort =
-      CAMADA_FP_DISPATCH(Encoding == FPEncoding::BV, mkRMSortImpl, );
+  SMTSortRef theSort = Encoding == FPEncoding::BV
+                           ? SMTSolverImpl::mkRMSortImpl()
+                           : mkRMSortImpl();
   assert(theSort->isRMSort());
   CachedSort = theSort;
   return theSort;
