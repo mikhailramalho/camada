@@ -408,9 +408,9 @@ protected:
   //
   // Provenance entries (terms camada itself built from bits) are
   // scope-independent identity facts. Entries derived from asserted
-  // equalities die with their push scope: the tying constraint is
-  // retracted by pop(), and keeping the bits without it could conjure
-  // contradictions out of thin air.
+  // equalities commit only at scope 0 (see commitShadowLink): inside a
+  // scope the tying constraint would be retracted by pop(), and keeping
+  // the bits without it could conjure contradictions out of thin air.
   std::unordered_map<const SMTExpr *, SMTExprRef> IEEEBVShadow;
   // mkEqual results pairing a native-FP term with a shadowed counterpart;
   // the shadow commits only if the equality is actually asserted
@@ -420,9 +420,6 @@ protected:
     SMTExprRef Bits;
   };
   std::unordered_map<const SMTExpr *, PendingShadowLink> PendingShadowLinks;
-  // Scope journal for assert-derived entries: pop() erases them — the
-  // opposite of LazyConstraintLevels' re-assert, deliberately.
-  std::vector<std::vector<const SMTExpr *>> ShadowScopeLevels{1};
   void commitShadowLink(const SMTExprRef &Constraint);
 
   // --- IEEE bits function for backends without a native fp->bv ---

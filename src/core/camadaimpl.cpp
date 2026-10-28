@@ -549,7 +549,6 @@ void SMTSolverImpl::clearExprCaches() {
   AckBVConstBits.clear();
   IEEEBVShadow.clear();
   PendingShadowLinks.clear();
-  ShadowScopeLevels.assign(1, {});
   IEEEBVFnCache.clear();
   IEEEBVAppCache.clear();
   invalidateUnsatAssumptions();
@@ -867,12 +866,7 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // reports UNSAT on satisfiable formulas. At scope 0 no pop can retract
   // the tie, so the rewrite stays sound; deeper scopes fall back to the
   // underspecified backend operation, which is always correct.
-  //
-  // Because only scope 0 commits, ShadowScopeLevels never holds more than
-  // the root entry and pop()'s retraction loop is unreachable today. Both
-  // are kept deliberately: they are what makes relaxing this gate safe, and
-  // the journal is the only record of which shadows a scope established.
-  if (ShadowScopeLevels.size() != 1)
+  if (LazyConstraintLevels.size() != 1)
     return;
   // Consume the entry only now that it commits. Erasing before this gate
   // would drop a link asserted inside a scope, so a later assert of the
@@ -881,9 +875,8 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // backend operation. The entry cannot outlive its key: the map is
   // cleared in clearExprCaches(), which runs before ExprArena.clear().
   PendingShadowLinks.erase(It);
-  // Keep the first entry on collision; only journal what was inserted.
-  if (IEEEBVShadow.emplace(Link.Target, Link.Bits).second)
-    ShadowScopeLevels.back().push_back(Link.Target);
+  // Keep the first entry on collision.
+  IEEEBVShadow.emplace(Link.Target, Link.Bits);
 }
 
 CAMADA_DEFINE_SIMPLE_BINARY_WRAPPER(SMTExprRef, mkBVAdd,
@@ -2636,7 +2629,6 @@ void SMTSolverImpl::reset() {
 void SMTSolverImpl::push(unsigned nscopes) {
   invalidateUnsatAssumptions();
   LazyConstraintLevels.resize(LazyConstraintLevels.size() + nscopes);
-  ShadowScopeLevels.resize(ShadowScopeLevels.size() + nscopes);
   pushImpl(nscopes);
 }
 
@@ -2655,9 +2647,9 @@ void SMTSolverImpl::pop(unsigned nscopes) {
   // into a model-less backend. This is cheap and cannot itself throw.
   invalidateUnsatAssumptions();
   // Then pop the backend, still ahead of the journal work below. That work
-  // moves the axioms out of LazyConstraintLevels and erases the shadow
-  // entries, so a throw after it would lose them for good while leaving
-  // the backend a scope deeper than the common layer believes.
+  // moves the axioms out of LazyConstraintLevels, so a throw after it
+  // would lose them for good while leaving the backend a scope deeper than
+  // the common layer believes.
   popImpl(nscopes);
   // Lazy default axioms and extensionality lemmas asserted inside the
   // popped scopes are scope-independent facts about expressions that
@@ -2669,14 +2661,6 @@ void SMTSolverImpl::pop(unsigned nscopes) {
     Reassert.insert(Reassert.end(), std::make_move_iterator(Level.begin()),
                     std::make_move_iterator(Level.end()));
     LazyConstraintLevels.pop_back();
-  }
-  // Assert-derived bit-pattern shadows die with their scope: the tying
-  // equality is retracted by the pop, and keeping the bits without it
-  // would let mkIEEEFPToBV claim facts no longer asserted.
-  for (unsigned I = 0; I < nscopes && ShadowScopeLevels.size() > 1; ++I) {
-    for (const SMTExpr *Key : ShadowScopeLevels.back())
-      IEEEBVShadow.erase(Key);
-    ShadowScopeLevels.pop_back();
   }
   // Not model-preserving, despite re-asserting axioms that were: popImpl
   // above already discarded the backend's model, so there is nothing left
