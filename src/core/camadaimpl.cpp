@@ -671,6 +671,10 @@ SMTSortRef SMTSolverImpl::mkFP64Sort(FPEncoding Encoding) {
   return mkFPSort(11, 52, Encoding);
 }
 
+bool SMTSolverImpl::lowersTuples(const SMTSortRef &Sort) const {
+  return !nativeTupleSupport() && sortContainsTuple(Sort);
+}
+
 SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
                                       const SMTSortRef &ElemSort) {
   requireOwned(IndexSort);
@@ -680,7 +684,7 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
   // no backend sort handle) through mkArraySortImpl, where the backend
   // would static_cast it as one of its own sorts. Reject up front. The
   // per-field array decomposition is tracked in issue #17.
-  fatalErrorIf(sortContainsTuple(IndexSort) && !nativeTupleSupport(),
+  fatalErrorIf(lowersTuples(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
   ArraySortCacheKey Key{IndexSort.get(), ElemSort.get()};
@@ -691,7 +695,7 @@ SMTSortRef SMTSolverImpl::mkArraySort(const SMTSortRef &IndexSort,
   // Element sorts involving tuples have no backend representation on
   // backends without native datatype support: the array decomposes into
   // a bundle of per-leaf-field backend arrays (see camadatuple.cpp).
-  if (!nativeTupleSupport() && sortContainsTuple(ElemSort)) {
+  if (lowersTuples(ElemSort)) {
     SMTSortRef theSort = mkCamadaTupleArraySort(*this, IndexSort, ElemSort);
     assert(theSort->isArraySort());
     ArraySortCache.emplace(Key, theSort);
@@ -1043,7 +1047,7 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // Decomposed tuple arrays compare as the conjunction of their leaf
     // equalities; each leaf re-enters this wrapper and engages the
     // normal array-equality machinery (lazy witness, STP encoding).
-    if (!nativeTupleSupport() && sortContainsTuple(LHS->Sort->getElementSort()))
+    if (lowersTuples(LHS->Sort->getElementSort()))
       return mkCamadaTupleArrayEqual(*this, LHS, RHS);
     // Ackermann-mode arrays have no backend term to hand to mkEqualImpl;
     // equality is always the witness + observed-index congruence
@@ -1248,8 +1252,7 @@ SMTExprRef SMTSolverImpl::mkIte(const SMTExprRef &Cond, const SMTExprRef &T,
     return mkCamadaTupleIte(*this, Cond, T, F);
   // Decomposed tuple arrays ite leaf-wise; the per-leaf ites re-enter
   // this wrapper, so the lazy-root union tracking below applies per leaf.
-  if (!nativeTupleSupport() && T->Sort->isArraySort() &&
-      sortContainsTuple(T->Sort->getElementSort()))
+  if (T->Sort->isArraySort() && lowersTuples(T->Sort->getElementSort()))
     return mkCamadaTupleArrayIte(*this, Cond, T, F);
   if (arrayMode() == ArrayEncoding::Ackermann && T->Sort->isArraySort())
     return mkAckArrayIte(Cond, T, F);
@@ -1436,7 +1439,7 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   // Decomposed tuple arrays select leaf-wise; the per-leaf selects below
   // re-enter this wrapper, so observation/lazy instantiation happens per
   // leaf.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort->getElementSort()))
     return mkCamadaTupleArraySelect(*this, Array, Index);
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
@@ -1466,7 +1469,7 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
                "Expected array element with matching sort");
   // Decomposed tuple arrays store leaf-wise; the per-leaf stores re-enter
   // this wrapper, so the lazy guards/tracking below apply per leaf.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort->getElementSort()))
     return mkCamadaTupleArrayStore(*this, Array, Index, Element);
   // A store index is an index the formula constrains, exactly like a select
   // index: without observing it, encoded array equality never instantiates
@@ -1932,7 +1935,7 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     return noModelError(Array);
   // Decomposed tuple arrays read each leaf at Index and reassemble the
   // per-leaf values into a tuple; the per-leaf reads re-enter this wrapper.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort->getElementSort()))
     return getCamadaTupleArrayElement(*this, Array, Index);
   // Ackermann-mode arrays have no backend term to evaluate; resolve from
   // the tracked derivation chain and the reads of the equality class.
@@ -1968,7 +1971,7 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
     return noModelError(Array);
   // Decomposed tuple arrays zip the per-leaf sparse models into one
   // tuple-valued model; the per-leaf queries re-enter this wrapper.
-  if (!nativeTupleSupport() && sortContainsTuple(Array->Sort->getElementSort()))
+  if (lowersTuples(Array->Sort->getElementSort()))
     return getCamadaTupleArrayValues(*this, Array);
   if (arrayMode() == ArrayEncoding::Ackermann) {
     // Same limitation getArrayElement screens: the walk compares indexes by
@@ -2238,8 +2241,7 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   // without native datatype support.
   if (Sort->isTupleSort() && !nativeTupleSupport())
     theExp = mkCamadaTupleSymbol(*this, Name, Sort);
-  else if (!nativeTupleSupport() && Sort->isArraySort() &&
-           sortContainsTuple(Sort->getElementSort()))
+  else if (Sort->isArraySort() && lowersTuples(Sort->getElementSort()))
     theExp = mkCamadaTupleArraySymbol(*this, Name, Sort);
   // Ackermann mode: array symbols are roots of the read/congruence
   // encoding, never backend terms.
@@ -2331,7 +2333,7 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
                                        ConstArrayLowering Lowering) {
   requireOwned(IndexSort);
   requireOwned(InitValue);
-  fatalErrorIf(!nativeTupleSupport() && sortContainsTuple(IndexSort),
+  fatalErrorIf(lowersTuples(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
   const bool NativeOk =
@@ -2351,7 +2353,7 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   // Tuple-involving initializers decompose into one constant array per
   // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
   // lowering (and its lazy machinery) applies per leaf.
-  if (!nativeTupleSupport() && sortContainsTuple(InitValue->Sort))
+  if (lowersTuples(InitValue->Sort))
     return mkCamadaTupleArrayConst(*this, IndexSort, InitValue, Lowering);
   // Ackermann mode: the lowering choice is moot — a Const node's selects
   // return the initializer directly, which is exactly what both Native

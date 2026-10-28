@@ -1037,6 +1037,11 @@ protected:
            arrayMode() != ArrayEncoding::Ackermann && nativeDatatypeSupport();
   }
 
+  /// Whether values of \p Sort are lowered by the common layer instead of
+  /// reaching the backend: the sort involves a tuple and the backend has no
+  /// native tuples (arrays of tuples decompose into per-leaf arrays).
+  bool lowersTuples(const SMTSortRef &Sort) const;
+
   /// Whether the backend implements SMT-LIB datatypes at all. A fixed
   /// property of the backend, unlike nativeTupleSupport() which also
   /// depends on what the caller asked for.
