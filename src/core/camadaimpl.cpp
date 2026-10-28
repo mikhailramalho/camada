@@ -463,11 +463,18 @@ static void requireFPSameSortAndRM(const SMTExprRef &LHS, const SMTExprRef &RHS,
   requireMatchingFPAndRMEncoding(LHS, RM, Op);
 }
 
-static void requireArrayIndex(const SMTExprRef &Array,
-                              const SMTExprRef &Index) {
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
-  fatalErrorIf(Array->Sort->getIndexSort() != Index->Sort,
-               "Expected array index with matching sort");
+static void requireArraySort(const SMTExprRef &Exp,
+                             const char *Op = CAMADA_CALLER_FUNCTION) {
+  if (!Exp->isArraySort())
+    reportWrongSort(Exp->Sort, "an array", Op);
+}
+
+static void requireArrayIndex(const SMTExprRef &Array, const SMTExprRef &Index,
+                              const char *Op = CAMADA_CALLER_FUNCTION) {
+  requireArraySort(Array, Op);
+  if (Array->Sort->getIndexSort() != Index->Sort)
+    reportSortMismatch(Array->Sort->getIndexSort(), Index->Sort, "array index",
+                       Op);
 }
 
 } // namespace
@@ -1325,8 +1332,9 @@ SMTExprRef SMTSolverImpl::mkArrayStore(const SMTExprRef &Array,
   requireOwned(Index);
   requireOwned(Element);
   requireArrayIndex(Array, Index);
-  fatalErrorIf(Array->Sort->getElementSort() != Element->Sort,
-               "Expected array element with matching sort");
+  if (Array->Sort->getElementSort() != Element->Sort)
+    reportSortMismatch(Array->Sort->getElementSort(), Element->Sort,
+                       "array element", "mkArrayStore");
   // Decomposed tuple arrays store leaf-wise; the per-leaf stores re-enter
   // this wrapper, so the lazy guards/tracking below apply per leaf.
   if (lowersTuples(Array->Sort))
@@ -1842,7 +1850,7 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   requireOwned(Array);
-  fatalErrorIf(!Array->isArraySort(), "Expected array expression");
+  requireArraySort(Array);
   if (!ModelAvailable)
     return noModelError(Array);
   // Decomposed tuple arrays zip the per-leaf sparse models into one
