@@ -1543,8 +1543,7 @@ SMTSolverImpl::walkLazyChain(const SMTExpr *Cur, OnStore Visit) {
     if (auto It = LazyArrayStores.find(Cur); It != LazyArrayStores.end()) {
       const std::string StepBits = lazyIndexModelBits(It->second.Index);
       if (StepBits.empty())
-        return SMTError{SMTErrorCode::BackendError,
-                        CachedBoolExprs[0]->getBackendKind(),
+        return SMTError{SMTErrorCode::BackendError, backendKind(),
                         "Could not evaluate a store index while walking a "
                         "lazily lowered array model"};
       if (Visit(It->second, StepBits))
@@ -1562,8 +1561,7 @@ SMTSolverImpl::walkLazyChain(const SMTExpr *Cur, OnStore Visit) {
     if (auto It = LazyConstArrayRoots.find(Cur);
         It != LazyConstArrayRoots.end())
       return &It->second;
-    return SMTError{SMTErrorCode::BackendError,
-                    CachedBoolExprs[0]->getBackendKind(),
+    return SMTError{SMTErrorCode::BackendError, backendKind(),
                     "Untracked derivation while walking a lazily lowered "
                     "array model"};
   }
@@ -1943,8 +1941,7 @@ SMTSolverImpl::getArrayElementByModelValue(const SMTExprRef &Array,
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValuesImpl(const SMTExprRef &) {
-  return SMTError{SMTErrorCode::UnsupportedOperation,
-                  CachedBoolExprs[0]->getBackendKind(),
+  return SMTError{SMTErrorCode::UnsupportedOperation, backendKind(),
                   "Array model extraction is not supported by this backend"};
 }
 
@@ -2419,8 +2416,7 @@ CheckResult SMTSolverImpl::checkSatAssumingImpl(
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
   if (!UnsatAssumptionsValid)
-    return SMTError{SMTErrorCode::InvalidUsage,
-                    CachedBoolExprs[0]->getBackendKind(),
+    return SMTError{SMTErrorCode::InvalidUsage, backendKind(),
                     "getUnsatAssumptions is only valid right after a "
                     "checkSatAssuming call that returned UNSAT, before the "
                     "solver state is mutated or checked again"};
@@ -2445,8 +2441,7 @@ SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptions() {
 }
 
 SMTResult<std::vector<SMTExprRef>> SMTSolverImpl::getUnsatAssumptionsImpl() {
-  return SMTError{SMTErrorCode::UnsupportedOperation,
-                  CachedBoolExprs[0]->getBackendKind(),
+  return SMTError{SMTErrorCode::UnsupportedOperation, backendKind(),
                   "Unsat assumptions are not supported by this backend"};
 }
 
