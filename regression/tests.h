@@ -501,6 +501,7 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_sort_width_accessors);
   RESETANDARGTEST(rm_model_value, NativeFP);
   RESETANDARGTEST(rm_model_value, BVFP);
+  RESETANDTEST(bv_rm_symbol_domain);
   RESETANDTEST(false_rm_equality_reports);
   RESETANDTEST(rm_getter_rejects_non_rm);
   RESETANDARGTEST(fp_typed_getter_format, NativeFP);

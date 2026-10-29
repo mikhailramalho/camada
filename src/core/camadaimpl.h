@@ -959,6 +959,12 @@ private:
   /// The precondition mkForall and mkExists share.
   void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
                                  const SMTExprRef &Body);
+  /// True when a BV rounding mode holds one of the five valid codes: it
+  /// is three bits wide, so codes 5 to 7 would act as a sixth mode.
+  SMTExprRef isValidBVRM(const SMTExprRef &R);
+  /// The conjunction of isValidBVRM over the BV rounding modes in Vars, or
+  /// null when there are none.
+  SMTExprRef validBoundRMs(const std::vector<SMTExprRef> &Vars);
 
   /// Settles LastUnknown once the backend has answered.
   CheckResult finishCheck(CheckResult Result);

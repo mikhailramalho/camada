@@ -1235,6 +1235,34 @@ inline void rm_model_value(const camada::SMTSolverRef &solver,
            Any.value() == camada::RM::ROUND_TO_ZERO));
 }
 
+// A BV-encoded rounding mode is three bits wide, so without an axiom codes
+// 5 to 7 acted as a sixth mode: a symbol could differ from all five.
+inline void bv_rm_symbol_domain(const camada::SMTSolverRef &solver) {
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  auto notAnyMode = [&](const camada::SMTExprRef &R) {
+    camada::SMTExprRef None = solver->mkBool(true);
+    for (camada::RM Mode :
+         {camada::RM::ROUND_TO_EVEN, camada::RM::ROUND_TO_AWAY,
+          camada::RM::ROUND_TO_PLUS_INF, camada::RM::ROUND_TO_MINUS_INF,
+          camada::RM::ROUND_TO_ZERO})
+      None = solver->mkAnd(
+          None, solver->mkNot(solver->mkEqual(R, solver->mkRM(Mode, Enc))));
+    return None;
+  };
+
+  auto rm = solver->mkSymbol("rm", solver->mkRMSort(Enc));
+  solver->addConstraint(notAnyMode(rm));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // The axiom outlives the scope the symbol was made in.
+  solver->reset();
+  solver->push();
+  auto scoped = solver->mkSymbol("scoped", solver->mkRMSort(Enc));
+  solver->pop();
+  solver->addConstraint(notAnyMode(scoped));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+}
+
 inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
   // IEEE-754 recommends returning one of the input NaNs rather than a
   // fresh one (6.2), and requires the result be quiet (6.2.3). Every

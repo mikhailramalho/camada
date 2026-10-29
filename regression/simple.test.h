@@ -660,6 +660,21 @@ inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   three = solver->mkBVFromDec(3, 4);
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, three)));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // A bound BV rounding mode ranges over the five modes only, not over
+  // all eight codes its three bits hold.
+  solver->reset();
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  auto rm = solver->mkSymbol("rm", solver->mkRMSort(Enc));
+  auto none = solver->mkBool(true);
+  for (camada::RM Mode :
+       {camada::RM::ROUND_TO_EVEN, camada::RM::ROUND_TO_AWAY,
+        camada::RM::ROUND_TO_PLUS_INF, camada::RM::ROUND_TO_MINUS_INF,
+        camada::RM::ROUND_TO_ZERO})
+    none = solver->mkAnd(
+        none, solver->mkNot(solver->mkEqual(rm, solver->mkRM(Mode, Enc))));
+  solver->addConstraint(solver->mkExists({rm}, none));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void uf_semantics(const camada::SMTSolverRef &solver) {

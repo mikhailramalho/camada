@@ -1700,10 +1700,29 @@ void SMTSolverImpl::requireQuantifierOperands(
                  "issue #17");
 }
 
+SMTExprRef SMTSolverImpl::isValidBVRM(const SMTExprRef &R) {
+  SMTExprRef Valid = mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::BV));
+  for (const RM Mode : {RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
+                        RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
+    Valid = mkOr(Valid, mkEqual(R, mkRM(Mode, FPEncoding::BV)));
+  return Valid;
+}
+
+// The axiom mkSymbol asserts holds for the free symbol, not for a bound
+// variable of the same name, so quantifiers restrict their own.
+SMTExprRef SMTSolverImpl::validBoundRMs(const std::vector<SMTExprRef> &Vars) {
+  SMTExprRef Valid;
+  for (const SMTExprRef &V : Vars)
+    if (V->Sort->isBVRMSort())
+      Valid = Valid ? mkAnd(Valid, isValidBVRM(V)) : isValidBVRM(V);
+  return Valid;
+}
+
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireQuantifierOperands(Vars, Body);
-  SMTExprRef theExp = mkForallImpl(Vars, Body);
+  SMTExprRef Valid = validBoundRMs(Vars);
+  SMTExprRef theExp = mkForallImpl(Vars, Valid ? mkImplies(Valid, Body) : Body);
   assert(theExp->isBoolSort());
   return theExp;
 }
@@ -1715,7 +1734,8 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkForallImpl, "Quantifiers",
 SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireQuantifierOperands(Vars, Body);
-  SMTExprRef theExp = mkExistsImpl(Vars, Body);
+  SMTExprRef Valid = validBoundRMs(Vars);
+  SMTExprRef theExp = mkExistsImpl(Vars, Valid ? mkAnd(Valid, Body) : Body);
   assert(theExp->isBoolSort());
   return theExp;
 }
@@ -2096,6 +2116,13 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   else {
     theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
+    // A scope-independent fact about the symbol, so journal it like the
+    // lazy-array axioms and let pop() re-assert it.
+    if (Sort->isBVRMSort()) {
+      SMTExprRef Valid = isValidBVRM(theExp);
+      addConstraint(Valid);
+      LazyConstraintLevels.back().push_back(std::move(Valid));
+    }
   }
   Entries.push_back({Sort.get(), theExp});
   return theExp;
