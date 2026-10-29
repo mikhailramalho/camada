@@ -472,6 +472,8 @@ inline void tests_arrays(const camada::SMTSolverRef &solver) {
   RESETANDTEST(lazy_array_equality_reached_defaults);
   RESETANDARGTEST(lazy_array_equality_reached_defaults, LazyArrays);
   RESETANDARGTEST(lazy_array_unobserved_indexes, LazyArrays);
+  RESETANDTEST(lazy_array_untracked_models);
+  RESETANDARGTEST(lazy_array_untracked_models, LazyArrays);
   RESETANDTEST(const_array_lowering_interop);
 }
 
@@ -590,6 +592,7 @@ inline void tests_arith(const camada::SMTSolverRef &solver) {
   RESETANDTEST(arith_model_queries);
   RESETANDTEST(arith_conversion_semantics);
   RESETANDTEST(int_bv_conversion_semantics);
+  RESETANDTEST(lazy_array_int_index_models);
 }
 
 // The fixtures the "camada-tuples" matrix cell runs: a backend with native

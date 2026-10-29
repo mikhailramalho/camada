@@ -130,9 +130,9 @@ public:
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
 
-  /// The sorts lazyIndexModelBits can canonicalize. The Ackermann model
-  /// walks compare indexes by those bits, so an index outside this set is
-  /// a capability gap to report, not a failure to diagnose.
+  /// The index sorts the Ackermann model walks support, so an index
+  /// outside this set is a capability gap to report, not a failure to
+  /// diagnose.
   static bool ackCanEvaluateIndexSort(const SMTSortRef &Sort) {
     return Sort->isBoolSort() || Sort->isBVSort();
   }
@@ -141,8 +141,19 @@ public:
         Backend, "The Ackermann array encoding can only evaluate bool- "
                  "and bitvector-sorted indexes against a model");
   }
+  /// The sorts lazyIndexModelBits can canonicalize, which the lazy
+  /// constant array model queries compare indexes by.
+  static bool lazyCanEvaluateIndexSort(const SMTSortRef &Sort) {
+    return ackCanEvaluateIndexSort(Sort) || Sort->isIntSort() ||
+           Sort->isRealSort();
+  }
+  static SMTError lazyUnsupportedIndexSort(SMTBackendKind Backend) {
+    return unsupportedError(
+        Backend, "Lazily lowered constant arrays can only evaluate bool-, "
+                 "bitvector-, Int- and Real-sorted indexes against a model");
+  }
 
-  /// Model bits of a bool/BV-sorted expression after a SAT check, used to
+  /// Model value of a bool/BV/Int/Real expression after a SAT check, used to
   /// compare index terms by model value. Empty string when the sort is
   /// unsupported or the model query fails. Callers that revisit the same
   /// index term pays a single backend query: the result is memoized for
@@ -579,6 +590,8 @@ protected:
   /// model (the backend's model is unconstrained at indexes whose defaults
   /// were never instantiated).
   SMTResult<ArrayModel> lazyArrayModel(const SMTExprRef &Array);
+  SMTResult<ArrayModel> outsideArrayModel(const SMTExprRef &Array,
+                                          const SMTExprRef &Outside);
 
   /// Process-lifetime (see makeProcessLifetimeHandleState): handles keep a
   /// raw pointer to it, so it must stay readable after this solver dies.

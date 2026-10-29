@@ -754,6 +754,70 @@ inline void lazy_array_equality_reached_defaults(
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
+// Model queries on arrays that meet a lazy constant array only through an
+// asserted equality (#267) or an ite branch the chain walk cannot follow
+// (#269) must agree with the formula.
+inline void lazy_array_untracked_models(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto arr = solver->mkArraySort(bv8, bv8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, bv8); };
+  auto lazy = solver->mkArrayConst(bv8, idx(9), Lowering);
+  auto b = solver->mkSymbol("b", arr);
+  auto s = solver->mkSymbol("s", arr);
+  auto c = solver->mkSymbol("c", solver->mkBoolSort());
+  auto ite = solver->mkIte(c, lazy, s);
+  solver->addConstraint(solver->mkEqual(b, lazy));
+  solver->addConstraint(solver->mkNot(c));
+  solver->addConstraint(
+      solver->mkEqual(solver->mkArraySelect(s, idx(1)), idx(5)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  auto bv = [&](const camada::SMTExprRef &E) {
+    return solver->getBV(E).value();
+  };
+  REQUIRE(bv(arrayElement(solver, b, idx(42))) == 9);
+  auto bModel = solver->getArrayValues(b);
+  REQUIRE(bModel);
+  REQUIRE(bv(bModel.value().Base) == 9);
+  for (const auto &Entry : bModel.value().Entries)
+    REQUIRE(bv(Entry.second) == 9);
+
+  REQUIRE(bv(arrayElement(solver, ite, idx(1))) == 5);
+  auto iteModel = solver->getArrayValues(ite);
+  REQUIRE(iteModel);
+  auto atOne = iteModel.value().Base;
+  for (const auto &Entry : iteModel.value().Entries)
+    if (bv(Entry.first) == 1)
+      atOne = Entry.second;
+  REQUIRE(atOne);
+  REQUIRE(bv(atOne) == 5);
+}
+
+// Int-indexed lazy constant arrays answer model queries from the
+// initializer, not the backend's free model (#268, #269).
+inline void lazy_array_int_index_models(const camada::SMTSolverRef &solver) {
+  auto intSort = solver->mkIntSort();
+  auto x = solver->mkSymbol("x", intSort);
+  auto lazy =
+      solver->mkArrayConst(intSort, x, camada::ConstArrayLowering::Lazy);
+  auto stored = solver->mkArrayStore(lazy, solver->mkInt(3), solver->mkInt(5));
+  solver->addConstraint(solver->mkEqual(x, solver->mkInt(9)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  auto num = [&](const camada::SMTExprRef &E) {
+    return solver->getInt(E).value();
+  };
+  REQUIRE(num(arrayElement(solver, lazy, solver->mkInt(42))) == "9");
+  auto model = solver->getArrayValues(stored);
+  REQUIRE(model);
+  REQUIRE(num(model.value().Base) == "9");
+  REQUIRE(model.value().Entries.size() == 1);
+  REQUIRE(num(model.value().Entries[0].first) == "3");
+  REQUIRE(num(model.value().Entries[0].second) == "5");
+}
+
 // Arrays agreeing at every observed index can still differ at the others,
 // where a lazy root holds its default but no axiom says so. Equalities over
 // lazy roots answered SAT here, and a model read at an unobserved index
