@@ -199,7 +199,11 @@ protected:
   ObjectArena ExprArena;
   std::array<SMTExprRef, 2> CachedBoolExprs;
   std::array<SMTExprRef, 5> CachedRMBVExprs;
-  std::array<std::vector<SMTExprRef>, 3> CachedSmallBVExprs;
+  // Indexed by width. Fixed size so a slot never moves while a literal is
+  // being built, and an arbitrary width cannot grow it.
+  static constexpr unsigned MaxCachedSmallBVWidth = 256;
+  std::array<std::array<SMTExprRef, MaxCachedSmallBVWidth + 1>, 3>
+      CachedSmallBVExprs;
   SMTSortRef CachedBoolSort;
   SMTSortRef CachedIntSort;
   SMTSortRef CachedRealSort;
