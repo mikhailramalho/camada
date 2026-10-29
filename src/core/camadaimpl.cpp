@@ -480,8 +480,9 @@ SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
   // Only -1, 0 and 1 are cached; any other value is simply not in the cache.
   if (Value < -1 || Value > 1)
     return SMTExprRef{};
-  const auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Value)];
-  return Width < Cache.size() ? Cache[Width] : SMTExprRef{};
+  if (Width > MaxCachedSmallBVWidth)
+    return SMTExprRef{};
+  return CachedSmallBVExprs[cachedSmallBVExprIndex(Value)][Width];
 }
 
 SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
@@ -551,7 +552,7 @@ void SMTSolverImpl::clearExprCaches() {
   CachedBoolExprs.fill({});
   CachedRMBVExprs.fill({});
   for (auto &Cache : CachedSmallBVExprs)
-    Cache.clear();
+    Cache.fill({});
   SymbolExprCache.clear();
   // Every alias just forgotten is gone from the backend too (this runs on
   // reset and destruction), so the numbering starts over: a solver that has
@@ -591,12 +592,9 @@ void SMTSolverImpl::initializeCommonSingletons() {
   auto &CachedBVNegOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(-1)];
   auto &CachedBVZeroExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(0)];
   auto &CachedBVOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(1)];
-  CachedBVZeroExprs.resize(5);
   for (unsigned Width = 1; Width <= 4; ++Width)
     CachedBVZeroExprs[Width] = mkBVFromBin(std::string(Width, '0'), Width);
-  CachedBVOneExprs.resize(2);
   CachedBVOneExprs[1] = One1;
-  CachedBVNegOneExprs.resize(2);
   CachedBVNegOneExprs[1] = One1;
   for (RM R : {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
                RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
@@ -1991,11 +1989,9 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
   const unsigned Width = Sort->getWidth();
   // Only plain bit-vector -1, 0 and 1 are cached.
   SMTExprRef *Slot = nullptr;
-  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
-    auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
-    if (Cache.size() <= Width)
-      Cache.resize(Width + 1);
-    Slot = &Cache[Width];
+  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1 &&
+      Width <= MaxCachedSmallBVWidth) {
+    Slot = &CachedSmallBVExprs[cachedSmallBVExprIndex(Int)][Width];
     if (*Slot)
       return *Slot;
   }

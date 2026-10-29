@@ -1278,6 +1278,13 @@ inline void small_bv_cache_bounds(const camada::SMTSolverRef &solver) {
 
   for (int64_t Value : {int64_t{2}, int64_t{-2}, int64_t{-5}, int64_t{1} << 40})
     REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(Value, 8)));
+
+  // Widths past the fixed table are built every time, not cached.
+  auto Wide = solver->mkBVFromDec(0, 1000);
+  REQUIRE(Wide->getWidth() == 1000);
+  REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(0, 1000)));
+  REQUIRE_FALSE(static_cast<bool>(
+      Impl->cachedSmallBVExpr(0, std::numeric_limits<unsigned>::max())));
 }
 
 inline void arena_stress_test(const camada::SMTSolverRef &solver) {
