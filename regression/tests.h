@@ -431,6 +431,7 @@ inline void tests_core(const camada::SMTSolverRef &solver) {
   RESETANDTEST(shared_subterm_model_value);
   RESETANDTEST(wide_bv_decimal_model_value);
   RESETANDTEST(incremental_push_pop);
+  RESETANDTEST(push_after_unsat);
   RESETANDTEST(symbol_cache_survives_push_pop);
   RESETANDTEST(handle_invalidation_after_reset);
   RESETANDTEST(dump_string_semantics);

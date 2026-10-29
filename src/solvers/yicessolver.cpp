@@ -1108,6 +1108,7 @@ SMTResult<std::vector<SMTExprRef>> YicesSolver::getUnsatAssumptionsImpl() {
 void YicesSolver::resetImpl() {
   Assertions.clear();
   AssertionScopeSizes.clear();
+  UnsatPushes = 0;
   // Recreate with the logic/config this context was created with — a
   // custom-configured solver (e.g. a mixed Int/BV logic) must not revert
   // to the default on reset().
@@ -1117,14 +1118,20 @@ void YicesSolver::resetImpl() {
 void YicesSolver::pushImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i) {
     AssertionScopeSizes.push_back(Assertions.size());
-    yicesCheckError(yices_push(Context), "Could not push Yices context");
+    if (UnsatPushes || yices_context_status(Context) == YICES_STATUS_UNSAT)
+      ++UnsatPushes;
+    else
+      yicesCheckError(yices_push(Context), "Could not push Yices context");
   }
 }
 
 void YicesSolver::popImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i) {
     assert(!AssertionScopeSizes.empty() && "Could not pop empty Yices scope");
-    yicesCheckError(yices_pop(Context), "Could not pop Yices context");
+    if (UnsatPushes)
+      --UnsatPushes;
+    else
+      yicesCheckError(yices_pop(Context), "Could not pop Yices context");
     Assertions.resize(AssertionScopeSizes.back());
     AssertionScopeSizes.pop_back();
   }
