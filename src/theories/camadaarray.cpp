@@ -35,6 +35,7 @@
 
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -345,125 +346,114 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
 // Everything below runs after a SAT check and must not mint reads, emit
 // axioms, or count as formula observations — the model would be
 // invalidated. Resolution canonicalizes indexes by model value
-// (lazyIndexModelBits), walks store/ite chains under the model, and at
-// symbol roots consults the reads of the whole equality class: roots
-// connected by an ArrayEqualLink whose EqVar is true in the model must
-// answer consistently.
+// (lazyIndexModelBits) and searches the nodes equal to the queried array
+// at that index: an ite and its taken branch, a store and its base when
+// the store misses the index, the two sides of an ArrayEqualLink whose
+// EqVar is true in the model.
 
 struct AckClassWalk {
-  // Terminal symbol roots reached by any chain in the class.
-  std::vector<const SMTExpr *> Roots;
-  // First constant-root initializer reached, if any.
-  SMTExprRef ConstInit;
-  // Value found at the queried index by a store step, if any.
-  SMTExprRef StoreHit;
-  // Store entries seen along the walked chains, outermost first per
-  // chain, deduped by index model value (for getArrayValues).
-  std::vector<std::pair<SMTExprRef, SMTExprRef>> StoreEntries;
-  std::set<std::string> SeenStoreBits;
+  // Edges between nodes equal at the query index under the model.
+  std::unordered_map<const SMTExpr *, std::vector<const SMTExpr *>> Edges;
+  // Values pinned at the query index: a store hitting it, a constant
+  // array's initializer, a root's read at it.
+  std::unordered_map<const SMTExpr *, SMTExprRef> Pinned;
+  std::set<const SMTExpr *> Walked;
+  // Nodes equal to the queried array at the query index, BFS order.
+  std::vector<const SMTExpr *> Component;
+  // First value pinned in Component, if any.
+  SMTExprRef Value;
   bool Failed = false;
+
+  void link(const SMTExpr *A, const SMTExpr *B) {
+    Edges[A].push_back(B);
+    Edges[B].push_back(A);
+  }
 };
 
-// Walk one chain to its terminal under the current model, recording store
-// entries. QueryBits is empty for getArrayValues-style walks (collect
-// everything) and non-empty for point queries (stop at a store hit).
-void SMTSolverImpl::ackWalkChain(const SMTExpr *Node,
+// Record Node's chain under the model into Walk. Returns false when the
+// chain cannot be evaluated.
+bool SMTSolverImpl::ackWalkChain(const SMTExpr *Node,
                                  const std::string &QueryBits,
                                  AckClassWalk &Walk) {
-  while (true) {
+  while (Walk.Walked.insert(Node).second) {
     const auto *AE = dynamic_cast<const CamadaAckArrayExpr *>(Node);
-    if (AE == nullptr) {
-      Walk.Failed = true;
-      return;
-    }
+    if (AE == nullptr)
+      return false;
+    const SMTExpr *Next = nullptr;
     switch (AE->getKind()) {
-    case SMTExprKind::ArrayStore: {
-      const std::string StepBits = lazyIndexModelBits(AE->Index);
-      if (StepBits.empty()) {
-        Walk.Failed = true;
-        return;
+    case SMTExprKind::ArrayStore:
+      Next = &*AE->Base;
+      if (!QueryBits.empty()) {
+        const std::string StepBits = lazyIndexModelBits(AE->Index);
+        if (StepBits.empty())
+          return false;
+        // A store hitting the index says nothing about its base there.
+        if (StepBits == QueryBits) {
+          Walk.Pinned.emplace(Node, AE->Element);
+          break;
+        }
       }
-      if (!QueryBits.empty() && StepBits == QueryBits && !Walk.StoreHit) {
-        Walk.StoreHit = AE->Element;
-        return;
-      }
-      if (Walk.SeenStoreBits.insert(StepBits).second)
-        Walk.StoreEntries.emplace_back(AE->Index, AE->Element);
-      Node = &*AE->Base;
-      continue;
-    }
+      Walk.link(Node, Next);
+      break;
     case SMTExprKind::Ite: {
       SMTResult<bool> Cond = getBool(AE->Cond);
-      if (!Cond) {
-        Walk.Failed = true;
-        return;
-      }
-      Node = Cond.value() ? &*AE->TrueArr : &*AE->FalseArr;
-      continue;
+      if (!Cond)
+        return false;
+      Next = Cond.value() ? &*AE->TrueArr : &*AE->FalseArr;
+      Walk.link(Node, Next);
+      break;
     }
     case SMTExprKind::ArrayConst:
-      if (!Walk.ConstInit)
-        Walk.ConstInit = AE->Init;
-      return;
+      Walk.Pinned.emplace(Node, AE->Init);
+      return true;
     case SMTExprKind::Symbol:
-      Walk.Roots.push_back(Node);
-      return;
+      if (auto RootIt = AckArrayRoots.find(Node);
+          !QueryBits.empty() && RootIt != AckArrayRoots.end())
+        for (const AckArrayRead &R : RootIt->second.Reads)
+          if ((R.IndexIsConst ? R.ConstBits : lazyIndexModelBits(R.Index)) ==
+              QueryBits) {
+            Walk.Pinned.emplace(Node, R.Value);
+            break;
+          }
+      return true;
     default:
-      Walk.Failed = true;
-      return;
+      return false;
     }
+    Node = Next;
   }
+  return true;
 }
 
-// Expand Walk to the full equality class of the array it started from:
-// every ArrayEqualLink of the same sort whose EqVar is true in the model
-// and whose sides reach a root already in the class pulls both sides'
-// chains in. Iterates to a fixpoint.
-void SMTSolverImpl::ackExpandEqualityClass(const SMTSortRef &ArraySort,
-                                           const std::string &QueryBits,
-                                           AckClassWalk &Walk) {
-  std::set<const SMTExpr *> InClass(Walk.Roots.begin(), Walk.Roots.end());
-  std::set<std::size_t> UsedLinks;
-  bool Changed = true;
-  while (Changed && !Walk.Failed && !Walk.StoreHit) {
-    Changed = false;
-    for (std::size_t LinkId = 0; LinkId < ArrayEqualLinks.size(); ++LinkId) {
-      if (UsedLinks.count(LinkId) != 0)
-        continue;
-      const ArrayEqualLink &Link = ArrayEqualLinks[LinkId];
-      if (Link.LHS->Sort != ArraySort)
-        continue;
-      // Roots of each side under the model, computed with a throwaway
-      // walk so a side's store entries only join the class walk when the
-      // link is actually taken.
-      AckClassWalk L, R;
-      ackWalkChain(&*Link.LHS, std::string(), L);
-      ackWalkChain(&*Link.RHS, std::string(), R);
-      if (L.Failed || R.Failed)
-        continue;
-      const auto Touches = [&InClass](const AckClassWalk &Side) {
-        for (const SMTExpr *Root : Side.Roots)
-          if (InClass.count(Root) != 0)
-            return true;
-        return false;
-      };
-      if (!Touches(L) && !Touches(R))
-        continue;
-      SMTResult<bool> EqVal = getBool(Link.EqVar);
-      if (!EqVal || !EqVal.value()) {
-        UsedLinks.insert(LinkId);
-        continue;
-      }
-      UsedLinks.insert(LinkId);
-      Changed = true;
-      for (const SMTExprRef &Side : {Link.LHS, Link.RHS}) {
-        ackWalkChain(&*Side, QueryBits, Walk);
-        if (Walk.Failed || Walk.StoreHit)
-          return;
-      }
-      for (const SMTExpr *Root : Walk.Roots)
-        InClass.insert(Root);
-    }
+// Collect the nodes equal to Array at the query index under the model:
+// its chain, and the chains of every array equality true in the model.
+// Empty QueryBits stands for an index that no store or read hits.
+void SMTSolverImpl::ackClassValue(const SMTExprRef &Array,
+                                  const std::string &QueryBits,
+                                  AckClassWalk &Walk) {
+  if (!ackWalkChain(&*Array, QueryBits, Walk)) {
+    Walk.Failed = true;
+    return;
+  }
+  // ponytail: walks every link of the sort per query; index the links by
+  // sort if model queries get slow.
+  for (const ArrayEqualLink &Link : ArrayEqualLinks) {
+    if (Link.LHS->Sort != Array->Sort)
+      continue;
+    SMTResult<bool> Eq = getBool(Link.EqVar);
+    if (Eq && Eq.value() && ackWalkChain(&*Link.LHS, QueryBits, Walk) &&
+        ackWalkChain(&*Link.RHS, QueryBits, Walk))
+      Walk.link(&*Link.LHS, &*Link.RHS);
+  }
+  std::set<const SMTExpr *> Seen{&*Array};
+  Walk.Component.push_back(&*Array);
+  for (std::size_t I = 0; I < Walk.Component.size(); ++I) {
+    const SMTExpr *Node = Walk.Component[I];
+    if (auto It = Walk.Pinned.find(Node);
+        !Walk.Value && It != Walk.Pinned.end())
+      Walk.Value = It->second;
+    for (const SMTExpr *Next : Walk.Edges[Node])
+      if (Seen.insert(Next).second)
+        Walk.Component.push_back(Next);
   }
 }
 
@@ -497,74 +487,61 @@ SMTExprRef SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
                "the Ackermann array encoding (bool/BV index sorts only)");
 
   AckClassWalk Walk;
-  ackWalkChain(&*Array, QueryBits, Walk);
-  if (!Walk.StoreHit && !Walk.Failed)
-    ackExpandEqualityClass(Array->Sort, QueryBits, Walk);
+  ackClassValue(Array, QueryBits, Walk);
   fatalErrorIf(Walk.Failed,
                "Could not walk the array derivation chain against the "
                "model under the Ackermann array encoding");
-  if (Walk.StoreHit)
-    return Walk.StoreHit;
-
-  // Match the queried value against the class's reads.
-  for (const SMTExpr *Root : Walk.Roots) {
-    auto RootIt = AckArrayRoots.find(Root);
-    if (RootIt == AckArrayRoots.end())
-      continue;
-    for (const AckArrayRead &R : RootIt->second.Reads) {
-      const std::string ReadBits =
-          R.IndexIsConst ? R.ConstBits : lazyIndexModelBits(R.Index);
-      if (!ReadBits.empty() && ReadBits == QueryBits)
-        return R.Value;
-    }
-  }
-
-  if (Walk.ConstInit)
-    return Walk.ConstInit;
+  if (Walk.Value)
+    return Walk.Value;
 
   // Genuinely unconstrained: hand out a stable default, memoized per
-  // (primary root, index value) for the lifetime of the current model.
-  const SMTExpr *MemoKey = Walk.Roots.empty() ? &*Array : Walk.Roots.front();
-  auto [It, Inserted] = AckModelDefaults.try_emplace(
-      std::make_pair(MemoKey, QueryBits), SMTExprRef{});
-  if (Inserted)
-    It->second = ackDefaultElementValue(Array->Sort->getElementSort());
-  return It->second;
+  // (node, index value) across the class for the lifetime of the model.
+  for (const SMTExpr *Node : Walk.Component)
+    if (auto It = AckModelDefaults.find({Node, QueryBits});
+        It != AckModelDefaults.end())
+      return It->second;
+  SMTExprRef Value = ackDefaultElementValue(Array->Sort->getElementSort());
+  for (const SMTExpr *Node : Walk.Component)
+    AckModelDefaults.emplace(std::make_pair(Node, QueryBits), Value);
+  return Value;
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::ackArrayModel(const SMTExprRef &Array) {
+  const SMTError WalkError{SMTErrorCode::BackendError, backendKind(),
+                           "Could not walk the array derivation chain "
+                           "against the model under the Ackermann array "
+                           "encoding"};
   AckClassWalk Walk;
-  ackWalkChain(&*Array, std::string(), Walk);
-  if (!Walk.Failed)
-    ackExpandEqualityClass(Array->Sort, std::string(), Walk);
+  ackClassValue(Array, std::string(), Walk);
   if (Walk.Failed)
-    return SMTError{SMTErrorCode::BackendError, backendKind(),
-                    "Could not walk the array derivation chain against the "
-                    "model under the Ackermann array encoding"};
+    return WalkError;
 
   ArrayModel Model;
-  // Store entries first (outermost first per chain, own chain walked
-  // first, deduped by index value in ackWalkChain), then the class's
-  // reads at still-unseen index values.
-  for (auto &Entry : Walk.StoreEntries)
-    Model.Entries.emplace_back(Entry.first, Entry.second);
-  for (const SMTExpr *Root : Walk.Roots) {
-    auto RootIt = AckArrayRoots.find(Root);
-    if (RootIt == AckArrayRoots.end())
-      continue;
-    for (const AckArrayRead &R : RootIt->second.Reads) {
-      const std::string ReadBits =
-          R.IndexIsConst ? R.ConstBits : lazyIndexModelBits(R.Index);
-      if (ReadBits.empty())
-        return SMTError{SMTErrorCode::BackendError, backendKind(),
-                        "Could not evaluate a read index while walking an "
-                        "Ackermann array model"};
-      if (Walk.SeenStoreBits.insert(ReadBits).second)
-        Model.Entries.emplace_back(R.Index, R.Value);
-    }
+  // Off every store and read index the class reaches, the value is the
+  // constant initializer, if any (null: unconstrained off the entries).
+  Model.Base = Walk.Value;
+  std::set<std::string> Seen;
+  const auto Add = [&](const SMTExprRef &Index) {
+    const std::string Bits = lazyIndexModelBits(Index);
+    if (Bits.empty())
+      return false;
+    if (!Seen.insert(Bits).second)
+      return true;
+    AckClassWalk At;
+    ackClassValue(Array, Bits, At);
+    if (At.Value)
+      Model.Entries.emplace_back(Index, At.Value);
+    return !At.Failed;
+  };
+  for (const SMTExpr *Node : Walk.Component) {
+    const auto *AE = static_cast<const CamadaAckArrayExpr *>(Node);
+    if (AE->getKind() == SMTExprKind::ArrayStore && !Add(AE->Index))
+      return WalkError;
+    if (auto RootIt = AckArrayRoots.find(Node); RootIt != AckArrayRoots.end())
+      for (const AckArrayRead &R : RootIt->second.Reads)
+        if (!Add(R.Index))
+          return WalkError;
   }
-  Model.Base = Walk.ConstInit; // null for symbol roots: unconstrained off
-                               // the listed entries
   return Model;
 }
 
