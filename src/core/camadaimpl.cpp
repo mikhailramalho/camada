@@ -1931,6 +1931,9 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 
 bool SMTSolverImpl::isObservedValue(const SMTExprRef &Index) {
   const std::string Bits = lazyIndexModelBits(Index);
+  // No model value: trust the backend's model.
+  if (Bits.empty())
+    return true;
   const SMTExpr *Outside = &*OutsideIndexBySort.at(&*Index->Sort);
   for (const SMTExprRef &Observed : ObservedIndexesBySort.at(&*Index->Sort))
     if (&*Observed != Outside && lazyIndexModelBits(Observed) == Bits)
@@ -1961,10 +1964,17 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
     return getArrayValuesImpl(Array);
   if (!lazyCanEvaluateIndexSort(Array->Sort->getIndexSort()))
     return lazyUnsupportedIndexSort(Array->getBackendKind());
-  if (reachesLazyArray(Array))
+  const bool LazyDerived = reachesLazyArray(Array);
+  if (LazyDerived)
     if (SMTResult<ArrayModel> Model = lazyArrayModel(Array))
       return Model;
-  return outsideArrayModel(Array, Outside->second);
+  // ponytail: reads element by element only for the sorts every backend's
+  // getArrayElement reads; other element sorts keep the old model.
+  const SMTSortRef &Elem = Array->Sort->getElementSort();
+  if (Elem->isBoolSort() || Elem->isBVSort() || Elem->isFPSort() ||
+      Elem->isRMSort())
+    return outsideArrayModel(Array, Outside->second);
+  return LazyDerived ? lazyArrayModel(Array) : getArrayValuesImpl(Array);
 }
 
 // The outside index stands in for every index value the formula never
@@ -1984,7 +1994,13 @@ SMTSolverImpl::outsideArrayModel(const SMTExprRef &Array,
   const std::vector<SMTExprRef> Observed =
       ObservedIndexesBySort.at(&*Outside->Sort);
   for (const SMTExprRef &Index : Observed) {
-    if (&*Index == &*Outside || !Seen.insert(lazyIndexModelBits(Index)).second)
+    if (&*Index == &*Outside)
+      continue;
+    const std::string Bits = lazyIndexModelBits(Index);
+    if (Bits.empty())
+      return SMTError{SMTErrorCode::BackendError, backendKind(),
+                      "Could not evaluate an observed array index"};
+    if (!Seen.insert(Bits).second)
       continue;
     SMTResult<SMTExprRef> Value = getArrayElement(Array, Index);
     if (!Value)
