@@ -1235,6 +1235,42 @@ inline void rm_model_value(const camada::SMTSolverRef &solver,
            Any.value() == camada::RM::ROUND_TO_ZERO));
 }
 
+// Subnormal sources under the BV encoding: the conversion collapsed the low
+// significand bits into a sticky before normalizing, folding away the bits
+// that mattered, and its exponent wrapped when the target's was narrower.
+// Expected bits are native Z3's.
+inline void fp_to_fp_subnormal_source(const camada::SMTSolverRef &solver) {
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  struct Case {
+    const char *From;
+    unsigned FromE, ToE, ToS;
+    camada::RM Mode;
+    const char *Want;
+  };
+  const Case Cases[] = {
+      // binary16 65 * 2^-24 is exact in (8,6).
+      {"0000000001000001", 5, 8, 6, camada::RM::ROUND_TO_EVEN,
+       "001101101000001"},
+      // binary16 2^-24 is far below (3,4)'s smallest subnormal.
+      {"0000000000000001", 5, 3, 4, camada::RM::ROUND_TO_EVEN, "00000000"},
+      {"0000000000000001", 5, 3, 4, camada::RM::ROUND_TO_PLUS_INF, "00000001"},
+      // binary32's smallest subnormal is far below (5,15)'s.
+      {"00000000000000000000000000000001", 8, 5, 15, camada::RM::ROUND_TO_EVEN,
+       "000000000000000000000"},
+  };
+  for (const Case &C : Cases) {
+    solver->reset();
+    auto got = solver->mkFPToFP(solver->mkFPFromBin(C.From, C.FromE, Enc),
+                                solver->mkFPSort(C.ToE, C.ToS, Enc),
+                                solver->mkRM(C.Mode, Enc));
+    INFO(C.From << " to (" << C.ToE << "," << C.ToS << ") mode "
+                << static_cast<int>(C.Mode));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(
+        solver->mkIEEEFPToBV(got), solver->mkBVFromBin(C.Want))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
+}
+
 inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
   // IEEE-754 recommends returning one of the input NaNs rather than a
   // fresh one (6.2), and requires the result be quiet (6.2.3). Every
