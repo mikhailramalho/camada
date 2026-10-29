@@ -314,15 +314,8 @@ protected:
 private:
   void releaseSymbolNames();
 
-  // SIGALRM-based per-check time limit (POSIX only): armTimeout installs a
-  // handler that calls yices_stop_search on this context and starts an
-  // interval timer from TimeoutMs; disarmTimeout cancels the timer and
-  // restores the previous handler. No-ops when TimeoutMs is 0.
-  void armTimeout();
-  void disarmTimeout();
-
   YicesContextRef Context = nullptr;
-  std::vector<std::string> NamedSymbols;
+  std::vector<term_t> NamedSymbols;
 
 }; // namespace camada
 

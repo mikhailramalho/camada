@@ -25,38 +25,52 @@
 #include "../camada.h"
 #include "../camadaerrors.h"
 
+#include <chrono>
+#include <condition_variable>
 #include <gmp.h>
 #include <mutex>
+#include <thread>
 #include <utility>
 #include <vector>
-
-#if !defined(_WIN32)
-#include <atomic>
-#include <csignal>
-#include <sys/time.h>
-#endif
 #include <yices.h>
 
 namespace camada {
 
-#if !defined(_WIN32)
 namespace {
-// Yices has no native time limit; the documented interruption mechanism is
-// calling yices_stop_search from a signal handler (the same pattern
-// smt-switch uses). The solver running the current check parks its context
-// here for the handler. The timer, handler slot, and this context are all
-// process-global, so at most one Yices check may run under a time limit at
-// a time process-wide: concurrent timed checks on Yices instances in
-// different threads would clobber each other's timer and deadline.
-std::atomic<context_t *> YicesSearchContext{nullptr};
-struct sigaction YicesOldAlarmAction = {};
+// Yices has no native time limit; yices_stop_search interrupts a running
+// check from another thread. Each timed check gets its own watchdog rather
+// than a process-wide SIGALRM handler and timer.
+class SearchDeadline {
+public:
+  SearchDeadline(context_t *Ctx, uint64_t TimeoutMs) {
+    if (TimeoutMs == 0)
+      return;
+    Watchdog = std::thread([this, Ctx, TimeoutMs] {
+      std::unique_lock<std::mutex> Lock(Mutex);
+      if (!Done.wait_for(Lock, std::chrono::milliseconds(TimeoutMs),
+                         [this] { return Finished; }))
+        yices_stop_search(Ctx);
+    });
+  }
 
-void yicesAlarmHandler(int) {
-  if (context_t *Ctx = YicesSearchContext.load())
-    yices_stop_search(Ctx);
-}
+  ~SearchDeadline() {
+    if (!Watchdog.joinable())
+      return;
+    {
+      std::lock_guard<std::mutex> Lock(Mutex);
+      Finished = true;
+    }
+    Done.notify_one();
+    Watchdog.join();
+  }
+
+private:
+  std::mutex Mutex;
+  std::condition_variable Done;
+  bool Finished = false;
+  std::thread Watchdog;
+};
 } // namespace
-#endif
 
 namespace {
 
@@ -193,8 +207,11 @@ void YicesSolver::destroyContext() {
 }
 
 void YicesSolver::releaseSymbolNames() {
-  for (const auto &Name : NamedSymbols)
-    yices_remove_term_name(Name.c_str());
+  // The name table is process-wide. Clearing by term removes only this
+  // solver's mapping; removing by name would drop whichever solver named
+  // the symbol last.
+  for (term_t T : NamedSymbols)
+    yices_clear_term_name(T);
   NamedSymbols.clear();
 }
 
@@ -974,7 +991,7 @@ SMTExprRef YicesSolver::mkSymbolImpl(const std::string &Name,
 
   yicesCheckError(yices_set_term_name(t, Name.c_str()),
                   "Error when trying to set Yices symbol name");
-  NamedSymbols.push_back(Name);
+  NamedSymbols.push_back(t);
 
   return makeExprRef<YicesExpr>(SMTExprKind::Symbol, Context, Sort, t);
 }
@@ -984,72 +1001,19 @@ SMTExprRef YicesSolver::mkArrayConstImpl(const SMTSortRef &,
   fatalError("Yices constant arrays are lowered lazily by the common layer");
 }
 
-void YicesSolver::armTimeout() {
-#if !defined(_WIN32)
-  if (TimeoutMs == 0)
-    return;
-  YicesSearchContext.store(Context);
-  struct sigaction Action = {};
-  Action.sa_handler = yicesAlarmHandler;
-  // yices_stop_search works through a flag the search loop polls, so the
-  // handler needs no syscall interruption: restart slow syscalls instead
-  // of surfacing spurious EINTRs to the rest of the process.
-  Action.sa_flags = SA_RESTART;
-  sigemptyset(&Action.sa_mask);
-  sigaction(SIGALRM, &Action, &YicesOldAlarmAction);
-  itimerval Timer{};
-  Timer.it_value.tv_sec = static_cast<time_t>(TimeoutMs / 1000);
-  Timer.it_value.tv_usec = static_cast<suseconds_t>((TimeoutMs % 1000) * 1000);
-  setitimer(ITIMER_REAL, &Timer, nullptr);
-#endif
-}
-
-void YicesSolver::disarmTimeout() {
-#if !defined(_WIN32)
-  if (TimeoutMs == 0)
-    return;
-  // A timer that expired between the check returning and the cancel below
-  // leaves SIGALRM pending; delivering it after the old disposition is
-  // restored could terminate the process (SIG_DFL). Block the signal,
-  // cancel the timer, discard any pending instance (POSIX guarantees
-  // setting SIG_IGN discards pending signals), then restore.
-  sigset_t AlarmSet, OldSet;
-  sigemptyset(&AlarmSet);
-  sigaddset(&AlarmSet, SIGALRM);
-  pthread_sigmask(SIG_BLOCK, &AlarmSet, &OldSet);
-  itimerval Off{};
-  setitimer(ITIMER_REAL, &Off, nullptr);
-  struct sigaction Ignore = {};
-  Ignore.sa_handler = SIG_IGN;
-  sigemptyset(&Ignore.sa_mask);
-  sigaction(SIGALRM, &Ignore, nullptr);
-  sigaction(SIGALRM, &YicesOldAlarmAction, nullptr);
-  YicesSearchContext.store(nullptr);
-  pthread_sigmask(SIG_SETMASK, &OldSet, nullptr);
-#endif
-}
-
-bool YicesSolver::setTimeoutImpl(uint64_t) {
-#if defined(_WIN32)
-  return false;
-#else
-  return true;
-#endif
-}
+bool YicesSolver::setTimeoutImpl(uint64_t) { return true; }
 
 bool YicesSolver::timeoutSupport() const {
-  // Enforced through SIGALRM + yices_stop_search; POSIX only.
-#if defined(_WIN32)
-  return false;
-#else
+  // Enforced through yices_stop_search from a watchdog thread.
   return true;
-#endif
 }
 
 CheckResult YicesSolver::checkImpl() {
-  armTimeout();
-  smt_status_t res = yices_check_context(Context, nullptr);
-  disarmTimeout();
+  smt_status_t res;
+  {
+    SearchDeadline Deadline(Context, TimeoutMs);
+    res = yices_check_context(Context, nullptr);
+  }
   if (res == YICES_STATUS_SAT)
     return CheckResult::SAT;
 
@@ -1057,7 +1021,7 @@ CheckResult YicesSolver::checkImpl() {
     return CheckResult::UNSAT;
 
   // The timeout is delivered by interrupting the search (see
-  // yicesAlarmHandler), so INTERRUPTED means the deadline fired.
+  // SearchDeadline), so INTERRUPTED means the deadline fired.
   if (res == YICES_STATUS_INTERRUPTED)
     noteUnknownReason(UnknownReason::Timeout);
   else if (res == YICES_STATUS_ERROR)
@@ -1072,11 +1036,13 @@ YicesSolver::checkSatAssumingImpl(const std::vector<SMTExprRef> &Assumptions) {
   for (const SMTExprRef &Assumption : Assumptions)
     assumptions.push_back(toSolverExpr<YicesExpr>(*Assumption).Expr);
 
-  armTimeout();
-  smt_status_t res = yices_check_context_with_assumptions(
-      Context, nullptr, static_cast<uint32_t>(assumptions.size()),
-      assumptions.data());
-  disarmTimeout();
+  smt_status_t res;
+  {
+    SearchDeadline Deadline(Context, TimeoutMs);
+    res = yices_check_context_with_assumptions(
+        Context, nullptr, static_cast<uint32_t>(assumptions.size()),
+        assumptions.data());
+  }
   if (res == YICES_STATUS_SAT)
     return CheckResult::SAT;
 
