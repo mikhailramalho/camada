@@ -69,6 +69,8 @@ set(CAMADA_CVC5_SHA256
 # Baked into cadiback's config.hpp, which Camada writes itself; see
 # camada_setup_cryptominisat_solver_deps.
 set(CAMADA_CADIBACK_REVISION "69255f55e411207c4bdea02c6c2ab1ef29740ce1")
+set(CAMADA_CADIBACK_SHA256
+    "d7084360537ed1bf5159b0b58633fb9bf02e9dc3f24cb053ecbdfa4dc9fefb19")
 
 # CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
 # prebuilt URLs to pin. It stays disabled on Windows, as it was under the
@@ -601,15 +603,15 @@ endfunction()
 # Tarballs carry no submodules. The only caller that had any is CryptoMiniSat,
 # whose four are test utilities (OutputCheck, cnf-utils, sha1-sat, licensecheck)
 # referenced from tests/ and never from the library build.
-function(camada_fetch_git_source package_name repository git_tag out_var)
+function(camada_fetch_git_source package_name repository git_tag out_var sha256)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
-  # A fifth argument pins the archive's SHA256. A clone verified the object
-  # against the ref; a tarball has no such check, and a tag can be repointed at
-  # different content. A full commit SHA is content-addressed already, but the
-  # tarball GitHub builds from it is not checked, so pin it as well.
-  if(ARGC GREATER 4)
-    set(url_hash_arg URL_HASH SHA256=${ARGV4})
+  # Every archive is pinned by SHA256. A clone verified the object against the
+  # ref; a tarball has no such check, and a tag can be repointed at different
+  # content. A full commit SHA is content-addressed already, but the tarball
+  # GitHub builds from it is not checked, so pin it as well.
+  if(NOT sha256)
+    message(FATAL_ERROR "No SHA256 pinned for ${repository}@${git_tag}")
   endif()
   cpmaddpackage(
     NAME
@@ -618,7 +620,8 @@ function(camada_fetch_git_source package_name repository git_tag out_var)
     YES
     URL
     "https://github.com/${repository}/archive/${git_tag}.tar.gz"
-    ${url_hash_arg})
+    URL_HASH
+    SHA256=${sha256})
   set(${out_var}
       "${${package_name}_SOURCE_DIR}"
       PARENT_SCOPE)
@@ -674,7 +677,7 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # CMS 5.11.22's backbone.cpp (2024-06-07).
     camada_fetch_git_source(
       cryptominisat_cadiback meelgroup/cadiback "${CAMADA_CADIBACK_REVISION}"
-      cms_cadiback_source_dir)
+      cms_cadiback_source_dir "${CAMADA_CADIBACK_SHA256}")
     camada_prepare_cryptominisat_dependency_layout("${cms_cadiback_dir}"
                                                    "${cms_cadiback_source_dir}")
     camada_run_checked(
@@ -1408,11 +1411,13 @@ endfunction()
 # fetch brings no submodules, and STP add_subdirectory()s these, so the
 # directory has to hold the real source rather than the empty placeholder the
 # archive carries.
-function(camada_place_stp_submodule destination package repository revision)
+function(camada_place_stp_submodule destination package repository revision
+         sha256)
   if(EXISTS "${destination}/CMakeLists.txt")
     return()
   endif()
-  camada_fetch_git_source(${package} ${repository} ${revision} source_dir)
+  camada_fetch_git_source(${package} ${repository} ${revision} source_dir
+                          ${sha256})
   file(REMOVE_RECURSE "${destination}")
   file(COPY "${source_dir}/" DESTINATION "${destination}")
 endfunction()
@@ -1443,10 +1448,12 @@ function(camada_setup_stp)
   # pins, so the tree matches a checkout with `git submodule update --init`.
   camada_place_stp_submodule(
     "${stp_source_dir}/lib/extlib-abc" stpabc berkeley-abc/abc
-    95393064368b7c05da4d6f0264fc3419c175c7cb)
+    95393064368b7c05da4d6f0264fc3419c175c7cb
+    b23f9384edb297a27cb0420d9f99ca4cf4e2a2a301ac10b41418f770a839cb9e)
   camada_place_stp_submodule(
     "${stp_source_dir}/lib/extlib-mimalloc" stpmimalloc microsoft/mimalloc
-    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe)
+    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe
+    c240b03282eab8d55a0348d4430c160bb8f73b1aff247dd45b7a10d03b2bdc9f)
 
   if(APPLE)
     # STATICCOMPILE implies BUILD_SHARED_LIBS=OFF, which makes STP link its
