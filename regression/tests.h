@@ -145,6 +145,16 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
   require_abort([&]() {
     (void)solver->mkArraySort(other->mkBVSort(4), solver->mkBVSort(4));
   });
+  // Literal builders take a sort too; -1, 0 and 1 used to be cached under
+  // the foreign sort and handed back to later calls on this solver.
+  require_abort([&]() { (void)solver->mkBVFromDec(0, other->mkBVSort(8)); });
+  require_abort([&]() { (void)solver->mkBVFromBin("0", other->mkBVSort(1)); });
+  require_abort([&]() {
+    (void)solver->mkFXPFromBin("0000", other->mkFXPSort(4, 2, true));
+  });
+  require_abort([&]() {
+    (void)solver->mkFXPFromRawBV(theirs, solver->mkFXPSort(8, 4, true));
+  });
 
   // Model getters, on a solver that has a model to hand back. The
   // macro-generated getters and the hand-written ones must agree here:

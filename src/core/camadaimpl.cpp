@@ -1984,6 +1984,7 @@ CAMADA_DEFINE_CONST_CTOR(mkReal, (int64_t num, int64_t den), (num, den),
 
 SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
+  requireOwned(Sort);
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector decimal literal sort must be bit-vector");
   const unsigned Width = Sort->getWidth();
@@ -2011,6 +2012,7 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int, unsigned BitWidth) {
 
 SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int,
                                       const SMTSortRef &Sort) {
+  requireOwned(Sort);
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector binary literal sort must be bit-vector");
   fatalErrorIf(Int.empty(), "Bit-vector binary literal must be non-empty");
