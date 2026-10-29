@@ -880,7 +880,10 @@ endfunction()
 function(camada_setup_gmp)
   set(gmp_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
   set(gmp_header "${CAMADA_DEPS_INSTALL_DIR}/include/gmp.h")
-  if(EXISTS "${gmp_lib}" AND EXISTS "${gmp_header}")
+  # CVC5 needs the C++ bindings, so a tree staged without them is rebuilt.
+  if(EXISTS "${gmp_lib}"
+     AND EXISTS "${gmp_header}"
+     AND EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmpxx.a")
     return()
   endif()
 
@@ -919,6 +922,8 @@ function(camada_setup_gmp)
     ./configure
     --prefix=${CAMADA_DEPS_INSTALL_DIR}
     --disable-shared
+    # libgmpxx, for CVC5: without it CVC5 takes the system GMP's headers.
+    --enable-cxx
     ABI=64
     # -std=gnu17: GCC 14 defaults to C23, where GMP's own "long long
     # reliability" probe no longer compiles -- it declares `void g(){}` and then
@@ -927,6 +932,7 @@ function(camada_setup_gmp)
     # compiler", so a host without a system GMP could not build any backend that
     # needs one.
     CFLAGS=-fPIC\ -std=gnu17
+    CXXFLAGS=-fPIC
     CPPFLAGS=-DPIC)
   camada_run_checked(
     WORKING_DIRECTORY
@@ -1331,6 +1337,18 @@ function(camada_build_cvc5_from_source)
   endif()
 
   camada_setup_shared_cadical()
+  # CVC5 is linked against the shared GMP, so it has to be compiled against the
+  # same headers. Its FindGMP searches the default paths and picks the system
+  # gmp.h otherwise; the explicit cache entries skip that search.
+  camada_gmp_library(cvc5_gmp_lib)
+  set(cvc5_gmp_args)
+  if(cvc5_gmp_lib STREQUAL "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+    set(cvc5_gmp_args
+        -DGMP_INCLUDE_DIR=${CAMADA_DEPS_INSTALL_DIR}/include
+        -DGMPXX_INCLUDE_DIR=${CAMADA_DEPS_INSTALL_DIR}/include
+        -DGMP_LIBRARIES=${cvc5_gmp_lib}
+        -DGMPXX_LIBRARIES=${CAMADA_DEPS_INSTALL_DIR}/lib/libgmpxx.a)
+  endif()
   camada_fetch_git_source(cvc5src cvc5/cvc5 "${CAMADA_CVC5_GIT_TAG}"
                           cvc5_source_dir "${CAMADA_CVC5_SHA256}")
   set(cvc5_build_name camada)
@@ -1360,7 +1378,8 @@ function(camada_build_cvc5_from_source)
     # build tree and installs pyparsing there. Forcing it OFF makes CVC5
     # pip-install into the system interpreter, which PEP 668 refuses on Homebrew
     # and on recent Debian/Ubuntu ("externally-managed-environment").
-    -DBUILD_BINDINGS_JAVA=OFF)
+    -DBUILD_BINDINGS_JAVA=OFF
+    ${cvc5_gmp_args})
 
   # CVC5's configure generates Unix Makefiles, not Ninja. Bare `make -j` is
   # unbounded: make starts every ready target at once, and a few hundred
