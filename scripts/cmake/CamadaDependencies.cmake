@@ -247,6 +247,44 @@ function(camada_find_gmp_header out_var)
   unset(_camada_gmp_header_dir CACHE)
 endfunction()
 
+# Sets out_var to the linker flag that keeps a shared library's dynamic table to
+# the patterns in symbols_file (one per line, # comments): a version script for
+# GNU ld and lld, an -exported_symbols_list for Apple's linker. Both are
+# generated from the one list so the platforms cannot drift. out_var_FILE gets
+# the generated file, for LINK_DEPENDS. Empty on Windows, which exports nothing
+# by default.
+function(camada_exported_symbols_flag out_var symbols_file)
+  set(${out_var}
+      ""
+      PARENT_SCOPE)
+  if(WIN32)
+    return()
+  endif()
+  file(STRINGS "${symbols_file}" patterns REGEX "^[^#]")
+  get_filename_component(name "${symbols_file}" NAME_WE)
+  if(APPLE)
+    # Mach-O prefixes every C-level name with an underscore.
+    list(TRANSFORM patterns PREPEND "_")
+    list(JOIN patterns "\n" body)
+    set(generated "${CMAKE_BINARY_DIR}/exports/${name}.exp")
+    set(flag "-Wl,-exported_symbols_list,${generated}")
+  else()
+    list(JOIN patterns ";\n    " globals)
+    set(body "{\n  global:\n    ${globals};\n  local:\n    *;\n};")
+    set(generated "${CMAKE_BINARY_DIR}/exports/${name}.map")
+    set(flag "-Wl,--version-script=${generated}")
+  endif()
+  # CONFIGURE rewrites only on change, so the library is not relinked on every
+  # configure.
+  file(CONFIGURE OUTPUT "${generated}" CONTENT "${body}\n" @ONLY)
+  set(${out_var}
+      "${flag}"
+      PARENT_SCOPE)
+  set(${out_var}_FILE
+      "${generated}"
+      PARENT_SCOPE)
+endfunction()
+
 function(camada_find_program_with_prefixes out_var program_name)
   string(TOUPPER "${program_name}" _camada_program_upper)
   set(_camada_program_cache_var "CAMADA_FOUND_PROGRAM_${_camada_program_upper}")
@@ -1570,15 +1608,11 @@ function(camada_setup_yices)
   set(yices_gmp_include_dir "${CAMADA_DEPS_INSTALL_DIR}/include")
   # Yices absorbs GMP statically, so its shared library would export GMP as well
   # as its own API, competing with every other provider in the process. Its link
-  # honours LDFLAGS, so the version script goes in there rather than patching
-  # its makefile. GNU ld and lld only: Apple's linker has no --version-script,
-  # so macOS keeps the plain flags.
-  set(yices_ldflags "-L${yices_gmp_lib_dir}")
-  if(NOT APPLE)
-    set(yices_ldflags
-        "${yices_ldflags} -Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/yices.map"
-    )
-  endif()
+  # honours LDFLAGS, so the export list goes in there rather than patching its
+  # makefile.
+  camada_exported_symbols_flag(yices_exports_flag
+                               "${CMAKE_CURRENT_LIST_DIR}/yices.exports")
+  set(yices_ldflags "-L${yices_gmp_lib_dir} ${yices_exports_flag}")
   camada_fetch_git_source(
     yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir
     584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
