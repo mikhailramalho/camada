@@ -1279,6 +1279,12 @@ inline void small_bv_cache_bounds(const camada::SMTSolverRef &solver) {
   for (int64_t Value : {int64_t{2}, int64_t{-2}, int64_t{-5}, int64_t{1} << 40})
     REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(Value, 8)));
 
+  // The last width the fixed table holds is cached; the next one is not.
+  auto Edge = solver->mkBVFromDec(1, 256);
+  REQUIRE(&*Impl->cachedSmallBVExpr(1, 256) == &*Edge);
+  REQUIRE(solver->mkBVFromDec(1, 257)->getWidth() == 257);
+  REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(1, 257)));
+
   // Widths past the fixed table are built every time, not cached.
   auto Wide = solver->mkBVFromDec(0, 1000);
   REQUIRE(Wide->getWidth() == 1000);
