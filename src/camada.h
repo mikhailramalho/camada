@@ -465,8 +465,8 @@ public:
   // negative) has no payload to carry and builds a fresh NaN. mkFPAbs
   // keeps the payload and clears the sign without quieting, since
   // IEEE-754 treats it as a non-computational bit manipulation.
-  // mkFPToFP does not yet reposition the payload into the target
-  // format's significand; see issue #195.
+  // mkFPToFP moves the payload into the target format the way hardware
+  // does: left-aligned, so narrowing drops its low bits.
   //
   // On a native FP sort none of this is observable: the backend has one
   // abstract NaN, so any NaN result reads back as its canonical pattern.

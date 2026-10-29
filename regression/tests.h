@@ -498,6 +498,7 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_neg_nan_native_bv_parity);
   RESETANDTEST(fp_neg_nan_payload_bits);
   RESETANDTEST(fp_nan_payload_propagation);
+  RESETANDTEST(fp_to_fp_nan_payload);
   RESETANDTEST(fp_sort_width_accessors);
   RESETANDARGTEST(rm_model_value, NativeFP);
   RESETANDARGTEST(rm_model_value, BVFP);

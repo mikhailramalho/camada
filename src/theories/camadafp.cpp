@@ -1664,11 +1664,21 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
   SMTExprRef pinf = mkFPInf(*this, to_ebits, to_sbits, false);
   SMTExprRef ninf = mkFPInf(*this, to_ebits, to_sbits, true);
 
-  // NaN -> NaN
+  // NaN -> NaN, quieted, with the payload moved the way hardware moves it:
+  // the significand field is left-aligned, so widening pads it on the
+  // right and narrowing drops its low bits. A payload narrowed to zero
+  // stays a NaN because the quiet bit is set after the move.
   SMTExprRef c1 = mkFPIsNaN(From);
-  SMTExprRef v1 =
-      mkIte(mkIsNeg(*this, From), mkFPNaN(*this, to_ebits, to_sbits, true),
-            mkFPNaN(*this, to_ebits, to_sbits, false));
+  SMTExprRef payload = extractSig(*this, From);
+  if (from_sbits < to_sbits)
+    payload = mkBVConcat(payload, mkBVFromDec(0, to_sbits - from_sbits));
+  else if (from_sbits > to_sbits)
+    payload = mkBVExtract(from_sbits - 2, from_sbits - to_sbits, payload);
+  SMTExprRef v1 = quietNaNOf(
+      *this,
+      mkBVToIEEEFP(mkBVConcat(extractSgn(*this, From),
+                              mkBVConcat(mkTopExp(*this, to_ebits), payload)),
+                   To));
 
   // +0 -> +0
   SMTExprRef c2 = mkIsPZero(*this, From);

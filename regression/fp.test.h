@@ -1235,6 +1235,51 @@ inline void rm_model_value(const camada::SMTSolverRef &solver,
            Any.value() == camada::RM::ROUND_TO_ZERO));
 }
 
+// fp.to_fp on a NaN moves the payload the way hardware does: the
+// significand field is left-aligned, so widening pads it on the right and
+// narrowing drops its low bits, and the result is quiet. Values taken from
+// an x86-64 host.
+inline void fp_to_fp_nan_payload(const camada::SMTSolverRef &solver) {
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  const auto bin = [](const std::string &Hex) {
+    std::string Bits;
+    for (char C : Hex) {
+      const unsigned V = std::stoul(std::string(1, C), nullptr, 16);
+      for (int I = 3; I >= 0; --I)
+        Bits += (V >> I) & 1 ? '1' : '0';
+    }
+    return Bits;
+  };
+  struct Case {
+    const char *From;
+    unsigned FromE, ToE, ToS;
+    const char *Want;
+  };
+  const Case Cases[] = {
+      {"7fd55555", 8, 11, 52, "7ffaaaaaa0000000"},
+      {"7ffaaaaaaaaaaaaa", 11, 8, 23, "7fd55555"},
+      // Signalling: quieted after the move.
+      {"7ff5555555555555", 11, 8, 23, "7feaaaaa"},
+      // The payload narrows to zero, and the quiet bit keeps it a NaN.
+      {"7ff0000000000001", 11, 8, 23, "7fc00000"},
+      {"fff8000000000001", 11, 8, 23, "ffc00000"},
+  };
+  for (const Case &C : Cases) {
+    solver->reset();
+    auto got = solver->mkFPToFP(solver->mkFPFromBin(bin(C.From), C.FromE, Enc),
+                                solver->mkFPSort(C.ToE, C.ToS, Enc),
+                                solver->mkRM(camada::RM::ROUND_TO_EVEN, Enc));
+    const std::string Want = bin(C.Want);
+    auto rb = solver->mkSymbol("nan_bits", solver->mkBVSort(Want.size()));
+    solver->addConstraint(solver->mkEqual(rb, solver->mkIEEEFPToBV(got)));
+    INFO(C.From << " -> " << C.Want);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    auto v = solver->getBVInBin(rb);
+    REQUIRE(v);
+    REQUIRE(v.value() == Want);
+  }
+}
+
 inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
   // IEEE-754 recommends returning one of the input NaNs rather than a
   // fresh one (6.2), and requires the result be quiet (6.2.3). Every
