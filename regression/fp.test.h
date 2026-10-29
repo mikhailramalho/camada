@@ -831,11 +831,12 @@ inline void fp_fma_host_oracle(const camada::SMTSolverRef &solver,
   }
 }
 
-// FMA under each directed rounding mode, with a literal mode. The exact
-// result sits half way between two floats, so every mode picks a side and a
-// backend that ignored the mode (MathSAT's FMA once ran its symbolic
-// rounding-mode chain over the literal and rounded every case down) fails
-// at least one of them. Round to away is left out: MathSAT has no such mode.
+// FMA under each directed rounding mode, with a literal mode and with a
+// symbol fixed to it. The exact result sits half way between two floats, so
+// every mode picks a side and a backend that ignored the mode (MathSAT's FMA
+// once ran its symbolic rounding-mode chain over the literal and rounded
+// every case down, and with a symbol it built a broken model) fails at least
+// one of them. Round to away is left out: MathSAT has no such mode.
 inline void fp_fma_rounding_modes(const camada::SMTSolverRef &solver,
                                   camada::FPEncoding Encoding) {
   const float Tiny = std::ldexp(1.0f, -24);
@@ -857,21 +858,27 @@ inline void fp_fma_rounding_modes(const camada::SMTSolverRef &solver,
   };
 
   // Read the result from the model: refuting the negated equality missed it.
-  for (const Case &C : Cases) {
-    solver->reset();
-    auto res = solver->mkSymbol("res", solver->mkFP32Sort(Encoding));
-    solver->addConstraint(
-        solver->mkEqual(res, solver->mkFPFMA(solver->mkFP32(C.X, Encoding),
-                                             solver->mkFP32(C.Y, Encoding),
-                                             solver->mkFP32(C.Z, Encoding),
-                                             solver->mkRM(C.Mode, Encoding))));
-    INFO("fma(" << C.X << ", " << C.Y << ", " << C.Z << ") mode "
-                << static_cast<int>(C.Mode));
-    REQUIRE(solver->check() == camada::CheckResult::SAT);
-    auto Got = solver->getFP32(res);
-    REQUIRE(Got);
-    REQUIRE(Got.value() == C.Want);
-  }
+  for (const Case &C : Cases)
+    for (bool Symbolic : {false, true}) {
+      solver->reset();
+      auto rm = solver->mkRM(C.Mode, Encoding);
+      if (Symbolic) {
+        auto sym = solver->mkSymbol("rm", solver->mkRMSort(Encoding));
+        solver->addConstraint(solver->mkEqual(sym, rm));
+        rm = sym;
+      }
+      auto res = solver->mkSymbol("res", solver->mkFP32Sort(Encoding));
+      solver->addConstraint(solver->mkEqual(
+          res, solver->mkFPFMA(solver->mkFP32(C.X, Encoding),
+                               solver->mkFP32(C.Y, Encoding),
+                               solver->mkFP32(C.Z, Encoding), rm)));
+      INFO("fma(" << C.X << ", " << C.Y << ", " << C.Z << ") mode "
+                  << static_cast<int>(C.Mode) << (Symbolic ? " symbolic" : ""));
+      REQUIRE(solver->check() == camada::CheckResult::SAT);
+      auto Got = solver->getFP32(res);
+      REQUIRE(Got);
+      REQUIRE(Got.value() == C.Want);
+    }
 }
 
 // FPEncoding::Native on a backend with no native FP is the BV encoding, so the
