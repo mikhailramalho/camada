@@ -755,7 +755,8 @@ std::string SMTLIBSolver::setupError() const {
 
 SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
                            const SolverConfig &Config)
-    : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)) {
+    : SMTSolverImpl(Config, SMTBackendKind::SMTLIB),
+      File(std::make_unique<FileEmitter>(OutputPath)) {
   // The base sets arrayMode() before the singletons are built: constant
   // tracking (AckBVConstBits) must cover the cached small bit-vectors. They
   // are pure terms, so a half-built solver gets them too and keeps the
@@ -769,7 +770,8 @@ SMTLIBSolver::SMTLIBSolver(const std::string &OutputPath,
 SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const SolverConfig &Config)
-    : SMTSolverImpl(Config), Proc(std::make_unique<ProcessEmitter>(Argv)) {
+    : SMTSolverImpl(Config, SMTBackendKind::SMTLIB),
+      Proc(std::make_unique<ProcessEmitter>(Argv)) {
   initializeCommonSingletons();
   if (!setupError().empty())
     return; // half-built; createSMTLIBSolver reports and discards it
@@ -780,7 +782,8 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBProcessTag,
                            const std::vector<std::string> &Argv,
                            const std::string &OutputPath,
                            const SolverConfig &Config)
-    : SMTSolverImpl(Config), File(std::make_unique<FileEmitter>(OutputPath)),
+    : SMTSolverImpl(Config, SMTBackendKind::SMTLIB),
+      File(std::make_unique<FileEmitter>(OutputPath)),
       Proc(std::make_unique<ProcessEmitter>(Argv)) {
   initializeCommonSingletons();
   if (!setupError().empty())
@@ -792,8 +795,9 @@ SMTLIBSolver::SMTLIBSolver(SMTLIBOneShotTag, const std::string &FormulaPath,
                            const std::string &ShellCmd,
                            const std::vector<std::string> &ModelArgv,
                            PgidCallback OnSpawn, const SolverConfig &Config)
-    : SMTSolverImpl(Config), OneShotMode(true), OneShotFormulaPath(FormulaPath),
-      OneShotShellCmd(ShellCmd), OneShotOnSpawn(std::move(OnSpawn)),
+    : SMTSolverImpl(Config, SMTBackendKind::SMTLIB), OneShotMode(true),
+      OneShotFormulaPath(FormulaPath), OneShotShellCmd(ShellCmd),
+      OneShotOnSpawn(std::move(OnSpawn)),
       File(std::make_unique<FileEmitter>(FormulaPath)),
       Proc(ModelArgv.empty() ? nullptr
                              : std::make_unique<ProcessEmitter>(ModelArgv)) {

@@ -81,7 +81,8 @@ public:
   /// There is deliberately no default constructor: a backend that forgot to
   /// forward its config would silently get ArrayEncoding::Native, so the
   /// compiler is made to ask for it.
-  explicit SMTSolverImpl(const SolverConfig &Config) : Config(Config) {}
+  SMTSolverImpl(const SolverConfig &Config, SMTBackendKind Kind)
+      : Config(Config), Kind(Kind) {}
   /// Backend destructors MUST call invalidateGeneratedObjects() before
   /// releasing backend resources (contexts, term managers, etc.). The arena
   /// destructors run during base-class teardown, after derived members are
@@ -150,11 +151,9 @@ public:
   /// Public because the Camada tuple lowering is a free function.
   std::string lazyIndexModelBits(const SMTExprRef &Exp);
 
-  /// The backend this solver drives, read off a cached expression.
-  /// Public, like unsupportedError, for the Camada tuple lowering.
-  SMTBackendKind backendKind() const {
-    return CachedBoolExprs[0]->getBackendKind();
-  }
+  /// The backend this solver drives. Public, like unsupportedError, for the
+  /// Camada tuple lowering.
+  SMTBackendKind backendKind() const { return Kind; }
 
   /// An UnsupportedOperation error from \p Backend saying \p Msg.
   static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
@@ -1526,6 +1525,9 @@ private:
   /// so a backend cannot cache a field and drift from the caller's request,
   /// and a field a backend has no use for simply never gets read.
   const SolverConfig Config;
+  /// Fixed by the concrete backend, so it stays valid while the expression
+  /// caches are empty during reset() and destruction.
+  const SMTBackendKind Kind;
 };
 
 } // namespace camada
