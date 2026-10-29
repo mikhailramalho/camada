@@ -294,6 +294,35 @@ protected:
       ObservedIndexesBySort;
   std::unordered_set<const SMTExpr *> ObservedIndexSeen;
   void observeArrayIndex(const SMTExprRef &Index);
+  // Observed indexes alone are not complete once a constant array is in
+  // play: two arrays can agree at every observed index and still differ at
+  // all the others, where a constant array holds its default but nothing
+  // says so. Each index sort with a lazy or Ackermann constant array gets
+  // one outside index, kept distinct from every observed index, so
+  // defaults and congruence also fire at a stand-in for all the others.
+  std::unordered_map<const SMTSort *, SMTExprRef> OutsideIndexBySort;
+  // Index sorts with an Ackermann constant array.
+  std::unordered_set<const SMTSort *> AckConstIndexSorts;
+  void ensureOutsideIndex(const SMTSortRef &IndexSort);
+  void separateFromOutside(const SMTExprRef &Outside, const SMTExprRef &Index,
+                           std::size_t K);
+  /// True when Index's model value is that of an index the formula
+  /// observes, other than the outside one.
+  bool isObservedValue(const SMTExprRef &Index);
+  // A native array disequality may pick its difference at an unobserved
+  // index, where a lazy root is unconstrained, so every array equality at
+  // an index sort with a lazy root gets an extensionality witness. Those
+  // built before the sort's first lazy root wait here; each distinct
+  // equality is handled once.
+  struct NativeArrayEqual {
+    SMTExprRef LHS;
+    SMTExprRef RHS;
+    SMTExprRef Eq;
+  };
+  std::unordered_map<const SMTSort *, std::vector<NativeArrayEqual>>
+      UnwitnessedArrayEquals;
+  std::unordered_set<const SMTExpr *> SeenArrayEquals;
+  void witnessArrayEqual(const NativeArrayEqual &E);
   // True while a model query (getArrayElement) is evaluating: selects
   // built for evaluation must not instantiate default axioms or count as
   // formula observations — asserting after check() invalidates the
