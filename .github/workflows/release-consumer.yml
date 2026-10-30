@@ -4,7 +4,11 @@ name: Release Consumer
 # (scripts/release-consumer) against the staged `./release` directory.
 # Exercises the install path the official release tarballs use, so changes
 # to install rules, exported include paths, or camadaTargets.cmake stop
-# breaking downstream builds silently.
+# breaking downstream builds silently. The subproject job builds Camada inside
+# a consumer with add_subdirectory instead (scripts/subproject-consumer), which
+# catches paths that only hold when Camada is the top-level project, and runs
+# the regression suite against the in-tree target. Homebrew's Z3 is new enough,
+# so no solver is built from source there.
 on:
   push:
     branches:
@@ -90,3 +94,28 @@ jobs:
 
     - name: Run consumer
       run: ctest --test-dir scripts/release-consumer/build --parallel 4 --output-on-failure
+
+  subproject:
+    name: macOS subproject consumer
+    runs-on: macos-15
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Dependencies
+      run: brew install catch2 cmake ninja z3
+
+    - name: Configure consumer
+      run: >
+        cmake -S scripts/subproject-consumer -B scripts/subproject-consumer/build -GNinja
+        -DCAMADA_ENABLE_REGRESSION=ON
+        -DCAMADA_DOWNLOAD_DEPENDENCIES=OFF
+        -DCAMADA_SOLVER_Z3_ENABLE=ON
+        -DCAMADA_SOLVER_BITWUZLA_ENABLE=OFF -DCAMADA_SOLVER_CVC5_ENABLE=OFF
+        -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF -DCAMADA_SOLVER_STP_ENABLE=OFF
+        -DCAMADA_SOLVER_YICES_ENABLE=OFF
+        -DENABLE_WERROR=ON
+
+    - name: Build consumer
+      run: cmake --build scripts/subproject-consumer/build
+
+    - name: Run consumer
+      run: ctest --test-dir scripts/subproject-consumer/build --parallel 4 --output-on-failure
