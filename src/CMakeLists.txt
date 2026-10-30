@@ -16,12 +16,12 @@ function(add_header_to_install)
   endforeach()
 endfunction()
 
-# Include the source dir, so headers under solvers/ can include their siblings
-# by plain name -- the same way an installed consumer resolves them from
-# camada/'s include root.
+# Include the source dir, so sources include "solvers/z3solver.h" and the like
+# relative to src/.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-# and the staged header directory, after the source dir, so we can include
-# camadafeatures.h while every other header still resolves to the source tree.
+# The staged header directory, for camadafeatures.h. It goes ahead of the binary
+# src/ below, where trees configured before the headers were staged still hold
+# an old camadafeatures.h.
 include_directories(${PROJECT_BINARY_DIR}/include/camada)
 # Include binary path so we can include ac_config.h
 include_directories(${PROJECT_BINARY_DIR}/src)
@@ -81,14 +81,22 @@ set(${LIBRARY_TARGET_NAME}_HDR core/camadaimpl.h)
 # Stage the installed headers in the build tree, in the installed layout, so a
 # project that adds Camada with add_subdirectory includes <camada/camada.h>
 # exactly as an installed consumer does. configure_file re-runs CMake whenever a
-# header changes, so the copies cannot go stale.
+# header changes, and a header that leaves the lists has its copy removed.
 set(_camada_staged_include_dir "${PROJECT_BINARY_DIR}/include")
+set(_camada_staged_dir "${_camada_staged_include_dir}/${LIBRARY_TARGET_NAME}")
+file(
+  GLOB_RECURSE _camada_old_staged
+  RELATIVE "${_camada_staged_dir}"
+  "${_camada_staged_dir}/*.h")
+list(REMOVE_ITEM _camada_old_staged camadafeatures.h)
 foreach(header IN
         LISTS ${LIBRARY_TARGET_NAME}_PUB_HDR ${LIBRARY_TARGET_NAME}_SOLVER_HDR
               ${LIBRARY_TARGET_NAME}_CORE_HDR)
-  configure_file(
-    "${header}"
-    "${_camada_staged_include_dir}/${LIBRARY_TARGET_NAME}/${header}" COPYONLY)
+  configure_file("${header}" "${_camada_staged_dir}/${header}" COPYONLY)
+  list(REMOVE_ITEM _camada_old_staged "${header}")
+endforeach()
+foreach(header IN LISTS _camada_old_staged)
+  file(REMOVE "${_camada_staged_dir}/${header}")
 endforeach()
 
 # Adds a library target called ${LIBRARY_TARGET_NAME} to be built from the
@@ -108,6 +116,23 @@ add_library(
 # to use such a name for a different target type will result in an error.
 add_library(${PROJECT_NAME}::${LIBRARY_TARGET_NAME} ALIAS
             ${LIBRARY_TARGET_NAME})
+
+# Specify include directories for both compilation and installation process. The
+# $<INSTALL_PREFIX> generator expression is useful to ensure to create
+# relocatable configuration files, see
+# https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-relocatable-packages
+#
+# Before the backends' include directories below: a backend prefix that also
+# holds an installed Camada would otherwise serve its old headers to an in-tree
+# consumer.
+target_include_directories(
+  ${LIBRARY_TARGET_NAME}
+  PUBLIC
+    "$<BUILD_INTERFACE:${_camada_staged_include_dir}>"
+    "$<BUILD_INTERFACE:${_camada_staged_dir}>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
+    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}>"
+)
 
 # Solvers
 #
@@ -231,15 +256,18 @@ if(CAMADA_SOLVER_SMTLIB_ENABLE)
                              PRIVATE SOLVER_SMTLIB_ENABLED)
 endif()
 
-# Set two minimum target properties for the library. See
+# Set the minimum target properties for the library. See
 # https://cmake.org/cmake/help/latest/command/set_target_properties.html
 # Properties are: 1) Library version number 2) list of corresponding public
-# headers
+# headers 3) default symbol visibility, which a parent's
+# CMAKE_CXX_VISIBILITY_PRESET=hidden would otherwise turn off for the whole API
 set_target_properties(
   ${LIBRARY_TARGET_NAME}
   PROPERTIES VERSION ${${PROJECT_NAME}_VERSION}
              SOVERSION ${CAMADA_VER_MAJOR}
-             PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_PUB_HDR}")
+             PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_PUB_HDR}"
+             CXX_VISIBILITY_PRESET default
+             VISIBILITY_INLINES_HIDDEN OFF)
 
 # A shared Camada absorbs the static backends, and their GMP and CaDiCaL with
 # them. Exporting those would make libcamada.so a provider of symbols it does
@@ -268,19 +296,6 @@ if(BUILD_SHARED_LIBS
   endif()
 endif()
 
-# Specify include directories for both compilation and installation process. The
-# $<INSTALL_PREFIX> generator expression is useful to ensure to create
-# relocatable configuration files, see
-# https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-relocatable-packages
-target_include_directories(
-  ${LIBRARY_TARGET_NAME}
-  PUBLIC
-    "$<BUILD_INTERFACE:${_camada_staged_include_dir}>"
-    "$<BUILD_INTERFACE:${_camada_staged_include_dir}/${LIBRARY_TARGET_NAME}>"
-    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
-    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}>"
-)
-
 # Specify installation targets, typology and destination folders.
 install(
   TARGETS ${LIBRARY_TARGET_NAME}
@@ -292,7 +307,7 @@ install(
                 COMPONENT dev)
 
 install(
-  FILES "${_camada_staged_include_dir}/${LIBRARY_TARGET_NAME}/camadafeatures.h"
+  FILES "${_camada_staged_dir}/camadafeatures.h"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}"
   COMPONENT dev)
 
