@@ -18,6 +18,11 @@ endif()
 set(CAMADA_DEPS_DIR
     "${PROJECT_BINARY_DIR}/deps"
     CACHE PATH "Directory used to store downloaded solver dependencies")
+# A parent may declare the same cache entry empty (ESBMC does, with another
+# meaning); the paths below would then land at the filesystem root.
+if(NOT CAMADA_DEPS_DIR)
+  set(CAMADA_DEPS_DIR "${PROJECT_BINARY_DIR}/deps")
+endif()
 set(CAMADA_DEPS_SRC_DIR
     "${CAMADA_DEPS_DIR}/src"
     CACHE PATH "Directory used to store downloaded solver sources")
@@ -750,8 +755,8 @@ function(camada_setup_cryptominisat)
   camada_ensure_deps_dirs()
   file(
     REMOVE_RECURSE
-    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-src"
-    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisatsrc-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisatsrc-subbuild"
     "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-src"
     "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-subbuild"
     "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadiback-src"
@@ -760,7 +765,7 @@ function(camada_setup_cryptominisat)
     "${CMAKE_BINARY_DIR}/_deps/cadiback")
   # 5.11.22 is the version STP 2.4.0 bumped its CI to (stp/stp#493).
   camada_fetch_git_source(
-    cryptominisat msoos/cryptominisat 5.11.22 cms_source_dir
+    cryptominisatsrc msoos/cryptominisat 5.11.22 cms_source_dir
     e39f3a066a979e6033efb95b8732912a0888654aabc375b999ad85674c7abf44)
   camada_setup_cryptominisat_solver_deps("${cms_source_dir}")
   get_filename_component(cms_parent_dir "${cms_source_dir}" DIRECTORY)
@@ -902,7 +907,8 @@ function(camada_setup_gmp)
   # The full SHA, not the abbreviation: GitHub resolves a prefix server-side, so
   # it could stop being unambiguous. The mirror is not upstream, hence the hash.
   camada_fetch_git_source(
-    gmp gmp-mirror/gmp 141ed4f98a50e4a3c1a95a1758cb599b7499ac39 gmp_source_dir
+    gmpsrc gmp-mirror/gmp 141ed4f98a50e4a3c1a95a1758cb599b7499ac39
+    gmp_source_dir
     53b961ec4277f5d12f02a6d1cf26c7d1578198625c52a114885a88f12c1855f4)
 
   camada_run_checked(
@@ -977,7 +983,7 @@ function(camada_setup_minisat)
 
   camada_ensure_deps_dirs()
   camada_fetch_git_source(
-    minisat msoos/minisat 2.2.1 minisat_source_dir
+    minisatsrc msoos/minisat 2.2.1 minisat_source_dir
     2cd8e9282d0f50f6bdac2cd001c95f66c1de9b2dec61391652c68729c347290f)
   set(minisat_prefix "${CAMADA_DEPS_INSTALL_DIR}")
 
@@ -1145,8 +1151,8 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
   endif()
 
   camada_fetch_git_source(
-    bitwuzla bitwuzla/bitwuzla "${CAMADA_BITWUZLA_GIT_TAG}" bitwuzla_source_dir
-    "${CAMADA_BITWUZLA_SHA256}")
+    bitwuzlasrc bitwuzla/bitwuzla "${CAMADA_BITWUZLA_GIT_TAG}"
+    bitwuzla_source_dir "${CAMADA_BITWUZLA_SHA256}")
   set(bitwuzla_build_dir "${bitwuzla_source_dir}/build-camada")
   file(REMOVE_RECURSE "${bitwuzla_build_dir}")
 
@@ -1606,7 +1612,7 @@ function(camada_setup_yices)
     )
   endif()
   camada_fetch_git_source(
-    yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir
+    yicessrc SRI-CSL/yices2 yices-2.7.0 yices_source_dir
     584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
   camada_run_checked(WORKING_DIRECTORY "${yices_source_dir}" MESSAGE
                      "Preparing Yices" COMMAND autoreconf)
