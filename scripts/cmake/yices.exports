@@ -1,0 +1,8 @@
+# Only Yices' own API leaves the Yices shared library; see src/camada.exports
+# for the format.
+#
+# Yices links GMP statically (--with-static-gmp), so without this the shared
+# library exports ~72 GMP symbols of its own. Together with the copy Camada
+# absorbs and any real libgmp in the process, that leaves several definitions
+# of __gmpz_init and lets load order decide which one callers bind to.
+yices_*

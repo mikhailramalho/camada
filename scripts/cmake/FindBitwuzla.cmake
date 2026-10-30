@@ -61,6 +61,13 @@ if(PkgConfig_FOUND)
     endif()
   endforeach()
 
+  # pkg_check_modules caches its flags and each library path it resolves, and
+  # skips the query once it has run, so a tree configured before our GMP and
+  # MPFR existed kept linking the system ones.
+  unset(__pkg_config_checked_Bitwuzla CACHE)
+  foreach(_camada_bitwuzla_lib IN ITEMS gmp mpfr)
+    unset(pkgcfg_lib_Bitwuzla_${_camada_bitwuzla_lib} CACHE)
+  endforeach()
   pkg_check_modules(Bitwuzla QUIET IMPORTED_TARGET bitwuzla)
   if(TARGET PkgConfig::Bitwuzla)
     get_target_property(_camada_bitwuzla_imported_includes PkgConfig::Bitwuzla

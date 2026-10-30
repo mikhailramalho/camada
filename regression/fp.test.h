@@ -831,11 +831,12 @@ inline void fp_fma_host_oracle(const camada::SMTSolverRef &solver,
   }
 }
 
-// FMA under each directed rounding mode, with a literal mode. The exact
-// result sits half way between two floats, so every mode picks a side and a
-// backend that ignored the mode (MathSAT's FMA once ran its symbolic
-// rounding-mode chain over the literal and rounded every case down) fails
-// at least one of them. Round to away is left out: MathSAT has no such mode.
+// FMA under each directed rounding mode, with a literal mode and with a
+// symbol fixed to it. The exact result sits half way between two floats, so
+// every mode picks a side and a backend that ignored the mode (MathSAT's FMA
+// once ran its symbolic rounding-mode chain over the literal and rounded
+// every case down, and with a symbol it built a broken model) fails at least
+// one of them. Round to away is left out: MathSAT has no such mode.
 inline void fp_fma_rounding_modes(const camada::SMTSolverRef &solver,
                                   camada::FPEncoding Encoding) {
   const float Tiny = std::ldexp(1.0f, -24);
@@ -857,21 +858,27 @@ inline void fp_fma_rounding_modes(const camada::SMTSolverRef &solver,
   };
 
   // Read the result from the model: refuting the negated equality missed it.
-  for (const Case &C : Cases) {
-    solver->reset();
-    auto res = solver->mkSymbol("res", solver->mkFP32Sort(Encoding));
-    solver->addConstraint(
-        solver->mkEqual(res, solver->mkFPFMA(solver->mkFP32(C.X, Encoding),
-                                             solver->mkFP32(C.Y, Encoding),
-                                             solver->mkFP32(C.Z, Encoding),
-                                             solver->mkRM(C.Mode, Encoding))));
-    INFO("fma(" << C.X << ", " << C.Y << ", " << C.Z << ") mode "
-                << static_cast<int>(C.Mode));
-    REQUIRE(solver->check() == camada::CheckResult::SAT);
-    auto Got = solver->getFP32(res);
-    REQUIRE(Got);
-    REQUIRE(Got.value() == C.Want);
-  }
+  for (const Case &C : Cases)
+    for (bool Symbolic : {false, true}) {
+      solver->reset();
+      auto rm = solver->mkRM(C.Mode, Encoding);
+      if (Symbolic) {
+        auto sym = solver->mkSymbol("rm", solver->mkRMSort(Encoding));
+        solver->addConstraint(solver->mkEqual(sym, rm));
+        rm = sym;
+      }
+      auto res = solver->mkSymbol("res", solver->mkFP32Sort(Encoding));
+      solver->addConstraint(solver->mkEqual(
+          res, solver->mkFPFMA(solver->mkFP32(C.X, Encoding),
+                               solver->mkFP32(C.Y, Encoding),
+                               solver->mkFP32(C.Z, Encoding), rm)));
+      INFO("fma(" << C.X << ", " << C.Y << ", " << C.Z << ") mode "
+                  << static_cast<int>(C.Mode) << (Symbolic ? " symbolic" : ""));
+      REQUIRE(solver->check() == camada::CheckResult::SAT);
+      auto Got = solver->getFP32(res);
+      REQUIRE(Got);
+      REQUIRE(Got.value() == C.Want);
+    }
 }
 
 // FPEncoding::Native on a backend with no native FP is the BV encoding, so the
@@ -1233,6 +1240,70 @@ inline void rm_model_value(const camada::SMTSolverRef &solver,
            Any.value() == camada::RM::ROUND_TO_PLUS_INF ||
            Any.value() == camada::RM::ROUND_TO_MINUS_INF ||
            Any.value() == camada::RM::ROUND_TO_ZERO));
+}
+
+// Subnormal sources under the BV encoding: the conversion collapsed the low
+// significand bits into a sticky before normalizing, folding away the bits
+// that mattered, and its exponent wrapped when the target's was narrower.
+// Expected bits are native Z3's.
+inline void fp_to_fp_subnormal_source(const camada::SMTSolverRef &solver) {
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  struct Case {
+    const char *From;
+    unsigned FromE, ToE, ToS;
+    camada::RM Mode;
+    const char *Want;
+  };
+  const Case Cases[] = {
+      // binary16 65 * 2^-24 is exact in (8,6).
+      {"0000000001000001", 5, 8, 6, camada::RM::ROUND_TO_EVEN,
+       "001101101000001"},
+      // binary16 2^-24 is far below (3,4)'s smallest subnormal.
+      {"0000000000000001", 5, 3, 4, camada::RM::ROUND_TO_EVEN, "00000000"},
+      {"0000000000000001", 5, 3, 4, camada::RM::ROUND_TO_PLUS_INF, "00000001"},
+      // binary32's smallest subnormal is far below (5,15)'s.
+      {"00000000000000000000000000000001", 8, 5, 15, camada::RM::ROUND_TO_EVEN,
+       "000000000000000000000"},
+  };
+  for (const Case &C : Cases) {
+    solver->reset();
+    auto got = solver->mkFPToFP(solver->mkFPFromBin(C.From, C.FromE, Enc),
+                                solver->mkFPSort(C.ToE, C.ToS, Enc),
+                                solver->mkRM(C.Mode, Enc));
+    INFO(C.From << " to (" << C.ToE << "," << C.ToS << ") mode "
+                << static_cast<int>(C.Mode));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(
+        solver->mkIEEEFPToBV(got), solver->mkBVFromBin(C.Want))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
+}
+
+// A BV-encoded rounding mode is three bits wide, so without an axiom codes
+// 5 to 7 acted as a sixth mode: a symbol could differ from all five.
+inline void bv_rm_symbol_domain(const camada::SMTSolverRef &solver) {
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  auto notAnyMode = [&](const camada::SMTExprRef &R) {
+    camada::SMTExprRef None = solver->mkBool(true);
+    for (camada::RM Mode :
+         {camada::RM::ROUND_TO_EVEN, camada::RM::ROUND_TO_AWAY,
+          camada::RM::ROUND_TO_PLUS_INF, camada::RM::ROUND_TO_MINUS_INF,
+          camada::RM::ROUND_TO_ZERO})
+      None = solver->mkAnd(
+          None, solver->mkNot(solver->mkEqual(R, solver->mkRM(Mode, Enc))));
+    return None;
+  };
+
+  auto rm = solver->mkSymbol("rm", solver->mkRMSort(Enc));
+  solver->addConstraint(notAnyMode(rm));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // The axiom outlives the scope the symbol was made in.
+  solver->reset();
+  solver->push();
+  auto scoped = solver->mkSymbol("scoped", solver->mkRMSort(Enc));
+  solver->pop();
+  solver->addConstraint(notAnyMode(scoped));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {

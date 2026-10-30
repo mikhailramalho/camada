@@ -1,5 +1,6 @@
-include_directories(${CMAKE_SOURCE_DIR}/src)
-include_directories(${CMAKE_BINARY_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_BINARY_DIR}/include/camada)
+include_directories(${PROJECT_BINARY_DIR}/src)
 
 set(REGRESSION_TARGET_NAME ${PROJECT_NAME}-regression)
 set(BENCH_TARGET_NAME ${PROJECT_NAME}-bench)
@@ -13,10 +14,10 @@ function(compile_test)
     string(TOUPPER ${name} upper_name)
 
     if(CAMADA_SOLVER_${upper_name}_ENABLE AND ${name}_FOUND)
-      if(NOT EXISTS "${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp")
+      if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${lower_name}.test.cpp")
         message(
           FATAL_ERROR
-            "Could not find regression file ${CMAKE_SOURCE_DIR}/regression/${lower_name}.test.cpp"
+            "Could not find regression file ${CMAKE_CURRENT_SOURCE_DIR}/${lower_name}.test.cpp"
         )
       endif()
       list(APPEND solver_src_test_files "${lower_name}.test.cpp")

@@ -166,11 +166,7 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeTuples));
   REQUIRE_FALSE(solver->supports(SolverFeature::NativeConstantArrays));
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
-#if defined(_WIN32)
-  REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
-#else
   REQUIRE(solver->supports(SolverFeature::Timeouts));
-#endif
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
 }
 

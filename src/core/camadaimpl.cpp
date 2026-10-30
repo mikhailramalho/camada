@@ -480,8 +480,9 @@ SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
   // Only -1, 0 and 1 are cached; any other value is simply not in the cache.
   if (Value < -1 || Value > 1)
     return SMTExprRef{};
-  const auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Value)];
-  return Width < Cache.size() ? Cache[Width] : SMTExprRef{};
+  if (Width > MaxCachedSmallBVWidth)
+    return SMTExprRef{};
+  return CachedSmallBVExprs[cachedSmallBVExprIndex(Value)][Width];
 }
 
 SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
@@ -551,7 +552,7 @@ void SMTSolverImpl::clearExprCaches() {
   CachedBoolExprs.fill({});
   CachedRMBVExprs.fill({});
   for (auto &Cache : CachedSmallBVExprs)
-    Cache.clear();
+    Cache.fill({});
   SymbolExprCache.clear();
   // Every alias just forgotten is gone from the backend too (this runs on
   // reset and destruction), so the numbering starts over: a solver that has
@@ -595,12 +596,9 @@ void SMTSolverImpl::initializeCommonSingletons() {
   auto &CachedBVNegOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(-1)];
   auto &CachedBVZeroExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(0)];
   auto &CachedBVOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(1)];
-  CachedBVZeroExprs.resize(5);
   for (unsigned Width = 1; Width <= 4; ++Width)
     CachedBVZeroExprs[Width] = mkBVFromBin(std::string(Width, '0'), Width);
-  CachedBVOneExprs.resize(2);
   CachedBVOneExprs[1] = One1;
-  CachedBVNegOneExprs.resize(2);
   CachedBVNegOneExprs[1] = One1;
   for (RM R : {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
                RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
@@ -1782,10 +1780,29 @@ void SMTSolverImpl::requireQuantifierOperands(
                  "issue #17");
 }
 
+SMTExprRef SMTSolverImpl::isValidBVRM(const SMTExprRef &R) {
+  SMTExprRef Valid = mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::BV));
+  for (const RM Mode : {RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
+                        RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
+    Valid = mkOr(Valid, mkEqual(R, mkRM(Mode, FPEncoding::BV)));
+  return Valid;
+}
+
+// The axiom mkSymbol asserts holds for the free symbol, not for a bound
+// variable of the same name, so quantifiers restrict their own.
+SMTExprRef SMTSolverImpl::validBoundRMs(const std::vector<SMTExprRef> &Vars) {
+  SMTExprRef Valid;
+  for (const SMTExprRef &V : Vars)
+    if (V->Sort->isBVRMSort())
+      Valid = Valid ? mkAnd(Valid, isValidBVRM(V)) : isValidBVRM(V);
+  return Valid;
+}
+
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireQuantifierOperands(Vars, Body);
-  SMTExprRef theExp = mkForallImpl(Vars, Body);
+  SMTExprRef Valid = validBoundRMs(Vars);
+  SMTExprRef theExp = mkForallImpl(Vars, Valid ? mkImplies(Valid, Body) : Body);
   assert(theExp->isBoolSort());
   return theExp;
 }
@@ -1797,7 +1814,8 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkForallImpl, "Quantifiers",
 SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireQuantifierOperands(Vars, Body);
-  SMTExprRef theExp = mkExistsImpl(Vars, Body);
+  SMTExprRef Valid = validBoundRMs(Vars);
+  SMTExprRef theExp = mkExistsImpl(Vars, Valid ? mkAnd(Valid, Body) : Body);
   assert(theExp->isBoolSort());
   return theExp;
 }
@@ -2136,16 +2154,15 @@ CAMADA_DEFINE_CONST_CTOR(mkReal, (int64_t num, int64_t den), (num, den),
 
 SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
+  requireOwned(Sort);
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector decimal literal sort must be bit-vector");
   const unsigned Width = Sort->getWidth();
   // Only plain bit-vector -1, 0 and 1 are cached.
   SMTExprRef *Slot = nullptr;
-  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
-    auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
-    if (Cache.size() <= Width)
-      Cache.resize(Width + 1);
-    Slot = &Cache[Width];
+  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1 &&
+      Width <= MaxCachedSmallBVWidth) {
+    Slot = &CachedSmallBVExprs[cachedSmallBVExprIndex(Int)][Width];
     if (*Slot)
       return *Slot;
   }
@@ -2165,6 +2182,7 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int, unsigned BitWidth) {
 
 SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int,
                                       const SMTSortRef &Sort) {
+  requireOwned(Sort);
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector binary literal sort must be bit-vector");
   fatalErrorIf(Int.empty(), "Bit-vector binary literal must be non-empty");
@@ -2246,6 +2264,13 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   else {
     theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
+    // A scope-independent fact about the symbol, so journal it like the
+    // lazy-array axioms and let pop() re-assert it.
+    if (Sort->isBVRMSort()) {
+      SMTExprRef Valid = isValidBVRM(theExp);
+      addConstraint(Valid);
+      LazyConstraintLevels.back().push_back(std::move(Valid));
+    }
   }
   Entries.push_back({Sort.get(), theExp});
   return theExp;

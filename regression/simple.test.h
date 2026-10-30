@@ -580,6 +580,33 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   REQUIRE(x_res.value() == 1);
 }
 
+// A frame opened on an UNSAT context must work and pop back cleanly (#244).
+inline void push_after_unsat(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("x", solver->mkBVSort(8));
+  auto isOne = solver->mkEqual(x, solver->mkBVFromDec(1, 8));
+  auto isTwo = solver->mkEqual(x, solver->mkBVFromDec(2, 8));
+
+  solver->addConstraint(isOne);
+  solver->push();
+  solver->addConstraint(isTwo);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  solver->push();
+  solver->addConstraint(isOne);
+  solver->push();
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  solver->pop(2);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  solver->pop();
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  // Unchecked: asserting false alone makes some backends UNSAT.
+  solver->push();
+  solver->addConstraint(solver->mkBool(false));
+  solver->push();
+  solver->pop(2);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
 // Locks in the documented behavior that symbols are cached by (name, sort)
 // for the solver's lifetime, including across push/pop. mkSymbol returns the
 // same handle as before the push, even though SMT-LIB strict semantics would
@@ -659,6 +686,21 @@ inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   x = solver->mkSymbol("x", solver->mkBVSort(4));
   three = solver->mkBVFromDec(3, 4);
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, three)));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // A bound BV rounding mode ranges over the five modes only, not over
+  // all eight codes its three bits hold.
+  solver->reset();
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  auto rm = solver->mkSymbol("rm", solver->mkRMSort(Enc));
+  auto none = solver->mkBool(true);
+  for (camada::RM Mode :
+       {camada::RM::ROUND_TO_EVEN, camada::RM::ROUND_TO_AWAY,
+        camada::RM::ROUND_TO_PLUS_INF, camada::RM::ROUND_TO_MINUS_INF,
+        camada::RM::ROUND_TO_ZERO})
+    none = solver->mkAnd(
+        none, solver->mkNot(solver->mkEqual(rm, solver->mkRM(Mode, Enc))));
+  solver->addConstraint(solver->mkExists({rm}, none));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
@@ -1278,6 +1320,19 @@ inline void small_bv_cache_bounds(const camada::SMTSolverRef &solver) {
 
   for (int64_t Value : {int64_t{2}, int64_t{-2}, int64_t{-5}, int64_t{1} << 40})
     REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(Value, 8)));
+
+  // The last width the fixed table holds is cached; the next one is not.
+  auto Edge = solver->mkBVFromDec(1, 256);
+  REQUIRE(&*Impl->cachedSmallBVExpr(1, 256) == &*Edge);
+  REQUIRE(solver->mkBVFromDec(1, 257)->getWidth() == 257);
+  REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(1, 257)));
+
+  // Widths past the fixed table are built every time, not cached.
+  auto Wide = solver->mkBVFromDec(0, 1000);
+  REQUIRE(Wide->getWidth() == 1000);
+  REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(0, 1000)));
+  REQUIRE_FALSE(static_cast<bool>(
+      Impl->cachedSmallBVExpr(0, std::numeric_limits<unsigned>::max())));
 }
 
 inline void arena_stress_test(const camada::SMTSolverRef &solver) {
