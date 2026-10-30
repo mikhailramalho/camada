@@ -660,6 +660,21 @@ inline void quantifier_semantics(const camada::SMTSolverRef &solver) {
   three = solver->mkBVFromDec(3, 4);
   solver->addConstraint(solver->mkForall({x}, solver->mkEqual(x, three)));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // A bound BV rounding mode ranges over the five modes only, not over
+  // all eight codes its three bits hold.
+  solver->reset();
+  const camada::FPEncoding Enc = camada::FPEncoding::BV;
+  auto rm = solver->mkSymbol("rm", solver->mkRMSort(Enc));
+  auto none = solver->mkBool(true);
+  for (camada::RM Mode :
+       {camada::RM::ROUND_TO_EVEN, camada::RM::ROUND_TO_AWAY,
+        camada::RM::ROUND_TO_PLUS_INF, camada::RM::ROUND_TO_MINUS_INF,
+        camada::RM::ROUND_TO_ZERO})
+    none = solver->mkAnd(
+        none, solver->mkNot(solver->mkEqual(rm, solver->mkRM(Mode, Enc))));
+  solver->addConstraint(solver->mkExists({rm}, none));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
 inline void uf_semantics(const camada::SMTSolverRef &solver) {
@@ -1278,6 +1293,19 @@ inline void small_bv_cache_bounds(const camada::SMTSolverRef &solver) {
 
   for (int64_t Value : {int64_t{2}, int64_t{-2}, int64_t{-5}, int64_t{1} << 40})
     REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(Value, 8)));
+
+  // The last width the fixed table holds is cached; the next one is not.
+  auto Edge = solver->mkBVFromDec(1, 256);
+  REQUIRE(&*Impl->cachedSmallBVExpr(1, 256) == &*Edge);
+  REQUIRE(solver->mkBVFromDec(1, 257)->getWidth() == 257);
+  REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(1, 257)));
+
+  // Widths past the fixed table are built every time, not cached.
+  auto Wide = solver->mkBVFromDec(0, 1000);
+  REQUIRE(Wide->getWidth() == 1000);
+  REQUIRE_FALSE(static_cast<bool>(Impl->cachedSmallBVExpr(0, 1000)));
+  REQUIRE_FALSE(static_cast<bool>(
+      Impl->cachedSmallBVExpr(0, std::numeric_limits<unsigned>::max())));
 }
 
 inline void arena_stress_test(const camada::SMTSolverRef &solver) {

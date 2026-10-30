@@ -81,7 +81,8 @@ public:
   /// There is deliberately no default constructor: a backend that forgot to
   /// forward its config would silently get ArrayEncoding::Native, so the
   /// compiler is made to ask for it.
-  explicit SMTSolverImpl(const SolverConfig &Config) : Config(Config) {}
+  SMTSolverImpl(const SolverConfig &Config, SMTBackendKind Kind)
+      : Config(Config), Kind(Kind) {}
   /// Backend destructors MUST call invalidateGeneratedObjects() before
   /// releasing backend resources (contexts, term managers, etc.). The arena
   /// destructors run during base-class teardown, after derived members are
@@ -150,11 +151,9 @@ public:
   /// Public because the Camada tuple lowering is a free function.
   std::string lazyIndexModelBits(const SMTExprRef &Exp);
 
-  /// The backend this solver drives, read off a cached expression.
-  /// Public, like unsupportedError, for the Camada tuple lowering.
-  SMTBackendKind backendKind() const {
-    return CachedBoolExprs[0]->getBackendKind();
-  }
+  /// The backend this solver drives. Public, like unsupportedError, for the
+  /// Camada tuple lowering.
+  SMTBackendKind backendKind() const { return Kind; }
 
   /// An UnsupportedOperation error from \p Backend saying \p Msg.
   static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
@@ -199,7 +198,11 @@ protected:
   ObjectArena ExprArena;
   std::array<SMTExprRef, 2> CachedBoolExprs;
   std::array<SMTExprRef, 5> CachedRMBVExprs;
-  std::array<std::vector<SMTExprRef>, 3> CachedSmallBVExprs;
+  // Indexed by width. Fixed size so a slot never moves while a literal is
+  // being built, and an arbitrary width cannot grow it.
+  static constexpr unsigned MaxCachedSmallBVWidth = 256;
+  std::array<std::array<SMTExprRef, MaxCachedSmallBVWidth + 1>, 3>
+      CachedSmallBVExprs;
   SMTSortRef CachedBoolSort;
   SMTSortRef CachedIntSort;
   SMTSortRef CachedRealSort;
@@ -959,6 +962,12 @@ private:
   /// The precondition mkForall and mkExists share.
   void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
                                  const SMTExprRef &Body);
+  /// True when a BV rounding mode holds one of the five valid codes: it
+  /// is three bits wide, so codes 5 to 7 would act as a sixth mode.
+  SMTExprRef isValidBVRM(const SMTExprRef &R);
+  /// The conjunction of isValidBVRM over the BV rounding modes in Vars, or
+  /// null when there are none.
+  SMTExprRef validBoundRMs(const std::vector<SMTExprRef> &Vars);
 
   /// Settles LastUnknown once the backend has answered.
   CheckResult finishCheck(CheckResult Result);
@@ -1522,6 +1531,9 @@ private:
   /// so a backend cannot cache a field and drift from the caller's request,
   /// and a field a backend has no use for simply never gets read.
   const SolverConfig Config;
+  /// Fixed by the concrete backend, so it stays valid while the expression
+  /// caches are empty during reset() and destruction.
+  const SMTBackendKind Kind;
 };
 
 } // namespace camada

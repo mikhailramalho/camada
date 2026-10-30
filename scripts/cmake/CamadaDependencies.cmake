@@ -69,6 +69,8 @@ set(CAMADA_CVC5_SHA256
 # Baked into cadiback's config.hpp, which Camada writes itself; see
 # camada_setup_cryptominisat_solver_deps.
 set(CAMADA_CADIBACK_REVISION "69255f55e411207c4bdea02c6c2ab1ef29740ce1")
+set(CAMADA_CADIBACK_SHA256
+    "d7084360537ed1bf5159b0b58633fb9bf02e9dc3f24cb053ecbdfa4dc9fefb19")
 
 # CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
 # prebuilt URLs to pin. It stays disabled on Windows, as it was under the
@@ -601,15 +603,15 @@ endfunction()
 # Tarballs carry no submodules. The only caller that had any is CryptoMiniSat,
 # whose four are test utilities (OutputCheck, cnf-utils, sha1-sat, licensecheck)
 # referenced from tests/ and never from the library build.
-function(camada_fetch_git_source package_name repository git_tag out_var)
+function(camada_fetch_git_source package_name repository git_tag out_var sha256)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
-  # A fifth argument pins the archive's SHA256. A clone verified the object
-  # against the ref; a tarball has no such check, and a tag can be repointed at
-  # different content. A full commit SHA is content-addressed already, but the
-  # tarball GitHub builds from it is not checked, so pin it as well.
-  if(ARGC GREATER 4)
-    set(url_hash_arg URL_HASH SHA256=${ARGV4})
+  # Every archive is pinned by SHA256. A clone verified the object against the
+  # ref; a tarball has no such check, and a tag can be repointed at different
+  # content. A full commit SHA is content-addressed already, but the tarball
+  # GitHub builds from it is not checked, so pin it as well.
+  if(NOT sha256)
+    message(FATAL_ERROR "No SHA256 pinned for ${repository}@${git_tag}")
   endif()
   cpmaddpackage(
     NAME
@@ -618,7 +620,8 @@ function(camada_fetch_git_source package_name repository git_tag out_var)
     YES
     URL
     "https://github.com/${repository}/archive/${git_tag}.tar.gz"
-    ${url_hash_arg})
+    URL_HASH
+    SHA256=${sha256})
   set(${out_var}
       "${${package_name}_SOURCE_DIR}"
       PARENT_SCOPE)
@@ -674,7 +677,7 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # CMS 5.11.22's backbone.cpp (2024-06-07).
     camada_fetch_git_source(
       cryptominisat_cadiback meelgroup/cadiback "${CAMADA_CADIBACK_REVISION}"
-      cms_cadiback_source_dir)
+      cms_cadiback_source_dir "${CAMADA_CADIBACK_SHA256}")
     camada_prepare_cryptominisat_dependency_layout("${cms_cadiback_dir}"
                                                    "${cms_cadiback_source_dir}")
     camada_run_checked(
@@ -877,7 +880,10 @@ endfunction()
 function(camada_setup_gmp)
   set(gmp_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
   set(gmp_header "${CAMADA_DEPS_INSTALL_DIR}/include/gmp.h")
-  if(EXISTS "${gmp_lib}" AND EXISTS "${gmp_header}")
+  # CVC5 needs the C++ bindings, so a tree staged without them is rebuilt.
+  if(EXISTS "${gmp_lib}"
+     AND EXISTS "${gmp_header}"
+     AND EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmpxx.a")
     return()
   endif()
 
@@ -916,6 +922,8 @@ function(camada_setup_gmp)
     ./configure
     --prefix=${CAMADA_DEPS_INSTALL_DIR}
     --disable-shared
+    # libgmpxx, for CVC5: without it CVC5 takes the system GMP's headers.
+    --enable-cxx
     ABI=64
     # -std=gnu17: GCC 14 defaults to C23, where GMP's own "long long
     # reliability" probe no longer compiles -- it declares `void g(){}` and then
@@ -924,6 +932,7 @@ function(camada_setup_gmp)
     # compiler", so a host without a system GMP could not build any backend that
     # needs one.
     CFLAGS=-fPIC\ -std=gnu17
+    CXXFLAGS=-fPIC
     CPPFLAGS=-DPIC)
   camada_run_checked(
     WORKING_DIRECTORY
@@ -1328,6 +1337,18 @@ function(camada_build_cvc5_from_source)
   endif()
 
   camada_setup_shared_cadical()
+  # CVC5 is linked against the shared GMP, so it has to be compiled against the
+  # same headers. Its FindGMP searches the default paths and picks the system
+  # gmp.h otherwise; the explicit cache entries skip that search.
+  camada_gmp_library(cvc5_gmp_lib)
+  set(cvc5_gmp_args)
+  if(cvc5_gmp_lib STREQUAL "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+    set(cvc5_gmp_args
+        -DGMP_INCLUDE_DIR=${CAMADA_DEPS_INSTALL_DIR}/include
+        -DGMPXX_INCLUDE_DIR=${CAMADA_DEPS_INSTALL_DIR}/include
+        -DGMP_LIBRARIES=${cvc5_gmp_lib}
+        -DGMPXX_LIBRARIES=${CAMADA_DEPS_INSTALL_DIR}/lib/libgmpxx.a)
+  endif()
   camada_fetch_git_source(cvc5src cvc5/cvc5 "${CAMADA_CVC5_GIT_TAG}"
                           cvc5_source_dir "${CAMADA_CVC5_SHA256}")
   set(cvc5_build_name camada)
@@ -1357,7 +1378,8 @@ function(camada_build_cvc5_from_source)
     # build tree and installs pyparsing there. Forcing it OFF makes CVC5
     # pip-install into the system interpreter, which PEP 668 refuses on Homebrew
     # and on recent Debian/Ubuntu ("externally-managed-environment").
-    -DBUILD_BINDINGS_JAVA=OFF)
+    -DBUILD_BINDINGS_JAVA=OFF
+    ${cvc5_gmp_args})
 
   # CVC5's configure generates Unix Makefiles, not Ninja. Bare `make -j` is
   # unbounded: make starts every ready target at once, and a few hundred
@@ -1408,11 +1430,13 @@ endfunction()
 # fetch brings no submodules, and STP add_subdirectory()s these, so the
 # directory has to hold the real source rather than the empty placeholder the
 # archive carries.
-function(camada_place_stp_submodule destination package repository revision)
+function(camada_place_stp_submodule destination package repository revision
+         sha256)
   if(EXISTS "${destination}/CMakeLists.txt")
     return()
   endif()
-  camada_fetch_git_source(${package} ${repository} ${revision} source_dir)
+  camada_fetch_git_source(${package} ${repository} ${revision} source_dir
+                          ${sha256})
   file(REMOVE_RECURSE "${destination}")
   file(COPY "${source_dir}/" DESTINATION "${destination}")
 endfunction()
@@ -1443,10 +1467,12 @@ function(camada_setup_stp)
   # pins, so the tree matches a checkout with `git submodule update --init`.
   camada_place_stp_submodule(
     "${stp_source_dir}/lib/extlib-abc" stpabc berkeley-abc/abc
-    95393064368b7c05da4d6f0264fc3419c175c7cb)
+    95393064368b7c05da4d6f0264fc3419c175c7cb
+    b23f9384edb297a27cb0420d9f99ca4cf4e2a2a301ac10b41418f770a839cb9e)
   camada_place_stp_submodule(
     "${stp_source_dir}/lib/extlib-mimalloc" stpmimalloc microsoft/mimalloc
-    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe)
+    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe
+    c240b03282eab8d55a0348d4430c160bb8f73b1aff247dd45b7a10d03b2bdc9f)
 
   if(APPLE)
     # STATICCOMPILE implies BUILD_SHARED_LIBS=OFF, which makes STP link its

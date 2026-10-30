@@ -94,7 +94,7 @@ void CVC5Expr::dump(std::string &Out) const {
 }
 
 CVC5Solver::CVC5Solver(const SolverConfig &Config)
-    : SMTSolverImpl(Config), Context(Terms) {
+    : SMTSolverImpl(Config, SMTBackendKind::CVC5), Context(Terms) {
   Context.setOption("arrays-exp", "true");
   Context.setOption("produce-models", "true");
   Context.setOption("produce-assertions", "true");
