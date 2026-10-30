@@ -559,9 +559,8 @@ SMTResult<ArrayModel> getCamadaTupleArrayValues(SMTSolverImpl &Solver,
   const SMTSortRef &ElementSort = Array->Sort->getElementSort();
 
   // Canonicalize an index by its model value (the ArrayModel contract is
-  // value-based, never term identity). Bool and BV index sorts are the
-  // only ones the lazy machinery produces entries for; anything else
-  // cannot be canonicalized.
+  // value-based, never term identity). Only Bool, BV, Int and Real index
+  // sorts can be canonicalized.
   // lazyIndexModelBits memoizes for the model's lifetime, which this
   // assembly depends on: it re-reads each index once per leaf, so an
   // unmemoized version costs (leaves * entries)^2 backend queries -- three

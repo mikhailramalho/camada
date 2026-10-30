@@ -1520,8 +1520,17 @@ std::string SMTSolverImpl::lazyIndexModelBitsUncached(const SMTExprRef &Exp) {
     SMTResult<bool> Value = getBool(Exp);
     return Value ? std::string(Value.value() ? "1" : "0") : std::string();
   }
+  if (Exp->isIntSort()) {
+    SMTResult<std::string> Value = getInt(Exp);
+    return Value ? Value.value() : std::string();
+  }
+  if (Exp->isRealSort()) {
+    SMTResult<std::string> Num = getRealNumerator(Exp);
+    SMTResult<std::string> Den = getRealDenominator(Exp);
+    return Num && Den ? Num.value() + "/" + Den.value() : std::string();
+  }
   if (!Exp->isBVSort())
-    return std::string(); // unsupported index sort: backend fallback
+    return std::string(); // unsupported index sort
   SMTResult<std::string> Value = getBVInBin(Exp);
   return Value ? Value.value() : std::string();
 }
@@ -1911,6 +1920,10 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return resolveAckArrayElement(Array, Index);
   }
+  auto Outside = OutsideIndexBySort.find(&*Index->Sort);
+  if (Outside != OutsideIndexBySort.end() &&
+      !lazyCanEvaluateIndexSort(Index->Sort))
+    return lazyUnsupportedIndexSort(Array->getBackendKind());
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
       return Resolved;
@@ -1918,9 +1931,8 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   // model is free at the indexes no default was instantiated at. The
   // outside index stands in for every one of those, so read it there.
   SMTExprRef At = Index;
-  if (auto It = OutsideIndexBySort.find(&*Index->Sort);
-      It != OutsideIndexBySort.end() && !isObservedValue(Index))
-    At = It->second;
+  if (Outside != OutsideIndexBySort.end() && !isObservedValue(Index))
+    At = Outside->second;
   // RAII: backend model queries can throw (z3::exception,
   // CVC5ApiException); the flag must not stay latched or every later
   // select would silently skip instantiation.
@@ -1937,7 +1949,7 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
 
 bool SMTSolverImpl::isObservedValue(const SMTExprRef &Index) {
   const std::string Bits = lazyIndexModelBits(Index);
-  // No bits for this sort: trust the backend's model, as before.
+  // No model value: trust the backend's model.
   if (Bits.empty())
     return true;
   const SMTExpr *Outside = &*OutsideIndexBySort.at(&*Index->Sort);
@@ -1965,9 +1977,55 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return ackArrayModel(Array);
   }
-  if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
-    return lazyArrayModel(Array);
-  return getArrayValuesImpl(Array);
+  auto Outside = OutsideIndexBySort.find(&*Array->Sort->getIndexSort());
+  if (Outside == OutsideIndexBySort.end())
+    return getArrayValuesImpl(Array);
+  if (!lazyCanEvaluateIndexSort(Array->Sort->getIndexSort()))
+    return lazyUnsupportedIndexSort(Array->getBackendKind());
+  const bool LazyDerived = reachesLazyArray(Array);
+  if (LazyDerived)
+    if (SMTResult<ArrayModel> Model = lazyArrayModel(Array))
+      return Model;
+  // ponytail: reads element by element only for the sorts every backend's
+  // getArrayElement reads; other element sorts keep the old model.
+  const SMTSortRef &Elem = Array->Sort->getElementSort();
+  if (Elem->isBoolSort() || Elem->isBVSort() || Elem->isFPSort() ||
+      Elem->isRMSort())
+    return outsideArrayModel(Array, Outside->second);
+  return LazyDerived ? lazyArrayModel(Array) : getArrayValuesImpl(Array);
+}
+
+// The outside index stands in for every index value the formula never
+// observed, so read the array there for the base and at each observed
+// index for the entries.
+SMTResult<ArrayModel>
+SMTSolverImpl::outsideArrayModel(const SMTExprRef &Array,
+                                 const SMTExprRef &Outside) {
+  ArrayModel Model;
+  SMTResult<SMTExprRef> Base = getArrayElement(Array, Outside);
+  if (!Base)
+    return Base.error();
+  Model.Base = Base.value();
+  // ponytail: one entry per observed index of the sort, read or not by
+  // this array; track indexes per array if models get too large.
+  std::set<std::string> Seen;
+  const std::vector<SMTExprRef> Observed =
+      ObservedIndexesBySort.at(&*Outside->Sort);
+  for (const SMTExprRef &Index : Observed) {
+    if (&*Index == &*Outside)
+      continue;
+    const std::string Bits = lazyIndexModelBits(Index);
+    if (Bits.empty())
+      return SMTError{SMTErrorCode::BackendError, backendKind(),
+                      "Could not evaluate an observed array index"};
+    if (!Seen.insert(Bits).second)
+      continue;
+    SMTResult<SMTExprRef> Value = getArrayElement(Array, Index);
+    if (!Value)
+      return Value.error();
+    Model.Entries.emplace_back(Index, Value.value());
+  }
+  return Model;
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
