@@ -13,8 +13,8 @@ function(check_yices_version yices_include yices_lib)
   unset(_camada_yices_probe_gmp CACHE)
 
   try_run(
-    YICES_RETURNCODE YICES_COMPILED ${CMAKE_BINARY_DIR}
-    ${CMAKE_SOURCE_DIR}/scripts/cmake/try_yices.cpp
+    YICES_RETURNCODE YICES_COMPILED ${PROJECT_BINARY_DIR}
+    ${PROJECT_SOURCE_DIR}/scripts/cmake/try_yices.cpp
     COMPILE_DEFINITIONS -I"${yices_include}" LINK_LIBRARIES -L${yices_lib_path}
                         ${_camada_yices_probe_libs}
     RUN_OUTPUT_VARIABLE SRC_OUTPUT)

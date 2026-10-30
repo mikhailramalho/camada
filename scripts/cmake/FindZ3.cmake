@@ -22,8 +22,8 @@ function(check_z3_version z3_include z3_lib)
   endif()
 
   try_run(
-    Z3_RETURNCODE Z3_COMPILED ${CMAKE_BINARY_DIR}
-    ${CMAKE_SOURCE_DIR}/scripts/cmake/try_z3.cpp
+    Z3_RETURNCODE Z3_COMPILED ${PROJECT_BINARY_DIR}
+    ${PROJECT_SOURCE_DIR}/scripts/cmake/try_z3.cpp
     COMPILE_DEFINITIONS -I"${z3_include}" LINK_LIBRARIES -L${z3_lib_path}
                         ${z3_lib}
     RUN_OUTPUT_VARIABLE SRC_OUTPUT)

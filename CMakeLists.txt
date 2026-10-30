@@ -43,8 +43,10 @@ macro(config_solver name version)
   option3vl(CAMADA_SOLVER_${upper_name}_ENABLE "Build Camada with ${name}")
 
   if(NOT CAMADA_SOLVER_${upper_name}_ENABLE STREQUAL "OFF")
-    # Try to find the solver and version
-    find_package(${name} ${version})
+    # Try to find the solver and version, always through our Find module: a
+    # parent's CMAKE_FIND_PACKAGE_PREFER_CONFIG would otherwise load the
+    # backend's own config package, which sets none of our variables.
+    find_package(${name} ${version} MODULE)
 
     # If the solver was found, enable it _IF_ the user did not explicitly
     # disable it
@@ -101,18 +103,26 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Adds custom modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/scripts/cmake/")
+# Adds custom modules, ahead of the parent's: LLVM, for one, ships a
+# FindZ3.cmake that sets none of the variables ours does.
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/")
 include(CamadaDependencies)
 
-# Add option to build using sanitizers
-include(Sanitizers)
+# Settings below this guard write global or cache state the parent owns, so a
+# subproject leaves them to the parent.
+if(PROJECT_IS_TOP_LEVEL)
+  # Add option to build using sanitizers
+  include(Sanitizers)
 
-# Enable ccache if available
-include(OptimizationCCache)
+  # Enable ccache if available
+  include(OptimizationCCache)
 
-# Shared/Dynamic or Static library?
-option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
+  # Shared/Dynamic or Static library?
+  option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
+elseif(NOT DEFINED BUILD_SHARED_LIBS)
+  # The same default, in Camada's scope only.
+  set(BUILD_SHARED_LIBS ON)
+endif()
 
 # When building static, prefer static archives in find_library lookups so the
 # exported camada::camada link interface captures absolute paths to .a files
@@ -202,7 +212,9 @@ add_install_rpath_support(
 
 # Set a default build type if none was specified
 set(default_build_type "RelWithDebInfo")
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if(PROJECT_IS_TOP_LEVEL
+   AND NOT CMAKE_BUILD_TYPE
+   AND NOT CMAKE_CONFIGURATION_TYPES)
   message(
     STATUS "Setting build type to '${default_build_type}' as none was specified"
   )
@@ -286,7 +298,32 @@ if(CAMADA_SOLVER_SMTLIB_ENABLE)
 endif()
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/camadafeatures.in"
-               "${CMAKE_CURRENT_BINARY_DIR}/src/camadafeatures.h")
+               "${PROJECT_BINARY_DIR}/include/camada/camadafeatures.h")
+
+# An installed consumer gets the CAMADA_HAVE_* variables from
+# camadaConfig.cmake. Hand an in-tree parent the same: in its scope for
+# add_subdirectory and FetchContent_MakeAvailable, and through the redirect file
+# that find_package(camada) reads under FetchContent's OVERRIDE_FIND_PACKAGE.
+if(NOT PROJECT_IS_TOP_LEVEL)
+  set(_camada_have_vars)
+  foreach(
+    backend IN
+    ITEMS BITWUZLA
+          CVC5
+          MATHSAT
+          STP
+          YICES
+          Z3
+          SMTLIB)
+    set(CAMADA_HAVE_${backend}
+        ${CAMADA_HAVE_${backend}}
+        PARENT_SCOPE)
+    string(APPEND _camada_have_vars
+           "set(CAMADA_HAVE_${backend} ${CAMADA_HAVE_${backend}})\n")
+  endforeach()
+  file(WRITE "${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}/camada-extra.cmake"
+       "${_camada_have_vars}")
+endif()
 
 # Define targets
 add_subdirectory(src)
@@ -316,8 +353,11 @@ if(CAMADA_ENABLE_REGRESSION)
   add_subdirectory(regression)
 endif()
 
-# Add targets related to doxygen documention generation
-add_subdirectory(doc)
+# Add targets related to doxygen documention generation. Not for a subproject:
+# the target is named plain `docs`, which a parent may define too.
+if(PROJECT_IS_TOP_LEVEL)
+  add_subdirectory(doc)
+endif()
 
 # Print Camada configuration
 if(NOT WIN32)
