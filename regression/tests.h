@@ -481,6 +481,7 @@ inline void tests_arrays(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array_equality_witness_congruence);
   RESETANDTEST(lazy_array_equality_reached_defaults);
   RESETANDARGTEST(lazy_array_equality_reached_defaults, LazyArrays);
+  RESETANDARGTEST(lazy_array_unobserved_indexes, LazyArrays);
   RESETANDTEST(const_array_lowering_interop);
 }
 

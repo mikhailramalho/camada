@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "camada.h"
 #include "modelhelpers.test.h"
 
@@ -753,6 +752,75 @@ inline void lazy_array_equality_reached_defaults(
   solver->addConstraint(solver->mkEqual(a, b));
   solver->addConstraint(solver->mkNot(solver->mkEqual(b, c)));
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+}
+
+// Arrays agreeing at every observed index can still differ at the others,
+// where a lazy root holds its default but no axiom says so. Equalities over
+// lazy roots answered SAT here, and a model read at an unobserved index
+// returned whatever the backend picked rather than the default.
+inline void lazy_array_unobserved_indexes(
+    const camada::SMTSolverRef &solver,
+    camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {
+  auto bv8 = solver->mkBVSort(8);
+  auto arr = solver->mkArraySort(bv8, bv8);
+  auto idx = [&](int64_t V) { return solver->mkBVFromDec(V, bv8); };
+
+  // array_of(5) == store(array_of(7), 3, 5) fails everywhere but index 3.
+  auto five = solver->mkArrayConst(bv8, idx(5), Lowering);
+  auto seven = solver->mkArrayConst(bv8, idx(7), Lowering);
+  solver->addConstraint(
+      solver->mkEqual(five, solver->mkArrayStore(seven, idx(3), idx(5))));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // The same store over equal defaults cannot differ, even when the
+  // disequality is built before either constant array.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  arr = solver->mkArraySort(bv8, bv8);
+  auto m1 = solver->mkSymbol("uo_m1", arr);
+  auto m2 = solver->mkSymbol("uo_m2", arr);
+  solver->addConstraint(solver->mkNot(solver->mkEqual(m1, m2)));
+  for (const auto &M : {m1, m2})
+    solver->addConstraint(solver->mkEqual(
+        M, solver->mkArrayStore(solver->mkArrayConst(bv8, idx(0), Lowering),
+                                idx(1), idx(7))));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // An array equal to a constant one holds its default at an index the
+  // formula never mentions.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  auto b = solver->mkSymbol("uo_b", solver->mkArraySort(bv8, bv8));
+  solver->addConstraint(
+      solver->mkEqual(b, solver->mkArrayConst(bv8, idx(5), Lowering)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Got = solver->getArrayElement(b, idx(42));
+  REQUIRE(Got);
+  REQUIRE(solver->getBV(Got.value()).value() == 5);
+
+  // The fact outlives the scope the constant array was made in.
+  solver->reset();
+  bv8 = solver->mkBVSort(8);
+  solver->push();
+  five = solver->mkArrayConst(bv8, idx(5), Lowering);
+  seven = solver->mkArrayConst(bv8, idx(7), Lowering);
+  solver->pop();
+  solver->addConstraint(
+      solver->mkEqual(five, solver->mkArrayStore(seven, idx(3), idx(5))));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+  // A 1-bit index has no unobserved value once both are stored at, and
+  // that must not make a satisfiable formula UNSAT.
+  solver->reset();
+  auto bv1 = solver->mkBVSort(1);
+  auto bit = [&](int64_t V) { return solver->mkBVFromDec(V, bv1); };
+  auto zeros = solver->mkArrayConst(bv1, solver->mkBVFromDec(0, 8), Lowering);
+  auto full = solver->mkArrayStore(
+      solver->mkArrayStore(zeros, bit(0), solver->mkBVFromDec(1, 8)), bit(1),
+      solver->mkBVFromDec(1, 8));
+  auto ones = solver->mkArrayConst(bv1, solver->mkBVFromDec(1, 8), Lowering);
+  solver->addConstraint(solver->mkEqual(full, ones));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
 // Constant array whose initializer is itself a constant array —

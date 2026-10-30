@@ -569,6 +569,10 @@ void SMTSolverImpl::clearExprCaches() {
   LazyRootsByIndexSort.clear();
   ObservedIndexesBySort.clear();
   ObservedIndexSeen.clear();
+  OutsideIndexBySort.clear();
+  AckConstIndexSorts.clear();
+  UnwitnessedArrayEquals.clear();
+  SeenArrayEquals.clear();
   ArrayEqualLinks.clear();
   ArrayEqualLinksByIndexSort.clear();
   ArrayEqualCongruenceDone.clear();
@@ -962,8 +966,6 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // encoding, whose selects re-enter the Ackermann lowering.
     if (arrayMode() == ArrayEncoding::Ackermann)
       return mkEncodedArrayEqual(LHS, RHS);
-    const bool LazyInvolved = !LazyConstArrayRoots.empty() &&
-                              (reachesLazyArray(LHS) || reachesLazyArray(RHS));
     // Backends without native array extensionality (STP) cannot decide
     // array equality at all — their only array predicate is select — so
     // every array equality is lowered to the witness + observed-index
@@ -971,29 +973,23 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // defaults, so this subsumes the lazy lemma below.
     if (!nativeArrayExtensionality())
       return mkEncodedArrayEqual(LHS, RHS);
-    if (LazyInvolved) {
-      // Extensionality witness for lazy constant arrays. The backend
-      // decides array equality natively, but a lazy root's default axiom
-      // is only instantiated at observed indexes, so a model could fake a
-      // difference (or agreement) at an unobserved index. The standard
-      // reduction plugs this: a fresh witness index per equality, the
-      // universally valid lemma
-      //   LHS = RHS  \/  select(LHS, K) != select(RHS, K)
-      // and default instantiation at K (done by mkArraySelect below). Any
-      // model claiming LHS != RHS must now exhibit the difference at K,
-      // where defaults are enforced.
-      SMTExprRef Witness = mkSymbolUnchecked(
-          "__CAMADA_lazyarr_ext" + std::to_string(LazyConstArrayCounter++),
-          LHS->Sort->getIndexSort());
-      SMTExprRef SelL = mkArraySelect(LHS, Witness);
-      SMTExprRef SelR = mkArraySelect(RHS, Witness);
-      SMTExprRef theEq = mkEqualImpl(LHS, RHS);
-      assert(theEq->isBoolSort());
-      SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
-      addInternalConstraint(Lemma);
-      LazyConstraintLevels.back().push_back(std::move(Lemma));
-      return theEq;
+    // Extensionality witness for lazy constant arrays. The backend
+    // decides array equality natively, but a lazy root's default axiom is
+    // only instantiated at observed indexes, so a model could fake a
+    // difference at an unobserved index. witnessArrayEqual plugs this.
+    NativeArrayEqual E{LHS, RHS, mkEqualImpl(LHS, RHS)};
+    assert(E.Eq->isBoolSort());
+    const SMTSort *IndexSortKey = &*LHS->Sort->getIndexSort();
+    // ponytail: every distinct array equality is remembered, even on a
+    // backend that never lowers a constant array lazily; skip recording
+    // there if the memory ever shows up.
+    if (SeenArrayEquals.insert(&*E.Eq).second) {
+      if (LazyRootsByIndexSort.count(IndexSortKey))
+        witnessArrayEqual(E);
+      else
+        UnwitnessedArrayEquals[IndexSortKey].push_back(E);
     }
+    return E.Eq;
   }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
   assert(theExp->isBoolSort());
@@ -1373,6 +1369,49 @@ bool SMTSolverImpl::reachesLazyArray(const SMTExprRef &Exp) const {
          LazyConstArrayReach.count(&*Exp) != 0;
 }
 
+void SMTSolverImpl::witnessArrayEqual(const NativeArrayEqual &E) {
+  // The standard reduction: a fresh witness index per equality, the
+  // universally valid lemma
+  //   LHS = RHS  \/  select(LHS, K) != select(RHS, K)
+  // and default instantiation at K (done by mkArraySelect below). Any
+  // model claiming LHS != RHS must now exhibit the difference at K, where
+  // defaults are enforced.
+  SMTExprRef Witness = mkSymbolUnchecked(
+      "__CAMADA_lazyarr_ext" + std::to_string(LazyConstArrayCounter++),
+      E.LHS->Sort->getIndexSort());
+  SMTExprRef SelL = mkArraySelect(E.LHS, Witness);
+  SMTExprRef SelR = mkArraySelect(E.RHS, Witness);
+  SMTExprRef Lemma = mkOr(E.Eq, mkNot(mkEqual(SelL, SelR)));
+  addInternalConstraint(Lemma);
+  LazyConstraintLevels.back().push_back(std::move(Lemma));
+}
+
+void SMTSolverImpl::separateFromOutside(const SMTExprRef &Outside,
+                                        const SMTExprRef &Index,
+                                        std::size_t K) {
+  // Index is the K-th index observed at its sort, not counting Outside.
+  // Keeping Outside apart from the first Size - 1 of them is always
+  // satisfiable. A finite sort can run out of values for it after that,
+  // so on the Size-th, observe every value instead: then none is left
+  // unobserved and Outside has nothing to stand in for.
+  const SMTSortRef &Sort = Index->Sort;
+  std::uint64_t Size = UINT64_MAX;
+  if (Sort->isBoolSort())
+    Size = 2;
+  else if (Sort->isBVSort() && Sort->getWidth() < 64)
+    Size = std::uint64_t(1) << Sort->getWidth();
+  if (K < Size) {
+    SMTExprRef Apart = mkNot(mkEqual(Outside, Index));
+    addConstraint(Apart);
+    LazyConstraintLevels.back().push_back(std::move(Apart));
+  } else if (K == Size) {
+    for (std::uint64_t V = 0; V < Size; ++V)
+      observeArrayIndex(Sort->isBoolSort()
+                            ? mkBool(V != 0)
+                            : mkBVFromDec(static_cast<int64_t>(V), Sort));
+  }
+}
+
 SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
                                            const SMTExprRef &InitValue) {
   // Nesting (array_of(array_of(v))) is supported: the outer default axiom
@@ -1401,7 +1440,31 @@ SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
     for (const SMTExprRef &Index : Observed)
       instantiateLazyDefaultAt(&*Root, Index);
   }
+  ensureOutsideIndex(IndexSort);
   return Root;
+}
+
+void SMTSolverImpl::ensureOutsideIndex(const SMTSortRef &IndexSort) {
+  const SMTSort *IndexSortKey = &*IndexSort;
+  if (OutsideIndexBySort.count(IndexSortKey))
+    return;
+  // The sort's first constant array: witness the equalities built before
+  // it, and give the sort its outside index.
+  if (auto It = UnwitnessedArrayEquals.find(IndexSortKey);
+      It != UnwitnessedArrayEquals.end()) {
+    const std::vector<NativeArrayEqual> Pending = std::move(It->second);
+    UnwitnessedArrayEquals.erase(It);
+    for (const NativeArrayEqual &E : Pending)
+      witnessArrayEqual(E);
+  }
+  SMTExprRef Outside = mkSymbolUnchecked(
+      "__CAMADA_lazyarr_out" + std::to_string(LazyConstArrayCounter++),
+      IndexSort);
+  const std::vector<SMTExprRef> Observed = ObservedIndexesBySort[IndexSortKey];
+  OutsideIndexBySort.emplace(IndexSortKey, Outside);
+  observeArrayIndex(Outside);
+  for (std::size_t K = 0; K < Observed.size(); ++K)
+    separateFromOutside(Outside, Observed[K], K + 1);
 }
 
 void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
@@ -1467,7 +1530,15 @@ void SMTSolverImpl::observeArrayIndex(const SMTExprRef &Index) {
   const SMTSort *SortKey = &*Index->Sort;
   if (!ObservedIndexSeen.insert(&*Index).second)
     return;
-  ObservedIndexesBySort[SortKey].push_back(Index);
+  std::vector<SMTExprRef> &Observed = ObservedIndexesBySort[SortKey];
+  Observed.push_back(Index);
+  if (auto It = OutsideIndexBySort.find(SortKey);
+      It != OutsideIndexBySort.end() && &*It->second != &*Index) {
+    // Observed counts the outside index too.
+    const std::size_t K = Observed.size() - 1;
+    const SMTExprRef Outside = It->second;
+    separateFromOutside(Outside, Index, K);
+  }
   // Copies throughout: instantiation builds selects that re-enter this
   // function and may register new roots/links/indexes.
   if (auto It = LazyRootsByIndexSort.find(SortKey);
@@ -1495,6 +1566,8 @@ SMTExprRef SMTSolverImpl::mkEncodedArrayEqual(const SMTExprRef &LHS,
   ArrayEqualLinks.push_back(ArrayEqualLink{EqVar, LHS, RHS});
   const SMTSort *IndexSortKey = &*LHS->Sort->getIndexSort();
   ArrayEqualLinksByIndexSort[IndexSortKey].push_back(LinkId);
+  if (AckConstIndexSorts.count(IndexSortKey))
+    ensureOutsideIndex(LHS->Sort->getIndexSort());
 
   // Positive direction at every index already observed at this sort —
   // reads may reach these arrays through derived terms or terms built
@@ -1841,6 +1914,13 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
       return Resolved;
+  // Any other array can still equal a lazy-derived one, and the backend's
+  // model is free at the indexes no default was instantiated at. The
+  // outside index stands in for every one of those, so read it there.
+  SMTExprRef At = Index;
+  if (auto It = OutsideIndexBySort.find(&*Index->Sort);
+      It != OutsideIndexBySort.end() && !isObservedValue(Index))
+    At = It->second;
   // RAII: backend model queries can throw (z3::exception,
   // CVC5ApiException); the flag must not stay latched or every later
   // select would silently skip instantiation.
@@ -1850,9 +1930,21 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     explicit ModelQueryGuard(bool &F) : Flag(F), Saved(F) { F = true; }
     ~ModelQueryGuard() { Flag = Saved; }
   } Guard(InLazyModelQuery);
-  SMTResult<SMTExprRef> theExp = getArrayElementImpl(Array, Index);
+  SMTResult<SMTExprRef> theExp = getArrayElementImpl(Array, At);
   assert(!theExp || theExp.value()->Sort == Array->Sort->getElementSort());
   return theExp;
+}
+
+bool SMTSolverImpl::isObservedValue(const SMTExprRef &Index) {
+  const std::string Bits = lazyIndexModelBits(Index);
+  // No bits for this sort: trust the backend's model, as before.
+  if (Bits.empty())
+    return true;
+  const SMTExpr *Outside = &*OutsideIndexBySort.at(&*Index->Sort);
+  for (const SMTExprRef &Observed : ObservedIndexesBySort.at(&*Index->Sort))
+    if (&*Observed != Outside && lazyIndexModelBits(Observed) == Bits)
+      return true;
+  return false;
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
@@ -2230,6 +2322,11 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   // and Lazy promise.
   if (arrayMode() == ArrayEncoding::Ackermann) {
     SMTExprRef theExp = mkAckArrayConst(IndexSort, InitValue);
+    // Only an equality can reason about unobserved indexes, so wait for
+    // one: building a constant array alone then keeps the model.
+    AckConstIndexSorts.insert(&*IndexSort);
+    if (ArrayEqualLinksByIndexSort.count(&*IndexSort))
+      ensureOutsideIndex(IndexSort);
     assert(theExp->isArraySort());
     assert(theExp->Sort->getIndexSort() == IndexSort);
     assert(theExp->Sort->getElementSort() == InitValue->Sort);
