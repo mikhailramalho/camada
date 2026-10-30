@@ -580,6 +580,33 @@ inline void incremental_push_pop(const camada::SMTSolverRef &solver) {
   REQUIRE(x_res.value() == 1);
 }
 
+// A frame opened on an UNSAT context must work and pop back cleanly (#244).
+inline void push_after_unsat(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("x", solver->mkBVSort(8));
+  auto isOne = solver->mkEqual(x, solver->mkBVFromDec(1, 8));
+  auto isTwo = solver->mkEqual(x, solver->mkBVFromDec(2, 8));
+
+  solver->addConstraint(isOne);
+  solver->push();
+  solver->addConstraint(isTwo);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  solver->push();
+  solver->addConstraint(isOne);
+  solver->push();
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  solver->pop(2);
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  solver->pop();
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  // Unchecked: asserting false alone makes some backends UNSAT.
+  solver->push();
+  solver->addConstraint(solver->mkBool(false));
+  solver->push();
+  solver->pop(2);
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+}
+
 // Locks in the documented behavior that symbols are cached by (name, sort)
 // for the solver's lifetime, including across push/pop. mkSymbol returns the
 // same handle as before the push, even though SMT-LIB strict semantics would
