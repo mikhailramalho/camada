@@ -1006,6 +1006,59 @@ function(camada_setup_gmp)
   endif()
 endfunction()
 
+# Bitwuzla's MPFR, built against the GMP above. A system MPFR is linked against
+# the system GMP, so it loads that copy at run time next to the static one
+# Bitwuzla calls, and both work on the same mpz/mpfr objects.
+function(camada_setup_mpfr)
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libmpfr.a")
+    return()
+  endif()
+  camada_setup_gmp()
+  camada_ensure_deps_dirs()
+  camada_include_cpm()
+  cpmaddpackage(
+    NAME
+    mpfr
+    DOWNLOAD_ONLY
+    YES
+    URL
+    "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz"
+    URL_HASH
+    SHA256=b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01
+    # Keep the archive's timestamps: extracted at the current time, configure.ac
+    # looks newer than configure and make reruns the release's automake.
+    DOWNLOAD_EXTRACT_TIMESTAMP
+    TRUE)
+
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${mpfr_SOURCE_DIR}"
+    MESSAGE
+    "Configuring MPFR"
+    COMMAND
+    ./configure
+    --prefix=${CAMADA_DEPS_INSTALL_DIR}
+    --disable-shared
+    --with-gmp=${CAMADA_DEPS_INSTALL_DIR}
+    CFLAGS=-fPIC)
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${mpfr_SOURCE_DIR}"
+    MESSAGE
+    "Building MPFR"
+    COMMAND
+    make
+    -j)
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${mpfr_SOURCE_DIR}"
+    MESSAGE
+    "Installing MPFR"
+    COMMAND
+    make
+    install)
+endfunction()
+
 function(camada_setup_minisat)
   set(minisat_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat/minisatConfig.cmake")
@@ -1214,13 +1267,17 @@ Libs: -L\${libdir} -lcadical
 Cflags: -I\${includedir}
 ")
 
+  # gmp.pc and mpfr.pc of our own GMP and MPFR, ahead of the system's.
+  camada_setup_mpfr()
+  set(bitwuzla_pc_path
+      "${cadical_pc_dir}:${CAMADA_DEPS_INSTALL_DIR}/lib/pkgconfig")
   set(saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
   set(saved_library_path "$ENV{LIBRARY_PATH}")
   set(saved_cpath "$ENV{CPATH}")
   if(saved_pkg_config_path)
-    set(ENV{PKG_CONFIG_PATH} "${cadical_pc_dir}:${saved_pkg_config_path}")
+    set(ENV{PKG_CONFIG_PATH} "${bitwuzla_pc_path}:${saved_pkg_config_path}")
   else()
-    set(ENV{PKG_CONFIG_PATH} "${cadical_pc_dir}")
+    set(ENV{PKG_CONFIG_PATH} "${bitwuzla_pc_path}")
   endif()
   if(saved_library_path)
     set(ENV{LIBRARY_PATH} "${cadical_prefix}/lib:${saved_library_path}")
@@ -1293,17 +1350,27 @@ endfunction()
 # enables CVC5 or STP.
 function(camada_setup_bitwuzla)
   camada_setup_shared_cadical()
-  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
+  # A tree staged before Bitwuzla had its own MPFR is rebuilt when downloads are
+  # allowed.
+  camada_should_download_dependency(bitwuzla_download TRUE)
+  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h"
+     OR (bitwuzla_download AND NOT EXISTS
+                               "${CAMADA_DEPS_INSTALL_DIR}/lib/libmpfr.a"))
     camada_ensure_deps_dirs()
     camada_build_bitwuzla_from_source("${CAMADA_CADICAL_PREFIX}")
   endif()
 
-  # GMP is named the same way, and dropped from Requires: pkg-config would
-  # otherwise resolve `gmp` itself, against whichever copy the system provides,
-  # which is not necessarily the one the rest of the build links.
+  # GMP and MPFR are named the same way, and dropped from Requires: pkg-config
+  # would otherwise resolve them itself, against whichever copies the system
+  # provides, which are not necessarily the ones Bitwuzla was built against.
   camada_gmp_library(bitwuzla_gmp_lib)
   get_filename_component(bitwuzla_gmp_dir "${bitwuzla_gmp_lib}" DIRECTORY)
   set(bitwuzla_gmp_flags " -L${bitwuzla_gmp_dir} -lgmp")
+  set(bitwuzla_requires "Requires: mpfr >= 4.2.1\n")
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libmpfr.a")
+    set(bitwuzla_requires)
+    set(bitwuzla_gmp_flags " -L${CAMADA_DEPS_INSTALL_DIR}/lib -lmpfr -lgmp")
+  endif()
 
   # Bitwuzla is built against the shared CaDiCaL, so the pkg-config file has to
   # name it; meson writes its own absolute build-time path, which this rewrite
@@ -1330,7 +1397,7 @@ function(camada_setup_bitwuzla)
                            DIRECTORY)
     file(
       WRITE "${bitwuzla_pc_file}"
-      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\nRequires: mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb${bitwuzla_cadical_flags}${bitwuzla_gmp_flags}\nCflags: -I\${includedir}\n"
+      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\n${bitwuzla_requires}Libs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb${bitwuzla_cadical_flags}${bitwuzla_gmp_flags}\nCflags: -I\${includedir}\n"
     )
   endforeach()
 endfunction()
