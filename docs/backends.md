@@ -43,9 +43,12 @@ outside binary32/binary64.
 
 ## Timeouts and unsat assumptions
 
-- Yices has no native time limit, so `setTimeout` uses a process-global
-  SIGALRM timer plus `yices_stop_search`. It is POSIX only, and at most one
-  timed Yices check may run at a time process-wide.
+- Yices has no native time limit, so `setTimeout` starts a watchdog thread per
+  timed check that calls `yices_stop_search` at the deadline.
+- Yices keeps its terms in process-wide tables and is built without its
+  thread-safety option, whose 2.7.0 release deadlocks in assumption checks
+  (fixed upstream in SRI-CSL/yices2#609, not yet released). Use Yices solvers
+  from one thread at a time across the whole process, not just per instance.
 - STP's time budget is whole seconds for the entire query; millisecond limits
   round up to the next second.
 - Unsat assumptions are opt-in at creation on Bitwuzla and CVC5, because

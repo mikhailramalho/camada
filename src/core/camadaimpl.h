@@ -81,7 +81,8 @@ public:
   /// There is deliberately no default constructor: a backend that forgot to
   /// forward its config would silently get ArrayEncoding::Native, so the
   /// compiler is made to ask for it.
-  explicit SMTSolverImpl(const SolverConfig &Config) : Config(Config) {}
+  SMTSolverImpl(const SolverConfig &Config, SMTBackendKind Kind)
+      : Config(Config), Kind(Kind) {}
   /// Backend destructors MUST call invalidateGeneratedObjects() before
   /// releasing backend resources (contexts, term managers, etc.). The arena
   /// destructors run during base-class teardown, after derived members are
@@ -130,9 +131,9 @@ public:
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
 
-  /// The sorts lazyIndexModelBits can canonicalize. The Ackermann model
-  /// walks compare indexes by those bits, so an index outside this set is
-  /// a capability gap to report, not a failure to diagnose.
+  /// The index sorts the Ackermann model walks support, so an index
+  /// outside this set is a capability gap to report, not a failure to
+  /// diagnose.
   static bool ackCanEvaluateIndexSort(const SMTSortRef &Sort) {
     return Sort->isBoolSort() || Sort->isBVSort();
   }
@@ -141,8 +142,19 @@ public:
         Backend, "The Ackermann array encoding can only evaluate bool- "
                  "and bitvector-sorted indexes against a model");
   }
+  /// The sorts lazyIndexModelBits can canonicalize, which the lazy
+  /// constant array model queries compare indexes by.
+  static bool lazyCanEvaluateIndexSort(const SMTSortRef &Sort) {
+    return ackCanEvaluateIndexSort(Sort) || Sort->isIntSort() ||
+           Sort->isRealSort();
+  }
+  static SMTError lazyUnsupportedIndexSort(SMTBackendKind Backend) {
+    return unsupportedError(
+        Backend, "Lazily lowered constant arrays can only evaluate bool-, "
+                 "bitvector-, Int- and Real-sorted indexes against a model");
+  }
 
-  /// Model bits of a bool/BV-sorted expression after a SAT check, used to
+  /// Model value of a bool/BV/Int/Real expression after a SAT check, used to
   /// compare index terms by model value. Empty string when the sort is
   /// unsupported or the model query fails. Callers that revisit the same
   /// index term pays a single backend query: the result is memoized for
@@ -150,11 +162,9 @@ public:
   /// Public because the Camada tuple lowering is a free function.
   std::string lazyIndexModelBits(const SMTExprRef &Exp);
 
-  /// The backend this solver drives, read off a cached expression.
-  /// Public, like unsupportedError, for the Camada tuple lowering.
-  SMTBackendKind backendKind() const {
-    return CachedBoolExprs[0]->getBackendKind();
-  }
+  /// The backend this solver drives. Public, like unsupportedError, for the
+  /// Camada tuple lowering.
+  SMTBackendKind backendKind() const { return Kind; }
 
   /// An UnsupportedOperation error from \p Backend saying \p Msg.
   static SMTError unsupportedError(SMTBackendKind Backend, const char *Msg) {
@@ -199,7 +209,11 @@ protected:
   ObjectArena ExprArena;
   std::array<SMTExprRef, 2> CachedBoolExprs;
   std::array<SMTExprRef, 5> CachedRMBVExprs;
-  std::array<std::vector<SMTExprRef>, 3> CachedSmallBVExprs;
+  // Indexed by width. Fixed size so a slot never moves while a literal is
+  // being built, and an arbitrary width cannot grow it.
+  static constexpr unsigned MaxCachedSmallBVWidth = 256;
+  std::array<std::array<SMTExprRef, MaxCachedSmallBVWidth + 1>, 3>
+      CachedSmallBVExprs;
   SMTSortRef CachedBoolSort;
   SMTSortRef CachedIntSort;
   SMTSortRef CachedRealSort;
@@ -294,6 +308,35 @@ protected:
       ObservedIndexesBySort;
   std::unordered_set<const SMTExpr *> ObservedIndexSeen;
   void observeArrayIndex(const SMTExprRef &Index);
+  // Observed indexes alone are not complete once a constant array is in
+  // play: two arrays can agree at every observed index and still differ at
+  // all the others, where a constant array holds its default but nothing
+  // says so. Each index sort with a lazy or Ackermann constant array gets
+  // one outside index, kept distinct from every observed index, so
+  // defaults and congruence also fire at a stand-in for all the others.
+  std::unordered_map<const SMTSort *, SMTExprRef> OutsideIndexBySort;
+  // Index sorts with an Ackermann constant array.
+  std::unordered_set<const SMTSort *> AckConstIndexSorts;
+  void ensureOutsideIndex(const SMTSortRef &IndexSort);
+  void separateFromOutside(const SMTExprRef &Outside, const SMTExprRef &Index,
+                           std::size_t K);
+  /// True when Index's model value is that of an index the formula
+  /// observes, other than the outside one.
+  bool isObservedValue(const SMTExprRef &Index);
+  // A native array disequality may pick its difference at an unobserved
+  // index, where a lazy root is unconstrained, so every array equality at
+  // an index sort with a lazy root gets an extensionality witness. Those
+  // built before the sort's first lazy root wait here; each distinct
+  // equality is handled once.
+  struct NativeArrayEqual {
+    SMTExprRef LHS;
+    SMTExprRef RHS;
+    SMTExprRef Eq;
+  };
+  std::unordered_map<const SMTSort *, std::vector<NativeArrayEqual>>
+      UnwitnessedArrayEquals;
+  std::unordered_set<const SMTExpr *> SeenArrayEquals;
+  void witnessArrayEqual(const NativeArrayEqual &E);
   // True while a model query (getArrayElement) is evaluating: selects
   // built for evaluation must not instantiate default axioms or count as
   // formula observations — asserting after check() invalidates the
@@ -405,10 +448,10 @@ protected:
                            const SMTExprRef &F);
   SMTExprRef mkAckArrayConst(const SMTSortRef &IndexSort,
                              const SMTExprRef &InitValue);
-  void ackWalkChain(const SMTExpr *Node, const std::string &QueryBits,
+  bool ackWalkChain(const SMTExpr *Node, const std::string &QueryBits,
                     AckClassWalk &Walk);
-  void ackExpandEqualityClass(const SMTSortRef &ArraySort,
-                              const std::string &QueryBits, AckClassWalk &Walk);
+  void ackClassValue(const SMTExprRef &Array, const std::string &QueryBits,
+                     AckClassWalk &Walk);
   SMTExprRef ackDefaultElementValue(const SMTSortRef &Sort);
   SMTExprRef resolveAckArrayElement(const SMTExprRef &Array,
                                     const SMTExprRef &Index);
@@ -550,6 +593,8 @@ protected:
   /// model (the backend's model is unconstrained at indexes whose defaults
   /// were never instantiated).
   SMTResult<ArrayModel> lazyArrayModel(const SMTExprRef &Array);
+  SMTResult<ArrayModel> outsideArrayModel(const SMTExprRef &Array,
+                                          const SMTExprRef &Outside);
 
   /// Process-lifetime (see makeProcessLifetimeHandleState): handles keep a
   /// raw pointer to it, so it must stay readable after this solver dies.
@@ -959,6 +1004,12 @@ private:
   /// The precondition mkForall and mkExists share.
   void requireQuantifierOperands(const std::vector<SMTExprRef> &Vars,
                                  const SMTExprRef &Body);
+  /// True when a BV rounding mode holds one of the five valid codes: it
+  /// is three bits wide, so codes 5 to 7 would act as a sixth mode.
+  SMTExprRef isValidBVRM(const SMTExprRef &R);
+  /// The conjunction of isValidBVRM over the BV rounding modes in Vars, or
+  /// null when there are none.
+  SMTExprRef validBoundRMs(const std::vector<SMTExprRef> &Vars);
 
   /// Settles LastUnknown once the backend has answered.
   CheckResult finishCheck(CheckResult Result);
@@ -1522,6 +1573,9 @@ private:
   /// so a backend cannot cache a field and drift from the caller's request,
   /// and a field a backend has no use for simply never gets read.
   const SolverConfig Config;
+  /// Fixed by the concrete backend, so it stays valid while the expression
+  /// caches are empty during reset() and destruction.
+  const SMTBackendKind Kind;
 };
 
 } // namespace camada

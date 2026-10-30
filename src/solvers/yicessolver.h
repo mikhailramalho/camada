@@ -310,19 +310,15 @@ protected:
   using TermVectort = std::vector<SMTExprRef>;
   TermVectort Assertions;
   std::vector<std::size_t> AssertionScopeSizes;
+  // Yices refuses to push an UNSAT context, so those frames are only
+  // counted. They always sit on top: the context stays UNSAT until a real pop.
+  unsigned UnsatPushes = 0;
 
 private:
   void releaseSymbolNames();
 
-  // SIGALRM-based per-check time limit (POSIX only): armTimeout installs a
-  // handler that calls yices_stop_search on this context and starts an
-  // interval timer from TimeoutMs; disarmTimeout cancels the timer and
-  // restores the previous handler. No-ops when TimeoutMs is 0.
-  void armTimeout();
-  void disarmTimeout();
-
   YicesContextRef Context = nullptr;
-  std::vector<std::string> NamedSymbols;
+  std::vector<term_t> NamedSymbols;
 
 }; // namespace camada
 

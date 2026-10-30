@@ -115,7 +115,7 @@ void BitwExpr::dump(std::string &Out) const {
 }
 
 BitwuzlaSolver::BitwuzlaSolver(const SolverConfig &Config)
-    : SMTSolverImpl(Config) {
+    : SMTSolverImpl(Config, SMTBackendKind::Bitwuzla) {
   initializeContext();
   initializeCommonSingletons();
 }

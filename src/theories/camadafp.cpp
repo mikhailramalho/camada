@@ -1698,11 +1698,9 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
 
   // otherwise: the actual conversion with rounding.
   SMTExprRef sgn, sig, exp, lz;
-  // Unnormalized: the significand is only padded or collapsed to a sticky
-  // below, neither of which touches its leading zeros, and the exponent
-  // path already subtracts lz explicitly — so round() sees a consistent
-  // pair and renormalizes from its own count.
-  unpack(*this, From, sgn, sig, exp, lz, false);
+  // Normalized: collapsing the low bits into a sticky below would otherwise
+  // fold away the significant bits of a subnormal source.
+  unpack(*this, From, sgn, sig, exp, lz, true);
 
   SMTExprRef res_sgn = sgn;
 
@@ -1741,7 +1739,9 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
     // subtract lz for subnormal numbers.
     SMTExprRef lz_ext = mkBVZeroExt(lz, to_ebits - from_ebits + 2);
     res_exp = mkBVSub(res_exp, lz_ext);
-  } else if (from_ebits > (to_ebits + 2)) {
+  } else {
+    // Clamped even when from_ebits == to_ebits + 2: exp - lz of a subnormal
+    // source then needs more bits than that, and would wrap.
     unsigned ebits_diff = from_ebits - (to_ebits + 2);
 
     // subtract lz for subnormal numbers.
@@ -1769,9 +1769,6 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
     res_exp = exp_in_range;
     res_exp = mkIte(ovf_cond, max_exp, res_exp);
     res_exp = mkIte(udf_cond, min_exp, res_exp);
-  } else {
-    // from_ebits == (to_ebits + 2)
-    res_exp = mkBVSub(exp, lz);
   }
 
   assert(res_exp->getWidth() == to_ebits + 2);

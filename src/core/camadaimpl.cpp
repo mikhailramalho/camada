@@ -480,8 +480,9 @@ SMTExprRef SMTSolverImpl::cachedSmallBVExpr(int64_t Value,
   // Only -1, 0 and 1 are cached; any other value is simply not in the cache.
   if (Value < -1 || Value > 1)
     return SMTExprRef{};
-  const auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Value)];
-  return Width < Cache.size() ? Cache[Width] : SMTExprRef{};
+  if (Width > MaxCachedSmallBVWidth)
+    return SMTExprRef{};
+  return CachedSmallBVExprs[cachedSmallBVExprIndex(Value)][Width];
 }
 
 SMTExprRef SMTSolverImpl::getRMExpr(RM R) const {
@@ -551,7 +552,7 @@ void SMTSolverImpl::clearExprCaches() {
   CachedBoolExprs.fill({});
   CachedRMBVExprs.fill({});
   for (auto &Cache : CachedSmallBVExprs)
-    Cache.clear();
+    Cache.fill({});
   SymbolExprCache.clear();
   // Every alias just forgotten is gone from the backend too (this runs on
   // reset and destruction), so the numbering starts over: a solver that has
@@ -568,6 +569,10 @@ void SMTSolverImpl::clearExprCaches() {
   LazyRootsByIndexSort.clear();
   ObservedIndexesBySort.clear();
   ObservedIndexSeen.clear();
+  OutsideIndexBySort.clear();
+  AckConstIndexSorts.clear();
+  UnwitnessedArrayEquals.clear();
+  SeenArrayEquals.clear();
   ArrayEqualLinks.clear();
   ArrayEqualLinksByIndexSort.clear();
   ArrayEqualCongruenceDone.clear();
@@ -591,12 +596,9 @@ void SMTSolverImpl::initializeCommonSingletons() {
   auto &CachedBVNegOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(-1)];
   auto &CachedBVZeroExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(0)];
   auto &CachedBVOneExprs = CachedSmallBVExprs[cachedSmallBVExprIndex(1)];
-  CachedBVZeroExprs.resize(5);
   for (unsigned Width = 1; Width <= 4; ++Width)
     CachedBVZeroExprs[Width] = mkBVFromBin(std::string(Width, '0'), Width);
-  CachedBVOneExprs.resize(2);
   CachedBVOneExprs[1] = One1;
-  CachedBVNegOneExprs.resize(2);
   CachedBVNegOneExprs[1] = One1;
   for (RM R : {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
                RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
@@ -964,8 +966,6 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // encoding, whose selects re-enter the Ackermann lowering.
     if (arrayMode() == ArrayEncoding::Ackermann)
       return mkEncodedArrayEqual(LHS, RHS);
-    const bool LazyInvolved = !LazyConstArrayRoots.empty() &&
-                              (reachesLazyArray(LHS) || reachesLazyArray(RHS));
     // Backends without native array extensionality (STP) cannot decide
     // array equality at all — their only array predicate is select — so
     // every array equality is lowered to the witness + observed-index
@@ -973,29 +973,23 @@ SMTExprRef SMTSolverImpl::mkEqual(const SMTExprRef &LHS,
     // defaults, so this subsumes the lazy lemma below.
     if (!nativeArrayExtensionality())
       return mkEncodedArrayEqual(LHS, RHS);
-    if (LazyInvolved) {
-      // Extensionality witness for lazy constant arrays. The backend
-      // decides array equality natively, but a lazy root's default axiom
-      // is only instantiated at observed indexes, so a model could fake a
-      // difference (or agreement) at an unobserved index. The standard
-      // reduction plugs this: a fresh witness index per equality, the
-      // universally valid lemma
-      //   LHS = RHS  \/  select(LHS, K) != select(RHS, K)
-      // and default instantiation at K (done by mkArraySelect below). Any
-      // model claiming LHS != RHS must now exhibit the difference at K,
-      // where defaults are enforced.
-      SMTExprRef Witness = mkSymbolUnchecked(
-          "__CAMADA_lazyarr_ext" + std::to_string(LazyConstArrayCounter++),
-          LHS->Sort->getIndexSort());
-      SMTExprRef SelL = mkArraySelect(LHS, Witness);
-      SMTExprRef SelR = mkArraySelect(RHS, Witness);
-      SMTExprRef theEq = mkEqualImpl(LHS, RHS);
-      assert(theEq->isBoolSort());
-      SMTExprRef Lemma = mkOr(theEq, mkNot(mkEqual(SelL, SelR)));
-      addInternalConstraint(Lemma);
-      LazyConstraintLevels.back().push_back(std::move(Lemma));
-      return theEq;
+    // Extensionality witness for lazy constant arrays. The backend
+    // decides array equality natively, but a lazy root's default axiom is
+    // only instantiated at observed indexes, so a model could fake a
+    // difference at an unobserved index. witnessArrayEqual plugs this.
+    NativeArrayEqual E{LHS, RHS, mkEqualImpl(LHS, RHS)};
+    assert(E.Eq->isBoolSort());
+    const SMTSort *IndexSortKey = &*LHS->Sort->getIndexSort();
+    // ponytail: every distinct array equality is remembered, even on a
+    // backend that never lowers a constant array lazily; skip recording
+    // there if the memory ever shows up.
+    if (SeenArrayEquals.insert(&*E.Eq).second) {
+      if (LazyRootsByIndexSort.count(IndexSortKey))
+        witnessArrayEqual(E);
+      else
+        UnwitnessedArrayEquals[IndexSortKey].push_back(E);
     }
+    return E.Eq;
   }
   SMTExprRef theExp = mkEqualImpl(LHS, RHS);
   assert(theExp->isBoolSort());
@@ -1375,6 +1369,49 @@ bool SMTSolverImpl::reachesLazyArray(const SMTExprRef &Exp) const {
          LazyConstArrayReach.count(&*Exp) != 0;
 }
 
+void SMTSolverImpl::witnessArrayEqual(const NativeArrayEqual &E) {
+  // The standard reduction: a fresh witness index per equality, the
+  // universally valid lemma
+  //   LHS = RHS  \/  select(LHS, K) != select(RHS, K)
+  // and default instantiation at K (done by mkArraySelect below). Any
+  // model claiming LHS != RHS must now exhibit the difference at K, where
+  // defaults are enforced.
+  SMTExprRef Witness = mkSymbolUnchecked(
+      "__CAMADA_lazyarr_ext" + std::to_string(LazyConstArrayCounter++),
+      E.LHS->Sort->getIndexSort());
+  SMTExprRef SelL = mkArraySelect(E.LHS, Witness);
+  SMTExprRef SelR = mkArraySelect(E.RHS, Witness);
+  SMTExprRef Lemma = mkOr(E.Eq, mkNot(mkEqual(SelL, SelR)));
+  addInternalConstraint(Lemma);
+  LazyConstraintLevels.back().push_back(std::move(Lemma));
+}
+
+void SMTSolverImpl::separateFromOutside(const SMTExprRef &Outside,
+                                        const SMTExprRef &Index,
+                                        std::size_t K) {
+  // Index is the K-th index observed at its sort, not counting Outside.
+  // Keeping Outside apart from the first Size - 1 of them is always
+  // satisfiable. A finite sort can run out of values for it after that,
+  // so on the Size-th, observe every value instead: then none is left
+  // unobserved and Outside has nothing to stand in for.
+  const SMTSortRef &Sort = Index->Sort;
+  std::uint64_t Size = UINT64_MAX;
+  if (Sort->isBoolSort())
+    Size = 2;
+  else if (Sort->isBVSort() && Sort->getWidth() < 64)
+    Size = std::uint64_t(1) << Sort->getWidth();
+  if (K < Size) {
+    SMTExprRef Apart = mkNot(mkEqual(Outside, Index));
+    addConstraint(Apart);
+    LazyConstraintLevels.back().push_back(std::move(Apart));
+  } else if (K == Size) {
+    for (std::uint64_t V = 0; V < Size; ++V)
+      observeArrayIndex(Sort->isBoolSort()
+                            ? mkBool(V != 0)
+                            : mkBVFromDec(static_cast<int64_t>(V), Sort));
+  }
+}
+
 SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
                                            const SMTExprRef &InitValue) {
   // Nesting (array_of(array_of(v))) is supported: the outer default axiom
@@ -1403,7 +1440,31 @@ SMTExprRef SMTSolverImpl::mkLazyConstArray(const SMTSortRef &IndexSort,
     for (const SMTExprRef &Index : Observed)
       instantiateLazyDefaultAt(&*Root, Index);
   }
+  ensureOutsideIndex(IndexSort);
   return Root;
+}
+
+void SMTSolverImpl::ensureOutsideIndex(const SMTSortRef &IndexSort) {
+  const SMTSort *IndexSortKey = &*IndexSort;
+  if (OutsideIndexBySort.count(IndexSortKey))
+    return;
+  // The sort's first constant array: witness the equalities built before
+  // it, and give the sort its outside index.
+  if (auto It = UnwitnessedArrayEquals.find(IndexSortKey);
+      It != UnwitnessedArrayEquals.end()) {
+    const std::vector<NativeArrayEqual> Pending = std::move(It->second);
+    UnwitnessedArrayEquals.erase(It);
+    for (const NativeArrayEqual &E : Pending)
+      witnessArrayEqual(E);
+  }
+  SMTExprRef Outside = mkSymbolUnchecked(
+      "__CAMADA_lazyarr_out" + std::to_string(LazyConstArrayCounter++),
+      IndexSort);
+  const std::vector<SMTExprRef> Observed = ObservedIndexesBySort[IndexSortKey];
+  OutsideIndexBySort.emplace(IndexSortKey, Outside);
+  observeArrayIndex(Outside);
+  for (std::size_t K = 0; K < Observed.size(); ++K)
+    separateFromOutside(Outside, Observed[K], K + 1);
 }
 
 void SMTSolverImpl::instantiateLazyDefaultAt(const SMTExpr *RootKey,
@@ -1459,8 +1520,17 @@ std::string SMTSolverImpl::lazyIndexModelBitsUncached(const SMTExprRef &Exp) {
     SMTResult<bool> Value = getBool(Exp);
     return Value ? std::string(Value.value() ? "1" : "0") : std::string();
   }
+  if (Exp->isIntSort()) {
+    SMTResult<std::string> Value = getInt(Exp);
+    return Value ? Value.value() : std::string();
+  }
+  if (Exp->isRealSort()) {
+    SMTResult<std::string> Num = getRealNumerator(Exp);
+    SMTResult<std::string> Den = getRealDenominator(Exp);
+    return Num && Den ? Num.value() + "/" + Den.value() : std::string();
+  }
   if (!Exp->isBVSort())
-    return std::string(); // unsupported index sort: backend fallback
+    return std::string(); // unsupported index sort
   SMTResult<std::string> Value = getBVInBin(Exp);
   return Value ? Value.value() : std::string();
 }
@@ -1469,7 +1539,15 @@ void SMTSolverImpl::observeArrayIndex(const SMTExprRef &Index) {
   const SMTSort *SortKey = &*Index->Sort;
   if (!ObservedIndexSeen.insert(&*Index).second)
     return;
-  ObservedIndexesBySort[SortKey].push_back(Index);
+  std::vector<SMTExprRef> &Observed = ObservedIndexesBySort[SortKey];
+  Observed.push_back(Index);
+  if (auto It = OutsideIndexBySort.find(SortKey);
+      It != OutsideIndexBySort.end() && &*It->second != &*Index) {
+    // Observed counts the outside index too.
+    const std::size_t K = Observed.size() - 1;
+    const SMTExprRef Outside = It->second;
+    separateFromOutside(Outside, Index, K);
+  }
   // Copies throughout: instantiation builds selects that re-enter this
   // function and may register new roots/links/indexes.
   if (auto It = LazyRootsByIndexSort.find(SortKey);
@@ -1497,6 +1575,8 @@ SMTExprRef SMTSolverImpl::mkEncodedArrayEqual(const SMTExprRef &LHS,
   ArrayEqualLinks.push_back(ArrayEqualLink{EqVar, LHS, RHS});
   const SMTSort *IndexSortKey = &*LHS->Sort->getIndexSort();
   ArrayEqualLinksByIndexSort[IndexSortKey].push_back(LinkId);
+  if (AckConstIndexSorts.count(IndexSortKey))
+    ensureOutsideIndex(LHS->Sort->getIndexSort());
 
   // Positive direction at every index already observed at this sort —
   // reads may reach these arrays through derived terms or terms built
@@ -1700,10 +1780,29 @@ void SMTSolverImpl::requireQuantifierOperands(
                  "issue #17");
 }
 
+SMTExprRef SMTSolverImpl::isValidBVRM(const SMTExprRef &R) {
+  SMTExprRef Valid = mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::BV));
+  for (const RM Mode : {RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
+                        RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO})
+    Valid = mkOr(Valid, mkEqual(R, mkRM(Mode, FPEncoding::BV)));
+  return Valid;
+}
+
+// The axiom mkSymbol asserts holds for the free symbol, not for a bound
+// variable of the same name, so quantifiers restrict their own.
+SMTExprRef SMTSolverImpl::validBoundRMs(const std::vector<SMTExprRef> &Vars) {
+  SMTExprRef Valid;
+  for (const SMTExprRef &V : Vars)
+    if (V->Sort->isBVRMSort())
+      Valid = Valid ? mkAnd(Valid, isValidBVRM(V)) : isValidBVRM(V);
+  return Valid;
+}
+
 SMTExprRef SMTSolverImpl::mkForall(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireQuantifierOperands(Vars, Body);
-  SMTExprRef theExp = mkForallImpl(Vars, Body);
+  SMTExprRef Valid = validBoundRMs(Vars);
+  SMTExprRef theExp = mkForallImpl(Vars, Valid ? mkImplies(Valid, Body) : Body);
   assert(theExp->isBoolSort());
   return theExp;
 }
@@ -1715,7 +1814,8 @@ CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkForallImpl, "Quantifiers",
 SMTExprRef SMTSolverImpl::mkExists(const std::vector<SMTExprRef> &Vars,
                                    const SMTExprRef &Body) {
   requireQuantifierOperands(Vars, Body);
-  SMTExprRef theExp = mkExistsImpl(Vars, Body);
+  SMTExprRef Valid = validBoundRMs(Vars);
+  SMTExprRef theExp = mkExistsImpl(Vars, Valid ? mkAnd(Valid, Body) : Body);
   assert(theExp->isBoolSort());
   return theExp;
 }
@@ -1820,9 +1920,19 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return resolveAckArrayElement(Array, Index);
   }
+  auto Outside = OutsideIndexBySort.find(&*Index->Sort);
+  if (Outside != OutsideIndexBySort.end() &&
+      !lazyCanEvaluateIndexSort(Index->Sort))
+    return lazyUnsupportedIndexSort(Array->getBackendKind());
   if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
     if (SMTExprRef Resolved = resolveLazyArrayElement(Array, Index))
       return Resolved;
+  // Any other array can still equal a lazy-derived one, and the backend's
+  // model is free at the indexes no default was instantiated at. The
+  // outside index stands in for every one of those, so read it there.
+  SMTExprRef At = Index;
+  if (Outside != OutsideIndexBySort.end() && !isObservedValue(Index))
+    At = Outside->second;
   // RAII: backend model queries can throw (z3::exception,
   // CVC5ApiException); the flag must not stay latched or every later
   // select would silently skip instantiation.
@@ -1832,9 +1942,21 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
     explicit ModelQueryGuard(bool &F) : Flag(F), Saved(F) { F = true; }
     ~ModelQueryGuard() { Flag = Saved; }
   } Guard(InLazyModelQuery);
-  SMTResult<SMTExprRef> theExp = getArrayElementImpl(Array, Index);
+  SMTResult<SMTExprRef> theExp = getArrayElementImpl(Array, At);
   assert(!theExp || theExp.value()->Sort == Array->Sort->getElementSort());
   return theExp;
+}
+
+bool SMTSolverImpl::isObservedValue(const SMTExprRef &Index) {
+  const std::string Bits = lazyIndexModelBits(Index);
+  // No model value: trust the backend's model.
+  if (Bits.empty())
+    return true;
+  const SMTExpr *Outside = &*OutsideIndexBySort.at(&*Index->Sort);
+  for (const SMTExprRef &Observed : ObservedIndexesBySort.at(&*Index->Sort))
+    if (&*Observed != Outside && lazyIndexModelBits(Observed) == Bits)
+      return true;
+  return false;
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
@@ -1855,9 +1977,55 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return ackArrayModel(Array);
   }
-  if (!LazyConstArrayRoots.empty() && reachesLazyArray(Array))
-    return lazyArrayModel(Array);
-  return getArrayValuesImpl(Array);
+  auto Outside = OutsideIndexBySort.find(&*Array->Sort->getIndexSort());
+  if (Outside == OutsideIndexBySort.end())
+    return getArrayValuesImpl(Array);
+  if (!lazyCanEvaluateIndexSort(Array->Sort->getIndexSort()))
+    return lazyUnsupportedIndexSort(Array->getBackendKind());
+  const bool LazyDerived = reachesLazyArray(Array);
+  if (LazyDerived)
+    if (SMTResult<ArrayModel> Model = lazyArrayModel(Array))
+      return Model;
+  // ponytail: reads element by element only for the sorts every backend's
+  // getArrayElement reads; other element sorts keep the old model.
+  const SMTSortRef &Elem = Array->Sort->getElementSort();
+  if (Elem->isBoolSort() || Elem->isBVSort() || Elem->isFPSort() ||
+      Elem->isRMSort())
+    return outsideArrayModel(Array, Outside->second);
+  return LazyDerived ? lazyArrayModel(Array) : getArrayValuesImpl(Array);
+}
+
+// The outside index stands in for every index value the formula never
+// observed, so read the array there for the base and at each observed
+// index for the entries.
+SMTResult<ArrayModel>
+SMTSolverImpl::outsideArrayModel(const SMTExprRef &Array,
+                                 const SMTExprRef &Outside) {
+  ArrayModel Model;
+  SMTResult<SMTExprRef> Base = getArrayElement(Array, Outside);
+  if (!Base)
+    return Base.error();
+  Model.Base = Base.value();
+  // ponytail: one entry per observed index of the sort, read or not by
+  // this array; track indexes per array if models get too large.
+  std::set<std::string> Seen;
+  const std::vector<SMTExprRef> Observed =
+      ObservedIndexesBySort.at(&*Outside->Sort);
+  for (const SMTExprRef &Index : Observed) {
+    if (&*Index == &*Outside)
+      continue;
+    const std::string Bits = lazyIndexModelBits(Index);
+    if (Bits.empty())
+      return SMTError{SMTErrorCode::BackendError, backendKind(),
+                      "Could not evaluate an observed array index"};
+    if (!Seen.insert(Bits).second)
+      continue;
+    SMTResult<SMTExprRef> Value = getArrayElement(Array, Index);
+    if (!Value)
+      return Value.error();
+    Model.Entries.emplace_back(Index, Value.value());
+  }
+  return Model;
 }
 
 SMTResult<ArrayModel> SMTSolverImpl::lazyArrayModel(const SMTExprRef &Array) {
@@ -1986,16 +2154,15 @@ CAMADA_DEFINE_CONST_CTOR(mkReal, (int64_t num, int64_t den), (num, den),
 
 SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int,
                                       const SMTSortRef &Sort) {
+  requireOwned(Sort);
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector decimal literal sort must be bit-vector");
   const unsigned Width = Sort->getWidth();
   // Only plain bit-vector -1, 0 and 1 are cached.
   SMTExprRef *Slot = nullptr;
-  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1) {
-    auto &Cache = CachedSmallBVExprs[cachedSmallBVExprIndex(Int)];
-    if (Cache.size() <= Width)
-      Cache.resize(Width + 1);
-    Slot = &Cache[Width];
+  if (Sort->getSortKind() == SMTSortKind::BV && Int >= -1 && Int <= 1 &&
+      Width <= MaxCachedSmallBVWidth) {
+    Slot = &CachedSmallBVExprs[cachedSmallBVExprIndex(Int)][Width];
     if (*Slot)
       return *Slot;
   }
@@ -2015,6 +2182,7 @@ SMTExprRef SMTSolverImpl::mkBVFromDec(const int64_t Int, unsigned BitWidth) {
 
 SMTExprRef SMTSolverImpl::mkBVFromBin(const std::string &Int,
                                       const SMTSortRef &Sort) {
+  requireOwned(Sort);
   fatalErrorIf(!Sort->isBVSort(),
                "Bit-vector binary literal sort must be bit-vector");
   fatalErrorIf(Int.empty(), "Bit-vector binary literal must be non-empty");
@@ -2096,6 +2264,13 @@ SMTExprRef SMTSolverImpl::mkSymbolUnchecked(const std::string &Name,
   else {
     theExp = mkSymbolImpl(Name, Sort);
     assert(theExp->Sort == Sort);
+    // A scope-independent fact about the symbol, so journal it like the
+    // lazy-array axioms and let pop() re-assert it.
+    if (Sort->isBVRMSort()) {
+      SMTExprRef Valid = isValidBVRM(theExp);
+      addConstraint(Valid);
+      LazyConstraintLevels.back().push_back(std::move(Valid));
+    }
   }
   Entries.push_back({Sort.get(), theExp});
   return theExp;
@@ -2205,6 +2380,11 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   // and Lazy promise.
   if (arrayMode() == ArrayEncoding::Ackermann) {
     SMTExprRef theExp = mkAckArrayConst(IndexSort, InitValue);
+    // Only an equality can reason about unobserved indexes, so wait for
+    // one: building a constant array alone then keeps the model.
+    AckConstIndexSorts.insert(&*IndexSort);
+    if (ArrayEqualLinksByIndexSort.count(&*IndexSort))
+      ensureOutsideIndex(IndexSort);
     assert(theExp->isArraySort());
     assert(theExp->Sort->getIndexSort() == IndexSort);
     assert(theExp->Sort->getElementSort() == InitValue->Sort);

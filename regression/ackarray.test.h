@@ -203,6 +203,44 @@ inline void ack_const_array_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->check() == camada::CheckResult::UNSAT);
 }
 
+// b == store(a, 1, 42): the store holds for b only, a keeps its own
+// value at 1, and b's value at any other index carries over to a (#239).
+inline void ack_store_link_model(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto arrsort = solver->mkArraySort(bv8, bv8);
+  auto a = solver->mkSymbol("a", arrsort);
+  auto b = solver->mkSymbol("b", arrsort);
+  auto one = solver->mkBVFromDec(1, 8);
+  auto five = solver->mkBVFromDec(5, 8);
+  solver->addConstraint(solver->mkEqual(
+      b, solver->mkArrayStore(a, one, solver->mkBVFromDec(42, 8))));
+  solver->addConstraint(solver->mkEqual(solver->mkArraySelect(a, one),
+                                        solver->mkBVFromDec(7, 8)));
+  solver->addConstraint(solver->mkEqual(solver->mkArraySelect(b, five),
+                                        solver->mkBVFromDec(3, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  const auto at = [&](const camada::SMTExprRef &Arr,
+                      const camada::SMTExprRef &Idx) {
+    return solver->getBV(arrayElement(solver, Arr, Idx)).value();
+  };
+  REQUIRE(at(a, one) == 7);
+  REQUIRE(at(b, one) == 42);
+  REQUIRE(at(a, five) == 3);
+
+  auto model = solver->getArrayValues(a);
+  REQUIRE(model);
+  int seen = 0;
+  for (const auto &entry : model.value().Entries) {
+    auto idx = solver->getBV(entry.first).value();
+    if (idx == 1 || idx == 5) {
+      REQUIRE(solver->getBV(entry.second).value() == (idx == 1 ? 7 : 3));
+      ++seen;
+    }
+  }
+  REQUIRE(seen == 2);
+}
+
 // getArrayValues: stored indexes appear with their values; a constant
 // root reports its initializer as the base.
 inline void ack_array_model_values(const camada::SMTSolverRef &solver) {
@@ -373,6 +411,8 @@ inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
   ack_internal_name_no_alias(solver);
   solver->reset();
   ack_array_model_values(solver);
+  solver->reset();
+  ack_store_link_model(solver);
   solver->reset();
   ack_fp_element_semantics(solver);
   solver->reset();

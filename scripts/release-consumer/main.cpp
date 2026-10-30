@@ -7,7 +7,7 @@
 
 // Exercise the solvers/ include path too, so a broken install layout for
 // the wrapper headers fails this consumer instead of a downstream build.
-#ifdef CAMADA_HAVE_Z3
+#if CAMADA_HAVE_Z3
 #include <camada/solvers/z3solver.h>
 #endif
 

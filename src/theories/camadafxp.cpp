@@ -430,6 +430,7 @@ SMTSortRef SMTSolverImpl::mkFXPSort(unsigned Width, unsigned FracBits,
 
 SMTExprRef SMTSolverImpl::mkFXPFromBin(const std::string &RawBits,
                                        const SMTSortRef &To) {
+  requireOwned(To);
   requireFXPSort(To);
   fatalErrorIf(RawBits.size() != To->getWidth(),
                "Fixed-point literal width must match the sort width");
@@ -439,7 +440,9 @@ SMTExprRef SMTSolverImpl::mkFXPFromBin(const std::string &RawBits,
 
 SMTExprRef SMTSolverImpl::mkFXPFromRawBV(const SMTExprRef &Exp,
                                          const SMTSortRef &To) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->Sort->isBVSort(), "Expected bit-vector expression");
+  requireOwned(To);
   requireFXPSort(To);
   fatalErrorIf(Exp->getWidth() != To->getWidth(),
                "Bit-vector and fixed-point target widths must match");
@@ -879,6 +882,7 @@ std::pair<SMTExprRef, unsigned> wideForConversion(SMTSolverImpl &S,
 SMTExprRef SMTSolverImpl::mkFXPToFXP(const SMTExprRef &Exp,
                                      const SMTSortRef &To, FXPRM Mode) {
   requireFXP(Exp);
+  requireOwned(To);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
@@ -891,6 +895,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFXP(const SMTExprRef &Exp,
 SMTExprRef SMTSolverImpl::mkFXPToFXPOverflow(const SMTExprRef &Exp,
                                              const SMTSortRef &To, FXPRM Mode) {
   requireFXP(Exp);
+  requireOwned(To);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
@@ -920,6 +925,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFXPOverflow(const SMTExprRef &Exp,
 SMTExprRef SMTSolverImpl::mkFXPToFXPSat(const SMTExprRef &Exp,
                                         const SMTSortRef &To, FXPRM Mode) {
   requireFXP(Exp);
+  requireOwned(To);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
@@ -937,7 +943,9 @@ SMTExprRef SMTSolverImpl::mkFXPToFXPSat(const SMTExprRef &Exp,
 
 SMTExprRef SMTSolverImpl::mkFXPFromBV(const SMTExprRef &Exp, bool SrcSigned,
                                       const SMTSortRef &To) {
+  requireOwned(Exp);
   fatalErrorIf(!Exp->Sort->isBVSort(), "Expected bit-vector expression");
+  requireOwned(To);
   requireFXPSort(To);
   // An integer is a fixed-point value with zero fraction bits; converting
   // is then a format conversion from (width, 0, source signedness) — the
@@ -1552,6 +1560,7 @@ FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
 SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
                                     RM R) {
   requireFXP(Exp);
+  requireOwned(To);
   fatalErrorIf(!To->isFPSort(), "Expected floating-point target sort");
   FXPFormat From = formatOf(Exp->Sort);
   unsigned WideSig = std::max(From.Width, 2u);
@@ -1599,6 +1608,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
 SMTExprRef SMTSolverImpl::mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
                                     FXPRM Mode) {
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
+  requireOwned(To);
   requireFXPSort(To);
   FXPFormat Target = formatOf(To);
   // fp.to_sbv / fp.to_ubv always round toward zero, so any other mode is
@@ -1617,6 +1627,7 @@ SMTExprRef SMTSolverImpl::mkFPToFXP(const SMTExprRef &Exp, const SMTSortRef &To,
 SMTExprRef SMTSolverImpl::mkFPToFXPOverflow(const SMTExprRef &Exp,
                                             const SMTSortRef &To, FXPRM Mode) {
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
+  requireOwned(To);
   requireFXPSort(To);
   // Round before testing the range, so the predicate agrees with
   // mkFPToFXP: a value inside the target's range can round out of it, and
@@ -1628,6 +1639,7 @@ SMTExprRef SMTSolverImpl::mkFPToFXPOverflow(const SMTExprRef &Exp,
 SMTExprRef SMTSolverImpl::mkFPToFXPSat(const SMTExprRef &Exp,
                                        const SMTSortRef &To, FXPRM Mode) {
   fatalErrorIf(!Exp->Sort->isFPSort(), "Expected floating-point expression");
+  requireOwned(To);
   requireFXPSort(To);
   FXPFormat Target = formatOf(To);
   FPFXPParts P = fpToFXPParts(*this, Exp, Target, Mode);

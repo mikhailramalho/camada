@@ -66,13 +66,14 @@ void STPExpr::dump(std::string &Out) const {
 }
 
 STPSolver::STPSolver(const SolverConfig &Config)
-    : SMTSolverImpl(Config), Context(STP::vc_createValidityChecker()) {
+    : SMTSolverImpl(Config, SMTBackendKind::STP),
+      Context(STP::vc_createValidityChecker()) {
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }
 
 STPSolver::STPSolver(STP::VC C, const SolverConfig &Config)
-    : SMTSolverImpl(Config), Context(C) {
+    : SMTSolverImpl(Config, SMTBackendKind::STP), Context(C) {
   STP::vc_registerErrorHandler(STPErrorHandler);
   initializeCommonSingletons();
 }

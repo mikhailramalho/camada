@@ -16,8 +16,13 @@ if(NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF"
 endif()
 
 set(CAMADA_DEPS_DIR
-    "${CMAKE_BINARY_DIR}/deps"
+    "${PROJECT_BINARY_DIR}/deps"
     CACHE PATH "Directory used to store downloaded solver dependencies")
+# A parent may declare the same cache entry empty (ESBMC does, with another
+# meaning); the paths below would then land at the filesystem root.
+if(NOT CAMADA_DEPS_DIR)
+  set(CAMADA_DEPS_DIR "${PROJECT_BINARY_DIR}/deps")
+endif()
 set(CAMADA_DEPS_SRC_DIR
     "${CAMADA_DEPS_DIR}/src"
     CACHE PATH "Directory used to store downloaded solver sources")
@@ -69,6 +74,8 @@ set(CAMADA_CVC5_SHA256
 # Baked into cadiback's config.hpp, which Camada writes itself; see
 # camada_setup_cryptominisat_solver_deps.
 set(CAMADA_CADIBACK_REVISION "69255f55e411207c4bdea02c6c2ab1ef29740ce1")
+set(CAMADA_CADIBACK_SHA256
+    "d7084360537ed1bf5159b0b58633fb9bf02e9dc3f24cb053ecbdfa4dc9fefb19")
 
 # CVC5 is built from source (see camada_build_cvc5_from_source), so there are no
 # prebuilt URLs to pin. It stays disabled on Windows, as it was under the
@@ -245,6 +252,44 @@ function(camada_find_gmp_header out_var)
   # find_path caches, so release the entry rather than leaving the lookup pinned
   # in CMakeCache.txt for the life of the build directory.
   unset(_camada_gmp_header_dir CACHE)
+endfunction()
+
+# Sets out_var to the linker flag that keeps a shared library's dynamic table to
+# the patterns in symbols_file (one per line, # comments): a version script for
+# GNU ld and lld, an -exported_symbols_list for Apple's linker. Both are
+# generated from the one list so the platforms cannot drift. out_var_FILE gets
+# the generated file, for LINK_DEPENDS. Empty on Windows, which exports nothing
+# by default.
+function(camada_exported_symbols_flag out_var symbols_file)
+  set(${out_var}
+      ""
+      PARENT_SCOPE)
+  if(WIN32)
+    return()
+  endif()
+  file(STRINGS "${symbols_file}" patterns REGEX "^[^#]")
+  get_filename_component(name "${symbols_file}" NAME_WE)
+  if(APPLE)
+    # Mach-O prefixes every C-level name with an underscore.
+    list(TRANSFORM patterns PREPEND "_")
+    list(JOIN patterns "\n" body)
+    set(generated "${PROJECT_BINARY_DIR}/exports/${name}.exp")
+    set(flag "-Wl,-exported_symbols_list,${generated}")
+  else()
+    list(JOIN patterns ";\n    " globals)
+    set(body "{\n  global:\n    ${globals};\n  local:\n    *;\n};")
+    set(generated "${PROJECT_BINARY_DIR}/exports/${name}.map")
+    set(flag "-Wl,--version-script=${generated}")
+  endif()
+  # CONFIGURE rewrites only on change, so the library is not relinked on every
+  # configure.
+  file(CONFIGURE OUTPUT "${generated}" CONTENT "${body}\n" @ONLY)
+  set(${out_var}
+      "${flag}"
+      PARENT_SCOPE)
+  set(${out_var}_FILE
+      "${generated}"
+      PARENT_SCOPE)
 endfunction()
 
 function(camada_find_program_with_prefixes out_var program_name)
@@ -601,15 +646,15 @@ endfunction()
 # Tarballs carry no submodules. The only caller that had any is CryptoMiniSat,
 # whose four are test utilities (OutputCheck, cnf-utils, sha1-sat, licensecheck)
 # referenced from tests/ and never from the library build.
-function(camada_fetch_git_source package_name repository git_tag out_var)
+function(camada_fetch_git_source package_name repository git_tag out_var sha256)
   camada_include_cpm()
   set(FETCHCONTENT_QUIET FALSE)
-  # A fifth argument pins the archive's SHA256. A clone verified the object
-  # against the ref; a tarball has no such check, and a tag can be repointed at
-  # different content. A full commit SHA is content-addressed already, but the
-  # tarball GitHub builds from it is not checked, so pin it as well.
-  if(ARGC GREATER 4)
-    set(url_hash_arg URL_HASH SHA256=${ARGV4})
+  # Every archive is pinned by SHA256. A clone verified the object against the
+  # ref; a tarball has no such check, and a tag can be repointed at different
+  # content. A full commit SHA is content-addressed already, but the tarball
+  # GitHub builds from it is not checked, so pin it as well.
+  if(NOT sha256)
+    message(FATAL_ERROR "No SHA256 pinned for ${repository}@${git_tag}")
   endif()
   cpmaddpackage(
     NAME
@@ -618,7 +663,8 @@ function(camada_fetch_git_source package_name repository git_tag out_var)
     YES
     URL
     "https://github.com/${repository}/archive/${git_tag}.tar.gz"
-    ${url_hash_arg})
+    URL_HASH
+    SHA256=${sha256})
   set(${out_var}
       "${${package_name}_SOURCE_DIR}"
       PARENT_SCOPE)
@@ -674,7 +720,7 @@ function(camada_setup_cryptominisat_solver_deps cms_source_dir)
     # CMS 5.11.22's backbone.cpp (2024-06-07).
     camada_fetch_git_source(
       cryptominisat_cadiback meelgroup/cadiback "${CAMADA_CADIBACK_REVISION}"
-      cms_cadiback_source_dir)
+      cms_cadiback_source_dir "${CAMADA_CADIBACK_SHA256}")
     camada_prepare_cryptominisat_dependency_layout("${cms_cadiback_dir}"
                                                    "${cms_cadiback_source_dir}")
     camada_run_checked(
@@ -747,8 +793,8 @@ function(camada_setup_cryptominisat)
   camada_ensure_deps_dirs()
   file(
     REMOVE_RECURSE
-    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-src"
-    "${CMAKE_BINARY_DIR}/_deps/cryptominisat-subbuild"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisatsrc-src"
+    "${CMAKE_BINARY_DIR}/_deps/cryptominisatsrc-subbuild"
     "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-src"
     "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadical-subbuild"
     "${CMAKE_BINARY_DIR}/_deps/cryptominisat_cadiback-src"
@@ -757,7 +803,7 @@ function(camada_setup_cryptominisat)
     "${CMAKE_BINARY_DIR}/_deps/cadiback")
   # 5.11.22 is the version STP 2.4.0 bumped its CI to (stp/stp#493).
   camada_fetch_git_source(
-    cryptominisat msoos/cryptominisat 5.11.22 cms_source_dir
+    cryptominisatsrc msoos/cryptominisat 5.11.22 cms_source_dir
     e39f3a066a979e6033efb95b8732912a0888654aabc375b999ad85674c7abf44)
   camada_setup_cryptominisat_solver_deps("${cms_source_dir}")
   get_filename_component(cms_parent_dir "${cms_source_dir}" DIRECTORY)
@@ -877,7 +923,10 @@ endfunction()
 function(camada_setup_gmp)
   set(gmp_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
   set(gmp_header "${CAMADA_DEPS_INSTALL_DIR}/include/gmp.h")
-  if(EXISTS "${gmp_lib}" AND EXISTS "${gmp_header}")
+  # CVC5 needs the C++ bindings, so a tree staged without them is rebuilt.
+  if(EXISTS "${gmp_lib}"
+     AND EXISTS "${gmp_header}"
+     AND EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmpxx.a")
     return()
   endif()
 
@@ -896,7 +945,8 @@ function(camada_setup_gmp)
   # The full SHA, not the abbreviation: GitHub resolves a prefix server-side, so
   # it could stop being unambiguous. The mirror is not upstream, hence the hash.
   camada_fetch_git_source(
-    gmp gmp-mirror/gmp 141ed4f98a50e4a3c1a95a1758cb599b7499ac39 gmp_source_dir
+    gmpsrc gmp-mirror/gmp 141ed4f98a50e4a3c1a95a1758cb599b7499ac39
+    gmp_source_dir
     53b961ec4277f5d12f02a6d1cf26c7d1578198625c52a114885a88f12c1855f4)
 
   camada_run_checked(
@@ -916,6 +966,8 @@ function(camada_setup_gmp)
     ./configure
     --prefix=${CAMADA_DEPS_INSTALL_DIR}
     --disable-shared
+    # libgmpxx, for CVC5: without it CVC5 takes the system GMP's headers.
+    --enable-cxx
     ABI=64
     # -std=gnu17: GCC 14 defaults to C23, where GMP's own "long long
     # reliability" probe no longer compiles -- it declares `void g(){}` and then
@@ -924,6 +976,7 @@ function(camada_setup_gmp)
     # compiler", so a host without a system GMP could not build any backend that
     # needs one.
     CFLAGS=-fPIC\ -std=gnu17
+    CXXFLAGS=-fPIC
     CPPFLAGS=-DPIC)
   camada_run_checked(
     WORKING_DIRECTORY
@@ -959,6 +1012,59 @@ function(camada_setup_gmp)
   endif()
 endfunction()
 
+# Bitwuzla's MPFR, built against the GMP above. A system MPFR is linked against
+# the system GMP, so it loads that copy at run time next to the static one
+# Bitwuzla calls, and both work on the same mpz/mpfr objects.
+function(camada_setup_mpfr)
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libmpfr.a")
+    return()
+  endif()
+  camada_setup_gmp()
+  camada_ensure_deps_dirs()
+  camada_include_cpm()
+  cpmaddpackage(
+    NAME
+    mpfr
+    DOWNLOAD_ONLY
+    YES
+    URL
+    "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz"
+    URL_HASH
+    SHA256=b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01
+    # Keep the archive's timestamps: extracted at the current time, configure.ac
+    # looks newer than configure and make reruns the release's automake.
+    DOWNLOAD_EXTRACT_TIMESTAMP
+    TRUE)
+
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${mpfr_SOURCE_DIR}"
+    MESSAGE
+    "Configuring MPFR"
+    COMMAND
+    ./configure
+    --prefix=${CAMADA_DEPS_INSTALL_DIR}
+    --disable-shared
+    --with-gmp=${CAMADA_DEPS_INSTALL_DIR}
+    CFLAGS=-fPIC)
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${mpfr_SOURCE_DIR}"
+    MESSAGE
+    "Building MPFR"
+    COMMAND
+    make
+    -j)
+  camada_run_checked(
+    WORKING_DIRECTORY
+    "${mpfr_SOURCE_DIR}"
+    MESSAGE
+    "Installing MPFR"
+    COMMAND
+    make
+    install)
+endfunction()
+
 function(camada_setup_minisat)
   set(minisat_config
       "${CAMADA_DEPS_INSTALL_DIR}/lib/cmake/minisat/minisatConfig.cmake")
@@ -968,7 +1074,7 @@ function(camada_setup_minisat)
 
   camada_ensure_deps_dirs()
   camada_fetch_git_source(
-    minisat msoos/minisat 2.2.1 minisat_source_dir
+    minisatsrc msoos/minisat 2.2.1 minisat_source_dir
     2cd8e9282d0f50f6bdac2cd001c95f66c1de9b2dec61391652c68729c347290f)
   set(minisat_prefix "${CAMADA_DEPS_INSTALL_DIR}")
 
@@ -1136,8 +1242,8 @@ function(camada_build_bitwuzla_from_source cadical_prefix)
   endif()
 
   camada_fetch_git_source(
-    bitwuzla bitwuzla/bitwuzla "${CAMADA_BITWUZLA_GIT_TAG}" bitwuzla_source_dir
-    "${CAMADA_BITWUZLA_SHA256}")
+    bitwuzlasrc bitwuzla/bitwuzla "${CAMADA_BITWUZLA_GIT_TAG}"
+    bitwuzla_source_dir "${CAMADA_BITWUZLA_SHA256}")
   set(bitwuzla_build_dir "${bitwuzla_source_dir}/build-camada")
   file(REMOVE_RECURSE "${bitwuzla_build_dir}")
 
@@ -1167,13 +1273,17 @@ Libs: -L\${libdir} -lcadical
 Cflags: -I\${includedir}
 ")
 
+  # gmp.pc and mpfr.pc of our own GMP and MPFR, ahead of the system's.
+  camada_setup_mpfr()
+  set(bitwuzla_pc_path
+      "${cadical_pc_dir}:${CAMADA_DEPS_INSTALL_DIR}/lib/pkgconfig")
   set(saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
   set(saved_library_path "$ENV{LIBRARY_PATH}")
   set(saved_cpath "$ENV{CPATH}")
   if(saved_pkg_config_path)
-    set(ENV{PKG_CONFIG_PATH} "${cadical_pc_dir}:${saved_pkg_config_path}")
+    set(ENV{PKG_CONFIG_PATH} "${bitwuzla_pc_path}:${saved_pkg_config_path}")
   else()
-    set(ENV{PKG_CONFIG_PATH} "${cadical_pc_dir}")
+    set(ENV{PKG_CONFIG_PATH} "${bitwuzla_pc_path}")
   endif()
   if(saved_library_path)
     set(ENV{LIBRARY_PATH} "${cadical_prefix}/lib:${saved_library_path}")
@@ -1246,17 +1356,27 @@ endfunction()
 # enables CVC5 or STP.
 function(camada_setup_bitwuzla)
   camada_setup_shared_cadical()
-  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h")
+  # A tree staged before Bitwuzla had its own MPFR is rebuilt when downloads are
+  # allowed.
+  camada_should_download_dependency(bitwuzla_download TRUE)
+  if(NOT EXISTS "${CAMADA_DEPS_INSTALL_DIR}/include/bitwuzla/c/bitwuzla.h"
+     OR (bitwuzla_download AND NOT EXISTS
+                               "${CAMADA_DEPS_INSTALL_DIR}/lib/libmpfr.a"))
     camada_ensure_deps_dirs()
     camada_build_bitwuzla_from_source("${CAMADA_CADICAL_PREFIX}")
   endif()
 
-  # GMP is named the same way, and dropped from Requires: pkg-config would
-  # otherwise resolve `gmp` itself, against whichever copy the system provides,
-  # which is not necessarily the one the rest of the build links.
+  # GMP and MPFR are named the same way, and dropped from Requires: pkg-config
+  # would otherwise resolve them itself, against whichever copies the system
+  # provides, which are not necessarily the ones Bitwuzla was built against.
   camada_gmp_library(bitwuzla_gmp_lib)
   get_filename_component(bitwuzla_gmp_dir "${bitwuzla_gmp_lib}" DIRECTORY)
   set(bitwuzla_gmp_flags " -L${bitwuzla_gmp_dir} -lgmp")
+  set(bitwuzla_requires "Requires: mpfr >= 4.2.1\n")
+  if(EXISTS "${CAMADA_DEPS_INSTALL_DIR}/lib/libmpfr.a")
+    set(bitwuzla_requires)
+    set(bitwuzla_gmp_flags " -L${CAMADA_DEPS_INSTALL_DIR}/lib -lmpfr -lgmp")
+  endif()
 
   # Bitwuzla is built against the shared CaDiCaL, so the pkg-config file has to
   # name it; meson writes its own absolute build-time path, which this rewrite
@@ -1283,7 +1403,7 @@ function(camada_setup_bitwuzla)
                            DIRECTORY)
     file(
       WRITE "${bitwuzla_pc_file}"
-      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\nRequires: mpfr >= 4.2.1\nLibs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb${bitwuzla_cadical_flags}${bitwuzla_gmp_flags}\nCflags: -I\${includedir}\n"
+      "prefix=${CAMADA_DEPS_INSTALL_DIR}\nincludedir=\${prefix}/include\nlibdir=${bitwuzla_libdir}\n\nName: bitwuzla\nDescription: bitwuzla: bitwuzla\nVersion: 0.9.1\n${bitwuzla_requires}Libs: -L\${libdir} -lbitwuzla -lbitwuzlals -lbitwuzlabv -lbitwuzlabb${bitwuzla_cadical_flags}${bitwuzla_gmp_flags}\nCflags: -I\${includedir}\n"
     )
   endforeach()
 endfunction()
@@ -1328,6 +1448,18 @@ function(camada_build_cvc5_from_source)
   endif()
 
   camada_setup_shared_cadical()
+  # CVC5 is linked against the shared GMP, so it has to be compiled against the
+  # same headers. Its FindGMP searches the default paths and picks the system
+  # gmp.h otherwise; the explicit cache entries skip that search.
+  camada_gmp_library(cvc5_gmp_lib)
+  set(cvc5_gmp_args)
+  if(cvc5_gmp_lib STREQUAL "${CAMADA_DEPS_INSTALL_DIR}/lib/libgmp.a")
+    set(cvc5_gmp_args
+        -DGMP_INCLUDE_DIR=${CAMADA_DEPS_INSTALL_DIR}/include
+        -DGMPXX_INCLUDE_DIR=${CAMADA_DEPS_INSTALL_DIR}/include
+        -DGMP_LIBRARIES=${cvc5_gmp_lib}
+        -DGMPXX_LIBRARIES=${CAMADA_DEPS_INSTALL_DIR}/lib/libgmpxx.a)
+  endif()
   camada_fetch_git_source(cvc5src cvc5/cvc5 "${CAMADA_CVC5_GIT_TAG}"
                           cvc5_source_dir "${CAMADA_CVC5_SHA256}")
   set(cvc5_build_name camada)
@@ -1357,7 +1489,8 @@ function(camada_build_cvc5_from_source)
     # build tree and installs pyparsing there. Forcing it OFF makes CVC5
     # pip-install into the system interpreter, which PEP 668 refuses on Homebrew
     # and on recent Debian/Ubuntu ("externally-managed-environment").
-    -DBUILD_BINDINGS_JAVA=OFF)
+    -DBUILD_BINDINGS_JAVA=OFF
+    ${cvc5_gmp_args})
 
   # CVC5's configure generates Unix Makefiles, not Ninja. Bare `make -j` is
   # unbounded: make starts every ready target at once, and a few hundred
@@ -1408,11 +1541,13 @@ endfunction()
 # fetch brings no submodules, and STP add_subdirectory()s these, so the
 # directory has to hold the real source rather than the empty placeholder the
 # archive carries.
-function(camada_place_stp_submodule destination package repository revision)
+function(camada_place_stp_submodule destination package repository revision
+         sha256)
   if(EXISTS "${destination}/CMakeLists.txt")
     return()
   endif()
-  camada_fetch_git_source(${package} ${repository} ${revision} source_dir)
+  camada_fetch_git_source(${package} ${repository} ${revision} source_dir
+                          ${sha256})
   file(REMOVE_RECURSE "${destination}")
   file(COPY "${source_dir}/" DESTINATION "${destination}")
 endfunction()
@@ -1443,10 +1578,12 @@ function(camada_setup_stp)
   # pins, so the tree matches a checkout with `git submodule update --init`.
   camada_place_stp_submodule(
     "${stp_source_dir}/lib/extlib-abc" stpabc berkeley-abc/abc
-    95393064368b7c05da4d6f0264fc3419c175c7cb)
+    95393064368b7c05da4d6f0264fc3419c175c7cb
+    b23f9384edb297a27cb0420d9f99ca4cf4e2a2a301ac10b41418f770a839cb9e)
   camada_place_stp_submodule(
     "${stp_source_dir}/lib/extlib-mimalloc" stpmimalloc microsoft/mimalloc
-    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe)
+    30ac9d56b8b9ea57ae84bc8ef17ef39000da08fe
+    c240b03282eab8d55a0348d4430c160bb8f73b1aff247dd45b7a10d03b2bdc9f)
 
   if(APPLE)
     # STATICCOMPILE implies BUILD_SHARED_LIBS=OFF, which makes STP link its
@@ -1570,17 +1707,13 @@ function(camada_setup_yices)
   set(yices_gmp_include_dir "${CAMADA_DEPS_INSTALL_DIR}/include")
   # Yices absorbs GMP statically, so its shared library would export GMP as well
   # as its own API, competing with every other provider in the process. Its link
-  # honours LDFLAGS, so the version script goes in there rather than patching
-  # its makefile. GNU ld and lld only: Apple's linker has no --version-script,
-  # so macOS keeps the plain flags.
-  set(yices_ldflags "-L${yices_gmp_lib_dir}")
-  if(NOT APPLE)
-    set(yices_ldflags
-        "${yices_ldflags} -Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/yices.map"
-    )
-  endif()
+  # honours LDFLAGS, so the export list goes in there rather than patching its
+  # makefile.
+  camada_exported_symbols_flag(yices_exports_flag
+                               "${CMAKE_CURRENT_LIST_DIR}/yices.exports")
+  set(yices_ldflags "-L${yices_gmp_lib_dir} ${yices_exports_flag}")
   camada_fetch_git_source(
-    yices2 SRI-CSL/yices2 yices-2.7.0 yices_source_dir
+    yicessrc SRI-CSL/yices2 yices-2.7.0 yices_source_dir
     584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
   camada_run_checked(WORKING_DIRECTORY "${yices_source_dir}" MESSAGE
                      "Preparing Yices" COMMAND autoreconf)

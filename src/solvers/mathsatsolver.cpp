@@ -126,7 +126,7 @@ void MathSATExpr::dump(std::string &Out) const {
 }
 
 MathSATSolver::MathSATSolver(const SolverConfig &SolverCfg)
-    : SMTSolverImpl(SolverCfg) {
+    : SMTSolverImpl(SolverCfg, SMTBackendKind::MathSAT) {
   Config =
       msat_create_default_config(logic().empty() ? "AUFBV" : logic().c_str());
   msat_set_option(Config, "model_generation", "true");
@@ -135,7 +135,7 @@ MathSATSolver::MathSATSolver(const SolverConfig &SolverCfg)
 }
 
 MathSATSolver::MathSATSolver(msat_config Config, const SolverConfig &SolverCfg)
-    : SMTSolverImpl(SolverCfg), Config(Config) {
+    : SMTSolverImpl(SolverCfg, SMTBackendKind::MathSAT), Config(Config) {
   initializeContext();
   initializeCommonSingletons();
 }
@@ -757,8 +757,7 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   // the round-down result). Identify a constant with the native predicates
   // instead, the same route getRMImpl takes and for the same reason.
   // A symbolic rounding mode matches none of them (mkRMSort is public, so
-  // the mode can be a symbol); it keeps the ite chain, whose arms the
-  // solver then has to reason about rather than evaluate.
+  // the mode can be a symbol); it goes through the probes below.
   const msat_term RTerm = toMathSATTerm(R);
   const SMTSortRef BVRMSort = mkRMSort(FPEncoding::BV);
   const auto bvRM = [&](RM Mode) {
@@ -774,33 +773,32 @@ SMTExprRef MathSATSolver::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   else if (msat_term_is_fp_roundingmode_zero(Context, RTerm))
     roundingMode = bvRM(RM::ROUND_TO_ZERO);
   else {
-    // The chain is exhaustive: MathSAT has no round-to-away term at all
-    // (mkRMImpl fatalErrors on it, and there is no
-    // msat_make_fp_roundingmode_away), so a native rounding-mode sort has
-    // exactly four inhabitants and testing three leaves only RTZ. It is not
-    // the silent RNA-to-RTZ mapping it looks like -- but it depends on that
-    // absence, so assert it rather than leave the reader to infer it.
+    // The probes cover four modes only: MathSAT has no round-to-away term
+    // at all (mkRMImpl fatalErrors on it, and there is no
+    // msat_make_fp_roundingmode_away). Assert that rather than leave the
+    // reader to infer it.
     fatalErrorIf(nativeRoundToAwaySupport(),
                  "MathSAT gained a native round-to-away mode: the rounding "
-                 "chain below needs an explicit RNA arm, since its default "
-                 "would silently map RNA to truncation");
-    //
-    // KNOWN LIMITATION: a symbolic rounding mode still rounds incorrectly,
-    // whichever arm it takes. Verified: with `rm` constrained equal to
-    // ROUND_TO_PLUS_INF, mkFPFMA(2^-24, 1.0, 1.0, rm) yields the round-down
-    // result, while the same case with a literal RTP is correct. The fault
-    // is in MathSAT's model evaluator mis-evaluating the equalities this
-    // chain tests, so no term-level encoding fixes it; resolving it needs
-    // either a rejection at the API boundary or an encoding that avoids
-    // rounding-mode atoms entirely (see issue #177).
+                 "probes below need an RNA case, since RNA would take the "
+                 "RTP arm");
+    // Telling the modes apart with mkEqual(R, mkRM(...)) is sound, but
+    // MathSAT then builds broken models: with R equal to RTP and compared
+    // against RNE, it reports R as no mode at all and the FMA rounded down.
+    // Probe R with additions instead, whose results differ per mode.
+    // ponytail: three FP32 adders per symbolic-mode FMA; a narrower format
+    // would be cheaper if this ever shows up in a profile.
+    const auto fp = [&](float F) { return mkFP32(F, FPEncoding::Native); };
+    const auto rounds = [&](float A, float B, float Want) {
+      return mkFPEqual(mkFPAdd(fp(A), fp(B), R), fp(Want));
+    };
+    // A tie above 1.0 rounds up only under RTP; its negation rounds down
+    // only under RTN; three quarters of an ulp rounds up under RNE or RTP.
     roundingMode = mkIte(
-        mkEqual(R, mkRM(RM::ROUND_TO_EVEN, FPEncoding::Native)),
-        bvRM(RM::ROUND_TO_EVEN),
-        mkIte(
-            mkEqual(R, mkRM(RM::ROUND_TO_PLUS_INF, FPEncoding::Native)),
-            bvRM(RM::ROUND_TO_PLUS_INF),
-            mkIte(mkEqual(R, mkRM(RM::ROUND_TO_MINUS_INF, FPEncoding::Native)),
-                  bvRM(RM::ROUND_TO_MINUS_INF), bvRM(RM::ROUND_TO_ZERO))));
+        rounds(1.0f, 0x1p-24f, 1.0f + 0x1p-23f), bvRM(RM::ROUND_TO_PLUS_INF),
+        mkIte(rounds(-1.0f, -0x1p-24f, -1.0f - 0x1p-23f),
+              bvRM(RM::ROUND_TO_MINUS_INF),
+              mkIte(rounds(1.0f, 0x3p-25f, 1.0f + 0x1p-23f),
+                    bvRM(RM::ROUND_TO_EVEN), bvRM(RM::ROUND_TO_ZERO))));
   }
 
   // We can call the conversion API directly here because the arguments were

@@ -145,6 +145,16 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
   require_abort([&]() {
     (void)solver->mkArraySort(other->mkBVSort(4), solver->mkBVSort(4));
   });
+  // Literal builders take a sort too; -1, 0 and 1 used to be cached under
+  // the foreign sort and handed back to later calls on this solver.
+  require_abort([&]() { (void)solver->mkBVFromDec(0, other->mkBVSort(8)); });
+  require_abort([&]() { (void)solver->mkBVFromBin("0", other->mkBVSort(1)); });
+  require_abort([&]() {
+    (void)solver->mkFXPFromBin("0000", other->mkFXPSort(4, 2, true));
+  });
+  require_abort([&]() {
+    (void)solver->mkFXPFromRawBV(theirs, solver->mkFXPSort(8, 4, true));
+  });
 
   // Model getters, on a solver that has a model to hand back. The
   // macro-generated getters and the hand-written ones must agree here:
@@ -431,6 +441,7 @@ inline void tests_core(const camada::SMTSolverRef &solver) {
   RESETANDTEST(shared_subterm_model_value);
   RESETANDTEST(wide_bv_decimal_model_value);
   RESETANDTEST(incremental_push_pop);
+  RESETANDTEST(push_after_unsat);
   RESETANDTEST(symbol_cache_survives_push_pop);
   RESETANDTEST(handle_invalidation_after_reset);
   RESETANDTEST(dump_string_semantics);
@@ -471,6 +482,9 @@ inline void tests_arrays(const camada::SMTSolverRef &solver) {
   RESETANDTEST(array_equality_witness_congruence);
   RESETANDTEST(lazy_array_equality_reached_defaults);
   RESETANDARGTEST(lazy_array_equality_reached_defaults, LazyArrays);
+  RESETANDARGTEST(lazy_array_unobserved_indexes, LazyArrays);
+  RESETANDTEST(lazy_array_untracked_models);
+  RESETANDARGTEST(lazy_array_untracked_models, LazyArrays);
   RESETANDTEST(const_array_lowering_interop);
 }
 
@@ -499,9 +513,11 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_neg_nan_payload_bits);
   RESETANDTEST(fp_nan_payload_propagation);
   RESETANDTEST(fp_to_fp_nan_payload);
+  RESETANDTEST(fp_to_fp_subnormal_source);
   RESETANDTEST(fp_sort_width_accessors);
   RESETANDARGTEST(rm_model_value, NativeFP);
   RESETANDARGTEST(rm_model_value, BVFP);
+  RESETANDTEST(bv_rm_symbol_domain);
   RESETANDTEST(false_rm_equality_reports);
   RESETANDTEST(rm_getter_rejects_non_rm);
   RESETANDARGTEST(fp_typed_getter_format, NativeFP);
@@ -590,6 +606,7 @@ inline void tests_arith(const camada::SMTSolverRef &solver) {
   RESETANDTEST(arith_model_queries);
   RESETANDTEST(arith_conversion_semantics);
   RESETANDTEST(int_bv_conversion_semantics);
+  RESETANDTEST(lazy_array_int_index_models);
 }
 
 // The fixtures the "camada-tuples" matrix cell runs: a backend with native

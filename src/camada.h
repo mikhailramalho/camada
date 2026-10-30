@@ -100,7 +100,9 @@ std::string getCamadaVersion();
 ///     methods (mk*, addConstraint, push/pop, check, get*, reset, dump...)
 ///     must be serialized by the caller; a single solver is intended for use
 ///     from one thread at a time. Concurrent solving should be done with one
-///     solver per thread.
+///     solver per thread. Yices is the exception: its library state is
+///     process-wide, so all Yices solvers together must be used from one
+///     thread at a time (see docs/backends.md).
 ///   * SMTExprRef and SMTSortRef handles are nullable and copyable, and may
 ///     be read concurrently from any thread as long as no thread calls
 ///     reset() or destroys the solver meanwhile. The liveness check catches
