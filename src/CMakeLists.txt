@@ -226,29 +226,21 @@ set_target_properties(
              PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_PUB_HDR}")
 
 # A shared Camada absorbs the static backends, and their GMP and CaDiCaL with
-# them. Exporting those would make libcamada.so a provider of symbols it does
-# not own, so a process that also loads a real libgmp.so gets several
-# definitions of __gmpz_init and resolves them by load order. Restrict the
-# dynamic table to Camada's own API; see src/camada.map.
-#
-# GNU ld and lld only, which covers the Linux legs. Apple's linker has no
-# --version-script (its -exported_symbols_list takes a different format) and the
-# check below simply leaves macOS as it is.
-if(BUILD_SHARED_LIBS
-   AND NOT APPLE
-   AND NOT WIN32)
-  include(CheckLinkerFlag)
-  set(_camada_version_script
-      "${CMAKE_CURRENT_SOURCE_DIR}/${LIBRARY_TARGET_NAME}.map")
-  check_linker_flag(CXX "LINKER:--version-script=${_camada_version_script}"
-                    CAMADA_HAVE_VERSION_SCRIPT)
-  if(CAMADA_HAVE_VERSION_SCRIPT)
-    target_link_options(${LIBRARY_TARGET_NAME} PRIVATE
-                        "LINKER:--version-script=${_camada_version_script}")
-    set_property(
-      TARGET ${LIBRARY_TARGET_NAME}
-      APPEND
-      PROPERTY LINK_DEPENDS "${_camada_version_script}")
+# them. Restrict the dynamic table to Camada's own API; see src/camada.exports.
+if(BUILD_SHARED_LIBS)
+  camada_exported_symbols_flag(_camada_exports_flag
+                               "${CMAKE_CURRENT_SOURCE_DIR}/camada.exports")
+  if(_camada_exports_flag)
+    include(CheckLinkerFlag)
+    check_linker_flag(CXX "${_camada_exports_flag}" CAMADA_HAVE_EXPORTS_FLAG)
+    if(CAMADA_HAVE_EXPORTS_FLAG)
+      target_link_options(${LIBRARY_TARGET_NAME} PRIVATE
+                          "${_camada_exports_flag}")
+      set_property(
+        TARGET ${LIBRARY_TARGET_NAME}
+        APPEND
+        PROPERTY LINK_DEPENDS "${_camada_exports_flag_FILE}")
+    endif()
   endif()
 endif()
 

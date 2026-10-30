@@ -1,0 +1,19 @@
+# Only Camada's own API leaves the shared library. One pattern per line,
+# without the Mach-O leading underscore; camada_exported_symbols_flag turns
+# this into a version script on ELF and an exported-symbols list on Apple.
+#
+# The shared library statically absorbs the backends it links (CVC5, Bitwuzla,
+# STP, MathSAT) and, with them, their GMP and CaDiCaL. Exporting those makes
+# libcamada a provider of symbols it does not own: a process that also loads a
+# real libgmp, or the Yices shared library, then has several definitions of
+# __gmpz_init and friends, and the loader picks one by load order. They agree
+# today only because every copy happens to be GMP 6.3.0.
+#
+# Camada's C++ API.
+*camada*
+# Typeinfo and vtables for the public classes, which a consumer needs in order
+# to derive from SMTSolver or catch a Camada exception across the library
+# boundary.
+_ZTIN6camada*
+_ZTSN6camada*
+_ZTVN6camada*
