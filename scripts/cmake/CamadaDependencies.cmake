@@ -986,7 +986,11 @@ function(camada_setup_mpfr)
     URL
     "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz"
     URL_HASH
-    SHA256=b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01)
+    SHA256=b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01
+    # Keep the archive's timestamps: extracted at the current time, configure.ac
+    # looks newer than configure and make reruns the release's automake.
+    DOWNLOAD_EXTRACT_TIMESTAMP
+    TRUE)
 
   camada_run_checked(
     WORKING_DIRECTORY
