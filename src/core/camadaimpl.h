@@ -408,10 +408,10 @@ protected:
                            const SMTExprRef &F);
   SMTExprRef mkAckArrayConst(const SMTSortRef &IndexSort,
                              const SMTExprRef &InitValue);
-  void ackWalkChain(const SMTExpr *Node, const std::string &QueryBits,
+  bool ackWalkChain(const SMTExpr *Node, const std::string &QueryBits,
                     AckClassWalk &Walk);
-  void ackExpandEqualityClass(const SMTSortRef &ArraySort,
-                              const std::string &QueryBits, AckClassWalk &Walk);
+  void ackClassValue(const SMTExprRef &Array, const std::string &QueryBits,
+                     AckClassWalk &Walk);
   SMTExprRef ackDefaultElementValue(const SMTSortRef &Sort);
   SMTExprRef resolveAckArrayElement(const SMTExprRef &Array,
                                     const SMTExprRef &Index);
