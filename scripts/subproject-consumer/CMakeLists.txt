@@ -14,6 +14,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 get_filename_component(_camada_root "${CMAKE_CURRENT_SOURCE_DIR}/../.."
                        ABSOLUTE)
 add_subdirectory("${_camada_root}" camada)
+if(NOT DEFINED CAMADA_HAVE_Z3)
+  message(FATAL_ERROR "Camada did not hand CAMADA_HAVE_Z3 to its parent")
+endif()
 
 add_executable(subproject_consumer
                "${_camada_root}/scripts/release-consumer/main.cpp")
