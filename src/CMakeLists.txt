@@ -16,12 +16,15 @@ function(add_header_to_install)
   endforeach()
 endfunction()
 
-# Include binary path so we can include ac_config.h
-include_directories(${CMAKE_BINARY_DIR}/src)
-# and the source dir, so headers under solvers/ can include their siblings by
-# plain name -- the same way an installed consumer resolves them from camada/'s
-# include root.
+# Include the source dir, so headers under solvers/ can include their siblings
+# by plain name -- the same way an installed consumer resolves them from
+# camada/'s include root.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+# and the staged header directory, after the source dir, so we can include
+# camadafeatures.h while every other header still resolves to the source tree.
+include_directories(${PROJECT_BINARY_DIR}/include/camada)
+# Include binary path so we can include ac_config.h
+include_directories(${PROJECT_BINARY_DIR}/src)
 
 # This is the "physical" (i.e. real) name of the library. The actual file name
 # of the library built is constructed based on conventions of the native
@@ -74,6 +77,19 @@ endif()
 add_header_to_install("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
 set(${LIBRARY_TARGET_NAME}_HDR core/camadaimpl.h)
+
+# Stage the installed headers in the build tree, in the installed layout, so a
+# project that adds Camada with add_subdirectory includes <camada/camada.h>
+# exactly as an installed consumer does. configure_file re-runs CMake whenever a
+# header changes, so the copies cannot go stale.
+set(_camada_staged_include_dir "${PROJECT_BINARY_DIR}/include")
+foreach(header IN
+        LISTS ${LIBRARY_TARGET_NAME}_PUB_HDR ${LIBRARY_TARGET_NAME}_SOLVER_HDR
+              ${LIBRARY_TARGET_NAME}_CORE_HDR)
+  configure_file(
+    "${header}"
+    "${_camada_staged_include_dir}/${LIBRARY_TARGET_NAME}/${header}" COPYONLY)
+endforeach()
 
 # Adds a library target called ${LIBRARY_TARGET_NAME} to be built from the
 # source and header files listed in the command invocation.
@@ -259,7 +275,8 @@ endif()
 target_include_directories(
   ${LIBRARY_TARGET_NAME}
   PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${_camada_staged_include_dir}>"
+    "$<BUILD_INTERFACE:${_camada_staged_include_dir}/${LIBRARY_TARGET_NAME}>"
     "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>"
     "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}>"
 )
@@ -275,7 +292,7 @@ install(
                 COMPONENT dev)
 
 install(
-  FILES "${CMAKE_BINARY_DIR}/src/camadafeatures.h"
+  FILES "${_camada_staged_include_dir}/${LIBRARY_TARGET_NAME}/camadafeatures.h"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIBRARY_TARGET_NAME}"
   COMPONENT dev)
 

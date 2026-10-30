@@ -12,8 +12,8 @@ function(check_mathsat_version mathsat_include mathsat_lib)
   endif()
 
   try_run(
-    MATHSAT_RETURNCODE MATHSAT_COMPILED ${CMAKE_BINARY_DIR}
-    ${CMAKE_SOURCE_DIR}/scripts/cmake/try_mathsat.cpp
+    MATHSAT_RETURNCODE MATHSAT_COMPILED ${PROJECT_BINARY_DIR}
+    ${PROJECT_SOURCE_DIR}/scripts/cmake/try_mathsat.cpp
     COMPILE_DEFINITIONS
       ${_camada_mathsat_compile_definitions} LINK_LIBRARIES
       -L${mathsat_lib_path} ${mathsat_lib} ${CAMADA_MATHSAT_GMP_LIB}

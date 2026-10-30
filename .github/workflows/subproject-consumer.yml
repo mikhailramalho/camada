@@ -1,0 +1,42 @@
+name: Subproject Consumer
+
+# Build Camada as a CMake subproject (scripts/subproject-consumer adds the
+# source tree with add_subdirectory) and run a tiny program and the regression
+# suite against the in-tree target. Catches paths that only hold when Camada is
+# the top-level project, and a broken build-tree include layout, which neither
+# the regular builds nor the release consumer exercise. Homebrew's Z3 is new
+# enough, so no solver is built from source.
+on:
+  push:
+    branches:
+    - master
+    - release/*
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  macos:
+    name: macOS subproject consumer
+    runs-on: macos-15
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Dependencies
+      run: brew install catch2 cmake ninja z3
+
+    - name: Configure consumer
+      run: >
+        cmake -S scripts/subproject-consumer -B scripts/subproject-consumer/build -GNinja
+        -DCAMADA_ENABLE_REGRESSION=ON
+        -DCAMADA_DOWNLOAD_DEPENDENCIES=OFF
+        -DCAMADA_SOLVER_Z3_ENABLE=ON
+        -DCAMADA_SOLVER_BITWUZLA_ENABLE=OFF -DCAMADA_SOLVER_CVC5_ENABLE=OFF
+        -DCAMADA_SOLVER_MATHSAT_ENABLE=OFF -DCAMADA_SOLVER_STP_ENABLE=OFF
+        -DCAMADA_SOLVER_YICES_ENABLE=OFF
+        -DENABLE_WERROR=ON
+
+    - name: Build consumer
+      run: cmake --build scripts/subproject-consumer/build
+
+    - name: Run consumer
+      run: ctest --test-dir scripts/subproject-consumer/build --parallel 4 --output-on-failure

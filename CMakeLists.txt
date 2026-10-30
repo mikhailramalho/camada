@@ -102,7 +102,8 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Adds custom modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/scripts/cmake/")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+                      "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/")
 include(CamadaDependencies)
 
 # Add option to build using sanitizers
@@ -286,7 +287,7 @@ if(CAMADA_SOLVER_SMTLIB_ENABLE)
 endif()
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/camadafeatures.in"
-               "${CMAKE_CURRENT_BINARY_DIR}/src/camadafeatures.h")
+               "${PROJECT_BINARY_DIR}/include/camada/camadafeatures.h")
 
 # Define targets
 add_subdirectory(src)

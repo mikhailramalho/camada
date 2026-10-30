@@ -16,7 +16,7 @@ if(NOT CAMADA_DOWNLOAD_DEPENDENCIES STREQUAL "OFF"
 endif()
 
 set(CAMADA_DEPS_DIR
-    "${CMAKE_BINARY_DIR}/deps"
+    "${PROJECT_BINARY_DIR}/deps"
     CACHE PATH "Directory used to store downloaded solver dependencies")
 set(CAMADA_DEPS_SRC_DIR
     "${CAMADA_DEPS_DIR}/src"
