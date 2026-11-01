@@ -309,9 +309,9 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
   SMTExprRef Read =
       mkSymbolUnchecked("__CAMADA_ackread" + std::to_string(AckArrayCounter++),
                         Array->Sort->getElementSort());
-  // Cache-insert before emitting axioms, and iterate over a copy: the
-  // constraints below go through public wrappers, matching the existing
-  // lazy-machinery discipline against re-entrant construction.
+  // Cache-insert before emitting axioms: the constraints below go through
+  // public wrappers, matching the existing lazy-machinery discipline
+  // against re-entrant construction.
   const std::size_t Pos = Root.Reads.size();
   Root.Reads.push_back(
       AckArrayRead{Index, Read, IndexIsConst,
@@ -321,15 +321,18 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
   else
     Root.ReadsByIndex.emplace(&*Index, Pos);
 
-  const std::vector<AckArrayRead> Prior(Root.Reads.begin(),
-                                        Root.Reads.end() - 1);
-  for (const AckArrayRead &P : Prior) {
+  // Index by position and copy the handles out: re-entrant construction
+  // may grow Root.Reads (Root itself stays put: AckArrayRoots is an
+  // unordered_map). Copying the whole vector made n reads cost O(n^2).
+  for (std::size_t I = 0; I < Pos; ++I) {
     // Two distinct BV-constant indexes cannot alias (equal values share
     // one read by construction), so their congruence axiom is skipped.
-    if (IndexIsConst && P.IndexIsConst)
+    if (IndexIsConst && Root.Reads[I].IndexIsConst)
       continue;
+    const SMTExprRef PIndex = Root.Reads[I].Index;
+    const SMTExprRef PValue = Root.Reads[I].Value;
     SMTExprRef Constraint =
-        mkImplies(mkEqual(Index, P.Index), mkEqual(Read, P.Value));
+        mkImplies(mkEqual(Index, PIndex), mkEqual(Read, PValue));
     // Not model-preserving: Read is a fresh variable minted for this
     // select, so the backend's current model has no value for it and
     // asserting the axiom genuinely discards that model.
