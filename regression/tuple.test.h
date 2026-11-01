@@ -134,6 +134,22 @@ inline void tuple_with_array_field(const camada::SMTSolverRef &solver) {
 // to the original except at one field. Bool + BV only, like
 // tuple_semantics, so every backend (native datatypes and the Camada
 // per-field lowering) runs it.
+// Selecting a BV rounding-mode field for the first time after a check
+// used to declare its symbol then, and the validity axiom that came with
+// it dropped the model.
+inline void tuple_bvrm_field_model(const camada::SMTSolverRef &solver) {
+  auto t = solver->mkSymbol(
+      "rmt", solver->mkTupleSort({solver->mkRMSort(camada::FPEncoding::BV),
+                                  solver->mkBVSort(8)}));
+  auto f1 = solver->mkTupleSelect(t, 1);
+  solver->addConstraint(solver->mkEqual(f1, solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  REQUIRE(solver->getRM(solver->mkTupleSelect(t, 0)));
+  auto v = solver->getBV(f1);
+  REQUIRE(v);
+  REQUIRE(v.value() == 7);
+}
+
 inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
   auto boolSort = solver->mkBoolSort();
   auto bv8Sort = solver->mkBVSort(8);

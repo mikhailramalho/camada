@@ -61,8 +61,8 @@ private:
 /// Tuple expression owned by the Camada layer. The SMTExpr::Kind
 /// discriminates between three shapes (Symbol / TupleConst / Ite) — no
 /// separate NodeKind is needed:
-///   - SMTExprKind::Symbol: lazy — per-field symbols minted on demand by
-///     mkTupleSelect
+///   - SMTExprKind::Symbol: per-field symbols declared with the tuple
+///     symbol and looked up by mkTupleSelect
 ///   - SMTExprKind::TupleConst: eager — components stored verbatim
 ///   - SMTExprKind::Ite: lazy — distributes over fields when selected
 class CamadaTupleExpr : public SMTExpr {
@@ -327,8 +327,14 @@ SMTExprRef mkCamadaTupleSymbol(SMTSolverImpl &Solver, const std::string &Name,
                                const SMTSortRef &Sort) {
   fatalErrorIf(!Sort->isTupleSort(),
                "mkCamadaTupleSymbol called on non-tuple sort");
-  return Solver.makeExprRef<CamadaTupleExpr>(
+  SMTExprRef Tuple = Solver.makeExprRef<CamadaTupleExpr>(
       SMTExprKind::Symbol, Sort->getBackendKind(), Sort, Name);
+  // Declare the field symbols now: a BV rounding-mode field asserts its
+  // validity axiom when declared, which would drop the model if the
+  // first select came after a check.
+  for (unsigned I = 0; I < Sort->getTupleElementSorts().size(); ++I)
+    (void)mkCamadaTupleSelect(Solver, Tuple, I);
+  return Tuple;
 }
 
 SMTExprRef mkCamadaTuple(SMTSolverImpl &Solver,
@@ -353,7 +359,8 @@ SMTExprRef mkCamadaTupleSelect(SMTSolverImpl &Solver, const SMTExprRef &Tuple,
   const SMTSortRef &FieldSort = Tuple->Sort->getTupleElementSorts()[Index];
   switch (TE->getKind()) {
   case SMTExprKind::Symbol: {
-    // Synthesize a per-field symbol on demand. The reserved __CAMADA_tup_
+    // The per-field symbol, declared by mkCamadaTupleSymbol; this finds it
+    // in mkSymbolUnchecked's cache. The reserved __CAMADA_tup_
     // name space prevents collisions with user-supplied symbol names.
     std::string FieldName =
         "__CAMADA_tup_" + TE->SymbolName + "_" + std::to_string(Index);
