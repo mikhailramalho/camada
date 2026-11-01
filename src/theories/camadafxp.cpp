@@ -1496,6 +1496,10 @@ FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
   SMTExprRef Val = Exp;
   unsigned SrcE = Src->getFPExponentWidth();
   unsigned SrcS = Src->getWidth() - 1 - SrcE;
+  // Wide's exponent is one bit wider than the source's, and its range
+  // math below and in bvWideFPSortFor runs in uint64_t.
+  fatalErrorIf(SrcE > 61, "Floating-point exponent is too wide for a "
+                          "fixed-point conversion");
   // Wide holds the widened source exactly (subnormals become normal), the
   // 2^FracBits scale without overflow, and the range bounds exactly.
   uint64_t MaxExp =
