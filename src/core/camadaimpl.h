@@ -453,8 +453,8 @@ protected:
   void ackClassValue(const SMTExprRef &Array, const std::string &QueryBits,
                      AckClassWalk &Walk);
   SMTExprRef ackDefaultElementValue(const SMTSortRef &Sort);
-  SMTExprRef resolveAckArrayElement(const SMTExprRef &Array,
-                                    const SMTExprRef &Index);
+  SMTResult<SMTExprRef> resolveAckArrayElement(const SMTExprRef &Array,
+                                               const SMTExprRef &Index);
   SMTResult<ArrayModel> ackArrayModel(const SMTExprRef &Array);
   void noteAckBVConstBits(const SMTExprRef &Exp, const std::string &Bits);
   void noteAckBVConstBits(const SMTExprRef &Exp, int64_t Value);

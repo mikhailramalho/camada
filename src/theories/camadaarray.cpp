@@ -475,8 +475,9 @@ SMTExprRef SMTSolverImpl::ackDefaultElementValue(const SMTSortRef &Sort) {
              "sort under the Ackermann array encoding");
 }
 
-SMTExprRef SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
-                                                 const SMTExprRef &Index) {
+SMTResult<SMTExprRef>
+SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
+                                      const SMTExprRef &Index) {
   const std::string QueryBits = lazyIndexModelBits(Index);
   // getArrayElement screens the index sort through ackCanEvaluateIndexSort
   // and its ModelAvailable gate rejects a model-less query, so reaching
@@ -488,9 +489,10 @@ SMTExprRef SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
 
   AckClassWalk Walk;
   ackClassValue(Array, QueryBits, Walk);
-  fatalErrorIf(Walk.Failed,
-               "Could not walk the array derivation chain against the "
-               "model under the Ackermann array encoding");
+  if (Walk.Failed)
+    return SMTError{SMTErrorCode::BackendError, backendKind(),
+                    "Could not walk the array derivation chain against the "
+                    "model under the Ackermann array encoding"};
   if (Walk.Value)
     return Walk.Value;
 
