@@ -595,19 +595,14 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
-  std::size_t ebits = LHS->Sort->getFPExponentWidth();
-  std::size_t sbits = LHS->Sort->getFPSignificandBits();
+  unsigned ebits = LHS->Sort->getFPExponentWidth();
+  unsigned sbits = LHS->Sort->getFPSignificandBits();
 
-  SMTExprRef nan = mkFPNaN(*this, static_cast<unsigned>(ebits),
-                           static_cast<unsigned>(sbits), false);
-  SMTExprRef nzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), true);
-  SMTExprRef pzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), false);
-  SMTExprRef ninf = mkFPInf(*this, static_cast<unsigned>(ebits),
-                            static_cast<unsigned>(sbits), true);
-  SMTExprRef pinf = mkFPInf(*this, static_cast<unsigned>(ebits),
-                            static_cast<unsigned>(sbits), false);
+  SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
+  SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
+  SMTExprRef pzero = mkFPZero(*this, ebits, sbits, false);
+  SMTExprRef ninf = mkFPInf(*this, ebits, sbits, true);
+  SMTExprRef pinf = mkFPInf(*this, ebits, sbits, false);
 
   SMTExprRef x_is_nan = mkFPIsNaN(LHS);
   SMTExprRef x_is_zero = mkFPIsZero(LHS);
@@ -1108,15 +1103,12 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
-  std::size_t ebits = LHS->Sort->getFPExponentWidth();
-  std::size_t sbits = LHS->Sort->getFPSignificandBits();
+  unsigned ebits = LHS->Sort->getFPExponentWidth();
+  unsigned sbits = LHS->Sort->getFPSignificandBits();
 
-  SMTExprRef nan = mkFPNaN(*this, static_cast<unsigned>(ebits),
-                           static_cast<unsigned>(sbits), false);
-  SMTExprRef nzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), true);
-  SMTExprRef pzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), false);
+  SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
+  SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
+  SMTExprRef pzero = mkFPZero(*this, ebits, sbits, false);
 
   SMTExprRef x_is_nan = mkFPIsNaN(LHS);
   SMTExprRef x_is_zero = mkFPIsZero(LHS);
@@ -1660,7 +1652,6 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
   if (from_sbits == to_sbits && from_ebits == to_ebits)
     return From;
 
-  SMTExprRef one1 = mkBVOne1(*this);
   SMTExprRef pinf = mkFPInf(*this, to_ebits, to_sbits, false);
   SMTExprRef ninf = mkFPInf(*this, to_ebits, to_sbits, true);
 
@@ -1730,8 +1721,6 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
   res_sig = mkBVZeroExt(res_sig, 1);
   assert(res_sig->getWidth() == to_sbits + 4);
 
-  SMTExprRef exponent_overflow = mkBool(false);
-
   SMTExprRef res_exp;
   if (from_ebits < (to_ebits + 2)) {
     res_exp = mkBVSignExt(exp, to_ebits - from_ebits + 2);
@@ -1775,13 +1764,8 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
 
   SMTExprRef rounded = round(R, res_sgn, res_sig, res_exp, to_ebits, to_sbits);
 
-  SMTExprRef is_neg = mkEqual(sgn, one1);
-  SMTExprRef sig_inf = mkIte(is_neg, ninf, pinf);
-
-  SMTExprRef v6 = mkIte(exponent_overflow, sig_inf, rounded);
-
   // And finally, we tie them together.
-  SMTExprRef result = mkIte(c5, v5, v6);
+  SMTExprRef result = mkIte(c5, v5, rounded);
   result = mkIte(c4, v4, result);
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
