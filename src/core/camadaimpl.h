@@ -442,6 +442,7 @@ protected:
                             const SMTSortRef &ElemSort);
   SMTExprRef mkAckArraySymbol(const std::string &Name, const SMTSortRef &Sort);
   SMTExprRef mkAckArraySelect(const SMTExprRef &Array, const SMTExprRef &Index);
+  SMTExprRef mkAckRootRead(const SMTExprRef &Array, const SMTExprRef &Index);
   SMTExprRef mkAckArrayStore(const SMTExprRef &Array, const SMTExprRef &Index,
                              const SMTExprRef &Element);
   SMTExprRef mkAckArrayIte(const SMTExprRef &Cond, const SMTExprRef &T,
