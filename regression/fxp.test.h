@@ -835,7 +835,7 @@ inline unsigned refCountls(const RefFormat &F, uint64_t Raw) {
 
 inline void fxp_abs_countls_semantics(const camada::SMTSolverRef &solver) {
   // Exhaustive over every format up to 6 bits, both signednesses.
-  for (unsigned Width = 2; Width <= 6; ++Width) {
+  for (unsigned Width = 1; Width <= 6; ++Width) {
     for (unsigned Frac = 0; Frac < Width; ++Frac) {
       for (bool Signed : {true, false}) {
         if (Signed && Frac + 1 > Width - 1)
@@ -857,6 +857,17 @@ inline void fxp_abs_countls_semantics(const camada::SMTSolverRef &solver) {
         REQUIRE(solver->check() == camada::CheckResult::SAT);
       }
     }
+  }
+
+  // A 1-bit signed format has no payload past the sign bit; countls
+  // used to build an out-of-range extract here.
+  {
+    solver->reset();
+    camada::SMTExprRef X =
+        solver->mkSymbol("fxp_cls_s1", solver->mkFXPSort(1, 0, true));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(
+        solver->mkFXPCountls(X, 8), solver->mkBVFromDec(0, 8))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 
   // The saturating case that distinguishes mkFXPAbs from the obvious

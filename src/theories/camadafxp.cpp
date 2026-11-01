@@ -1111,6 +1111,9 @@ SMTExprRef SMTSolverImpl::mkFXPCountls(const SMTExprRef &Exp,
   fatalErrorIf(ToWidth < 64 && (F.IsSigned ? F.Width - 1 : F.Width) >
                                    (uint64_t(1) << ToWidth) - 1,
                "Target width is too narrow to hold the leading-sign count");
+  // A 1-bit signed value is all sign bit: nothing is left to count.
+  if (F.IsSigned && F.Width == 1)
+    return mkBVFromDec(0, ToWidth);
   SMTExprRef Raw = mkFXPToRawBV(Exp);
   // Complementing a negative value turns leading ones into leading
   // zeros, so both signs reduce to counting leading zeros; the sign bit
