@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace camada {
 
@@ -368,10 +369,39 @@ SMTExprRef mkCamadaTupleSelect(SMTSolverImpl &Solver, const SMTExprRef &Tuple,
   }
   case SMTExprKind::TupleConst:
     return TE->Elements[Index];
-  case SMTExprKind::Ite:
-    return Solver.mkIte(TE->Cond,
-                        mkCamadaTupleSelect(Solver, TE->TrueTuple, Index),
-                        mkCamadaTupleSelect(Solver, TE->FalseTuple, Index));
+  case SMTExprKind::Ite: {
+    // A worklist with a memo rather than recursion: ite chains nest
+    // thousands deep, and DAGs that share branches would take exponential
+    // time (#311).
+    std::unordered_map<const SMTExpr *, SMTExprRef> Done;
+    std::vector<SMTExprRef> Stack{Tuple};
+    while (!Stack.empty()) {
+      const SMTExprRef Node = Stack.back();
+      if (Done.count(&*Node)) {
+        Stack.pop_back();
+        continue;
+      }
+      const CamadaTupleExpr *E = toCamadaTupleExpr(Node);
+      if (E->getKind() != SMTExprKind::Ite) {
+        Done.emplace(&*Node, mkCamadaTupleSelect(Solver, Node, Index));
+        Stack.pop_back();
+        continue;
+      }
+      auto T = Done.find(&*E->TrueTuple);
+      auto F = Done.find(&*E->FalseTuple);
+      if (T == Done.end() || F == Done.end()) {
+        if (T == Done.end())
+          Stack.push_back(E->TrueTuple);
+        if (F == Done.end())
+          Stack.push_back(E->FalseTuple);
+        continue;
+      }
+      SMTExprRef Result = Solver.mkIte(E->Cond, T->second, F->second);
+      Done.emplace(&*Node, Result);
+      Stack.pop_back();
+    }
+    return Done.at(&*Tuple);
+  }
   default:
     fatalError("Invalid CamadaTupleExpr SMTExprKind");
   }

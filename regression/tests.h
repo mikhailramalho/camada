@@ -113,6 +113,19 @@ fxp_countls_narrow_target_rejected(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->mkFXPCountls(x, 6)->getWidth() == 6);
 }
 
+// A source exponent wider than the conversion's 64-bit range math is
+// rejected; at 62 bits it used to loop forever. Lives here because it
+// needs require_abort.
+inline void
+fxp_from_wide_exponent_rejected(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("fxp_wide_exp",
+                            solver->mkFPSort(62, 10, camada::FPEncoding::BV));
+  require_abort([&]() {
+    (void)solver->mkFPToFXP(x, solver->mkFXPSort(16, 8, true),
+                            camada::FXPRM::TowardZero);
+  });
+}
+
 // A handle only means anything to the solver that made it: passing one to
 // another instance used to reach the backend, where it was static_cast to
 // that backend's type. Observed in release builds as an uncaught
@@ -155,6 +168,9 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
   require_abort([&]() {
     (void)solver->mkFXPFromRawBV(theirs, solver->mkFXPSort(8, 4, true));
   });
+  // Fixed-point operands reach the backend through the raw-BV view.
+  auto theirFxp = other->mkSymbol("foreign_fxp", other->mkFXPSort(8, 4, true));
+  require_abort([&]() { (void)solver->mkFXPNeg(theirFxp); });
 
   // Model getters, on a solver that has a model to hand back. The
   // macro-generated getters and the hand-written ones must agree here:
@@ -397,6 +413,20 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
     auto x = solver->mkSymbol("nc_ok", solver->mkBVSort(16));
     REQUIRE(solver->mkSBVToFP(x, solver->mkFPSort(8, 3, BV), rm())->isFPSort());
   }
+
+  // fp.to_ubv/sbv into a target narrower than the exponent used to abort
+  // on swapped extract bounds. (7,2) 1.0 is 1; (30,2) 6.0 is 6.
+  {
+    auto one = solver->mkFPFromBin("0011111100", 7, BV);
+    // Sign 0, exponent 10...01 (bias + 2), significand 10.
+    std::string Six = "01" + std::string(28, '0') + "110";
+    auto six = solver->mkFPFromBin(Six, 30, BV);
+    solver->addConstraint(solver->mkNot(solver->mkAnd(
+        solver->mkEqual(solver->mkFPToUBV(one, 1), solver->mkBVFromDec(1, 1)),
+        solver->mkEqual(solver->mkFPToSBV(six, 8),
+                        solver->mkBVFromDec(6, 8)))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
 }
 
 // The encodings and lowerings the group functions below run their fixtures
@@ -495,6 +525,7 @@ inline void tests_tuples(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_symbol_name_reuse_across_sorts);
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_update_semantics);
+  RESETANDTEST(tuple_deep_ite_select);
   RESETANDTEST(tuple_structural_equality);
   RESETANDTEST(tuple_array_semantics);
   RESETANDTEST(tuple_array_equality_ite);
@@ -575,6 +606,7 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
 // Fixed-point: pure common-layer BV encoding, no backend gating needed.
 inline void tests_fxp(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_countls_narrow_target_rejected);
+  RESETANDTEST(fxp_from_wide_exponent_rejected);
   RESETANDTEST(fxp_exhaustive_semantics);
   RESETANDTEST(fxp_boundary_overflow_semantics);
   RESETANDTEST(fxp_rounding_semantics);
@@ -617,6 +649,7 @@ inline void tests_camada_tuples(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_array_semantics);
   RESETANDTEST(tuple_update_semantics);
   RESETANDTEST(tuple_bvrm_field_model);
+  RESETANDTEST(tuple_deep_ite_select);
 }
 
 // Nested array shapes: the depth-5 tuple/array tower and nested constant

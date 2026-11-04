@@ -450,6 +450,8 @@ SMTExprRef SMTSolverImpl::mkFXPFromRawBV(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToRawBV(const SMTExprRef &Exp) {
+  // Every FXP operation reads its operands through here.
+  requireOwned(Exp);
   requireFXP(Exp);
   // Retag to a plain BV sort so downstream BV operations' same-sort checks
   // do not see a distinct FXP sort kind (the IEEEFPToBV precedent).
@@ -893,27 +895,21 @@ SMTExprRef SMTSolverImpl::mkFXPToFXP(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToFXPOverflow(const SMTExprRef &Exp,
-                                             const SMTSortRef &To, FXPRM Mode) {
+                                             const SMTSortRef &To,
+                                             FXPRM /*Mode*/) {
   requireFXP(Exp);
   requireOwned(To);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
   auto [Raw, Wide] = wideForConversion(*this, Exp, Target);
-  // Round FIRST, then compare against the bounds. Testing the exact value
-  // would be wrong for any mode that can round away from zero: a Q8.8
-  // value of 7.96875 fits a signed Q4.4 exactly (127) under truncation
-  // but rounds to 128 under nearest, which does not fit. The predicate
-  // has to agree with the conversion it describes.
-  if (From.FracBits > Target.FracBits)
-    Raw = shiftRounded(*this, Raw, From.FracBits - Target.FracBits, Wide,
-                       From.IsSigned, Mode);
+  // TR 18037 4.1.3: overflow is a property of the exact source value, so
+  // no rounding here. The mode cannot matter: min and max are
+  // representable, so an in-range value never rounds out of range.
   // Bring value and bounds to a common scale; Wide has headroom for both.
-  unsigned Effective =
-      From.FracBits > Target.FracBits ? Target.FracBits : From.FracBits;
-  unsigned Scale = std::max(Effective, Target.FracBits);
-  if (Scale > Effective)
-    Raw = mkBVShl(Raw, mkBVFromDec(Scale - Effective, Wide));
+  unsigned Scale = std::max(From.FracBits, Target.FracBits);
+  if (Scale > From.FracBits)
+    Raw = mkBVShl(Raw, mkBVFromDec(Scale - From.FracBits, Wide));
   unsigned BoundShift = Scale - Target.FracBits;
   // The wide value is sign-correct thanks to the slack bit, so signed
   // comparisons are exact for both signednesses of the source.
@@ -1111,6 +1107,9 @@ SMTExprRef SMTSolverImpl::mkFXPCountls(const SMTExprRef &Exp,
   fatalErrorIf(ToWidth < 64 && (F.IsSigned ? F.Width - 1 : F.Width) >
                                    (uint64_t(1) << ToWidth) - 1,
                "Target width is too narrow to hold the leading-sign count");
+  // A 1-bit signed value is all sign bit: nothing is left to count.
+  if (F.IsSigned && F.Width == 1)
+    return mkBVFromDec(0, ToWidth);
   SMTExprRef Raw = mkFXPToRawBV(Exp);
   // Complementing a negative value turns leading ones into leading
   // zeros, so both signs reduce to counting leading zeros; the sign bit
@@ -1457,10 +1456,14 @@ std::string fpPow2Bits(bool Negative, int64_t K, unsigned AddDist,
 // backends restrict which native formats exist (bitwuzla rejects
 // nonstandard ones, cvc5's default build allows only Float32/Float64), and
 // those two are the universal floor wherever native FP exists at all.
-// Returns null when neither fits — the caller then computes in the BV
-// encoding and bit-bridges the result into the native sort.
+// Returns null when neither fits, or when the computation needs a native
+// round-to-away mode the backend lacks (MathSAT) — the caller then
+// computes in the BV encoding and bit-bridges the result into the native
+// sort.
 SMTSortRef nativeWideFPSortFor(SMTSolverImpl &S, unsigned SigWidth,
-                               uint64_t MaxExp) {
+                               uint64_t MaxExp, bool NeedsAway) {
+  if (NeedsAway && !S.supports(SolverFeature::NativeRoundToAway))
+    return SMTSortRef();
   static constexpr std::pair<unsigned, unsigned> Ladder[] = {{8, 23}, {11, 52}};
   for (auto [E, Sig] : Ladder)
     if (Sig >= SigWidth && (uint64_t(1) << (E - 1)) >= MaxExp + 3)
@@ -1496,6 +1499,10 @@ FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
   SMTExprRef Val = Exp;
   unsigned SrcE = Src->getFPExponentWidth();
   unsigned SrcS = Src->getWidth() - 1 - SrcE;
+  // Wide's exponent is one bit wider than the source's, and its range
+  // math below and in bvWideFPSortFor runs in uint64_t.
+  fatalErrorIf(SrcE > 61, "Floating-point exponent is too wide for a "
+                          "fixed-point conversion");
   // Wide holds the widened source exactly (subnormals become normal), the
   // 2^FracBits scale without overflow, and the range bounds exactly.
   uint64_t MaxExp =
@@ -1504,7 +1511,9 @@ FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
   FPEncoding Enc = FPEncoding::BV;
   SMTSortRef Wide;
   if (!Src->isBVFPSort()) {
-    Wide = nativeWideFPSortFor(S, WideSig, MaxExp);
+    Wide = nativeWideFPSortFor(S, WideSig, MaxExp,
+                               Mode == FXPRM::NearestTiesAwayFromZero ||
+                                   Mode == FXPRM::NearestTiesTowardPositive);
     if (Wide) {
       Enc = FPEncoding::Native;
     } else {
@@ -1576,7 +1585,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
   FPEncoding Enc = FPEncoding::BV;
   SMTSortRef Wide, RoundTo = To;
   if (!To->isBVFPSort()) {
-    Wide = nativeWideFPSortFor(*this, WideSig, MaxExp);
+    Wide = nativeWideFPSortFor(*this, WideSig, MaxExp, R == RM::ROUND_TO_AWAY);
     if (Wide)
       Enc = FPEncoding::Native;
     else

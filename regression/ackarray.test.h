@@ -307,6 +307,25 @@ inline void ack_fp_element_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getFP32(at9));
 }
 
+// Native rounding-mode elements: an unconstrained read used to abort
+// because the default synthesis had no RM arm. Kept out of the flat
+// driver: the STP pipe child has no FP theory.
+inline void ack_rm_element_default(const camada::SMTSolverRef &solver) {
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+  auto a = solver->mkSymbol(
+      "a", solver->mkArraySort(solver->mkBVSort(8),
+                               solver->mkRMSort(camada::FPEncoding::Native)));
+  solver->addConstraint(solver->mkEqual(
+      solver->mkArraySelect(a, solver->mkBVFromDec(1, 8)),
+      solver->mkRM(camada::RM::ROUND_TO_ZERO, camada::FPEncoding::Native)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto at1 = solver->getRM(arrayElement(solver, a, solver->mkBVFromDec(1, 8)));
+  REQUIRE(at1);
+  REQUIRE(at1.value() == camada::RM::ROUND_TO_ZERO);
+  REQUIRE(solver->getRM(arrayElement(solver, a, solver->mkBVFromDec(3, 8))));
+}
+
 // checkSatAssuming over array constraints: congruence axioms are ordinary
 // journaled constraints, so they survive whichever mechanism the backend
 // uses (native assumptions or the push/assert/check/pop fallback).
@@ -393,8 +412,23 @@ ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
   REQUIRE(Values.error().Code == camada::SMTErrorCode::UnsupportedOperation);
 }
 
+// A select used to recurse once per store and overflowed the stack at
+// about 7.5k stores, a normal depth for ESBMC memory models.
+inline void ack_deep_store_chain(const camada::SMTSolverRef &solver) {
+  auto bv = solver->mkBVSort(32);
+  auto a = solver->mkSymbol("deep_a", solver->mkArraySort(bv, bv));
+  auto k = solver->mkSymbol("deep_k", bv);
+  for (int I = 0; I < 20000; ++I)
+    a = solver->mkArrayStore(a, solver->mkBVAdd(k, solver->mkBVFromDec(I, 32)),
+                             solver->mkBVFromDec(I, 32));
+  auto sel = solver->mkArraySelect(a, solver->mkSymbol("deep_j", bv));
+  REQUIRE(sel->Sort == bv);
+}
+
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
   ack_unsupported_index_sort_reports(solver);
+  solver->reset();
+  ack_deep_store_chain(solver);
   solver->reset();
   ack_dump_model_skips_camada_nodes(solver);
   solver->reset();
@@ -430,6 +464,8 @@ inline void ack_array_tests(const camada::SMTSolverRef &solver) {
   ack_ite_array_semantics(solver);
   solver->reset();
   ack_const_array_semantics(solver);
+  solver->reset();
+  ack_rm_element_default(solver);
 }
 
 #endif
