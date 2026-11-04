@@ -113,6 +113,19 @@ fxp_countls_narrow_target_rejected(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->mkFXPCountls(x, 6)->getWidth() == 6);
 }
 
+// A source exponent wider than the conversion's 64-bit range math is
+// rejected; at 62 bits it used to loop forever. Lives here because it
+// needs require_abort.
+inline void
+fxp_from_wide_exponent_rejected(const camada::SMTSolverRef &solver) {
+  auto x = solver->mkSymbol("fxp_wide_exp",
+                            solver->mkFPSort(62, 10, camada::FPEncoding::BV));
+  require_abort([&]() {
+    (void)solver->mkFPToFXP(x, solver->mkFXPSort(16, 8, true),
+                            camada::FXPRM::TowardZero);
+  });
+}
+
 // A handle only means anything to the solver that made it: passing one to
 // another instance used to reach the backend, where it was static_cast to
 // that backend's type. Observed in release builds as an uncaught
@@ -590,6 +603,7 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
 // Fixed-point: pure common-layer BV encoding, no backend gating needed.
 inline void tests_fxp(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fxp_countls_narrow_target_rejected);
+  RESETANDTEST(fxp_from_wide_exponent_rejected);
   RESETANDTEST(fxp_exhaustive_semantics);
   RESETANDTEST(fxp_boundary_overflow_semantics);
   RESETANDTEST(fxp_rounding_semantics);
