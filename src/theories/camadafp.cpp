@@ -2209,10 +2209,11 @@ SMTExprRef SMTSolverImpl::mkRMImpl(const RM &R) {
 
 SMTExprRef SMTSolverImpl::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  // we always create the same NaN: sgn = Sgn, exp = all 1, sig = 0...01
+  // Always the same quiet NaN (IEEE-754 7.2): sgn = Sgn, exp = all 1,
+  // sig = 10...0.
   SMTExprRef theExp =
       packFP(*this, mkSgnBit(*this, Sgn), mkTopExp(*this, ExpWidth),
-             mkBVFromDec(1, SigWidth - 1));
+             mkBVFromBin("1" + std::string(SigWidth - 2, '0'), SigWidth - 1));
   return rewrapAs(theExp, SMTExprKind::FPConst);
 }
 
