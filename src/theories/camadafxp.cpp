@@ -1457,10 +1457,14 @@ std::string fpPow2Bits(bool Negative, int64_t K, unsigned AddDist,
 // backends restrict which native formats exist (bitwuzla rejects
 // nonstandard ones, cvc5's default build allows only Float32/Float64), and
 // those two are the universal floor wherever native FP exists at all.
-// Returns null when neither fits — the caller then computes in the BV
-// encoding and bit-bridges the result into the native sort.
+// Returns null when neither fits, or when the computation needs a native
+// round-to-away mode the backend lacks (MathSAT) — the caller then
+// computes in the BV encoding and bit-bridges the result into the native
+// sort.
 SMTSortRef nativeWideFPSortFor(SMTSolverImpl &S, unsigned SigWidth,
-                               uint64_t MaxExp) {
+                               uint64_t MaxExp, bool NeedsAway) {
+  if (NeedsAway && !S.supports(SolverFeature::NativeRoundToAway))
+    return SMTSortRef();
   static constexpr std::pair<unsigned, unsigned> Ladder[] = {{8, 23}, {11, 52}};
   for (auto [E, Sig] : Ladder)
     if (Sig >= SigWidth && (uint64_t(1) << (E - 1)) >= MaxExp + 3)
@@ -1508,7 +1512,9 @@ FPFXPParts fpToFXPParts(SMTSolverImpl &S, const SMTExprRef &Exp,
   FPEncoding Enc = FPEncoding::BV;
   SMTSortRef Wide;
   if (!Src->isBVFPSort()) {
-    Wide = nativeWideFPSortFor(S, WideSig, MaxExp);
+    Wide = nativeWideFPSortFor(S, WideSig, MaxExp,
+                               Mode == FXPRM::NearestTiesAwayFromZero ||
+                                   Mode == FXPRM::NearestTiesTowardPositive);
     if (Wide) {
       Enc = FPEncoding::Native;
     } else {
@@ -1580,7 +1586,7 @@ SMTExprRef SMTSolverImpl::mkFXPToFP(const SMTExprRef &Exp, const SMTSortRef &To,
   FPEncoding Enc = FPEncoding::BV;
   SMTSortRef Wide, RoundTo = To;
   if (!To->isBVFPSort()) {
-    Wide = nativeWideFPSortFor(*this, WideSig, MaxExp);
+    Wide = nativeWideFPSortFor(*this, WideSig, MaxExp, R == RM::ROUND_TO_AWAY);
     if (Wide)
       Enc = FPEncoding::Native;
     else

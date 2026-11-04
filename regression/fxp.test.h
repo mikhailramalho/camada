@@ -1334,6 +1334,34 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
     REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 
+  // Round-to-away modes work on every backend, including MathSAT, which
+  // has no native round-to-away and used to abort here. -2.5 is a tie:
+  // away gives -3, ties toward +inf gives -2. 2^24 + 1 is a binary32 tie
+  // that away rounds up to 2^24 + 2 (0x4b800001).
+  {
+    solver->reset();
+    camada::SMTSortRef To = solver->mkFXPSort(16, 0, true);
+    camada::SMTExprRef V = solver->mkFPFromBin(
+        refBits(RefFormat{32, 0, false}, 0xc0200000u), 8, Enc);
+    auto C = [&](uint64_t Raw) {
+      return solver->mkFXPFromBin(refBits(RefFormat{16, 0, true}, Raw), To);
+    };
+    camada::SMTExprRef X =
+        solver->mkFXPFromBin(refBits(RefFormat{32, 0, true}, (1u << 24) + 1),
+                             solver->mkFXPSort(32, 0, true));
+    solver->addConstraint(solver->mkFXPEqual(
+        solver->mkFPToFXP(V, To, camada::FXPRM::NearestTiesAwayFromZero),
+        C(uint64_t(-3) & 0xFFFF)));
+    solver->addConstraint(solver->mkFXPEqual(
+        solver->mkFPToFXP(V, To, camada::FXPRM::NearestTiesTowardPositive),
+        C(uint64_t(-2) & 0xFFFF)));
+    solver->addConstraint(solver->mkEqual(
+        solver->mkIEEEFPToBV(solver->mkFXPToFP(X, solver->mkFP32Sort(Enc),
+                                               camada::RM::ROUND_TO_AWAY)),
+        solver->mkBVFromDec(0x4b800001, 32)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
+
   // Oracle-pinned vectors on the standard formats, run under BOTH
   // encodings (the kToFP/kFromFP tables themselves run BV-only). These
   // are the rows that discriminate the rounding rules: RNE ties in both
