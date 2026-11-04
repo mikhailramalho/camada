@@ -134,6 +134,30 @@ inline void tuple_with_array_field(const camada::SMTSolverRef &solver) {
 // to the original except at one field. Bool + BV only, like
 // tuple_semantics, so every backend (native datatypes and the Camada
 // per-field lowering) runs it.
+// Tuple selects through ite used to recurse once per level, overflowing
+// the stack at about 17.5k levels, and with no memo a DAG of shared
+// branches took exponential time.
+inline void tuple_deep_ite_select(const camada::SMTSolverRef &solver) {
+  auto bv8 = solver->mkBVSort(8);
+  auto ts = solver->mkTupleSort({bv8, bv8});
+  auto c = solver->mkSymbol("deep_c", solver->mkBoolSort());
+  auto t = solver->mkSymbol("deep_t", ts);
+  for (int I = 0; I < 20000; ++I)
+    t = solver->mkIte(c, t,
+                      solver->mkTuple({solver->mkBVFromDec(I % 256, 8),
+                                       solver->mkBVFromDec(0, 8)}));
+  REQUIRE(solver->mkTupleSelect(t, 0)->Sort == bv8);
+
+  auto d = solver->mkSymbol("deep_d", solver->mkBoolSort());
+  auto x = solver->mkSymbol("deep_x", ts), y = solver->mkSymbol("deep_y", ts);
+  for (int I = 0; I < 24; ++I) {
+    auto nx = solver->mkIte(c, x, y);
+    y = solver->mkIte(d, y, x);
+    x = nx;
+  }
+  REQUIRE(solver->mkTupleSelect(x, 1)->Sort == bv8);
+}
+
 inline void tuple_update_semantics(const camada::SMTSolverRef &solver) {
   auto boolSort = solver->mkBoolSort();
   auto bv8Sort = solver->mkBVSort(8);

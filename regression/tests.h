@@ -495,6 +495,7 @@ inline void tests_tuples(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_symbol_name_reuse_across_sorts);
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_update_semantics);
+  RESETANDTEST(tuple_deep_ite_select);
   RESETANDTEST(tuple_structural_equality);
   RESETANDTEST(tuple_array_semantics);
   RESETANDTEST(tuple_array_equality_ite);
@@ -616,6 +617,7 @@ inline void tests_camada_tuples(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_array_semantics);
   RESETANDTEST(tuple_update_semantics);
+  RESETANDTEST(tuple_deep_ite_select);
 }
 
 // Nested array shapes: the depth-5 tuple/array tower and nested constant
