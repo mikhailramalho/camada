@@ -313,6 +313,26 @@ fxp_boundary_overflow_semantics(const camada::SMTSolverRef &solver) {
         mkConst(solver, F, 127)));
     REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
+  // The same rule for conversion: Q8.8 7.96875 (raw 2040) is past the
+  // Q3.4 max 7.9375 though it floors onto it, under every mode.
+  for (camada::FXPRM Mode :
+       {camada::FXPRM::TowardNegative, camada::FXPRM::TowardZero,
+        camada::FXPRM::NearestTiesToEven}) {
+    solver->reset();
+    RefFormat Src{16, 8, true};
+    solver->addConstraint(solver->mkFXPToFXPOverflow(mkConst(solver, Src, 2040),
+                                                     mkSort(solver, F), Mode));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
+  // u0.8 raw 255 (0.996) is past the s0.7 max 127/128.
+  {
+    solver->reset();
+    RefFormat U{8, 8, false}, S{8, 7, true};
+    solver->addConstraint(
+        solver->mkFXPToFXPOverflow(mkConst(solver, U, 255), mkSort(solver, S),
+                                   camada::FXPRM::TowardNegative));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
   // 127 * 16 = 2032 = max*16 exactly: representable, NOT an overflow.
   {
     solver->reset();

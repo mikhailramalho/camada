@@ -893,27 +893,21 @@ SMTExprRef SMTSolverImpl::mkFXPToFXP(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToFXPOverflow(const SMTExprRef &Exp,
-                                             const SMTSortRef &To, FXPRM Mode) {
+                                             const SMTSortRef &To,
+                                             FXPRM /*Mode*/) {
   requireFXP(Exp);
   requireOwned(To);
   requireFXPSort(To);
   FXPFormat From = formatOf(Exp->Sort);
   FXPFormat Target = formatOf(To);
   auto [Raw, Wide] = wideForConversion(*this, Exp, Target);
-  // Round FIRST, then compare against the bounds. Testing the exact value
-  // would be wrong for any mode that can round away from zero: a Q8.8
-  // value of 7.96875 fits a signed Q4.4 exactly (127) under truncation
-  // but rounds to 128 under nearest, which does not fit. The predicate
-  // has to agree with the conversion it describes.
-  if (From.FracBits > Target.FracBits)
-    Raw = shiftRounded(*this, Raw, From.FracBits - Target.FracBits, Wide,
-                       From.IsSigned, Mode);
+  // TR 18037 4.1.3: overflow is a property of the exact source value, so
+  // no rounding here. The mode cannot matter: min and max are
+  // representable, so an in-range value never rounds out of range.
   // Bring value and bounds to a common scale; Wide has headroom for both.
-  unsigned Effective =
-      From.FracBits > Target.FracBits ? Target.FracBits : From.FracBits;
-  unsigned Scale = std::max(Effective, Target.FracBits);
-  if (Scale > Effective)
-    Raw = mkBVShl(Raw, mkBVFromDec(Scale - Effective, Wide));
+  unsigned Scale = std::max(From.FracBits, Target.FracBits);
+  if (Scale > From.FracBits)
+    Raw = mkBVShl(Raw, mkBVFromDec(Scale - From.FracBits, Wide));
   unsigned BoundShift = Scale - Target.FracBits;
   // The wide value is sign-correct thanks to the slack bit, so signed
   // comparisons are exact for both signednesses of the source.
