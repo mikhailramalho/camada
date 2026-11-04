@@ -1734,7 +1734,8 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
     unsigned ebits_diff = from_ebits - (to_ebits + 2);
 
     // subtract lz for subnormal numbers.
-    SMTExprRef exp_sub_lz = mkBVSub(mkBVSignExt(exp, 2), mkBVSignExt(lz, 2));
+    // lz is unsigned (the narrow branch above zero-extends it too).
+    SMTExprRef exp_sub_lz = mkBVSub(mkBVSignExt(exp, 2), mkBVZeroExt(lz, 2));
 
     // check whether exponent is within roundable (to_ebits+2) range.
     SMTExprRef max_exp = mkBVConcat(
