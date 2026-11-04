@@ -397,6 +397,20 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
     auto x = solver->mkSymbol("nc_ok", solver->mkBVSort(16));
     REQUIRE(solver->mkSBVToFP(x, solver->mkFPSort(8, 3, BV), rm())->isFPSort());
   }
+
+  // fp.to_ubv/sbv into a target narrower than the exponent used to abort
+  // on swapped extract bounds. (7,2) 1.0 is 1; (30,2) 6.0 is 6.
+  {
+    auto one = solver->mkFPFromBin("0011111100", 7, BV);
+    // Sign 0, exponent 10...01 (bias + 2), significand 10.
+    std::string Six = "01" + std::string(28, '0') + "110";
+    auto six = solver->mkFPFromBin(Six, 30, BV);
+    solver->addConstraint(solver->mkNot(solver->mkAnd(
+        solver->mkEqual(solver->mkFPToUBV(one, 1), solver->mkBVFromDec(1, 1)),
+        solver->mkEqual(solver->mkFPToSBV(six, 8),
+                        solver->mkBVFromDec(6, 8)))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
 }
 
 // The encodings and lowerings the group functions below run their fixtures

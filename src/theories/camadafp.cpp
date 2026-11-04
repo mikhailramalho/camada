@@ -1937,10 +1937,11 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
   if (ebits + 2 < big_sig_sz)
     shift = mkBVZeroExt(shift, big_sig_sz - ebits - 2);
   else if (ebits + 2 > big_sig_sz) {
-    SMTExprRef upper = mkBVExtract(big_sig_sz, ebits + 2, shift);
-    shift = mkBVExtract(ebits + 1, 0, shift);
+    // Keep the low big_sig_sz bits, saturating if any upper bit is set.
+    SMTExprRef upper = mkBVExtract(ebits + 1, big_sig_sz, shift);
+    shift = mkBVExtract(big_sig_sz - 1, 0, shift);
     shift = mkIte(mkEqual(upper, mkBVFromDec(0, upper->getWidth())), shift,
-                  mkBVFromDec(big_sig_sz - 1, ebits + 2));
+                  mkBVFromDec(big_sig_sz - 1, big_sig_sz));
   }
   assert(shift->getWidth() == big_sig->getWidth());
 
