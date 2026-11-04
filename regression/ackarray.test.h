@@ -307,6 +307,25 @@ inline void ack_fp_element_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getFP32(at9));
 }
 
+// Native rounding-mode elements: an unconstrained read used to abort
+// because the default synthesis had no RM arm. Kept out of the flat
+// driver: the STP pipe child has no FP theory.
+inline void ack_rm_element_default(const camada::SMTSolverRef &solver) {
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+  auto a = solver->mkSymbol(
+      "a", solver->mkArraySort(solver->mkBVSort(8),
+                               solver->mkRMSort(camada::FPEncoding::Native)));
+  solver->addConstraint(solver->mkEqual(
+      solver->mkArraySelect(a, solver->mkBVFromDec(1, 8)),
+      solver->mkRM(camada::RM::ROUND_TO_ZERO, camada::FPEncoding::Native)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto at1 = solver->getRM(arrayElement(solver, a, solver->mkBVFromDec(1, 8)));
+  REQUIRE(at1);
+  REQUIRE(at1.value() == camada::RM::ROUND_TO_ZERO);
+  REQUIRE(solver->getRM(arrayElement(solver, a, solver->mkBVFromDec(3, 8))));
+}
+
 // checkSatAssuming over array constraints: congruence axioms are ordinary
 // journaled constraints, so they survive whichever mechanism the backend
 // uses (native assumptions or the push/assert/check/pop fallback).
@@ -445,6 +464,8 @@ inline void ack_array_tests(const camada::SMTSolverRef &solver) {
   ack_ite_array_semantics(solver);
   solver->reset();
   ack_const_array_semantics(solver);
+  solver->reset();
+  ack_rm_element_default(solver);
 }
 
 #endif

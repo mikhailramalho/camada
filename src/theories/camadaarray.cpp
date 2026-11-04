@@ -498,6 +498,9 @@ void SMTSolverImpl::ackClassValue(const SMTExprRef &Array,
 SMTExprRef SMTSolverImpl::ackDefaultElementValue(const SMTSortRef &Sort) {
   if (Sort->isBoolSort())
     return mkBool(false);
+  if (Sort->isRMSort())
+    return mkRM(RM::ROUND_TO_EVEN,
+                Sort->isBVRMSort() ? FPEncoding::BV : FPEncoding::Native);
   // FP first: BVFP sorts answer true to isBVSort() too.
   if (Sort->isFPSort())
     return mkFPFromBin(
