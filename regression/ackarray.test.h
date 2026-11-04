@@ -381,12 +381,9 @@ ack_dump_model_skips_camada_nodes(const camada::SMTSolverRef &solver) {
   REQUIRE(Dump.find("__CAMADA_ackread") != std::string::npos);
 }
 
-// The Ackermann resolver compares indexes by their model bits, which only
-// Bool and BV sorts produce. An Int-indexed array is legal on the backends
-// that support Int, so the query must report the gap rather than abort --
-// it used to kill the process from ordinary public API use.
-inline void
-ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
+// The Ackermann resolver compares indexes by their model bits, which
+// Bool, BV, Int and Real produce. Int indexes used to be screened out.
+inline void ack_int_index_model(const camada::SMTSolverRef &solver) {
   if (!solver->supports(camada::SolverFeature::IntRealArithmetic))
     return;
   // The SMT-LIB pipeline drives a child that may reject Int outright (the
@@ -399,6 +396,31 @@ ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
       "ackint_arr", solver->mkArraySort(intsort, solver->mkBVSort(8)));
   auto i = solver->mkSymbol("ackint_i", intsort);
   solver->addConstraint(solver->mkEqual(i, solver->mkInt(int64_t(1))));
+  solver->addConstraint(solver->mkEqual(solver->mkArraySelect(arr, i),
+                                        solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Elem = solver->getArrayElement(arr, solver->mkInt(int64_t(1)));
+  REQUIRE(Elem);
+  auto V = solver->getBV(Elem.value());
+  REQUIRE(V);
+  REQUIRE(V.value() == 7);
+  auto Values = solver->getArrayValues(arr);
+  REQUIRE(Values);
+  REQUIRE(Values.value().Entries.size() == 1);
+}
+
+// A native FP index has no model bits, so the query must report the gap
+// rather than abort -- it used to kill the process from ordinary public
+// API use.
+inline void
+ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint) ||
+      solver->getSolverNameAndVersion().compare(0, 6, "SMTLIB") == 0)
+    return;
+  auto fpsort = solver->mkFP32Sort(camada::FPEncoding::Native);
+  auto arr = solver->mkSymbol("ackfp_arr",
+                              solver->mkArraySort(fpsort, solver->mkBVSort(8)));
+  auto i = solver->mkSymbol("ackfp_i", fpsort);
   solver->addConstraint(solver->mkEqual(solver->mkArraySelect(arr, i),
                                         solver->mkBVFromDec(7, 8)));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
@@ -427,6 +449,8 @@ inline void ack_deep_store_chain(const camada::SMTSolverRef &solver) {
 
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
   ack_unsupported_index_sort_reports(solver);
+  solver->reset();
+  ack_int_index_model(solver);
   solver->reset();
   ack_deep_store_chain(solver);
   solver->reset();

@@ -131,22 +131,18 @@ public:
   /// reserved __CAMADA_ prefix.
   SMTExprRef mkSymbolUnchecked(const std::string &Name, const SMTSortRef &Sort);
 
-  /// The index sorts the Ackermann model walks support, so an index
-  /// outside this set is a capability gap to report, not a failure to
-  /// diagnose.
-  static bool ackCanEvaluateIndexSort(const SMTSortRef &Sort) {
-    return Sort->isBoolSort() || Sort->isBVSort();
+  /// The sorts lazyIndexModelBits can canonicalize, which the lazy
+  /// constant array and Ackermann model queries compare indexes by. An
+  /// index outside this set is a capability gap to report, not a failure
+  /// to diagnose.
+  static bool lazyCanEvaluateIndexSort(const SMTSortRef &Sort) {
+    return Sort->isBoolSort() || Sort->isBVSort() || Sort->isIntSort() ||
+           Sort->isRealSort();
   }
   static SMTError ackUnsupportedIndexSort(SMTBackendKind Backend) {
     return unsupportedError(
-        Backend, "The Ackermann array encoding can only evaluate bool- "
-                 "and bitvector-sorted indexes against a model");
-  }
-  /// The sorts lazyIndexModelBits can canonicalize, which the lazy
-  /// constant array model queries compare indexes by.
-  static bool lazyCanEvaluateIndexSort(const SMTSortRef &Sort) {
-    return ackCanEvaluateIndexSort(Sort) || Sort->isIntSort() ||
-           Sort->isRealSort();
+        Backend, "The Ackermann array encoding can only evaluate bool-, "
+                 "bitvector-, Int- and Real-sorted indexes against a model");
   }
   static SMTError lazyUnsupportedIndexSort(SMTBackendKind Backend) {
     return unsupportedError(

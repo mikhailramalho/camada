@@ -1912,10 +1912,9 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   // Ackermann-mode arrays have no backend term to evaluate; resolve from
   // the tracked derivation chain and the reads of the equality class.
   if (arrayMode() == ArrayEncoding::Ackermann) {
-    // The resolver compares indexes by their model bits, which only Bool
-    // and BV sorts produce. An Int-indexed array is perfectly legal on the
-    // backends that support Int, so report the gap instead of aborting.
-    if (!ackCanEvaluateIndexSort(Index->Sort))
+    // The resolver compares indexes by their model bits; report a sort
+    // that has none instead of aborting.
+    if (!lazyCanEvaluateIndexSort(Index->Sort))
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return resolveAckArrayElement(Array, Index);
   }
@@ -1968,11 +1967,10 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   if (lowersTuples(Array->Sort))
     return getCamadaTupleArrayValues(*this, Array);
   if (arrayMode() == ArrayEncoding::Ackermann) {
-    // Same limitation getArrayElement screens: the walk compares indexes by
-    // their model bits, which only Bool and BV sorts produce. Report the
-    // capability gap rather than the BackendError the walk would return,
-    // which reads as a solver malfunction.
-    if (!ackCanEvaluateIndexSort(Array->Sort->getIndexSort()))
+    // Same limitation getArrayElement screens. Report the capability gap
+    // rather than the BackendError the walk would return, which reads as a
+    // solver malfunction.
+    if (!lazyCanEvaluateIndexSort(Array->Sort->getIndexSort()))
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return ackArrayModel(Array);
   }

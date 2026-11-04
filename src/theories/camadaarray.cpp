@@ -520,13 +520,13 @@ SMTResult<SMTExprRef>
 SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
                                       const SMTExprRef &Index) {
   const std::string QueryBits = lazyIndexModelBits(Index);
-  // getArrayElement screens the index sort through ackCanEvaluateIndexSort
+  // getArrayElement screens the index sort through lazyCanEvaluateIndexSort
   // and its ModelAvailable gate rejects a model-less query, so reaching
   // this with empty bits means the screen and this check disagree -- a
   // Camada bug, not a caller mistake.
   fatalErrorIf(QueryBits.empty(),
                "Cannot evaluate the queried index against the model under "
-               "the Ackermann array encoding (bool/BV index sorts only)");
+               "the Ackermann array encoding");
 
   AckClassWalk Walk;
   ackClassValue(Array, QueryBits, Walk);
