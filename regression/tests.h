@@ -168,6 +168,9 @@ inline void foreign_handle_rejected(const camada::SMTSolverRef &solver,
   require_abort([&]() {
     (void)solver->mkFXPFromRawBV(theirs, solver->mkFXPSort(8, 4, true));
   });
+  // Fixed-point operands reach the backend through the raw-BV view.
+  auto theirFxp = other->mkSymbol("foreign_fxp", other->mkFXPSort(8, 4, true));
+  require_abort([&]() { (void)solver->mkFXPNeg(theirFxp); });
 
   // Model getters, on a solver that has a model to hand back. The
   // macro-generated getters and the hand-written ones must agree here:

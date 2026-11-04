@@ -450,6 +450,8 @@ SMTExprRef SMTSolverImpl::mkFXPFromRawBV(const SMTExprRef &Exp,
 }
 
 SMTExprRef SMTSolverImpl::mkFXPToRawBV(const SMTExprRef &Exp) {
+  // Every FXP operation reads its operands through here.
+  requireOwned(Exp);
   requireFXP(Exp);
   // Retag to a plain BV sort so downstream BV operations' same-sort checks
   // do not see a distinct FXP sort kind (the IEEEFPToBV precedent).
