@@ -2454,10 +2454,6 @@ SMTResult<RM> SMTSolverImpl::getRMImpl(const SMTExprRef &Exp) {
     for (const RM Mode :
          {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
           RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO}) {
-      // MathSAT aborts on a native round-to-away term; skip the mode it
-      // cannot represent rather than build it.
-      if (Mode == RM::ROUND_TO_AWAY && !nativeRoundToAwaySupport())
-        continue;
       SMTResult<bool> Same =
           getBool(mkEqual(Exp, mkRM(Mode, FPEncoding::Native)));
       if (!Same)
