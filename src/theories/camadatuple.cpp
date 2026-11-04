@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace camada {
 
@@ -61,8 +62,8 @@ private:
 /// Tuple expression owned by the Camada layer. The SMTExpr::Kind
 /// discriminates between three shapes (Symbol / TupleConst / Ite) — no
 /// separate NodeKind is needed:
-///   - SMTExprKind::Symbol: lazy — per-field symbols minted on demand by
-///     mkTupleSelect
+///   - SMTExprKind::Symbol: per-field symbols declared with the tuple
+///     symbol and looked up by mkTupleSelect
 ///   - SMTExprKind::TupleConst: eager — components stored verbatim
 ///   - SMTExprKind::Ite: lazy — distributes over fields when selected
 class CamadaTupleExpr : public SMTExpr {
@@ -327,8 +328,14 @@ SMTExprRef mkCamadaTupleSymbol(SMTSolverImpl &Solver, const std::string &Name,
                                const SMTSortRef &Sort) {
   fatalErrorIf(!Sort->isTupleSort(),
                "mkCamadaTupleSymbol called on non-tuple sort");
-  return Solver.makeExprRef<CamadaTupleExpr>(
+  SMTExprRef Tuple = Solver.makeExprRef<CamadaTupleExpr>(
       SMTExprKind::Symbol, Sort->getBackendKind(), Sort, Name);
+  // Declare the field symbols now: a BV rounding-mode field asserts its
+  // validity axiom when declared, which would drop the model if the
+  // first select came after a check.
+  for (unsigned I = 0; I < Sort->getTupleElementSorts().size(); ++I)
+    (void)mkCamadaTupleSelect(Solver, Tuple, I);
+  return Tuple;
 }
 
 SMTExprRef mkCamadaTuple(SMTSolverImpl &Solver,
@@ -353,7 +360,8 @@ SMTExprRef mkCamadaTupleSelect(SMTSolverImpl &Solver, const SMTExprRef &Tuple,
   const SMTSortRef &FieldSort = Tuple->Sort->getTupleElementSorts()[Index];
   switch (TE->getKind()) {
   case SMTExprKind::Symbol: {
-    // Synthesize a per-field symbol on demand. The reserved __CAMADA_tup_
+    // The per-field symbol, declared by mkCamadaTupleSymbol; this finds it
+    // in mkSymbolUnchecked's cache. The reserved __CAMADA_tup_
     // name space prevents collisions with user-supplied symbol names.
     std::string FieldName =
         "__CAMADA_tup_" + TE->SymbolName + "_" + std::to_string(Index);
@@ -361,10 +369,39 @@ SMTExprRef mkCamadaTupleSelect(SMTSolverImpl &Solver, const SMTExprRef &Tuple,
   }
   case SMTExprKind::TupleConst:
     return TE->Elements[Index];
-  case SMTExprKind::Ite:
-    return Solver.mkIte(TE->Cond,
-                        mkCamadaTupleSelect(Solver, TE->TrueTuple, Index),
-                        mkCamadaTupleSelect(Solver, TE->FalseTuple, Index));
+  case SMTExprKind::Ite: {
+    // A worklist with a memo rather than recursion: ite chains nest
+    // thousands deep, and DAGs that share branches would take exponential
+    // time (#311).
+    std::unordered_map<const SMTExpr *, SMTExprRef> Done;
+    std::vector<SMTExprRef> Stack{Tuple};
+    while (!Stack.empty()) {
+      const SMTExprRef Node = Stack.back();
+      if (Done.count(&*Node)) {
+        Stack.pop_back();
+        continue;
+      }
+      const CamadaTupleExpr *E = toCamadaTupleExpr(Node);
+      if (E->getKind() != SMTExprKind::Ite) {
+        Done.emplace(&*Node, mkCamadaTupleSelect(Solver, Node, Index));
+        Stack.pop_back();
+        continue;
+      }
+      auto T = Done.find(&*E->TrueTuple);
+      auto F = Done.find(&*E->FalseTuple);
+      if (T == Done.end() || F == Done.end()) {
+        if (T == Done.end())
+          Stack.push_back(E->TrueTuple);
+        if (F == Done.end())
+          Stack.push_back(E->FalseTuple);
+        continue;
+      }
+      SMTExprRef Result = Solver.mkIte(E->Cond, T->second, F->second);
+      Done.emplace(&*Node, Result);
+      Stack.pop_back();
+    }
+    return Done.at(&*Tuple);
+  }
   default:
     fatalError("Invalid CamadaTupleExpr SMTExprKind");
   }

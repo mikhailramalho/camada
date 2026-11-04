@@ -1304,10 +1304,9 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
   if (arrayMode() == ArrayEncoding::Ackermann) {
-    // Selects built for model evaluation must not mint reads or emit
-    // axioms; resolve them against the model instead.
-    SMTExprRef theExp = InLazyModelQuery ? resolveAckArrayElement(Array, Index)
-                                         : mkAckArraySelect(Array, Index);
+    // No InLazyModelQuery arm: only getArrayElement's non-Ackermann tail
+    // sets the flag, and the array mode is fixed per solver.
+    SMTExprRef theExp = mkAckArraySelect(Array, Index);
     assert(theExp->Sort == Array->Sort->getElementSort());
     return theExp;
   }
@@ -1913,10 +1912,9 @@ SMTResult<SMTExprRef> SMTSolverImpl::getArrayElement(const SMTExprRef &Array,
   // Ackermann-mode arrays have no backend term to evaluate; resolve from
   // the tracked derivation chain and the reads of the equality class.
   if (arrayMode() == ArrayEncoding::Ackermann) {
-    // The resolver compares indexes by their model bits, which only Bool
-    // and BV sorts produce. An Int-indexed array is perfectly legal on the
-    // backends that support Int, so report the gap instead of aborting.
-    if (!ackCanEvaluateIndexSort(Index->Sort))
+    // The resolver compares indexes by their model bits; report a sort
+    // that has none instead of aborting.
+    if (!lazyCanEvaluateIndexSort(Index->Sort))
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return resolveAckArrayElement(Array, Index);
   }
@@ -1969,11 +1967,10 @@ SMTResult<ArrayModel> SMTSolverImpl::getArrayValues(const SMTExprRef &Array) {
   if (lowersTuples(Array->Sort))
     return getCamadaTupleArrayValues(*this, Array);
   if (arrayMode() == ArrayEncoding::Ackermann) {
-    // Same limitation getArrayElement screens: the walk compares indexes by
-    // their model bits, which only Bool and BV sorts produce. Report the
-    // capability gap rather than the BackendError the walk would return,
-    // which reads as a solver malfunction.
-    if (!ackCanEvaluateIndexSort(Array->Sort->getIndexSort()))
+    // Same limitation getArrayElement screens. Report the capability gap
+    // rather than the BackendError the walk would return, which reads as a
+    // solver malfunction.
+    if (!lazyCanEvaluateIndexSort(Array->Sort->getIndexSort()))
       return ackUnsupportedIndexSort(Array->getBackendKind());
     return ackArrayModel(Array);
   }
@@ -2967,13 +2964,12 @@ SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
   return rewrapAs(theExp, SMTExprKind::BVRedAnd);
 }
 
-// Reversed operands: (a > b) iff (b < a).
-CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGtImpl,
-                                  SMTSolverImpl::mkFPLtImpl(RHS, LHS), FPGt)
+// Reversed operands: (a > b) iff (b < a). The public mkFPLt dispatches on
+// the encoding, so a backend's native fp.lt serves native operands.
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGtImpl, mkFPLt(RHS, LHS), FPGt)
 
-// Reversed operands: (a > b) iff (b < a).
-CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGeImpl,
-                                  SMTSolverImpl::mkFPLeImpl(RHS, LHS), FPGe)
+// Reversed operands: (a >= b) iff (b <= a).
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGeImpl, mkFPLe(RHS, LHS), FPGe)
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkTupleImpl, "Tuples",
                                const std::vector<SMTExprRef> &)

@@ -313,6 +313,26 @@ fxp_boundary_overflow_semantics(const camada::SMTSolverRef &solver) {
         mkConst(solver, F, 127)));
     REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
+  // The same rule for conversion: Q8.8 7.96875 (raw 2040) is past the
+  // Q3.4 max 7.9375 though it floors onto it, under every mode.
+  for (camada::FXPRM Mode :
+       {camada::FXPRM::TowardNegative, camada::FXPRM::TowardZero,
+        camada::FXPRM::NearestTiesToEven}) {
+    solver->reset();
+    RefFormat Src{16, 8, true};
+    solver->addConstraint(solver->mkFXPToFXPOverflow(mkConst(solver, Src, 2040),
+                                                     mkSort(solver, F), Mode));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
+  // u0.8 raw 255 (0.996) is past the s0.7 max 127/128.
+  {
+    solver->reset();
+    RefFormat U{8, 8, false}, S{8, 7, true};
+    solver->addConstraint(
+        solver->mkFXPToFXPOverflow(mkConst(solver, U, 255), mkSort(solver, S),
+                                   camada::FXPRM::TowardNegative));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
   // 127 * 16 = 2032 = max*16 exactly: representable, NOT an overflow.
   {
     solver->reset();
@@ -835,7 +855,7 @@ inline unsigned refCountls(const RefFormat &F, uint64_t Raw) {
 
 inline void fxp_abs_countls_semantics(const camada::SMTSolverRef &solver) {
   // Exhaustive over every format up to 6 bits, both signednesses.
-  for (unsigned Width = 2; Width <= 6; ++Width) {
+  for (unsigned Width = 1; Width <= 6; ++Width) {
     for (unsigned Frac = 0; Frac < Width; ++Frac) {
       for (bool Signed : {true, false}) {
         if (Signed && Frac + 1 > Width - 1)
@@ -857,6 +877,17 @@ inline void fxp_abs_countls_semantics(const camada::SMTSolverRef &solver) {
         REQUIRE(solver->check() == camada::CheckResult::SAT);
       }
     }
+  }
+
+  // A 1-bit signed format has no payload past the sign bit; countls
+  // used to build an out-of-range extract here.
+  {
+    solver->reset();
+    camada::SMTExprRef X =
+        solver->mkSymbol("fxp_cls_s1", solver->mkFXPSort(1, 0, true));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(
+        solver->mkFXPCountls(X, 8), solver->mkBVFromDec(0, 8))));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
 
   // The saturating case that distinguishes mkFXPAbs from the obvious
@@ -1331,6 +1362,34 @@ inline void fxp_fp_conversion_semantics(const camada::SMTSolverRef &solver,
             solver->mkFXPFromBin(refBits(RefFormat{16, 15, true}, 0xa667),
                                  To)));
     solver->addConstraint(Ok);
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
+
+  // Round-to-away modes work on every backend, including MathSAT, which
+  // has no native round-to-away and used to abort here. -2.5 is a tie:
+  // away gives -3, ties toward +inf gives -2. 2^24 + 1 is a binary32 tie
+  // that away rounds up to 2^24 + 2 (0x4b800001).
+  {
+    solver->reset();
+    camada::SMTSortRef To = solver->mkFXPSort(16, 0, true);
+    camada::SMTExprRef V = solver->mkFPFromBin(
+        refBits(RefFormat{32, 0, false}, 0xc0200000u), 8, Enc);
+    auto C = [&](uint64_t Raw) {
+      return solver->mkFXPFromBin(refBits(RefFormat{16, 0, true}, Raw), To);
+    };
+    camada::SMTExprRef X =
+        solver->mkFXPFromBin(refBits(RefFormat{32, 0, true}, (1u << 24) + 1),
+                             solver->mkFXPSort(32, 0, true));
+    solver->addConstraint(solver->mkFXPEqual(
+        solver->mkFPToFXP(V, To, camada::FXPRM::NearestTiesAwayFromZero),
+        C(uint64_t(-3) & 0xFFFF)));
+    solver->addConstraint(solver->mkFXPEqual(
+        solver->mkFPToFXP(V, To, camada::FXPRM::NearestTiesTowardPositive),
+        C(uint64_t(-2) & 0xFFFF)));
+    solver->addConstraint(solver->mkEqual(
+        solver->mkIEEEFPToBV(solver->mkFXPToFP(X, solver->mkFP32Sort(Enc),
+                                               camada::RM::ROUND_TO_AWAY)),
+        solver->mkBVFromDec(0x4b800001, 32)));
     REQUIRE(solver->check() == camada::CheckResult::SAT);
   }
 

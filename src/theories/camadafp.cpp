@@ -595,19 +595,14 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
-  std::size_t ebits = LHS->Sort->getFPExponentWidth();
-  std::size_t sbits = LHS->Sort->getFPSignificandBits();
+  unsigned ebits = LHS->Sort->getFPExponentWidth();
+  unsigned sbits = LHS->Sort->getFPSignificandBits();
 
-  SMTExprRef nan = mkFPNaN(*this, static_cast<unsigned>(ebits),
-                           static_cast<unsigned>(sbits), false);
-  SMTExprRef nzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), true);
-  SMTExprRef pzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), false);
-  SMTExprRef ninf = mkFPInf(*this, static_cast<unsigned>(ebits),
-                            static_cast<unsigned>(sbits), true);
-  SMTExprRef pinf = mkFPInf(*this, static_cast<unsigned>(ebits),
-                            static_cast<unsigned>(sbits), false);
+  SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
+  SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
+  SMTExprRef pzero = mkFPZero(*this, ebits, sbits, false);
+  SMTExprRef ninf = mkFPInf(*this, ebits, sbits, true);
+  SMTExprRef pinf = mkFPInf(*this, ebits, sbits, false);
 
   SMTExprRef x_is_nan = mkFPIsNaN(LHS);
   SMTExprRef x_is_zero = mkFPIsZero(LHS);
@@ -1108,15 +1103,12 @@ SMTExprRef SMTSolverImpl::mkFPAddImpl(const SMTExprRef &LHS,
   assert(LHS->getWidth() == RHS->getWidth());
   assert(LHS->Sort->getFPExponentWidth() == RHS->Sort->getFPExponentWidth());
 
-  std::size_t ebits = LHS->Sort->getFPExponentWidth();
-  std::size_t sbits = LHS->Sort->getFPSignificandBits();
+  unsigned ebits = LHS->Sort->getFPExponentWidth();
+  unsigned sbits = LHS->Sort->getFPSignificandBits();
 
-  SMTExprRef nan = mkFPNaN(*this, static_cast<unsigned>(ebits),
-                           static_cast<unsigned>(sbits), false);
-  SMTExprRef nzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), true);
-  SMTExprRef pzero = mkFPZero(*this, static_cast<unsigned>(ebits),
-                              static_cast<unsigned>(sbits), false);
+  SMTExprRef nan = mkFPNaN(*this, ebits, sbits, false);
+  SMTExprRef nzero = mkFPZero(*this, ebits, sbits, true);
+  SMTExprRef pzero = mkFPZero(*this, ebits, sbits, false);
 
   SMTExprRef x_is_nan = mkFPIsNaN(LHS);
   SMTExprRef x_is_zero = mkFPIsZero(LHS);
@@ -1660,7 +1652,6 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
   if (from_sbits == to_sbits && from_ebits == to_ebits)
     return From;
 
-  SMTExprRef one1 = mkBVOne1(*this);
   SMTExprRef pinf = mkFPInf(*this, to_ebits, to_sbits, false);
   SMTExprRef ninf = mkFPInf(*this, to_ebits, to_sbits, true);
 
@@ -1730,8 +1721,6 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
   res_sig = mkBVZeroExt(res_sig, 1);
   assert(res_sig->getWidth() == to_sbits + 4);
 
-  SMTExprRef exponent_overflow = mkBool(false);
-
   SMTExprRef res_exp;
   if (from_ebits < (to_ebits + 2)) {
     res_exp = mkBVSignExt(exp, to_ebits - from_ebits + 2);
@@ -1745,7 +1734,8 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
     unsigned ebits_diff = from_ebits - (to_ebits + 2);
 
     // subtract lz for subnormal numbers.
-    SMTExprRef exp_sub_lz = mkBVSub(mkBVSignExt(exp, 2), mkBVSignExt(lz, 2));
+    // lz is unsigned (the narrow branch above zero-extends it too).
+    SMTExprRef exp_sub_lz = mkBVSub(mkBVSignExt(exp, 2), mkBVZeroExt(lz, 2));
 
     // check whether exponent is within roundable (to_ebits+2) range.
     SMTExprRef max_exp = mkBVConcat(
@@ -1775,13 +1765,8 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
 
   SMTExprRef rounded = round(R, res_sgn, res_sig, res_exp, to_ebits, to_sbits);
 
-  SMTExprRef is_neg = mkEqual(sgn, one1);
-  SMTExprRef sig_inf = mkIte(is_neg, ninf, pinf);
-
-  SMTExprRef v6 = mkIte(exponent_overflow, sig_inf, rounded);
-
   // And finally, we tie them together.
-  SMTExprRef result = mkIte(c5, v5, v6);
+  SMTExprRef result = mkIte(c5, v5, rounded);
   result = mkIte(c4, v4, result);
   result = mkIte(c3, v3, result);
   result = mkIte(c2, v2, result);
@@ -1953,10 +1938,11 @@ SMTExprRef SMTSolverImpl::mkToBV(const SMTExprRef &Exp, bool isSigned,
   if (ebits + 2 < big_sig_sz)
     shift = mkBVZeroExt(shift, big_sig_sz - ebits - 2);
   else if (ebits + 2 > big_sig_sz) {
-    SMTExprRef upper = mkBVExtract(big_sig_sz, ebits + 2, shift);
-    shift = mkBVExtract(ebits + 1, 0, shift);
+    // Keep the low big_sig_sz bits, saturating if any upper bit is set.
+    SMTExprRef upper = mkBVExtract(ebits + 1, big_sig_sz, shift);
+    shift = mkBVExtract(big_sig_sz - 1, 0, shift);
     shift = mkIte(mkEqual(upper, mkBVFromDec(0, upper->getWidth())), shift,
-                  mkBVFromDec(big_sig_sz - 1, ebits + 2));
+                  mkBVFromDec(big_sig_sz - 1, big_sig_sz));
   }
   assert(shift->getWidth() == big_sig->getWidth());
 
@@ -2223,10 +2209,11 @@ SMTExprRef SMTSolverImpl::mkRMImpl(const RM &R) {
 
 SMTExprRef SMTSolverImpl::mkNaNImpl(const bool Sgn, const unsigned ExpWidth,
                                     const unsigned SigWidth) {
-  // we always create the same NaN: sgn = Sgn, exp = all 1, sig = 0...01
+  // Always the same quiet NaN (IEEE-754 7.2): sgn = Sgn, exp = all 1,
+  // sig = 10...0.
   SMTExprRef theExp =
       packFP(*this, mkSgnBit(*this, Sgn), mkTopExp(*this, ExpWidth),
-             mkBVFromDec(1, SigWidth - 1));
+             mkBVFromBin("1" + std::string(SigWidth - 2, '0'), SigWidth - 1));
   return rewrapAs(theExp, SMTExprKind::FPConst);
 }
 
@@ -2467,10 +2454,6 @@ SMTResult<RM> SMTSolverImpl::getRMImpl(const SMTExprRef &Exp) {
     for (const RM Mode :
          {RM::ROUND_TO_EVEN, RM::ROUND_TO_AWAY, RM::ROUND_TO_PLUS_INF,
           RM::ROUND_TO_MINUS_INF, RM::ROUND_TO_ZERO}) {
-      // MathSAT aborts on a native round-to-away term; skip the mode it
-      // cannot represent rather than build it.
-      if (Mode == RM::ROUND_TO_AWAY && !nativeRoundToAwaySupport())
-        continue;
       SMTResult<bool> Same =
           getBool(mkEqual(Exp, mkRM(Mode, FPEncoding::Native)));
       if (!Same)

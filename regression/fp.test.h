@@ -1306,6 +1306,12 @@ inline void fp_to_fp_subnormal_source(const camada::SMTSolverRef &solver) {
       // binary16 2^-24 is far below (3,4)'s smallest subnormal.
       {"0000000000000001", 5, 3, 4, camada::RM::ROUND_TO_EVEN, "00000000"},
       {"0000000000000001", 5, 3, 4, camada::RM::ROUND_TO_PLUS_INF, "00000001"},
+      // (5,16)'s smallest subnormal has 16 leading zeros, which set the top
+      // bit of the 5-bit count; sign-extending it gave 4.0.
+      {"0000000000000000000001", 5, 3, 4, camada::RM::ROUND_TO_EVEN,
+       "00000000"},
+      {"0000000000000000000001", 5, 3, 4, camada::RM::ROUND_TO_PLUS_INF,
+       "00000001"},
       // binary32's smallest subnormal is far below (5,15)'s.
       {"00000000000000000000000000000001", 8, 5, 15, camada::RM::ROUND_TO_EVEN,
        "000000000000000000000"},
@@ -1462,7 +1468,7 @@ inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
   }
 
   // An invalid operation on non-NaN operands still builds a fresh NaN:
-  // there is no input payload to carry.
+  // there is no input payload to carry. IEEE-754 7.2 makes it quiet.
   solver->reset();
   {
     auto rm = solver->mkRM(camada::RM::ROUND_TO_EVEN, Enc);
@@ -1473,7 +1479,6 @@ inline void fp_nan_payload_propagation(const camada::SMTSolverRef &solver) {
     REQUIRE(solver->check() == camada::CheckResult::SAT);
     auto v = solver->getBVInBin(rb);
     REQUIRE(v);
-    REQUIRE(v.value() != QA);
-    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    REQUIRE(v.value() == "01111111110000000000000000000000");
   }
 }

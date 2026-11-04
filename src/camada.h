@@ -464,7 +464,8 @@ public:
   // a C memory model does.
   //
   // An invalid operation on non-NaN operands (0/0, inf - inf, sqrt of a
-  // negative) has no payload to carry and builds a fresh NaN. mkFPAbs
+  // negative) has no payload to carry and builds the canonical quiet NaN
+  // (0x7FC00000 in binary32). mkFPAbs
   // keeps the payload and clears the sign without quieting, since
   // IEEE-754 treats it as a non-computational bit manipulation.
   // mkFPToFP moves the payload into the target format the way hardware

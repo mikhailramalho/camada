@@ -307,6 +307,25 @@ inline void ack_fp_element_semantics(const camada::SMTSolverRef &solver) {
   REQUIRE(solver->getFP32(at9));
 }
 
+// Native rounding-mode elements: an unconstrained read used to abort
+// because the default synthesis had no RM arm. Kept out of the flat
+// driver: the STP pipe child has no FP theory.
+inline void ack_rm_element_default(const camada::SMTSolverRef &solver) {
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+  auto a = solver->mkSymbol(
+      "a", solver->mkArraySort(solver->mkBVSort(8),
+                               solver->mkRMSort(camada::FPEncoding::Native)));
+  solver->addConstraint(solver->mkEqual(
+      solver->mkArraySelect(a, solver->mkBVFromDec(1, 8)),
+      solver->mkRM(camada::RM::ROUND_TO_ZERO, camada::FPEncoding::Native)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto at1 = solver->getRM(arrayElement(solver, a, solver->mkBVFromDec(1, 8)));
+  REQUIRE(at1);
+  REQUIRE(at1.value() == camada::RM::ROUND_TO_ZERO);
+  REQUIRE(solver->getRM(arrayElement(solver, a, solver->mkBVFromDec(3, 8))));
+}
+
 // checkSatAssuming over array constraints: congruence axioms are ordinary
 // journaled constraints, so they survive whichever mechanism the backend
 // uses (native assumptions or the push/assert/check/pop fallback).
@@ -362,12 +381,9 @@ ack_dump_model_skips_camada_nodes(const camada::SMTSolverRef &solver) {
   REQUIRE(Dump.find("__CAMADA_ackread") != std::string::npos);
 }
 
-// The Ackermann resolver compares indexes by their model bits, which only
-// Bool and BV sorts produce. An Int-indexed array is legal on the backends
-// that support Int, so the query must report the gap rather than abort --
-// it used to kill the process from ordinary public API use.
-inline void
-ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
+// The Ackermann resolver compares indexes by their model bits, which
+// Bool, BV, Int and Real produce. Int indexes used to be screened out.
+inline void ack_int_index_model(const camada::SMTSolverRef &solver) {
   if (!solver->supports(camada::SolverFeature::IntRealArithmetic))
     return;
   // The SMT-LIB pipeline drives a child that may reject Int outright (the
@@ -383,6 +399,31 @@ ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(solver->mkArraySelect(arr, i),
                                         solver->mkBVFromDec(7, 8)));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
+  auto Elem = solver->getArrayElement(arr, solver->mkInt(int64_t(1)));
+  REQUIRE(Elem);
+  auto V = solver->getBV(Elem.value());
+  REQUIRE(V);
+  REQUIRE(V.value() == 7);
+  auto Values = solver->getArrayValues(arr);
+  REQUIRE(Values);
+  REQUIRE(Values.value().Entries.size() == 1);
+}
+
+// A native FP index has no model bits, so the query must report the gap
+// rather than abort -- it used to kill the process from ordinary public
+// API use.
+inline void
+ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
+  if (!solver->supports(camada::SolverFeature::NativeFloatingPoint) ||
+      solver->getSolverNameAndVersion().compare(0, 6, "SMTLIB") == 0)
+    return;
+  auto fpsort = solver->mkFP32Sort(camada::FPEncoding::Native);
+  auto arr = solver->mkSymbol("ackfp_arr",
+                              solver->mkArraySort(fpsort, solver->mkBVSort(8)));
+  auto i = solver->mkSymbol("ackfp_i", fpsort);
+  solver->addConstraint(solver->mkEqual(solver->mkArraySelect(arr, i),
+                                        solver->mkBVFromDec(7, 8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
   auto Elem = solver->getArrayElement(arr, i);
   REQUIRE_FALSE(Elem);
   REQUIRE(Elem.error().Code == camada::SMTErrorCode::UnsupportedOperation);
@@ -393,8 +434,25 @@ ack_unsupported_index_sort_reports(const camada::SMTSolverRef &solver) {
   REQUIRE(Values.error().Code == camada::SMTErrorCode::UnsupportedOperation);
 }
 
+// A select used to recurse once per store and overflowed the stack at
+// about 7.5k stores, a normal depth for ESBMC memory models.
+inline void ack_deep_store_chain(const camada::SMTSolverRef &solver) {
+  auto bv = solver->mkBVSort(32);
+  auto a = solver->mkSymbol("deep_a", solver->mkArraySort(bv, bv));
+  auto k = solver->mkSymbol("deep_k", bv);
+  for (int I = 0; I < 20000; ++I)
+    a = solver->mkArrayStore(a, solver->mkBVAdd(k, solver->mkBVFromDec(I, 32)),
+                             solver->mkBVFromDec(I, 32));
+  auto sel = solver->mkArraySelect(a, solver->mkSymbol("deep_j", bv));
+  REQUIRE(sel->Sort == bv);
+}
+
 inline void ack_array_tests_flat(const camada::SMTSolverRef &solver) {
   ack_unsupported_index_sort_reports(solver);
+  solver->reset();
+  ack_int_index_model(solver);
+  solver->reset();
+  ack_deep_store_chain(solver);
   solver->reset();
   ack_dump_model_skips_camada_nodes(solver);
   solver->reset();
@@ -430,6 +488,8 @@ inline void ack_array_tests(const camada::SMTSolverRef &solver) {
   ack_ite_array_semantics(solver);
   solver->reset();
   ack_const_array_semantics(solver);
+  solver->reset();
+  ack_rm_element_default(solver);
 }
 
 #endif
