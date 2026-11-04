@@ -1304,10 +1304,9 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
   if (arrayMode() == ArrayEncoding::Ackermann) {
-    // Selects built for model evaluation must not mint reads or emit
-    // axioms; resolve them against the model instead.
-    SMTExprRef theExp = InLazyModelQuery ? resolveAckArrayElement(Array, Index)
-                                         : mkAckArraySelect(Array, Index);
+    // No InLazyModelQuery arm: only getArrayElement's non-Ackermann tail
+    // sets the flag, and the array mode is fixed per solver.
+    SMTExprRef theExp = mkAckArraySelect(Array, Index);
     assert(theExp->Sort == Array->Sort->getElementSort());
     return theExp;
   }
