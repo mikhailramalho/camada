@@ -648,6 +648,7 @@ inline void tests_camada_tuples(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_with_array_field);
   RESETANDTEST(tuple_array_semantics);
   RESETANDTEST(tuple_update_semantics);
+  RESETANDTEST(tuple_bvrm_field_model);
   RESETANDTEST(tuple_deep_ite_select);
 }
 
