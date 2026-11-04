@@ -1304,10 +1304,9 @@ SMTExprRef SMTSolverImpl::mkArraySelect(const SMTExprRef &Array,
   if (!InLazyModelQuery)
     observeArrayIndex(Index);
   if (arrayMode() == ArrayEncoding::Ackermann) {
-    // Selects built for model evaluation must not mint reads or emit
-    // axioms; resolve them against the model instead.
-    SMTExprRef theExp = InLazyModelQuery ? resolveAckArrayElement(Array, Index)
-                                         : mkAckArraySelect(Array, Index);
+    // No InLazyModelQuery arm: only getArrayElement's non-Ackermann tail
+    // sets the flag, and the array mode is fixed per solver.
+    SMTExprRef theExp = mkAckArraySelect(Array, Index);
     assert(theExp->Sort == Array->Sort->getElementSort());
     return theExp;
   }
@@ -2965,13 +2964,12 @@ SMTExprRef SMTSolverImpl::mkBVRedAndImpl(const SMTExprRef &Exp) {
   return rewrapAs(theExp, SMTExprKind::BVRedAnd);
 }
 
-// Reversed operands: (a > b) iff (b < a).
-CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGtImpl,
-                                  SMTSolverImpl::mkFPLtImpl(RHS, LHS), FPGt)
+// Reversed operands: (a > b) iff (b < a). The public mkFPLt dispatches on
+// the encoding, so a backend's native fp.lt serves native operands.
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGtImpl, mkFPLt(RHS, LHS), FPGt)
 
-// Reversed operands: (a > b) iff (b < a).
-CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGeImpl,
-                                  SMTSolverImpl::mkFPLeImpl(RHS, LHS), FPGe)
+// Reversed operands: (a >= b) iff (b <= a).
+CAMADA_DEFINE_DERIVED_BINARY_IMPL(mkFPGeImpl, mkFPLe(RHS, LHS), FPGe)
 
 CAMADA_DEFINE_UNSUPPORTED_IMPL(SMTExprRef, mkTupleImpl, "Tuples",
                                const std::vector<SMTExprRef> &)

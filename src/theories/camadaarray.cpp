@@ -231,30 +231,43 @@ SMTExprRef SMTSolverImpl::mkAckArrayConst(const SMTSortRef &IndexSort,
 
 SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
                                            const SMTExprRef &Index) {
-  const CamadaAckArrayExpr *AE = requireAckArrayExpr(Array);
+  requireAckArrayExpr(Array);
   auto BitsIt = AckBVConstBits.find(&*Index);
   const bool IndexIsConst = BitsIt != AckBVConstBits.end();
 
-  switch (AE->getKind()) {
-  case SMTExprKind::ArrayStore:
-  case SMTExprKind::Ite: {
-    // Chain nodes are shared by construction, so memoize the lowered
-    // select per (node, index): repeated selects reuse one term instead
-    // of rebuilding the ite cascade. Constant indexes key by value,
-    // mirroring the read canonicalization at symbol roots below.
-    {
-      AckSelectMemoState &Memo = AckSelectMemo[&*Array];
-      if (IndexIsConst) {
-        if (auto It = Memo.ByConstBits.find(BitsIt->second);
-            It != Memo.ByConstBits.end())
-          return It->second;
-      } else if (auto It = Memo.ByIndex.find(&*Index);
-                 It != Memo.ByIndex.end()) {
-        return It->second;
-      }
+  // Chain nodes are shared by construction, so memoize the lowered select
+  // per (node, index): repeated selects reuse one term instead of
+  // rebuilding the ite cascade. Constant indexes key by value, mirroring
+  // the read canonicalization at symbol roots. Leaves are cheap to
+  // revisit and only memoized for this call.
+  std::unordered_map<const SMTExpr *, SMTExprRef> Leaves;
+  const auto Lowered = [&](const SMTExprRef &Node) -> SMTExprRef {
+    if (auto It = Leaves.find(&*Node); It != Leaves.end())
+      return It->second;
+    auto MemoIt = AckSelectMemo.find(&*Node);
+    if (MemoIt == AckSelectMemo.end())
+      return SMTExprRef();
+    if (IndexIsConst) {
+      auto It = MemoIt->second.ByConstBits.find(BitsIt->second);
+      return It != MemoIt->second.ByConstBits.end() ? It->second : SMTExprRef();
     }
+    auto It = MemoIt->second.ByIndex.find(&*Index);
+    return It != MemoIt->second.ByIndex.end() ? It->second : SMTExprRef();
+  };
+
+  // A worklist rather than recursion: store chains in ESBMC memory models
+  // run thousands of levels deep, past one stack frame per level (#311).
+  std::vector<SMTExprRef> Stack{Array};
+  while (!Stack.empty()) {
+    const SMTExprRef Node = Stack.back();
+    if (Lowered(Node)) {
+      Stack.pop_back();
+      continue;
+    }
+    const auto *AE = static_cast<const CamadaAckArrayExpr *>(&*Node);
     SMTExprRef Result;
-    if (AE->getKind() == SMTExprKind::ArrayStore) {
+    switch (AE->getKind()) {
+    case SMTExprKind::ArrayStore: {
       // Host-side fold before emitting anything: a select whose index is
       // syntactically the stored index (same object, or equal BV-constant
       // bits) hits the store; two distinct BV constants provably miss and
@@ -262,34 +275,56 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
       auto StoreBitsIt = AckBVConstBits.find(&*AE->Index);
       const bool StoreIsConst = StoreBitsIt != AckBVConstBits.end();
       if (&*Index == &*AE->Index || (IndexIsConst && StoreIsConst &&
-                                     BitsIt->second == StoreBitsIt->second))
+                                     BitsIt->second == StoreBitsIt->second)) {
         Result = AE->Element;
-      else if (IndexIsConst && StoreIsConst)
-        Result = mkAckArraySelect(AE->Base, Index);
-      else
-        Result = mkIte(mkEqual(Index, AE->Index), AE->Element,
-                       mkAckArraySelect(AE->Base, Index));
-    } else {
-      Result = mkIte(AE->Cond, mkAckArraySelect(AE->TrueArr, Index),
-                     mkAckArraySelect(AE->FalseArr, Index));
+        break;
+      }
+      SMTExprRef Base = Lowered(AE->Base);
+      if (!Base) {
+        Stack.push_back(AE->Base);
+        continue;
+      }
+      Result = IndexIsConst && StoreIsConst
+                   ? Base
+                   : mkIte(mkEqual(Index, AE->Index), AE->Element, Base);
+      break;
     }
-    // Fresh lookup: the recursion above inserts into AckSelectMemo, which
-    // can rehash and invalidate any reference held across it.
-    AckSelectMemoState &Memo = AckSelectMemo[&*Array];
+    case SMTExprKind::Ite: {
+      SMTExprRef T = Lowered(AE->TrueArr), F = Lowered(AE->FalseArr);
+      if (!T)
+        Stack.push_back(AE->TrueArr);
+      if (!F)
+        Stack.push_back(AE->FalseArr);
+      if (!T || !F)
+        continue;
+      Result = mkIte(AE->Cond, T, F);
+      break;
+    }
+    case SMTExprKind::ArrayConst:
+      Leaves.emplace(&*Node, AE->Init);
+      Stack.pop_back();
+      continue;
+    case SMTExprKind::Symbol:
+      Leaves.emplace(&*Node, mkAckRootRead(Node, Index));
+      Stack.pop_back();
+      continue;
+    default:
+      fatalError("Invalid CamadaAckArrayExpr SMTExprKind");
+    }
+    AckSelectMemoState &Memo = AckSelectMemo[&*Node];
     if (IndexIsConst)
       Memo.ByConstBits.emplace(BitsIt->second, Result);
     else
       Memo.ByIndex.emplace(&*Index, Result);
-    return Result;
+    Stack.pop_back();
   }
-  case SMTExprKind::ArrayConst:
-    return AE->Init;
-  case SMTExprKind::Symbol:
-    break;
-  default:
-    fatalError("Invalid CamadaAckArrayExpr SMTExprKind");
-  }
+  return Lowered(Array);
+}
 
+SMTExprRef SMTSolverImpl::mkAckRootRead(const SMTExprRef &Array,
+                                        const SMTExprRef &Index) {
+  auto BitsIt = AckBVConstBits.find(&*Index);
+  const bool IndexIsConst = BitsIt != AckBVConstBits.end();
   // Symbol root: mint (or reuse) the Ackermann read for this index.
   // BV-constant indexes are canonicalized by value so equal constants
   // share one read; every other index term keys by object identity —
@@ -309,9 +344,9 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
   SMTExprRef Read =
       mkSymbolUnchecked("__CAMADA_ackread" + std::to_string(AckArrayCounter++),
                         Array->Sort->getElementSort());
-  // Cache-insert before emitting axioms, and iterate over a copy: the
-  // constraints below go through public wrappers, matching the existing
-  // lazy-machinery discipline against re-entrant construction.
+  // Cache-insert before emitting axioms: the constraints below go through
+  // public wrappers, matching the existing lazy-machinery discipline
+  // against re-entrant construction.
   const std::size_t Pos = Root.Reads.size();
   Root.Reads.push_back(
       AckArrayRead{Index, Read, IndexIsConst,
@@ -321,15 +356,18 @@ SMTExprRef SMTSolverImpl::mkAckArraySelect(const SMTExprRef &Array,
   else
     Root.ReadsByIndex.emplace(&*Index, Pos);
 
-  const std::vector<AckArrayRead> Prior(Root.Reads.begin(),
-                                        Root.Reads.end() - 1);
-  for (const AckArrayRead &P : Prior) {
+  // Index by position and copy the handles out: re-entrant construction
+  // may grow Root.Reads (Root itself stays put: AckArrayRoots is an
+  // unordered_map). Copying the whole vector made n reads cost O(n^2).
+  for (std::size_t I = 0; I < Pos; ++I) {
     // Two distinct BV-constant indexes cannot alias (equal values share
     // one read by construction), so their congruence axiom is skipped.
-    if (IndexIsConst && P.IndexIsConst)
+    if (IndexIsConst && Root.Reads[I].IndexIsConst)
       continue;
+    const SMTExprRef PIndex = Root.Reads[I].Index;
+    const SMTExprRef PValue = Root.Reads[I].Value;
     SMTExprRef Constraint =
-        mkImplies(mkEqual(Index, P.Index), mkEqual(Read, P.Value));
+        mkImplies(mkEqual(Index, PIndex), mkEqual(Read, PValue));
     // Not model-preserving: Read is a fresh variable minted for this
     // select, so the backend's current model has no value for it and
     // asserting the axiom genuinely discards that model.
@@ -460,6 +498,9 @@ void SMTSolverImpl::ackClassValue(const SMTExprRef &Array,
 SMTExprRef SMTSolverImpl::ackDefaultElementValue(const SMTSortRef &Sort) {
   if (Sort->isBoolSort())
     return mkBool(false);
+  if (Sort->isRMSort())
+    return mkRM(RM::ROUND_TO_EVEN,
+                Sort->isBVRMSort() ? FPEncoding::BV : FPEncoding::Native);
   // FP first: BVFP sorts answer true to isBVSort() too.
   if (Sort->isFPSort())
     return mkFPFromBin(
@@ -475,8 +516,9 @@ SMTExprRef SMTSolverImpl::ackDefaultElementValue(const SMTSortRef &Sort) {
              "sort under the Ackermann array encoding");
 }
 
-SMTExprRef SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
-                                                 const SMTExprRef &Index) {
+SMTResult<SMTExprRef>
+SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
+                                      const SMTExprRef &Index) {
   const std::string QueryBits = lazyIndexModelBits(Index);
   // getArrayElement screens the index sort through lazyCanEvaluateIndexSort
   // and its ModelAvailable gate rejects a model-less query, so reaching
@@ -488,9 +530,10 @@ SMTExprRef SMTSolverImpl::resolveAckArrayElement(const SMTExprRef &Array,
 
   AckClassWalk Walk;
   ackClassValue(Array, QueryBits, Walk);
-  fatalErrorIf(Walk.Failed,
-               "Could not walk the array derivation chain against the "
-               "model under the Ackermann array encoding");
+  if (Walk.Failed)
+    return SMTError{SMTErrorCode::BackendError, backendKind(),
+                    "Could not walk the array derivation chain against the "
+                    "model under the Ackermann array encoding"};
   if (Walk.Value)
     return Walk.Value;
 
