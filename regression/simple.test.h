@@ -1287,6 +1287,10 @@ inline void arith_symbolic_shift_semantics(const camada::SMTSolverRef &solver) {
   solver->addConstraint(solver->mkEqual(x, solver->mkInt("5")));
   solver->addConstraint(solver->mkEqual(k, solver->mkInt("3")));
   solver->addConstraint(solver->mkEqual(shl_expr, solver->mkInt("40")));
+  // The shift is an Int, so dividing it is integer division. Z3 before 5.4
+  // built 2^k as a Real, which made this real division (40/3, not 13).
+  solver->addConstraint(solver->mkEqual(
+      solver->mkArithDiv(shl_expr, solver->mkInt("3")), solver->mkInt("13")));
   REQUIRE(solver->check() == camada::CheckResult::SAT);
 }
 
