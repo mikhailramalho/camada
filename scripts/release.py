@@ -167,17 +167,18 @@ if __name__ == '__main__':
         solver_archives.extend(
             copy_release_dependency("**/libbitwuzla*.a", deps_install_dir,
                                     release_lib_dir))
-        # CVC5 and its bundled polynomial libraries. Both CVC5 and Bitwuzla
-        # reference CaDiCaL, so it follows them below.
+        # CVC5 and its bundled polynomial libraries. CVC5 references CaDiCaL,
+        # so it follows below.
         for archive in ("lib/libcvc5.a", "lib/libpicpoly.a",
                         "lib/libpicpolyxx.a"):
             solver_archives.extend(
                 copy_release_dependency(archive, deps_install_dir,
                                         release_lib_dir))
-        # Bitwuzla and CVC5 are built against the shared CaDiCaL rather than
-        # bundling their own, so the package has to ship it. It lives outside
-        # deps/install on purpose (see CAMADA_CADICAL_PREFIX), and comes
-        # after both on the link line because both reference it.
+        # CVC5 is built against the shared CaDiCaL rather than bundling its
+        # own, so the package has to ship it. It lives outside deps/install on
+        # purpose (see CAMADA_CADICAL_PREFIX), and comes after CVC5 on the link
+        # line because CVC5 references it. Bitwuzla carries its own, renamed
+        # copy inside libbitwuzla.a.
         solver_archives.extend(
             copy_release_dependency(
                 "lib/libcadical.a",

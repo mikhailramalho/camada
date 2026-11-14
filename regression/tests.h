@@ -664,9 +664,8 @@ inline void tests_nesting(const camada::SMTSolverRef &solver) {
 }
 
 // The same nested constant-array shapes under the eager (native) lowering.
-// Separate from tests_nesting because Bitwuzla cannot run these: a native
-// constant array used as an array element always reaches its array solver,
-// which answers UNKNOWN for CONST_ARRAY terms (a matrix exclusion).
+// Separate from tests_nesting so a backend whose array solver cannot reason
+// about native constant arrays can opt out (Bitwuzla before 0.10 did).
 inline void tests_nesting_native_const(const camada::SMTSolverRef &solver) {
   RESETANDTEST(tuple_array_const_nested);
   RESETANDTEST(nested_const_array_semantics);

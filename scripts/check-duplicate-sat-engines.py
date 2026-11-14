@@ -2,10 +2,10 @@
 """Fail when two copies of one SAT engine reach a single static link.
 
 Backends ship their SAT solver differently: CVC5 keeps CaDiCaL in its own
-libcadical.a, Bitwuzla's upstream prebuilt compiles CaDiCaL *into*
-libbitwuzla.a. Linking both statically keeps one definition of each shared
-symbol, but each library's code still computes member offsets from the
-headers it was built against. CVC5 builds CaDiCaL with -DQUIET, which drops
+libcadical.a, Bitwuzla compiles CaDiCaL *into* libbitwuzla.a (Camada renames
+that copy's namespace). Linking two copies statically keeps one definition of
+each shared symbol, but each library's code still computes member offsets
+from the headers it was built against. CVC5 builds CaDiCaL with -DQUIET, which drops
 two members from the middle of CaDiCaL::Internal, so the survivor reads every
 later field at the wrong offset -- Bitwuzla sized a Walker allocation from
 garbage and asked for 8 GB while solving one VCC.
@@ -27,13 +27,14 @@ import subprocess
 import sys
 
 # Namespace or symbol prefixes that identify a bundled SAT engine. A second
-# archive defining the same engine's *strong* symbols is the failure.
+# archive defining the same engine's *strong* symbols is the failure. Mach-O
+# prefixes every symbol with one more underscore, hence the optional "_".
 SAT_ENGINES = {
-    "CaDiCaL": re.compile(r"^_ZN7CaDiCaL"),
-    "CryptoMiniSat": re.compile(r"^_ZN5CMSat"),
-    "Kissat": re.compile(r"^kissat_"),
-    "MiniSat": re.compile(r"^_ZN7Minisat"),
-    "Glucose": re.compile(r"^_ZN7Glucose"),
+    "CaDiCaL": re.compile(r"^_?_ZN7CaDiCaL"),
+    "CryptoMiniSat": re.compile(r"^_?_ZN5CMSat"),
+    "Kissat": re.compile(r"^_?kissat_"),
+    "MiniSat": re.compile(r"^_?_ZN7Minisat"),
+    "Glucose": re.compile(r"^_?_ZN7Glucose"),
 }
 
 
@@ -76,9 +77,8 @@ def engines_in(archive):
     whether those symbols are exported or localized.
 
     A localized copy is not a conflict: the linker cannot substitute it for
-    anyone else's, which is the whole reason a build localizes one. Camada
-    does exactly this for CryptoMiniSat's CaDiCaL fork, which would otherwise
-    collide with the one Bitwuzla and CVC5 share."""
+    anyone else's, which is the whole reason a build localizes one, as STP
+    does for the MiniSat inside libstp.a."""
     exported, everything = strong_symbols(archive)
     found = {}
     for engine, pattern in SAT_ENGINES.items():
@@ -187,8 +187,8 @@ def main():
             print(f"  {archive}  ({count} strong symbols)", file=sys.stderr)
     print("\nA link keeps one definition of each shared symbol while every "
           "library\nkeeps the field offsets it was compiled with. Build the "
-          "backends against\none copy of the engine; Camada does this for "
-          "CaDiCaL whenever the Bitwuzla\nand CVC5 backends are both enabled.",
+          "backends against\none copy of the engine, or rename one copy as "
+          "Camada does for Bitwuzla's CaDiCaL.",
           file=sys.stderr)
     return 1
 
