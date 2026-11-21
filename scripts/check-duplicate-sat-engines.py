@@ -38,9 +38,9 @@ SAT_ENGINES = {
 }
 
 
-def _nm(archive):
+def _nm(archive, *flags):
     try:
-        result = subprocess.run(["nm", "--defined-only", str(archive)],
+        result = subprocess.run(["nm", *flags, "--defined-only", str(archive)],
                                 capture_output=True, text=True, check=False)
     except FileNotFoundError:
         sys.exit("error: nm not found; this check needs binutils")
@@ -60,6 +60,8 @@ def strong_symbols(archive):
     `everything` is how a deliberately localized copy of an engine is
     detected: objcopy demotes T to t, and the whole point of doing that is
     that the linker can no longer confuse it with anyone else's copy."""
+    if sys.platform == "darwin":
+        return _strong_symbols_macho(archive)
     exported, everything = set(), set()
     for line in _nm(archive).splitlines():
         fields = line.split()
@@ -69,6 +71,31 @@ def strong_symbols(archive):
             everything.add(fields[-1])
             if fields[-2].isupper():
                 exported.add(fields[-1])
+    return exported, everything
+
+
+def _strong_symbols_macho(archive):
+    """strong_symbols() for Mach-O, where the type letter cannot tell weak from
+    strong: Apple's nm prints an inline or template definition as T, so every
+    archive that subclasses an engine's class or instantiates one of its
+    templates would look like a second copy of the engine. `nm -m` spells the
+    linkage out instead ("weak private external", "non-external", ...).
+
+    "private external" is hidden from a dylib's export table but still visible
+    to the static linker, so it counts as exported here."""
+    exported, everything = set(), set()
+    for line in _nm(archive, "-m").splitlines():
+        # "<addr> (<segment>,<section>) <linkage words> <name>"; member
+        # headers and blank lines have no leading address.
+        fields = line.split()
+        if len(fields) < 3 or not re.fullmatch(r"[0-9a-f]+", fields[0]):
+            continue
+        linkage = fields[2:-1]
+        if "weak" in linkage:
+            continue
+        everything.add(fields[-1])
+        if "external" in linkage:
+            exported.add(fields[-1])
     return exported, everything
 
 
