@@ -125,10 +125,10 @@ set(CAMADA_CADICAL_LIB "${CAMADA_CADICAL_PREFIX}/lib/libcadical.a")
 set(CAMADA_CADICAL_SRC_DIR
     "${CAMADA_DEPS_SRC_DIR}/cadical-${_camada_cadical_tag}")
 set(CAMADA_BITWUZLA_GIT_TAG
-    "0.10.0"
+    "0.11.0"
     CACHE STRING "Bitwuzla tag used when building it from source")
 set(CAMADA_BITWUZLA_SHA256
-    "5f4309dfe3e7d716889fa113e7a48a3b4e33efc95348b3cafb036f10e8d17e1d"
+    "97d916f5d5fbc79a39ad3d3f95b4871de0fb20d001045289a414826873821d41"
     CACHE STRING "Expected SHA256 of the Bitwuzla source archive")
 
 # Bitwuzla is always built from source (see camada_setup_bitwuzla), so there is

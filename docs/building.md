@@ -53,7 +53,7 @@ Downloaded sources and locally installed solver artifacts are stored under
 `<build-dir>/deps/src` and `<build-dir>/deps/install`.
 
 When CMake downloads dependencies itself:
-- `Bitwuzla` uses a source build from `0.10.0`, with its bundled CaDiCaL
+- `Bitwuzla` uses a source build from `0.11.0`, with its bundled CaDiCaL
   compiled under a renamed namespace so it cannot clash with the CaDiCaL that
   CVC5 and STP share.
 - `Z3` is built from source on Linux and macOS, in the variant Camada itself
