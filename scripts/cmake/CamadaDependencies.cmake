@@ -1717,6 +1717,9 @@ function(camada_setup_yices)
     cb4c58c3508a5e67c156ba26182cd540af644fb7ba39b2873feebf73f21201b2)
   camada_run_checked(WORKING_DIRECTORY "${yices_source_dir}" MESSAGE
                      "Preparing Yices" COMMAND autoreconf)
+  # Thread safety lets separate solvers run on separate threads: Yices locks its
+  # process-wide term tables. 2.7.0's version deadlocked in assumption checks
+  # (SRI-CSL/yices2#609), hence the 2.8.0 minimum.
   camada_run_checked(
     WORKING_DIRECTORY
     "${yices_source_dir}"
@@ -1727,6 +1730,7 @@ function(camada_setup_yices)
     --prefix
     ${CAMADA_DEPS_INSTALL_DIR}
     --with-static-gmp=${yices_gmp_lib}
+    --enable-thread-safety
     CPPFLAGS=-I${yices_gmp_include_dir}
     LDFLAGS=${yices_ldflags})
   camada_run_checked(

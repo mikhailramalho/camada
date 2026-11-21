@@ -5,8 +5,11 @@
 // exclusions live in matrix.test.h.
 CAMADA_SHARED_MATRIX(Yices, camada::createYicesSolver)
 
+#include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <solvers/yicessolver.h>
+#include <thread>
+#include <vector>
 
 // SolverConfig::Logic drives the Yices context logic; it must survive
 // reset(), which recreates the context.
@@ -228,4 +231,41 @@ TEST_CASE("Yices rejects Int/Real sorts without an arithmetic logic",
     REQUIRE(Message.find("disabled") != std::string::npos);
     REQUIRE(Message.find("QF_AUFBV") != std::string::npos);
   }
+}
+
+// Camada builds Yices with --enable-thread-safety: term and type creation
+// take a global lock, and separate contexts solve in parallel. Each thread
+// owns its solver and resets it every round, so symbol names are set and
+// cleared in the process-wide name table. No checkSatAssuming here: Yices
+// 2.8.0 reads its term table unlocked there (see docs/backends.md). Catch2
+// assertions are not thread-safe, so threads only count mismatches.
+TEST_CASE("Yices solvers run in parallel threads", "[YICES]") {
+  if (!yices_is_thread_safe())
+    SKIP("Yices was built without --enable-thread-safety");
+
+  constexpr unsigned Threads = 8, Rounds = 300;
+  std::atomic<unsigned> Mismatches{0};
+  std::vector<std::thread> Pool;
+  for (unsigned T = 0; T < Threads; ++T)
+    Pool.emplace_back([T, &Mismatches] {
+      auto yices = camada::createYicesSolver();
+      for (unsigned R = 0; R < Rounds; ++R) {
+        const int64_t Want = T * 1000 + R;
+        yices->reset();
+        auto x = yices->mkSymbol("x", yices->mkBVSort(32));
+        yices->addConstraint(
+            yices->mkEqual(yices->mkBVMul(x, yices->mkBVFromDec(3, 32)),
+                           yices->mkBVFromDec(3 * Want, 32)));
+        if (yices->check() != camada::CheckResult::SAT) {
+          ++Mismatches;
+          continue;
+        }
+        auto Got = yices->getBV(x);
+        if (!Got || Got.value() != Want)
+          ++Mismatches;
+      }
+    });
+  for (auto &Th : Pool)
+    Th.join();
+  REQUIRE(Mismatches.load() == 0);
 }
