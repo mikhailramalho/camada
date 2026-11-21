@@ -345,6 +345,9 @@ public:
   virtual SMTExprRef mkArithShl(const SMTExprRef &Exp, unsigned Amount) = 0;
 
   /// Creates an integer shift-left operation, equivalent to lhs * 2^rhs.
+  /// Needs a native power with a symbolic exponent (Z3, cvc5, MathSAT); the
+  /// Yices and SMT-LIB pipe backends abort here. Use the constant-amount
+  /// overload there.
   virtual SMTExprRef mkArithShl(const SMTExprRef &LHS,
                                 const SMTExprRef &RHS) = 0;
 

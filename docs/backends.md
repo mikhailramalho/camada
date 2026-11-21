@@ -122,6 +122,9 @@ limitations still matter in day-to-day use.
     was found unsound (context reasoning over lambda terms is incomplete —
     a symbolic-index read of the default could satisfy formulas it should
     refute), a limitation smt-switch independently refuses to support.
+  - `mkArithShl` with a symbolic amount aborts: Yices has no power with a
+    symbolic exponent, and the bundled build has no nonlinear arithmetic
+    (no MCSAT). The constant-amount overload works.
   - global Yices initialization/teardown is hardened for multiple wrappers, but
     simultaneously live Yices solver instances can still collide on shared
     symbol names.
@@ -262,3 +265,6 @@ the operations each child supports. Callers that need FP against a child
 solver that doesn't speak it should ask Camada for `FPEncoding::BV` at
 sort-construction time — that routes every FP op through the common-layer
 bit-blast path and emits BV-only SMT-LIB.
+
+`mkArithShl` with a symbolic amount is not supported over the pipe, even
+when the child has a power operator; the constant-amount overload works.
