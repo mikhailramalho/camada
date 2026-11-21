@@ -456,6 +456,31 @@ static inline void unpack(SMTSolver &S, const SMTExprRef &Src, SMTExprRef &Sgn,
   assert(Sig->getWidth() == SWidth);
 }
 
+// A subnormal's exp - lz reaches emin - (sbits - 1), which takes ebits + 2
+// signed bits instead of ebits + 1 once sbits > 2^(ebits-1) + 3.
+static bool expLzNeedsWideBits(unsigned ebits, unsigned sbits) {
+  return ebits < 31 && sbits > (1u << (ebits - 1)) + 3;
+}
+
+// The product exponent (a_exp - a_lz) + (b_exp - b_lz) in ebits + 2 bits.
+// Where it can fall below -2^(ebits+1), the least value that width holds,
+// it is computed a bit wider and clamped there: the true and the clamped
+// product both lie under a quarter of the least subnormal, so they round
+// identically, alone or added to any finite c.
+static SMTExprRef productExp(SMTSolverImpl &S, const SMTExprRef &AExp,
+                             const SMTExprRef &ALz, const SMTExprRef &BExp,
+                             const SMTExprRef &BLz, unsigned ebits,
+                             unsigned sbits) {
+  unsigned X = expLzNeedsWideBits(ebits, sbits) ? 3 : 2;
+  SMTExprRef Exp =
+      S.mkBVAdd(S.mkBVSub(S.mkBVSignExt(AExp, X), S.mkBVZeroExt(ALz, X)),
+                S.mkBVSub(S.mkBVSignExt(BExp, X), S.mkBVZeroExt(BLz, X)));
+  if (X == 2)
+    return Exp;
+  SMTExprRef Min = S.mkBVFromBin("11" + std::string(ebits + 1, '0'), ebits + 3);
+  return S.mkBVExtract(ebits + 1, 0, S.mkIte(S.mkBVSle(Exp, Min), Min, Exp));
+}
+
 SMTSortRef SMTSolverImpl::mkRMSortImpl() { return mkBVRMSortImpl(); }
 
 SMTSortRef SMTSolverImpl::mkIntSortImpl() {
@@ -653,19 +678,13 @@ SMTExprRef SMTSolverImpl::mkFPMulImpl(const SMTExprRef &LHS,
   unpack(*this, LHS, a_sgn, a_sig, a_exp, a_lz, true);
   unpack(*this, RHS, b_sgn, b_sig, b_exp, b_lz, true);
 
-  SMTExprRef a_lz_ext = mkBVZeroExt(a_lz, 2);
-  SMTExprRef b_lz_ext = mkBVZeroExt(b_lz, 2);
-
   SMTExprRef a_sig_ext = mkBVZeroExt(a_sig, sbits);
   SMTExprRef b_sig_ext = mkBVZeroExt(b_sig, sbits);
-
-  SMTExprRef a_exp_ext = mkBVSignExt(a_exp, 2);
-  SMTExprRef b_exp_ext = mkBVSignExt(b_exp, 2);
 
   SMTExprRef res_sgn, res_sig, res_exp;
   res_sgn = mkBVXor(a_sgn, b_sgn);
 
-  res_exp = mkBVAdd(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+  res_exp = productExp(*this, a_exp, a_lz, b_exp, b_lz, ebits, sbits);
 
   SMTExprRef product = mkBVMul(a_sig_ext, b_sig_ext);
 
@@ -1237,8 +1256,10 @@ SMTExprRef SMTSolverImpl::mkFPSqrtImpl(const SMTExprRef &Exp,
 
   const SMTExprRef res_sgn = zero1;
 
-  SMTExprRef real_exp = mkBVSub(mkBVSignExt(a_exp, 1), mkBVZeroExt(a_lz, 1));
-  SMTExprRef res_exp = mkBVSignExt(mkBVExtract(ebits, 1, real_exp), 2);
+  unsigned X = expLzNeedsWideBits(ebits, sbits) ? 2 : 1;
+  SMTExprRef real_exp = mkBVSub(mkBVSignExt(a_exp, X), mkBVZeroExt(a_lz, X));
+  SMTExprRef res_exp =
+      mkBVSignExt(mkBVExtract(ebits + X - 1, 1, real_exp), 3 - X);
 
   SMTExprRef e_is_odd = mkEqual(mkBVExtract(0, 0, real_exp), one1);
 
@@ -1394,21 +1415,17 @@ SMTExprRef SMTSolverImpl::mkFPFMAImpl(const SMTExprRef &X, const SMTExprRef &Y,
   unpack(*this, Y, b_sgn, b_sig, b_exp, b_lz, true);
   unpack(*this, Z, c_sgn, c_sig, c_exp, c_lz, true);
 
-  SMTExprRef a_lz_ext = mkBVZeroExt(a_lz, 2);
-  SMTExprRef b_lz_ext = mkBVZeroExt(b_lz, 2);
   SMTExprRef c_lz_ext = mkBVZeroExt(c_lz, 2);
 
   SMTExprRef a_sig_ext = mkBVZeroExt(a_sig, sbits);
   SMTExprRef b_sig_ext = mkBVZeroExt(b_sig, sbits);
 
-  SMTExprRef a_exp_ext = mkBVSignExt(a_exp, 2);
-  SMTExprRef b_exp_ext = mkBVSignExt(b_exp, 2);
   SMTExprRef c_exp_ext = mkBVSignExt(c_exp, 2);
 
   SMTExprRef mul_sgn = mkBVXor(a_sgn, b_sgn);
 
   SMTExprRef mul_exp =
-      mkBVAdd(mkBVSub(a_exp_ext, a_lz_ext), mkBVSub(b_exp_ext, b_lz_ext));
+      productExp(*this, a_exp, a_lz, b_exp, b_lz, ebits, sbits);
 
   SMTExprRef mul_sig = mkBVMul(a_sig_ext, b_sig_ext);
 
@@ -1722,16 +1739,18 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
   assert(res_sig->getWidth() == to_sbits + 4);
 
   SMTExprRef res_exp;
-  if (from_ebits < (to_ebits + 2)) {
+  unsigned exp_lz_bits =
+      from_ebits + (expLzNeedsWideBits(from_ebits, from_sbits) ? 2 : 1);
+  if (exp_lz_bits <= to_ebits + 2) {
     res_exp = mkBVSignExt(exp, to_ebits - from_ebits + 2);
 
     // subtract lz for subnormal numbers.
     SMTExprRef lz_ext = mkBVZeroExt(lz, to_ebits - from_ebits + 2);
     res_exp = mkBVSub(res_exp, lz_ext);
   } else {
-    // Clamped even when from_ebits == to_ebits + 2: exp - lz of a subnormal
-    // source then needs more bits than that, and would wrap.
-    unsigned ebits_diff = from_ebits - (to_ebits + 2);
+    // Clamped even when from_ebits is to_ebits + 2, or to_ebits + 1 for a
+    // wide source: exp - lz of a subnormal source then needs more bits than
+    // to_ebits + 2, and would wrap.
 
     // subtract lz for subnormal numbers.
     // lz is unsigned (the narrow branch above zero-extends it too).
@@ -1747,8 +1766,9 @@ SMTExprRef SMTSolverImpl::mkFPToFPImpl(const SMTExprRef &From,
 
     SMTExprRef first_ovf_exp = mkBVFromBin(
         pow2Bits(to_ebits + 1, -1, false, from_ebits + 2), from_ebits + 2);
-    SMTExprRef first_udf_exp = mkBVConcat(
-        mkBVNeg(mkBVFromDec(1, ebits_diff + 3)), mkBVFromDec(1, to_ebits + 1));
+    SMTExprRef first_udf_exp =
+        mkBVConcat(mkBVNeg(mkBVFromDec(1, from_ebits + 1 - to_ebits)),
+                   mkBVFromDec(1, to_ebits + 1));
 
     SMTExprRef exp_in_range = mkBVExtract(to_ebits + 1, 0, exp_sub_lz);
     assert(exp_in_range->getWidth() == to_ebits + 2);

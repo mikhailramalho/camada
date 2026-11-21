@@ -429,6 +429,37 @@ fp_narrow_significand_operations_encode(const camada::SMTSolverRef &solver) {
   }
 }
 
+// Mul, fma, sqrt and the to_fp into a one-bit-narrower exponent compute a
+// subnormal's exp - lz, which wrapped once SigWidth > 2^(ExpWidth-1) + 2:
+// (4,11)'s smallest subnormal squared to +inf. See issue #304.
+inline void fp_wide_significand_subnormals(const camada::SMTSolverRef &solver) {
+  constexpr auto BV = camada::FPEncoding::BV;
+  const auto rm = [&](camada::RM R) { return solver->mkRM(R, BV); };
+  const auto RNE = camada::RM::ROUND_TO_EVEN;
+  auto x = solver->mkFPFromBin("0000000000000001", 4, BV);
+  auto pzero = solver->mkFPFromBin("0000000000000000", 4, BV);
+  auto y = solver->mkFPFromBin("0000000000000000000000001", 5, BV);
+  auto is = [&](const camada::SMTExprRef &E, const std::string &Bin) {
+    return solver->mkEqual(
+        E, solver->mkFPFromBin(Bin, E->Sort->getFPExponentWidth(), BV));
+  };
+  auto all = solver->mkBool(true);
+  for (const auto &C :
+       {is(solver->mkFPMul(x, x, rm(RNE)), "0000000000000000"),
+        is(solver->mkFPMul(x, x, rm(camada::RM::ROUND_TO_PLUS_INF)),
+           "0000000000000001"),
+        is(solver->mkFPFMA(x, x, pzero, rm(RNE)), "0000000000000000"),
+        is(solver->mkFPFMA(x, x, x, rm(camada::RM::ROUND_TO_PLUS_INF)),
+           "0000000000000010"),
+        is(solver->mkFPSqrt(x, rm(RNE)), "0000000101101010"),
+        is(solver->mkFPSqrt(y, rm(RNE)), "0000000010110101000001010"),
+        is(solver->mkFPToFP(x, solver->mkFPSort(3, 4, BV), rm(RNE)),
+           "00000000")})
+    all = solver->mkAnd(all, C);
+  solver->addConstraint(solver->mkNot(all));
+  REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+}
+
 // The encodings and lowerings the group functions below run their fixtures
 // under, declared once for all of them.
 inline constexpr auto NativeFP = camada::FPEncoding::Native;
@@ -601,6 +632,7 @@ inline void tests_fp(const camada::SMTSolverRef &solver) {
   RESETANDTEST(fp_wide_format_semantics);
   RESETANDTEST(fp_degenerate_format_rejected);
   RESETANDTEST(fp_narrow_significand_operations_encode);
+  RESETANDTEST(fp_wide_significand_subnormals);
 }
 
 // Fixed-point: pure common-layer BV encoding, no backend gating needed.
