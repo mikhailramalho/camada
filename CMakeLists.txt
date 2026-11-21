@@ -233,7 +233,7 @@ set(RELEASE_MODE
     CACHE INTERNAL "Force release mode")
 
 # Find solvers
-config_solver(Bitwuzla 0.9.1)
+config_solver(Bitwuzla 0.10.0)
 config_solver(CVC5 1.0.8)
 config_solver(MathSAT 5.6.20)
 config_solver(STP 2.4.0)

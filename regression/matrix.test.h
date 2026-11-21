@@ -36,10 +36,6 @@ constexpr Exclusion MatrixExclusions[] = {
      "those aborts"},
     {"STP", "nesting-native-const",
      "same as nesting: STP's array theory cannot sort nested arrays"},
-    {"Bitwuzla", "nesting-native-const",
-     "a native constant array used as an array element always reaches "
-     "bitwuzla's array solver, which answers UNKNOWN for CONST_ARRAY "
-     "terms; the lazy lowering in the nesting group covers these shapes"},
     {"Yices", "arith-symbolic-shift",
      "the Yices backend has no symbolic-amount shift (mkArithShl with a "
      "non-constant amount is unimplemented), whatever logic the context has"},

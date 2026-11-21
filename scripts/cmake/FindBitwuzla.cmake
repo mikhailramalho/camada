@@ -52,7 +52,7 @@ if(PkgConfig_FOUND)
   foreach(_camada_bitwuzla_pkgconfig_path IN
           LISTS _camada_bitwuzla_pkgconfig_paths)
     if(EXISTS "${_camada_bitwuzla_pkgconfig_path}")
-      if(_camada_bitwuzla_saved_pkg_config_path)
+      if(NOT "$ENV{PKG_CONFIG_PATH}" STREQUAL "")
         set(ENV{PKG_CONFIG_PATH}
             "${_camada_bitwuzla_pkgconfig_path}:$ENV{PKG_CONFIG_PATH}")
       else()
@@ -93,7 +93,7 @@ if(NOT Bitwuzla_FOUND AND _camada_download_bitwuzla)
     foreach(_camada_bitwuzla_pkgconfig_path IN
             LISTS _camada_bitwuzla_pkgconfig_paths)
       if(EXISTS "${_camada_bitwuzla_pkgconfig_path}")
-        if(_camada_bitwuzla_saved_pkg_config_path)
+        if(NOT "$ENV{PKG_CONFIG_PATH}" STREQUAL "")
           set(ENV{PKG_CONFIG_PATH}
               "${_camada_bitwuzla_pkgconfig_path}:$ENV{PKG_CONFIG_PATH}")
         else()

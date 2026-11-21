@@ -49,16 +49,16 @@ list of options, and how each dependency is fetched.
 
 | Feature | Bitwuzla | CVC5 | MathSAT | STP | Yices | Z3 |
 | ------- | :------: | :--: | :-----: | :-: | :---: | :-: |
-| Minimum version | 0.9.1 | 1.0.8 | 5.6.20 | 2.4.0 | 2.6.1 | 4.13.3 |
+| Minimum version | 0.10.0 | 1.0.8 | 5.6.20 | 2.4.0 | 2.6.1 | 4.13.3 |
 | Bit-vectors, booleans, arrays | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Integers / reals |   | ✔️ | ✔️ |   | ✔️ | ✔️ |
 | Native FP | ✔️<sup>1</sup> | ✔️<sup>1</sup> | ✔️<sup>2</sup> |   |   | ✔️ |
 | FP over bit-vectors | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Uninterpreted functions | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 | Native tuples |   | ✔️ |   |   |   | ✔️ |
-| Native constant arrays | ✔️<sup>3</sup> | ✔️ | ✔️ |   |   | ✔️ |
+| Native constant arrays | ✔️ | ✔️ | ✔️ |   |   | ✔️ |
 | Quantifiers | ✔️ | ✔️ |   |   |   | ✔️ |
-| Unsat assumptions | ✔️<sup>4</sup> | ✔️<sup>4</sup> | ✔️ |   | ✔️ | ✔️ |
+| Unsat assumptions | ✔️<sup>3</sup> | ✔️<sup>3</sup> | ✔️ |   | ✔️ | ✔️ |
 | Array models | ✔️ | ✔️ | ✔️ |   | ✔️ | ✔️ |
 
 Everything not native is still available through Camada's own lowering, so
@@ -68,9 +68,7 @@ tuples and constant arrays work on every backend.
 `exponentWidth <= significandWidth`.
 <sup>2</sup> `fp.fma` and `fp.rem` go through the bit-vector path;
 `ROUND_TO_AWAY` is unsupported.
-<sup>3</sup> Returns UNKNOWN when a constant array survives Bitwuzla's
-preprocessing; `ConstArrayLowering::Lazy` avoids it.
-<sup>4</sup> Opt-in at creation (`SolverConfig::UseUnsatAssumptions`).
+<sup>3</sup> Opt-in at creation (`SolverConfig::UseUnsatAssumptions`).
 
 Per-backend caveats, the FP format table, and the SMT-LIB pipe backend are in
 [docs/backends.md](docs/backends.md).
