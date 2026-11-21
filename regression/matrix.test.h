@@ -43,9 +43,6 @@ constexpr Exclusion MatrixExclusions[] = {
     {"Yices", "arith-symbolic-shift",
      "the Yices backend has no symbolic-amount shift (mkArithShl with a "
      "non-constant amount is unimplemented), whatever logic the context has"},
-    {"MathSAT", "arith-symbolic-shift",
-     "pow with a symbolic exponent answers UNSAT on a SAT query, still "
-     "broken in MathSAT 5.6.19 despite its LA(Z) fixes"},
 };
 
 // The reason a (Backend, Group) cell is excluded from Table, or null.

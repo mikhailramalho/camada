@@ -137,7 +137,7 @@ set(CAMADA_BITWUZLA_SHA256
 # no prebuilt URL to pin. It is not built on Windows: the Windows CI leg leaves
 # it disabled, as ESBMC does.
 set(CAMADA_MATHSAT_VERSION
-    "5.6.19"
+    "5.6.20"
     CACHE STRING "MathSAT release version used for prebuilt downloads")
 # The 5.6.17 macOS tarball was mispackaged (a plain ar archive of fat Mach-O
 # members, which Apple's ld rejects), so macOS was pinned to 5.6.16 for a while.
@@ -150,10 +150,10 @@ set(CAMADA_MATHSAT_MACOS_VERSION
     "${CAMADA_MATHSAT_VERSION}"
     CACHE STRING "MathSAT release version used for the macOS prebuilts")
 set(CAMADA_MATHSAT_LINUX_X86_64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.19-linux-x86_64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.20-linux-x86_64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux x86_64")
 set(CAMADA_MATHSAT_LINUX_AARCH64_URL
-    "https://mathsat.fbk.eu/release/mathsat-5.6.19-linux-aarch64.tar.gz"
+    "https://mathsat.fbk.eu/release/mathsat-5.6.20-linux-aarch64.tar.gz"
     CACHE STRING "URL used to download MathSAT for Linux aarch64")
 set(CAMADA_MATHSAT_MACOS_X86_64_URL
     "https://mathsat.fbk.eu/release/mathsat-${CAMADA_MATHSAT_MACOS_VERSION}-macos.tar.gz"
