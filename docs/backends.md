@@ -4,7 +4,7 @@
 
 <sup>1</sup> |
 | [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️<sup>1</sup> |
-| [MathSAT](https://mathsat.fbk.eu/)         |  5.6.3          | ✔️<sup>2</sup> |
+| [MathSAT](https://mathsat.fbk.eu/)         |  5.6.20         | ✔️<sup>2</sup> |
 | [STP](https://stp.github.io/)              |  2.4.0          |   |
 | [Yices](https://yices.csl.sri.com/)        |  2.8.0          |   |
 | [Z3](https://github.com/Z3Prover/z3)       |  4.13.3         | ✔️ |
