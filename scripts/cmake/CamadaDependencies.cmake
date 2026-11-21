@@ -1639,7 +1639,7 @@ function(camada_setup_yices)
   set(yices_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.a")
   set(yices_header "${CAMADA_DEPS_INSTALL_DIR}/include/yices.h")
   set(yices_shared_lib "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so")
-  set(yices_shared_soname "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so.2.7.0")
+  set(yices_shared_soname "${CAMADA_DEPS_INSTALL_DIR}/lib/libyices.so.2.8.0")
   if(BUILD_SHARED_LIBS
      AND EXISTS "${yices_shared_lib}"
      AND EXISTS "${yices_header}")
@@ -1680,10 +1680,13 @@ function(camada_setup_yices)
                                "${CMAKE_CURRENT_LIST_DIR}/yices.exports")
   set(yices_ldflags "-L${yices_gmp_lib_dir} ${yices_exports_flag}")
   camada_fetch_git_source(
-    yicessrc SRI-CSL/yices2 yices-2.7.0 yices_source_dir
-    584db72abf6643927b2c3ba98ff793f602216b452b8ff2f34a8851d35904804a)
+    yicessrc SRI-CSL/yices2 yices-2.8.0 yices_source_dir
+    cb4c58c3508a5e67c156ba26182cd540af644fb7ba39b2873feebf73f21201b2)
   camada_run_checked(WORKING_DIRECTORY "${yices_source_dir}" MESSAGE
                      "Preparing Yices" COMMAND autoreconf)
+  # Thread safety lets separate solvers run on separate threads: Yices locks its
+  # process-wide term tables. 2.7.0's version deadlocked in assumption checks
+  # (SRI-CSL/yices2#609), hence the 2.8.0 minimum.
   camada_run_checked(
     WORKING_DIRECTORY
     "${yices_source_dir}"
@@ -1694,6 +1697,7 @@ function(camada_setup_yices)
     --prefix
     ${CAMADA_DEPS_INSTALL_DIR}
     --with-static-gmp=${yices_gmp_lib}
+    --enable-thread-safety
     CPPFLAGS=-I${yices_gmp_include_dir}
     LDFLAGS=${yices_ldflags})
   camada_run_checked(

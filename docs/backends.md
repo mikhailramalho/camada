@@ -6,7 +6,7 @@
 | [CVC5](https://cvc5.github.io/)            |  1.0.8          | ✔️<sup>1</sup> |
 | [MathSAT](https://mathsat.fbk.eu/)         |  5.6.20         | ✔️<sup>2</sup> |
 | [STP](https://stp.github.io/)              |  2.4.0          |   |
-| [Yices](https://yices.csl.sri.com/)        |  2.6.1          |   |
+| [Yices](https://yices.csl.sri.com/)        |  2.8.0          |   |
 | [Z3](https://github.com/Z3Prover/z3)       |  4.13.3         | ✔️ |
 | SMT-LIB (any external solver) | n/a | depends on child |
 
@@ -45,10 +45,12 @@ outside binary32/binary64.
 
 - Yices has no native time limit, so `setTimeout` starts a watchdog thread per
   timed check that calls `yices_stop_search` at the deadline.
-- Yices keeps its terms in process-wide tables and is built without its
-  thread-safety option, whose 2.7.0 release deadlocks in assumption checks
-  (fixed upstream in SRI-CSL/yices2#609, not yet released). Use Yices solvers
-  from one thread at a time across the whole process, not just per instance.
+- Yices keeps its terms in process-wide tables, so Camada builds it with its
+  thread-safety option, which locks those tables. Separate Yices solvers can
+  then run on separate threads, with one exception: Yices 2.8.0 reads its term
+  tables without the lock in `checkSatAssuming`, so that call can crash while
+  another thread builds Yices terms. A Yices you supply yourself must be built
+  with `--enable-thread-safety` for any of this to hold.
 - STP's time budget is whole seconds for the entire query; millisecond limits
   round up to the next second.
 - Unsat assumptions are opt-in at creation on Bitwuzla and CVC5, because
@@ -120,6 +122,9 @@ limitations still matter in day-to-day use.
     was found unsound (context reasoning over lambda terms is incomplete —
     a symbolic-index read of the default could satisfy formulas it should
     refute), a limitation smt-switch independently refuses to support.
+  - `mkArithShl` with a symbolic amount aborts: Yices has no power with a
+    symbolic exponent, and the bundled build has no nonlinear arithmetic
+    (no MCSAT). The constant-amount overload works.
   - global Yices initialization/teardown is hardened for multiple wrappers, but
     simultaneously live Yices solver instances can still collide on shared
     symbol names.
@@ -251,3 +256,6 @@ the operations each child supports. Callers that need FP against a child
 solver that doesn't speak it should ask Camada for `FPEncoding::BV` at
 sort-construction time — that routes every FP op through the common-layer
 bit-blast path and emits BV-only SMT-LIB.
+
+`mkArithShl` with a symbolic amount is not supported over the pipe, even
+when the child has a power operator; the constant-amount overload works.
