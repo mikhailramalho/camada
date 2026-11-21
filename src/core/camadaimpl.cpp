@@ -2353,23 +2353,11 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
   fatalErrorIf(lowersTuples(IndexSort),
                "Arrays whose index sort involves a tuple are not supported "
                "on this backend; see issue #17");
-  const bool NativeOk =
-      nativeConstArraySupport() && nativeConstArrayAccepts(InitValue);
-  if (Lowering == ConstArrayLowering::Auto)
-    Lowering = NativeOk ? ConstArrayLowering::Native : ConstArrayLowering::Lazy;
-  // An explicit Native is not quietly downgraded: the caller asked for the
-  // backend operator, and the lazy lowering is a different term. In Ackermann
-  // mode the lowering choice is moot (see below), so it is not an error there.
-  fatalErrorIf(Lowering == ConstArrayLowering::Native && !NativeOk &&
-                   arrayMode() != ArrayEncoding::Ackermann,
-               nativeConstArraySupport()
-                   ? "This backend's native constant arrays take only a "
-                     "literal initializer; use ConstArrayLowering::Auto or Lazy"
-                   : "Native constant arrays are not supported by this "
-                     "backend");
   // Tuple-involving initializers decompose into one constant array per
-  // scalar leaf; the per-leaf calls re-enter this wrapper, so the resolved
-  // lowering (and its lazy machinery) applies per leaf.
+  // scalar leaf; the per-leaf calls re-enter this wrapper, so each leaf
+  // resolves its own lowering. Both this and the Ackermann branch come
+  // before nativeConstArrayAccepts, which would read a Camada-owned
+  // initializer as a backend term.
   if (lowersTuples(InitValue->Sort))
     return mkCamadaTupleArrayConst(*this, IndexSort, InitValue, Lowering);
   // Ackermann mode: the lowering choice is moot — a Const node's selects
@@ -2387,6 +2375,18 @@ SMTExprRef SMTSolverImpl::mkArrayConst(const SMTSortRef &IndexSort,
     assert(theExp->Sort->getElementSort() == InitValue->Sort);
     return theExp;
   }
+  const bool NativeOk =
+      nativeConstArraySupport() && nativeConstArrayAccepts(InitValue);
+  if (Lowering == ConstArrayLowering::Auto)
+    Lowering = NativeOk ? ConstArrayLowering::Native : ConstArrayLowering::Lazy;
+  // An explicit Native is not quietly downgraded: the caller asked for the
+  // backend operator, and the lazy lowering is a different term.
+  fatalErrorIf(Lowering == ConstArrayLowering::Native && !NativeOk,
+               nativeConstArraySupport()
+                   ? "This backend's native constant arrays take only a "
+                     "literal initializer; use ConstArrayLowering::Auto or Lazy"
+                   : "Native constant arrays are not supported by this "
+                     "backend");
   SMTExprRef theExp = Lowering == ConstArrayLowering::Native
                           ? mkArrayConstImpl(IndexSort, InitValue)
                           : mkLazyConstArray(IndexSort, InitValue);
