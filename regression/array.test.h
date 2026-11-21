@@ -627,11 +627,9 @@ inline void array_equality_semantics(const camada::SMTSolverRef &solver) {
 }
 
 // Equality between an array symbol and a constant array — ESBMC's
-// `symbol = array_of(v)` pattern. Bitwuzla 0.9.x answers UNKNOWN on the
-// native ((as const ...)) form of this (with an "Equality over constant
-// arrays not fully supported yet" warning), which is why it lowers
-// constant arrays lazily; this fixture pins the pattern on every
-// backend and lowering.
+// `symbol = array_of(v)` pattern. Bitwuzla before 0.10 answered UNKNOWN
+// on the native ((as const ...)) form of this when preprocessing did not
+// remove it; this fixture pins the pattern on every backend and lowering.
 inline void const_array_equality_semantics(
     const camada::SMTSolverRef &solver,
     camada::ConstArrayLowering Lowering = camada::ConstArrayLowering::Auto) {

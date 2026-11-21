@@ -245,16 +245,7 @@ protected:
   SMTExprRef mkSymbolImpl(const std::string &Name,
                           const SMTSortRef &Sort) override;
 
-  // Native constant arrays. Bitwuzla 0.9.1's array solver cannot reason
-  // about a CONST_ARRAY term: it answers UNKNOWN ("Equality over constant
-  // arrays not fully supported yet") whenever one reaches it. It only works
-  // because preprocessing usually substitutes the constant array away first,
-  // which covers `symbol = ((as const ...) v)` and selects over it. When it
-  // cannot -- two constant arrays with different defaults compared, or a
-  // constant array behind a case split -- check() returns UNKNOWN. The lazy
-  // lowering (ConstArrayLowering::Lazy) has no such gap but asserts one
-  // axiom per observed index, which is what made incremental ESBMC runs
-  // slow, so native is the default and Lazy stays available per call.
+  // Native constant arrays, which Bitwuzla reasons about in full since 0.10.
   SMTExprRef mkArrayConstImpl(const SMTSortRef &IndexSort,
                               const SMTExprRef &InitValue) override;
 

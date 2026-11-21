@@ -53,7 +53,9 @@ Downloaded sources and locally installed solver artifacts are stored under
 `<build-dir>/deps/src` and `<build-dir>/deps/install`.
 
 When CMake downloads dependencies itself:
-- `Bitwuzla` uses a source build from `0.9.1`.
+- `Bitwuzla` uses a source build from `0.11.0`, with its bundled CaDiCaL
+  compiled under a renamed namespace so it cannot clash with the CaDiCaL that
+  CVC5 and STP share.
 - `Z3` is built from source on Linux and macOS, in the variant Camada itself
   is built as: shared for a shared Camada, static for a static one. The 5.3
   prebuilts ship only a shared `libz3` there, and Camada's release tarballs
@@ -63,9 +65,10 @@ When CMake downloads dependencies itself:
   `CAMADA_Z3_BUILD_TYPE` (default `Release`) sets the build type of that Z3,
   independently of Camada's. Windows uses the prebuilt `z3-5.4.1` archive.
 - `CVC5` uses a source build from `cvc5-1.4.2`.
-- `CaDiCaL` uses a source build, shared by every backend that needs it:
-  Bitwuzla, CVC5 and STP link one copy, because two copies built with
-  different flags disagree on `CaDiCaL::Internal`'s layout.
+- `CaDiCaL` uses a source build, shared by CVC5 and STP: they link one copy,
+  because two copies built with different flags disagree on
+  `CaDiCaL::Internal`'s layout. Bitwuzla needs CaDiCaL 3, which CVC5 does not
+  support yet, so it keeps its own under a renamed namespace.
 - `Yices` uses a source build.
 - `GMP` uses a source build, and every backend links that one copy (STP and
   MathSAT by path, Yices through `--with-static-gmp`, CVC5 and Bitwuzla through
