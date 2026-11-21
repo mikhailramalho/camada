@@ -49,7 +49,7 @@ list of options, and how each dependency is fetched.
 
 | Feature | Bitwuzla | CVC5 | MathSAT | STP | Yices | Z3 |
 | ------- | :------: | :--: | :-----: | :-: | :---: | :-: |
-| Minimum version | 0.9.1 | 1.0.8 | 5.6.3 | 2.4.0 | 2.6.1 | 4.13.3 |
+| Minimum version | 0.9.1 | 1.0.8 | 5.6.20 | 2.4.0 | 2.6.1 | 4.13.3 |
 | Bit-vectors, booleans, arrays | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 | Integers / reals |   | ✔️ | ✔️ |   | ✔️ | ✔️ |
 | Native FP | ✔️<sup>1</sup> | ✔️<sup>1</sup> | ✔️<sup>2</sup> |   |   | ✔️ |

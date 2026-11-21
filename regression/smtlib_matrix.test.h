@@ -45,7 +45,9 @@ constexpr Exclusion SMTLIBExclusions[] = {
     //     tuples there ---
     {"bitwuzla", "native-tuples",
      "the bitwuzla child rejects declare-datatypes"},
-    {"mathsat", "native-tuples", "the mathsat child rejects declare-datatypes"},
+    {"mathsat", "native-tuples",
+     "the mathsat child accepts declare-datatypes but defines no constructors "
+     "or selectors, so their first use is an unknown symbol"},
     {"yices-smt2", "native-tuples",
      "the yices-smt2 child rejects declare-datatypes"},
     {"stp", "native-tuples", "the stp child rejects declare-datatypes"},

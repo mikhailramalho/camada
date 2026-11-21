@@ -71,7 +71,7 @@ When CMake downloads dependencies itself:
   MathSAT by path, Yices through `--with-static-gmp`, CVC5 and Bitwuzla through
   their exported link interfaces). With `CAMADA_DOWNLOAD_DEPENDENCIES=OFF`
   the host's GMP is used instead.
-- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.19`. (The
+- `MathSAT` uses the vendor-provided prebuilt archive from `5.6.20`. (The
   `5.6.17` macOS tarball shipped `libmathsat.a` as a plain `ar` archive of
   fat Mach-O objects, a layout Apple's `ld` rejects, so macOS was pinned to
   `5.6.16` until `5.6.19` restored the correct lipo format.)
