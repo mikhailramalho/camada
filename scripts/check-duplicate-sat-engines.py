@@ -2,10 +2,10 @@
 """Fail when two copies of one SAT engine reach a single static link.
 
 Backends ship their SAT solver differently: CVC5 keeps CaDiCaL in its own
-libcadical.a, Bitwuzla's upstream prebuilt compiles CaDiCaL *into*
-libbitwuzla.a. Linking both statically keeps one definition of each shared
-symbol, but each library's code still computes member offsets from the
-headers it was built against. CVC5 builds CaDiCaL with -DQUIET, which drops
+libcadical.a, Bitwuzla compiles CaDiCaL *into* libbitwuzla.a (Camada renames
+that copy's namespace). Linking two copies statically keeps one definition of
+each shared symbol, but each library's code still computes member offsets
+from the headers it was built against. CVC5 builds CaDiCaL with -DQUIET, which drops
 two members from the middle of CaDiCaL::Internal, so the survivor reads every
 later field at the wrong offset -- Bitwuzla sized a Walker allocation from
 garbage and asked for 8 GB while solving one VCC.
@@ -27,19 +27,20 @@ import subprocess
 import sys
 
 # Namespace or symbol prefixes that identify a bundled SAT engine. A second
-# archive defining the same engine's *strong* symbols is the failure.
+# archive defining the same engine's *strong* symbols is the failure. Mach-O
+# prefixes every symbol with one more underscore, hence the optional "_".
 SAT_ENGINES = {
-    "CaDiCaL": re.compile(r"^_ZN7CaDiCaL"),
-    "CryptoMiniSat": re.compile(r"^_ZN5CMSat"),
-    "Kissat": re.compile(r"^kissat_"),
-    "MiniSat": re.compile(r"^_ZN7Minisat"),
-    "Glucose": re.compile(r"^_ZN7Glucose"),
+    "CaDiCaL": re.compile(r"^_?_ZN7CaDiCaL"),
+    "CryptoMiniSat": re.compile(r"^_?_ZN5CMSat"),
+    "Kissat": re.compile(r"^_?kissat_"),
+    "MiniSat": re.compile(r"^_?_ZN7Minisat"),
+    "Glucose": re.compile(r"^_?_ZN7Glucose"),
 }
 
 
-def _nm(archive):
+def _nm(archive, *flags):
     try:
-        result = subprocess.run(["nm", "--defined-only", str(archive)],
+        result = subprocess.run(["nm", *flags, "--defined-only", str(archive)],
                                 capture_output=True, text=True, check=False)
     except FileNotFoundError:
         sys.exit("error: nm not found; this check needs binutils")
@@ -59,6 +60,8 @@ def strong_symbols(archive):
     `everything` is how a deliberately localized copy of an engine is
     detected: objcopy demotes T to t, and the whole point of doing that is
     that the linker can no longer confuse it with anyone else's copy."""
+    if sys.platform == "darwin":
+        return _strong_symbols_macho(archive)
     exported, everything = set(), set()
     for line in _nm(archive).splitlines():
         fields = line.split()
@@ -71,14 +74,38 @@ def strong_symbols(archive):
     return exported, everything
 
 
+def _strong_symbols_macho(archive):
+    """strong_symbols() for Mach-O, where the type letter cannot tell weak from
+    strong: Apple's nm prints an inline or template definition as T, so every
+    archive that subclasses an engine's class or instantiates one of its
+    templates would look like a second copy of the engine. `nm -m` spells the
+    linkage out instead ("weak private external", "non-external", ...).
+
+    "private external" is hidden from a dylib's export table but still visible
+    to the static linker, so it counts as exported here."""
+    exported, everything = set(), set()
+    for line in _nm(archive, "-m").splitlines():
+        # "<addr> (<segment>,<section>) <linkage words> <name>"; member
+        # headers and blank lines have no leading address.
+        fields = line.split()
+        if len(fields) < 3 or not re.fullmatch(r"[0-9a-f]+", fields[0]):
+            continue
+        linkage = fields[2:-1]
+        if "weak" in linkage:
+            continue
+        everything.add(fields[-1])
+        if "external" in linkage:
+            exported.add(fields[-1])
+    return exported, everything
+
+
 def engines_in(archive):
     """Which SAT engines this archive defines, how many symbols each, and
     whether those symbols are exported or localized.
 
     A localized copy is not a conflict: the linker cannot substitute it for
-    anyone else's, which is the whole reason a build localizes one. Camada
-    does exactly this for CryptoMiniSat's CaDiCaL fork, which would otherwise
-    collide with the one Bitwuzla and CVC5 share."""
+    anyone else's, which is the whole reason a build localizes one, as STP
+    does for the MiniSat inside libstp.a."""
     exported, everything = strong_symbols(archive)
     found = {}
     for engine, pattern in SAT_ENGINES.items():
@@ -187,8 +214,8 @@ def main():
             print(f"  {archive}  ({count} strong symbols)", file=sys.stderr)
     print("\nA link keeps one definition of each shared symbol while every "
           "library\nkeeps the field offsets it was compiled with. Build the "
-          "backends against\none copy of the engine; Camada does this for "
-          "CaDiCaL whenever the Bitwuzla\nand CVC5 backends are both enabled.",
+          "backends against\none copy of the engine, or rename one copy as "
+          "Camada does for Bitwuzla's CaDiCaL.",
           file=sys.stderr)
     return 1
 
