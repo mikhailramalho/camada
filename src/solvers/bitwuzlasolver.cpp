@@ -27,7 +27,6 @@
 #include "../camadaerrors.h"
 
 #include <cstdlib>
-#include <cstring>
 #include <limits>
 #include <utility>
 #include <vector>
@@ -770,18 +769,8 @@ SMTExprRef BitwuzlaSolver::mkApplyImpl(const SMTExprRef &Function,
 }
 
 SMTResult<bool> BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
-  const char *result = bitwuzla_term_to_string(
+  return bitwuzla_term_value_get_bool(
       bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr));
-
-  bitwuzlaCheck(result != nullptr,
-                "Bitwuzla returned null boolean value string");
-  if (!strcmp(result, "true"))
-    return true;
-  if (!strcmp(result, "false"))
-    return false;
-
-  return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Bitwuzla,
-                  "Bool model value is neither true nor false"};
 }
 
 SMTResult<std::string> BitwuzlaSolver::getBVInBinImpl(const SMTExprRef &Exp) {
