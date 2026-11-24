@@ -119,9 +119,7 @@ public:
   template <typename SolverSort> SMTSortRef makeSortRef(SolverSort Sort) {
     auto *OwnedSort = SortArena.create<SolverSort>(std::move(Sort));
     assert(OwnedSort->validateSortWidth());
-#ifndef NDEBUG
     OwnedSort->markWidthValidated();
-#endif
     return SMTSortRef(OwnedSort, HandleState, HandleState->Generation);
   }
 

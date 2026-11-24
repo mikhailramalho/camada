@@ -158,8 +158,10 @@ private:
     fatalErrorIf(Size > std::numeric_limits<std::size_t>::max() - Alignment,
                  "Arena allocation size overflow");
     Capacity = std::max(Capacity, Size + Alignment);
-    Blocks.push_back(
-        Block{std::make_unique<std::byte[]>(Capacity), Capacity, 0});
+    // Not make_unique, which zero-fills the block: create() constructs every
+    // object before anything reads its bytes.
+    Blocks.push_back(Block{
+        std::unique_ptr<std::byte[]>(new std::byte[Capacity]), Capacity, 0});
   }
 
   static std::size_t alignmentPadding(std::uintptr_t Base,

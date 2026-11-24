@@ -254,10 +254,10 @@ public:
   /// Returns whether the solver width matches our internal representation.
   bool validateSortWidth() const;
 
-#ifndef NDEBUG
+  // Present in every build: the inline makeSortRef/makeExprRef in
+  // camadaimpl.h use it, and a client's NDEBUG may differ from the library's.
   bool isWidthValidated() const { return WidthValidated; }
   void markWidthValidated() { WidthValidated = true; }
-#endif
 
   virtual void dump() const;
   virtual void dump(std::string &Out) const;
@@ -274,9 +274,7 @@ protected:
   SMTSortKind Kind;
   SortData Data;
   mutable unsigned SolverWidth = 0;
-#ifndef NDEBUG
   bool WidthValidated = false;
-#endif
 };
 
 inline bool operator==(SMTSortRef const &LHS, SMTSortRef const &RHS) {
