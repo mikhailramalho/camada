@@ -832,14 +832,18 @@ BitwuzlaSolver::getArrayValuesImpl(const SMTExprRef &Array) {
                                 wrap(Children[2], ElemSort));
     Val = Children[0];
   }
-  if (bitwuzla_term_get_kind(Val) == BITWUZLA_KIND_CONST_ARRAY) {
-    size_t Size = 0;
-    BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
-    if (Size != 1)
-      return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Bitwuzla,
-                      "Malformed constant array in model"};
-    Result.Base = wrap(Children[0], ElemSort);
-  }
+  // Bitwuzla builds every array value as stores over a constant array. Any
+  // other base means get_value returned the term itself, which it does for a
+  // term over a quantifier it never registered (built but not asserted).
+  if (bitwuzla_term_get_kind(Val) != BITWUZLA_KIND_CONST_ARRAY)
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Bitwuzla,
+                    "Bitwuzla has no model value for this term"};
+  size_t Size = 0;
+  BitwuzlaTerm *Children = bitwuzla_term_get_children(Val, &Size);
+  if (Size != 1)
+    return SMTError{SMTErrorCode::BackendError, SMTBackendKind::Bitwuzla,
+                    "Malformed constant array in model"};
+  Result.Base = wrap(Children[0], ElemSort);
   return Result;
 }
 
