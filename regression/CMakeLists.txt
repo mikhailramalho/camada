@@ -39,7 +39,10 @@ endif()
 # add each solver specific implementation, if it is enabled
 compile_test("Bitwuzla;CVC5;MathSAT;STP;Yices;Z3")
 
-set(REGRESSION_SOURCES main.cpp "${solver_test_files}")
+set(REGRESSION_SOURCES main.cpp ndebug.test.cpp "${solver_test_files}")
+# Checks that the installed headers do not change layout with NDEBUG.
+set_source_files_properties(ndebug.test.cpp PROPERTIES COMPILE_DEFINITIONS
+                                                       NDEBUG)
 if(CAMADA_SOLVER_SMTLIB_ENABLE)
   list(APPEND REGRESSION_SOURCES smtlib.test.cpp)
 endif()
