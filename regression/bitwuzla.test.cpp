@@ -48,6 +48,32 @@ TEST_CASE("FP remainder randomized host oracle Bitwuzla", "[Bitwuzla]") {
   }
 }
 
+// get_value on a term over a quantifier Bitwuzla never registered returns the
+// term itself. getArrayValues used to read that as an empty model with no
+// base, which says every index is unconstrained.
+TEST_CASE("Bitwuzla array model over an unasserted quantifier", "[Bitwuzla]") {
+  auto solver = camada::createBitwuzlaSolver();
+  auto bv8 = solver->mkBVSort(8);
+  auto arr = solver->mkArraySort(bv8, bv8);
+  auto x = solver->mkSymbol("x", bv8);
+  auto y = solver->mkSymbol("y", bv8);
+  auto a = solver->mkSymbol("a", arr);
+  auto c = solver->mkSymbol("c", arr);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(0, bv8)));
+  solver->addConstraint(solver->mkNot(solver->mkEqual(a, c)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  auto q = solver->mkForall({y}, solver->mkBVUle(x, y));
+  auto av = solver->getArrayValues(solver->mkIte(q, a, c));
+  REQUIRE(!av);
+  REQUIRE(av.error().Code == camada::SMTErrorCode::InvalidModelValue);
+
+  // An ordinary array still reads normally.
+  auto ok = solver->getArrayValues(a);
+  REQUIRE(ok);
+  REQUIRE(ok.value().Base);
+}
+
 TEST_CASE("Override Bitwuzla Solver", "[Bitwuzla]") {
 
   class myBitwuzlaSolver : public camada::BitwuzlaSolver {
