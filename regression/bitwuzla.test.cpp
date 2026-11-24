@@ -144,3 +144,32 @@ TEST_CASE("Unsat-assumption opt-in Bitwuzla test", "[Bitwuzla]") {
   REQUIRE(core);
   REQUIRE(!core.value().empty());
 }
+
+// Bitwuzla's model is partial: get_value on a term over a quantifier it never
+// registered returns the term itself, and the value getters aborted on it.
+TEST_CASE("Bitwuzla model values over an unasserted quantifier", "[Bitwuzla]") {
+  auto solver = camada::createBitwuzlaSolver();
+  auto bv8 = solver->mkBVSort(8);
+  auto x = solver->mkSymbol("x", bv8);
+  auto y = solver->mkSymbol("y", bv8);
+  solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(0, bv8)));
+  REQUIRE(solver->check() == camada::CheckResult::SAT);
+
+  auto q = solver->mkForall({y}, solver->mkBVUle(x, y));
+  auto b = solver->getBool(q);
+  REQUIRE(!b);
+  REQUIRE(b.error().Code == camada::SMTErrorCode::InvalidModelValue);
+
+  auto bv = solver->getBVInBin(solver->mkIte(q, x, y));
+  REQUIRE(!bv);
+  REQUIRE(bv.error().Code == camada::SMTErrorCode::InvalidModelValue);
+
+  auto fp = solver->getFPInBin(
+      solver->mkIte(q, solver->mkFP32(1.0f, camada::FPEncoding::Native),
+                    solver->mkFP32(2.0f, camada::FPEncoding::Native)));
+  REQUIRE(!fp);
+  REQUIRE(fp.error().Code == camada::SMTErrorCode::InvalidModelValue);
+
+  // An ordinary term still reads normally.
+  REQUIRE(solver->getBVUnsigned(x).value() == 0);
+}
