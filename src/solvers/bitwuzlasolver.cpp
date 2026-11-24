@@ -27,7 +27,6 @@
 #include "../camadaerrors.h"
 
 #include <cstdlib>
-#include <cstring>
 #include <limits>
 #include <utility>
 #include <vector>
@@ -769,31 +768,38 @@ SMTExprRef BitwuzlaSolver::mkApplyImpl(const SMTExprRef &Function,
                        ApplyArgs.data()));
 }
 
+// Bitwuzla's model is partial: for a term over a quantifier it never
+// registered (built but not asserted), get_value returns the term itself.
+// The value getters abort on that, so report it as an error instead.
+static SMTResult<BitwuzlaTerm> modelValue(Bitwuzla *Context,
+                                          const SMTExprRef &Exp) {
+  BitwuzlaTerm Value =
+      bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr);
+  if (!bitwuzla_term_is_value(Value))
+    return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Bitwuzla,
+                    "Bitwuzla has no model value for this term"};
+  return Value;
+}
+
 SMTResult<bool> BitwuzlaSolver::getBoolImpl(const SMTExprRef &Exp) {
-  const char *result = bitwuzla_term_to_string(
-      bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr));
-
-  bitwuzlaCheck(result != nullptr,
-                "Bitwuzla returned null boolean value string");
-  if (!strcmp(result, "true"))
-    return true;
-  if (!strcmp(result, "false"))
-    return false;
-
-  return SMTError{SMTErrorCode::InvalidModelValue, SMTBackendKind::Bitwuzla,
-                  "Bool model value is neither true nor false"};
+  SMTResult<BitwuzlaTerm> Value = modelValue(Context, Exp);
+  if (!Value)
+    return Value.error();
+  return bitwuzla_term_value_get_bool(Value.value());
 }
 
 SMTResult<std::string> BitwuzlaSolver::getBVInBinImpl(const SMTExprRef &Exp) {
-  const char *result = bitwuzla_term_value_get_str(
-      bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr));
-  return result ? std::string(result) : std::string();
+  SMTResult<BitwuzlaTerm> Value = modelValue(Context, Exp);
+  if (!Value)
+    return Value.error();
+  return std::string(bitwuzla_term_value_get_str(Value.value()));
 }
 
 SMTResult<std::string> BitwuzlaSolver::getFPInBinImpl(const SMTExprRef &Exp) {
-  const char *result = bitwuzla_term_value_get_str_fmt(
-      bitwuzla_get_value(Context, toSolverExpr<BitwExpr>(*Exp).Expr), 2);
-  return result ? std::string(result) : std::string();
+  SMTResult<BitwuzlaTerm> Value = modelValue(Context, Exp);
+  if (!Value)
+    return Value.error();
+  return std::string(bitwuzla_term_value_get_str_fmt(Value.value(), 2));
 }
 
 SMTResult<SMTExprRef>
