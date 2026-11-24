@@ -26,6 +26,7 @@
 #include "../camadacache.h"
 #include "../camadaerrors.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <utility>
@@ -1100,8 +1101,11 @@ std::string BitwuzlaSolver::getSolverNameAndVersion() const {
 }
 
 void BitwuzlaSolver::dumpImpl(std::string &Out) {
-  // Portable: use tmpfile() (C standard) as the FILE* sink for the C API,
-  // then read it back. Avoids POSIX-only open_memstream, which MSVC lacks.
+  // Bitwuzla's C API prints only to a FILE*. POSIX open_memstream keeps the
+  // dump in memory: glibc's tmpfile() always creates its file in /tmp,
+  // ignoring TMPDIR, so it fails wherever /tmp is read-only. MSVC has no
+  // open_memstream, so Windows reads the dump back from a tmpfile().
+#ifdef _WIN32
   FILE *Stream = std::tmpfile();
   bitwuzlaCheck(Stream != nullptr,
                 "Failed to open temp file for Bitwuzla dump");
@@ -1114,6 +1118,17 @@ void BitwuzlaSolver::dumpImpl(std::string &Out) {
   while ((N = std::fread(Buf, 1, sizeof(Buf), Stream)) > 0)
     Out.append(Buf, N);
   std::fclose(Stream);
+#else
+  char *Buf = nullptr;
+  size_t Len = 0;
+  FILE *Stream = open_memstream(&Buf, &Len);
+  bitwuzlaCheck(Stream != nullptr,
+                "Failed to open memory stream for Bitwuzla dump");
+  bitwuzla_print_formula(Context, "smt2", Stream, 2);
+  std::fclose(Stream); // sets Buf and Len
+  Out.assign(Buf, Len);
+  std::free(Buf);
+#endif
 }
 
 void BitwuzlaSolver::dumpModelImpl(std::string &Out) {
