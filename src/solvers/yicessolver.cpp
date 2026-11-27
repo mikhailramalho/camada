@@ -225,6 +225,10 @@ void YicesSolver::recreateContextWithConfig(const char *Logic,
   ContextLogic = Logic;
   ContextConfigure = Configure;
   destroyContext();
+  newContext();
+}
+
+void YicesSolver::newContext() {
   yices_clear_error();
 
   ctx_config_t *config = yices_new_config();
@@ -232,11 +236,10 @@ void YicesSolver::recreateContextWithConfig(const char *Logic,
   // not supported") silently left Yices' all-theories default, which then
   // disagreed with the arithmetic this solver reports from the logic's name.
   yicesCheckError(
-      yices_default_config_for_logic(config, Logic),
-      ("Yices does not accept the logic \"" + std::string(Logic) + "\"")
-          .c_str());
-  if (Configure)
-    Configure(config);
+      yices_default_config_for_logic(config, ContextLogic.c_str()),
+      ("Yices does not accept the logic \"" + ContextLogic + "\"").c_str());
+  if (ContextConfigure)
+    ContextConfigure(config);
   // The context mode is owned by Camada, deliberately after the Configure
   // callback: push()/pop() need at least push-pop mode, and "interactive"
   // additionally restores the context automatically when a search is
@@ -1080,6 +1083,18 @@ void YicesSolver::resetImpl() {
   // custom-configured solver (e.g. a mixed Int/BV logic) must not revert
   // to the default on reset().
   recreateContextWithConfig(ContextLogic.c_str(), ContextConfigure);
+}
+
+// Terms and their names are global in Yices, so they outlive the context; a
+// new context with the same logic and configuration is all renew() needs.
+// Expressions made before keep the old context in their Context field, which
+// nothing reads.
+void YicesSolver::renewImpl() {
+  Assertions.clear();
+  AssertionScopeSizes.clear();
+  UnsatPushes = 0;
+  yices_free_context(Context);
+  newContext();
 }
 
 void YicesSolver::pushImpl(unsigned nscopes) {

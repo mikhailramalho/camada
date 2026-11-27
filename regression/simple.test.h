@@ -1396,3 +1396,106 @@ inline void shared_subterm_model_value(const camada::SMTSolverRef &solver) {
   REQUIRE(val);
   REQUIRE(val.value() == 36);
 }
+
+// renew() keeps every term, starts the new instance empty at scope 0, and
+// asserts camada's own facts again. Make builds a solver from a SolverConfig.
+template <typename Factory> void renew_semantics(Factory Make) {
+  {
+    auto solver = Make({});
+    auto bv8 = solver->mkBVSort(8);
+    auto x = solver->mkSymbol("x", bv8);
+    auto y = solver->mkSymbol("y", bv8);
+    auto xIs5 = solver->mkEqual(x, solver->mkBVFromDec(5, bv8));
+    solver->addConstraint(xIs5);
+    solver->push();
+    solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(6, bv8)));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+
+    // From inside a scope: the new instance is at scope 0 with nothing
+    // asserted, and the model is gone.
+    solver->renew();
+    REQUIRE_FALSE(solver->getBVUnsigned(x));
+    solver->push();
+    solver->addConstraint(solver->mkEqual(x, solver->mkBVFromDec(7, bv8)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT); // x == 5 is gone
+    solver->pop();
+
+    // Every handle made before renew() still works, and builds new terms.
+    solver->addConstraint(xIs5);
+    solver->addConstraint(
+        solver->mkEqual(y, solver->mkBVAdd(x, solver->mkBVFromDec(1, bv8))));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+    REQUIRE(solver->getBVUnsigned(x).value() == 5);
+    REQUIRE(solver->getBVUnsigned(y).value() == 6);
+    solver->push();
+    solver->addConstraint(solver->mkEqual(y, x));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+    solver->pop();
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
+
+  // Ackermann reads are tied by congruence axioms only camada asserts, so
+  // renew() has to assert them on the new instance, including those made
+  // inside a scope that was open at the time.
+  {
+    camada::SolverConfig Cfg;
+    Cfg.Arrays = camada::ArrayEncoding::Ackermann;
+    auto solver = Make(Cfg);
+    auto bv8 = solver->mkBVSort(8);
+    auto a = solver->mkSymbol("a", solver->mkArraySort(bv8, bv8));
+    auto i = solver->mkSymbol("i", bv8);
+    auto j = solver->mkSymbol("j", bv8);
+    auto ri = solver->mkArraySelect(a, i);
+    solver->push();
+    auto rj = solver->mkArraySelect(a, j);
+
+    solver->renew();
+    solver->addConstraint(solver->mkEqual(i, j));
+    solver->addConstraint(solver->mkNot(solver->mkEqual(ri, rj)));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
+
+  // fp-to-bits shadows need native FP.
+  if (!Make({})->supports(camada::SolverFeature::NativeFloatingPoint))
+    return;
+
+  // Asserting x == to_fp(bits) at scope 0 makes mkIEEEFPToBV(x) return bits.
+  // That rewrite relies on the equality, so renew() asserts it again even
+  // though the caller does not.
+  {
+    auto solver = Make({});
+    auto fp32 = solver->mkFP32Sort(camada::FPEncoding::Native);
+    auto x = solver->mkSymbol("x", fp32);
+    auto bits = solver->mkSymbol("bits", solver->mkBVSort(32));
+    solver->addConstraint(solver->mkEqual(x, solver->mkBVToIEEEFP(bits, fp32)));
+    auto xBits = solver->mkIEEEFPToBV(x);
+
+    solver->renew();
+    solver->addConstraint(
+        solver->mkFPEqual(x, solver->mkFP32(1.0f, camada::FPEncoding::Native)));
+    // The bits of 2.0f.
+    solver->addConstraint(
+        solver->mkEqual(xBits, solver->mkBVFromDec(0x40000000, 32)));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
+
+  // Only the equality that made the shadow is kept: a second equality for
+  // the same term is the caller's alone and does not survive renew().
+  {
+    auto solver = Make({});
+    auto fp32 = solver->mkFP32Sort(camada::FPEncoding::Native);
+    auto bv32 = solver->mkBVSort(32);
+    auto x = solver->mkSymbol("x", fp32);
+    auto b1 = solver->mkSymbol("b1", bv32);
+    auto b2 = solver->mkSymbol("b2", bv32);
+    solver->addConstraint(solver->mkEqual(x, solver->mkBVToIEEEFP(b1, fp32)));
+    solver->addConstraint(solver->mkEqual(x, solver->mkBVToIEEEFP(b2, fp32)));
+
+    solver->renew();
+    solver->addConstraint(
+        solver->mkEqual(b1, solver->mkBVFromDec(0x3f800000, 32)));
+    solver->addConstraint(
+        solver->mkEqual(b2, solver->mkBVFromDec(0x40000000, 32)));
+    REQUIRE(solver->check() == camada::CheckResult::SAT);
+  }
+}

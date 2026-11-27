@@ -394,6 +394,8 @@ protected:
   bool unsatAssumptionSupport() const override { return true; }
 
   void resetImpl() override;
+  bool renewSupport() const override { return true; }
+  void renewImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
 

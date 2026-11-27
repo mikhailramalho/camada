@@ -1169,6 +1169,11 @@ SMTResult<std::vector<SMTExprRef>> Z3Solver::getUnsatAssumptionsImpl() {
 
 void Z3Solver::resetImpl() { Solver.reset(); }
 
+// Z3_solver_reset drops the solver's internal state and keeps its parameters
+// and the factory it was made from, so the next check starts a new internal
+// solver over the same context, and therefore the same terms.
+void Z3Solver::renewImpl() { Solver.reset(); }
+
 void Z3Solver::pushImpl(unsigned nscopes) {
   for (unsigned i = 0; i < nscopes; ++i)
     Solver.push();

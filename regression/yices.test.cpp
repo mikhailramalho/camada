@@ -171,7 +171,7 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
-  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
+  REQUIRE(solver->supports(SolverFeature::Renew));
 }
 
 // A Yices context holds only the theories its logic names, so Int/Real support
@@ -269,4 +269,23 @@ TEST_CASE("Yices solvers run in parallel threads", "[YICES]") {
   for (auto &Th : Pool)
     Th.join();
   REQUIRE(Mismatches.load() == 0);
+}
+
+// renew() makes the new context with the logic and configuration of the old
+// one, and keeps the symbol names, which outlive contexts in Yices.
+TEST_CASE("Yices renew keeps the logic and the names", "[YICES]") {
+  camada::SolverConfig Cfg;
+  Cfg.Logic = "QF_UFLIA";
+  auto yices = camada::createYicesSolver(Cfg);
+  auto x = yices->mkSymbol("renew_x", yices->mkIntSort());
+  yices->addConstraint(yices->mkArithGt(x, yices->mkInt(3)));
+  REQUIRE(yices->check() == camada::CheckResult::SAT);
+
+  yices->renew();
+  // The default QF_AUFBV context would reject arithmetic here.
+  yices->addConstraint(yices->mkEqual(x, yices->mkInt(2)));
+  REQUIRE(yices->check() == camada::CheckResult::SAT);
+  std::string Model;
+  yices->dumpModel(Model);
+  REQUIRE(Model.find("renew_x") != std::string::npos);
 }

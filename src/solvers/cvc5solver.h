@@ -24,6 +24,7 @@
 
 #include <cstdint>
 #include <cvc5/cvc5.h>
+#include <optional>
 #include <string>
 
 #include "../camadaexpr.h"
@@ -72,8 +73,8 @@ public:
 protected:
   cvc5::TermManager &termManager() { return Terms; }
   const cvc5::TermManager &termManager() const { return Terms; }
-  cvc5::Solver &context() { return Context; }
-  const cvc5::Solver &context() const { return Context; }
+  cvc5::Solver &context() { return *Context; }
+  const cvc5::Solver &context() const { return *Context; }
 
   void addConstraintImpl(const SMTExprRef &Exp) override;
 
@@ -378,6 +379,8 @@ protected:
   SMTResult<std::vector<SMTExprRef>> getUnsatAssumptionsImpl() override;
 
   void resetImpl() override;
+  bool renewSupport() const override { return true; }
+  void renewImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
 
@@ -390,7 +393,9 @@ protected:
 
 private:
   cvc5::TermManager Terms;
-  cvc5::Solver Context;
+  // Optional so renew() can build a new solver at the same address, which
+  // the sorts and expressions made so far point to.
+  std::optional<cvc5::Solver> Context;
 
 }; // end class CVC5Solver
 

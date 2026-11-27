@@ -80,6 +80,8 @@ protected:
   void recreateContextWithConfig(const char *Logic,
                                  void (*Configure)(ctx_config_t *));
   void destroyContext();
+  /// Creates the context from ContextLogic and ContextConfigure.
+  void newContext();
 
   /// The logic and extra configuration the current context was created
   /// with, remembered so reset() recreates an equivalent context instead
@@ -296,6 +298,8 @@ protected:
   bool timeoutSupport() const override;
 
   void resetImpl() override;
+  bool renewSupport() const override { return true; }
+  void renewImpl() override;
   void pushImpl(unsigned nscopes) override;
   void popImpl(unsigned nscopes) override;
 

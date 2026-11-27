@@ -155,5 +155,11 @@ const char *excluded(const Exclusion (&Table)[N], const char *Backend,
     auto a = Factory({});                                                      \
     auto b = Factory({});                                                      \
     foreign_handle_rejected(a, b);                                             \
+  })                                                                           \
+  CAMADA_MATRIX_CASE(Backend, "renew", {                                       \
+    auto solver = Factory({});                                                 \
+    CAMADA_REJECTED_WITHOUT(Renew,                                             \
+      require_abort([&]() { solver->renew(); });)                              \
+    renew_semantics(Factory);                                                  \
   })
 // clang-format on

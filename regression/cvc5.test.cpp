@@ -36,7 +36,7 @@ TEST_CASE("CVC5 feature capabilities", "[CVC5]") {
   REQUIRE_FALSE(solver->produceUnsatAssumptions());
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
-  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
+  REQUIRE(solver->supports(SolverFeature::Renew));
 
   auto withCores = camada::createCVC5Solver(withUnsatAssumptions());
   REQUIRE(withCores->supports(SolverFeature::UnsatAssumptions));
@@ -106,4 +106,31 @@ TEST_CASE("CVC5 options set by a subclass survive reset", "[CVC5]") {
   auto x = solver.mkSymbol("x", solver.mkBVSort(8));
   solver.addConstraint(solver.mkEqual(x, solver.mkBVFromDec(5, 8)));
   REQUIRE(solver.check() == camada::CheckResult::SAT);
+}
+
+// renew() builds a new cvc5::Solver, which starts with default options, so
+// it copies each option set on the old one and the logic.
+TEST_CASE("CVC5 options and logic survive renew", "[CVC5]") {
+  class optionSolver : public camada::CVC5Solver {
+  public:
+    optionSolver() {
+      context().setOption("random-seed", "7");
+      context().setLogic("QF_ABV");
+    }
+    cvc5::Solver &cvc5() { return context(); }
+  };
+
+  optionSolver solver;
+  solver.setTimeout(5000);
+  auto x = solver.mkSymbol("x", solver.mkBVSort(8));
+  solver.addConstraint(solver.mkEqual(x, solver.mkBVFromDec(5, 8)));
+  REQUIRE(solver.check() == camada::CheckResult::SAT);
+
+  solver.renew();
+  REQUIRE(solver.cvc5().getOption("random-seed") == "7");
+  REQUIRE(solver.cvc5().getOption("tlimit-per") == "5000");
+  REQUIRE(solver.cvc5().getLogic() == "QF_ABV");
+  solver.addConstraint(solver.mkEqual(x, solver.mkBVFromDec(6, 8)));
+  REQUIRE(solver.check() == camada::CheckResult::SAT);
+  REQUIRE(solver.getBVUnsigned(x).value() == 6); // produce-models carried over
 }
