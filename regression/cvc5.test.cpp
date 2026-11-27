@@ -36,6 +36,7 @@ TEST_CASE("CVC5 feature capabilities", "[CVC5]") {
   REQUIRE_FALSE(solver->produceUnsatAssumptions());
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
 
   auto withCores = camada::createCVC5Solver(withUnsatAssumptions());
   REQUIRE(withCores->supports(SolverFeature::UnsatAssumptions));

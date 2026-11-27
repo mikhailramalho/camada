@@ -581,6 +581,7 @@ void SMTSolverImpl::clearExprCaches() {
   AckBVConstBits.clear();
   IEEEBVShadow.clear();
   PendingShadowLinks.clear();
+  ShadowLinkFacts.clear();
   IEEEBVFnCache.clear();
   IEEEBVAppCache.clear();
   invalidateUnsatAssumptions();
@@ -899,7 +900,8 @@ void SMTSolverImpl::commitShadowLink(const SMTExprRef &Constraint) {
   // cleared in clearExprCaches(), which runs before ExprArena.clear().
   PendingShadowLinks.erase(It);
   // Keep the first entry on collision.
-  IEEEBVShadow.emplace(Link.Target, Link.Bits);
+  if (IEEEBVShadow.emplace(Link.Target, Link.Bits).second)
+    ShadowLinkFacts.push_back(Constraint);
 }
 
 CAMADA_BV_BINARY(mkBVAdd)
@@ -2644,6 +2646,8 @@ bool SMTSolverImpl::supports(SolverFeature Feature) const {
     return timeoutSupport();
   case SolverFeature::ArrayModels:
     return arrayModelSupport();
+  case SolverFeature::Renew:
+    return renewSupport();
   }
   fatalError("Unhandled SolverFeature in supports()");
 }
@@ -2669,6 +2673,31 @@ void SMTSolverImpl::reset() {
   // and survives the reset.
   if (TimeoutMs)
     setTimeoutImpl(TimeoutMs);
+}
+
+void SMTSolverImpl::renew() {
+  if (!renewSupport())
+    unsupportedFeature("renew");
+  invalidateUnsatAssumptions();
+  renewImpl();
+  if (TimeoutMs)
+    setTimeoutImpl(TimeoutMs);
+  // The new instance is at scope 0, so every journaled fact, from any open
+  // scope, now belongs to the root. They are definitional, so that is sound.
+  std::vector<SMTExprRef> Facts;
+  for (auto &Level : LazyConstraintLevels)
+    Facts.insert(Facts.end(), std::make_move_iterator(Level.begin()),
+                 std::make_move_iterator(Level.end()));
+  LazyConstraintLevels.assign(1, std::move(Facts));
+  // Links the loop below commits are asserted by it, so only the earlier
+  // ones need asserting after it.
+  const size_t Links = ShadowLinkFacts.size();
+  // addConstraint, as pop() uses, so a fact that now reaches scope 0 can
+  // commit its pending shadow the same way.
+  for (const SMTExprRef &Fact : LazyConstraintLevels.front())
+    addConstraint(Fact);
+  for (size_t I = 0; I < Links; ++I)
+    addConstraint(ShadowLinkFacts[I]);
 }
 
 void SMTSolverImpl::push(unsigned nscopes) {

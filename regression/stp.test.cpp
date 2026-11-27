@@ -46,6 +46,7 @@ TEST_CASE("STP feature capabilities", "[STP]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
 }
 
 TEST_CASE("Unsupported nested arrays STP test", "[STP]") {

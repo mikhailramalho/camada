@@ -1202,6 +1202,17 @@ public:
   /// Reset the solver and remove all constraints.
   virtual void reset() = 0;
 
+  /// Replace the backend's solver instance with a fresh one, keeping every
+  /// term and sort built so far valid. The new instance starts at scope 0
+  /// with none of the caller's constraints: the scope depth, the model and
+  /// the unsat assumptions are reset, and the caller asserts again whatever
+  /// it still needs. Camada asserts its own facts again (lazy and Ackermann
+  /// array axioms, fp-to-bits ties, rounding-mode bounds), and every scope-0
+  /// equality mkIEEEFPToBV has used to rewrite a term, since those rewrites
+  /// stay in effect. The options and the timeout carry over. Backends reporting
+  /// supports(SolverFeature::Renew) == false abort.
+  virtual void renew() = 0;
+
   /// Create a new assertion scope.
   virtual void push(unsigned nscopes = 1) = 0;
 
