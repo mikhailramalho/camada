@@ -2965,15 +2965,17 @@ SMTExprRef SMTSolverImpl::mkInt2BVImpl(const SMTExprRef &Exp, unsigned Width) {
   // bit-vector value tied to an integer can only be introduced through a
   // fresh symbol constrained via the inverse direction (the mkIEEEFPToBV
   // precedent). Euclidean mod puts the wrap in [0, 2^Width) for negative
-  // integers too. The constraint is asserted at the current push level
-  // and unwound by (pop) — unlike mkIEEEFPToBV's tie, which is journalled
-  // into LazyConstraintLevels and re-asserted afterwards.
+  // integers too. The tie is definitional and Fresh outlives any pop, so it
+  // is journaled in LazyConstraintLevels, which pop() re-asserts at the
+  // outer level, like mkIEEEFPToBV's tie.
   SMTExprRef Fresh = mkSymbolUnchecked(
       "__CAMADA_int2bv_" + std::to_string(NextInt2BVId++), mkBVSort(Width));
   SMTExprRef Wrapped = mkArithMod(Exp, mkInt(power2Dec(Width)));
+  SMTExprRef Tie = mkEqual(mkBV2IntImpl(Fresh, /*IsSigned=*/false), Wrapped);
   // Not model-preserving: Fresh is minted just above, so the current model
   // has no value for it and the backend discards the model here.
-  addConstraint(mkEqual(mkBV2IntImpl(Fresh, /*IsSigned=*/false), Wrapped));
+  addConstraint(Tie);
+  LazyConstraintLevels.back().push_back(std::move(Tie));
   return rewrapAs(Fresh, SMTExprKind::Int2BV);
 }
 
