@@ -68,9 +68,21 @@ outside binary32/binary64.
 
 `renew()` replaces the backend's solver instance with a fresh one and keeps
 every term and sort, so a caller gets an instance that preprocesses its
-formula from scratch without building its terms again. Only Bitwuzla supports
-it (`supports(SolverFeature::Renew)`): the new instance shares the old one's
-term manager and options. It starts at scope 0 with none of the caller's
+formula from scratch without building its terms again. Bitwuzla, CVC5, Yices
+and Z3 support it (`supports(SolverFeature::Renew)`):
+
+- Bitwuzla and CVC5 make a new instance over the same term manager. CVC5
+  copies the logic and every option set on the old one that `getOption` can
+  read back; write-only ones such as `output` and `verbose` are lost.
+- Yices makes a new context with the logic and configuration given to
+  `recreateContextWithConfig`, as `reset()` does; a context installed with
+  `setContext()` is not kept. Terms and their names are global.
+- Z3 resets its solver, as `reset()` does: the parameters and the solver
+  factory stay, so tactic and logic solvers survive, but one wrapped with a
+  simplifier or translated from another context has no factory and comes
+  back as a plain SMT solver.
+
+The new instance starts at scope 0 with none of the caller's
 constraints. Camada asserts its own facts again, and the scope-0 equalities
 that `mkIEEEFPToBV` relied on to rewrite terms it already returned.
 
