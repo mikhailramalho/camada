@@ -1243,6 +1243,19 @@ inline void int_bv_conversion_semantics(const camada::SMTSolverRef &solver) {
     solver->addConstraint(solver->mkNot(solver->mkEqual(NotX, MinusXMinusOne)));
     REQUIRE(solver->check() == camada::CheckResult::UNSAT);
   }
+
+  // A conversion built inside a scope is still tied to its integer after the
+  // pop: its handle stays valid, so its tie has to stay too (issue #365).
+  solver->reset();
+  {
+    auto x = solver->mkSymbol("i2b_x", solver->mkIntSort());
+    solver->push();
+    auto bv = solver->mkInt2BV(x, 8);
+    solver->pop();
+    solver->addConstraint(solver->mkEqual(x, solver->mkInt(5)));
+    solver->addConstraint(solver->mkEqual(bv, solver->mkBVFromDec(7, 8)));
+    REQUIRE(solver->check() == camada::CheckResult::UNSAT);
+  }
 }
 
 inline void arith_conversion_semantics(const camada::SMTSolverRef &solver) {
