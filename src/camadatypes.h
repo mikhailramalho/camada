@@ -263,6 +263,8 @@ enum class SolverFeature : std::uint8_t {
   /// arrays (see issue #79). Lazily lowered constant arrays are answered
   /// by the common layer on every backend regardless.
   ArrayModels,
+  /// renew(): a fresh backend instance over the terms already built.
+  Renew,
 };
 
 /// Coarse-grained error categories for operations that return `SMTResult<T>`.

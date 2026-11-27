@@ -136,6 +136,10 @@ void BitwuzlaSolver::initializeContext() {
     bitwuzla_set_option(Options, BITWUZLA_OPT_PRODUCE_UNSAT_ASSUMPTIONS, 1);
   configureOptions(Options);
   bitwuzla_set_abort_callback(bitwuzlaErrorHandler);
+  newInstance();
+}
+
+void BitwuzlaSolver::newInstance() {
   Context = bitwuzla_new(TermManager, Options);
   bitwuzla_set_termination_callback(Context, bitwuzlaTerminationCallback,
                                     &CheckDeadline);
@@ -153,6 +157,14 @@ void BitwuzlaSolver::destroyContext() {
     bitwuzla_term_manager_delete(TermManager);
     TermManager = nullptr;
   }
+}
+
+// Terms and sorts belong to the term manager, so a new instance over the same
+// manager and options keeps every handle valid. Expressions made before keep
+// the old instance in their Context field, which nothing reads.
+void BitwuzlaSolver::renewImpl() {
+  bitwuzla_delete(Context);
+  newInstance();
 }
 
 void BitwuzlaSolver::addConstraintImpl(const SMTExprRef &Exp) {

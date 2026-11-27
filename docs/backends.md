@@ -64,6 +64,16 @@ outside binary32/binary64.
 - On STP, `getArrayValues` still answers for lazily lowered constant arrays,
   which the common layer handles.
 
+## Renewing the solver instance
+
+`renew()` replaces the backend's solver instance with a fresh one and keeps
+every term and sort, so a caller gets an instance that preprocesses its
+formula from scratch without building its terms again. Only Bitwuzla supports
+it (`supports(SolverFeature::Renew)`): the new instance shares the old one's
+term manager and options. It starts at scope 0 with none of the caller's
+constraints. Camada asserts its own facts again, and the scope-0 equalities
+that `mkIEEEFPToBV` relied on to rewrite terms it already returned.
+
 ## Arrays
 
 - `Array<Idx, Bool>` is lowered through `Array<Idx, BV1>` on MathSAT and STP.

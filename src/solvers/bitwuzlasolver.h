@@ -76,8 +76,11 @@ protected:
 
   void initializeContext();
   void destroyContext();
+  /// Creates the Bitwuzla instance over TermManager and Options.
+  void newInstance();
 
-  /// Called by initializeContext() on every new context, after the options
+  /// Called by initializeContext() on every new context (renew() keeps the
+  /// options it set and does not call it again), after the options
   /// Camada needs are set and before the Bitwuzla instance exists, which is
   /// the only point it accepts options. Override it to set more through
   /// bitwuzla_set_option. A subclass is not constructed yet while the base
@@ -250,6 +253,8 @@ protected:
                               const SMTExprRef &InitValue) override;
 
   bool nativeConstArraySupport() const override { return true; }
+  bool renewSupport() const override { return true; }
+  void renewImpl() override;
   SMTExprRef mkBVToIEEEFPImpl(const SMTExprRef &Exp,
                               const SMTSortRef &To) override;
   SMTExprRef mkIEEEFPToBVImpl(const SMTExprRef &Exp) override;

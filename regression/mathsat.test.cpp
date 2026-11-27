@@ -122,4 +122,5 @@ TEST_CASE("MathSAT feature capabilities", "[MathSAT]") {
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
 }

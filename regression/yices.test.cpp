@@ -171,6 +171,7 @@ TEST_CASE("Yices feature capabilities", "[Yices]") {
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
 }
 
 // A Yices context holds only the theories its logic names, so Int/Real support

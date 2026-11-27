@@ -389,6 +389,7 @@ TEST_CASE("SMTLIB feature capabilities", "[SMTLIB]") {
   REQUIRE_FALSE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE_FALSE(solver->supports(SolverFeature::Timeouts));
   REQUIRE_FALSE(solver->supports(SolverFeature::ArrayModels));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
 
   // Camada tuple lowering does not touch the native-tuples bit: that
   // reports the backend capability, and tupleMode() reports the request.

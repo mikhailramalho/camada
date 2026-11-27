@@ -480,6 +480,9 @@ protected:
     SMTExprRef Bits;
   };
   std::unordered_map<const SMTExpr *, PendingShadowLink> PendingShadowLinks;
+  // The asserted equalities behind committed shadows. renew() asserts them
+  // on the new instance, since the terms already rewritten rely on them.
+  std::vector<SMTExprRef> ShadowLinkFacts;
   void commitShadowLink(const SMTExprRef &Constraint);
 
   // --- IEEE bits function for backends without a native fp->bv ---
@@ -1023,6 +1026,8 @@ public:
 
   bool supports(SolverFeature Feature) const override final;
 
+  void renew() override final;
+
   // --- Creation-time options ---
   //
   // The config is stored once and read through these, so no backend keeps
@@ -1149,6 +1154,10 @@ protected:
 
   /// Whole-array model values (getArrayValues).
   virtual bool arrayModelSupport() const { return true; }
+  virtual bool renewSupport() const { return false; }
+  /// Replaces the backend's solver instance, keeping terms and sorts. Only
+  /// called when renewSupport() is true.
+  virtual void renewImpl() { unsupportedFeature("renew"); }
 
   /// A solve-time limit that the backend actually enforces.
   virtual bool timeoutSupport() const { return true; }

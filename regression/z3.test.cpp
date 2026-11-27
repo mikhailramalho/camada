@@ -87,6 +87,7 @@ TEST_CASE("Z3 feature capabilities", "[Z3]") {
   REQUIRE(solver->supports(SolverFeature::UnsatAssumptions));
   REQUIRE(solver->supports(SolverFeature::Timeouts));
   REQUIRE(solver->supports(SolverFeature::ArrayModels));
+  REQUIRE_FALSE(solver->supports(SolverFeature::Renew));
 }
 
 namespace {
